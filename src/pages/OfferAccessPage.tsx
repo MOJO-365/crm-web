@@ -46,6 +46,7 @@ function extractBase64(dataUrl?: string | null): string | null {
 export const OfferAccessPage = () => {
     const [searchParams] = useSearchParams();
     const offerValues = searchParams.get('offer');
+    const versionParam = searchParams.get('v');
 
     // offerValues seems to be "CUSTOMER_ID" based on user snippet /?offer=GEE108
     const customerId = offerValues;
@@ -110,15 +111,25 @@ export const OfferAccessPage = () => {
                     const sentAt = new Date(customer.offerEmailSentAt);
                     const now = new Date();
                     const diffTime = Math.abs(now.getTime() - sentAt.getTime());
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    // 1000 * 60 * 60 = 1 hour. diffTime / hour = hours difference.
+                    const diffHours = diffTime / (1000 * 60 * 60);
 
-                    // Expiry days (default to 3 = 72 hours)
-                    const expiryDays = 3;
+                    // Expiry (72 hours)
+                    const expiryHours = 72;
 
-                    if (diffDays > expiryDays) {
+                    if (diffHours > expiryHours) {
                         setOfferExpired(true);
                         return; // Stop processing further
                     }
+                }
+
+                // Check for Offer Version (Reminder Expiry)
+                const dbVersion = customer.offerVersion || 1;
+                const urlVersion = versionParam ? parseInt(versionParam, 10) : 1;
+
+                if (dbVersion > urlVersion) {
+                    setOfferExpired(true);
+                    return;
                 }
 
                 setCustomerData(customer);
@@ -299,7 +310,7 @@ export const OfferAccessPage = () => {
 
                     {/* Description */}
                     <p className="text-slate-600 mb-8 leading-relaxed">
-                        Unfortunately, this offer link is no longer valid. Offers expire after 72 hours for security purposes.
+                        Unfortunately, this offer link is no longer valid.
                     </p>
 
                     {/* Divider */}
@@ -975,7 +986,7 @@ export const OfferAccessPage = () => {
                     <div className="p-5">
                         {(() => {
                             const hasFiT = (activeOffer.fit ?? 0) > 0 || (activeOffer.fitPeak ?? 0) > 0 || (activeOffer.fitCritical ?? 0) > 0 || (activeOffer.fitVpp ?? 0) > 0;
-                            const hasCL = (activeOffer.cl1Usage ?? 0) > 0 || (activeOffer.cl2Usage ?? 0) > 0;
+                            const hasCL = (activeOffer.cl1Usage ?? 0) > 0 || (activeOffer.cl2Usage ?? 0) > 0 || (activeOffer.cl1Supply ?? 0) > 0 || (activeOffer.cl2Supply ?? 0) > 0;
 
                             return (
                                 <div className="flex flex-wrap gap-8">
@@ -986,30 +997,31 @@ export const OfferAccessPage = () => {
                                             <h4 className="text-sm font-bold uppercase tracking-wide">Energy Rates</h4>
                                         </div>
                                         <div className="space-y-3">
-                                            {(activeOffer.peak ?? 0) > 0 && (
-                                                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                    <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(activeOffer.peak ?? 0, customerData.discount ?? 0).toFixed(4)}/kWh</div>
-                                                    <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Peak</div>
-                                                </div>
-                                            )}
-                                            {(activeOffer.offPeak ?? 0) > 0 && (
-                                                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                    <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(activeOffer.offPeak ?? 0, customerData.discount ?? 0).toFixed(4)}/kWh</div>
-                                                    <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Off-Peak</div>
-                                                </div>
-                                            )}
-                                            {(activeOffer.shoulder ?? 0) > 0 && (
-                                                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                    <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(activeOffer.shoulder ?? 0, customerData.discount ?? 0).toFixed(4)}/kWh</div>
-                                                    <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Shoulder</div>
-                                                </div>
-                                            )}
-                                            {(activeOffer.anytime ?? 0) > 0 && (
-                                                <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 text-center space-y-0.5">
-                                                    <div className="text-orange-600 dark:text-orange-400 font-bold text-base tracking-tight">${calculateDiscountedRate(activeOffer.anytime ?? 0, customerData.discount ?? 0).toFixed(4)}/kWh</div>
-                                                    <div className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider opacity-80">Anytime</div>
-                                                </div>
-                                            )}
+                                            {[
+                                                { label: 'Peak', value: activeOffer.peak, type: 'peak' },
+                                                { label: 'Off-Peak', value: activeOffer.offPeak, type: 'offPeak' },
+                                                { label: 'Shoulder', value: activeOffer.shoulder, type: 'shoulder' },
+                                                { label: 'Anytime', value: activeOffer.anytime, type: 'anytime' }
+                                            ]
+                                                .filter(rate => (rate.value ?? 0) > 0)
+                                                .sort((a, b) => calculateDiscountedRate(a.value ?? 0, customerData.discount ?? 0) - calculateDiscountedRate(b.value ?? 0, customerData.discount ?? 0))
+                                                .map((rate, idx) => {
+                                                    const isAnytime = rate.type === 'anytime';
+                                                    const bgColor = isAnytime ? "bg-orange-50 dark:bg-orange-900/30" : "bg-blue-50 dark:bg-blue-900/30";
+                                                    const borderColor = isAnytime ? "border-orange-200 dark:border-orange-800" : "border-blue-200 dark:border-blue-800";
+                                                    const textColor = isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400";
+
+                                                    return (
+                                                        <div key={idx} className={`${bgColor} border ${borderColor} rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm`}>
+                                                            <div className={`${textColor} font-bold text-base tracking-tight`}>
+                                                                ${calculateDiscountedRate(rate.value ?? 0, customerData.discount ?? 0).toFixed(4)}/kWh
+                                                            </div>
+                                                            <div className={`text-[10px] font-bold ${textColor} uppercase tracking-wider opacity-80`}>
+                                                                {rate.label}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                         </div>
                                     </div>
 
@@ -1051,30 +1063,31 @@ export const OfferAccessPage = () => {
                                                 <h4 className="text-sm font-bold uppercase tracking-wide">Solar FiT</h4>
                                             </div>
                                             <div className="space-y-3">
-                                                {(activeOffer.fit ?? 0) > 0 && (
-                                                    <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                        <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(activeOffer.fit ?? 0).toFixed(4)}/kWh</div>
-                                                        <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">Feed-in</div>
-                                                    </div>
-                                                )}
-                                                {(activeOffer.fitPeak ?? 0) > 0 && (
-                                                    <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                        <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(activeOffer.fitPeak ?? 0).toFixed(4)}/kWh</div>
-                                                        <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">PREMIUM FIT</div>
-                                                    </div>
-                                                )}
-                                                {(activeOffer.fitCritical ?? 0) > 0 && (
-                                                    <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                        <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(activeOffer.fitCritical ?? 0).toFixed(4)}/kWh</div>
-                                                        <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">CRITICAL EVENT FIT</div>
-                                                    </div>
-                                                )}
-                                                {(activeOffer.fitVpp ?? 0) > 0 && (
-                                                    <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                        <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(activeOffer.fitVpp ?? 0).toFixed(4)}/kWh</div>
-                                                        <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">BASE FIT</div>
-                                                    </div>
-                                                )}
+                                                {[
+                                                    { label: 'Feed-in', value: activeOffer.fit, type: 'fit' },
+                                                    { label: 'PREMIUM FIT', value: activeOffer.fitPeak, type: 'fitPeak' },
+                                                    { label: 'CRITICAL EVENT FIT', value: activeOffer.fitCritical, type: 'fitCritical' },
+                                                    { label: 'BASE FIT', value: activeOffer.fitVpp, type: 'fitVpp' }
+                                                ]
+                                                    .filter(rate => {
+                                                        if ((rate.value ?? 0) <= 0) return false;
+                                                        const isVppActive = customerData.vppDetails?.vpp === 1;
+                                                        const hasSolar = customerData.solarDetails?.hassolar === 1;
+
+                                                        if (rate.type === 'fit') return !isVppActive;
+                                                        return isVppActive || !hasSolar;
+                                                    })
+                                                    .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+                                                    .map((rate, idx) => (
+                                                        <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">
+                                                                ${(rate.value ?? 0).toFixed(4)}/kWh
+                                                            </div>
+                                                            <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">
+                                                                {rate.label}
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                             </div>
                                         </div>
                                     )}
@@ -1087,18 +1100,28 @@ export const OfferAccessPage = () => {
                                                 <h4 className="text-sm font-bold uppercase tracking-wide">Controlled Load</h4>
                                             </div>
                                             <div className="space-y-3">
-                                                {(activeOffer.cl1Usage ?? 0) > 0 && (
-                                                    <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                        <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(activeOffer.cl1Usage ?? 0, customerData.discount ?? 0).toFixed(4)}/kWh</div>
-                                                        <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Usage</div>
-                                                    </div>
-                                                )}
-                                                {(activeOffer.cl2Usage ?? 0) > 0 && (
-                                                    <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                        <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(activeOffer.cl2Usage ?? 0, customerData.discount ?? 0).toFixed(4)}/kWh</div>
-                                                        <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Usage</div>
-                                                    </div>
-                                                )}
+                                                {[
+                                                    { label: 'CL1 Usage', value: activeOffer.cl1Usage, type: 'cl1_usage' },
+                                                    { label: 'CL2 Usage', value: activeOffer.cl2Usage, type: 'cl2_usage' },
+                                                    { label: 'CL1 Supply', value: activeOffer.cl1Supply, type: 'cl1_supply' },
+                                                    { label: 'CL2 Supply', value: activeOffer.cl2Supply, type: 'cl2_supply' }
+                                                ]
+                                                    .filter(rate => (rate.value ?? 0) > 0)
+                                                    .map((rate, idx) => {
+                                                        const isUsage = rate.type.endsWith('_usage');
+                                                        const price = isUsage ? calculateDiscountedRate(rate.value ?? 0, customerData.discount ?? 0) : (rate.value ?? 0);
+                                                        const unit = isUsage ? 'kWh' : 'day';
+                                                        return (
+                                                            <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">
+                                                                    ${price.toFixed(4)}/{unit}
+                                                                </div>
+                                                                <div className={`text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80`}>
+                                                                    {rate.label}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                             </div>
                                         </div>
                                     )}

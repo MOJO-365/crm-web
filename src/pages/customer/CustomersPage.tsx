@@ -8,10 +8,10 @@ import { DataTable, type Column, Modal } from '@/components/common';
 import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
-    ActivityIcon, InfoIcon, IdCardIcon,
-    EyeIcon, TrashIcon, UploadIcon
+    EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
+    IdCardIcon
 } from '@/components/icons';
-import { GET_CUSTOMERS_CURSOR, GET_CUSTOMER_BY_ID, SOFT_DELETE_CUSTOMER, SEND_REMINDER_EMAIL, CREATE_CUSTOMER, UPDATE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RATES_HISTORY_BY_VERSION, GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE } from '@/graphql';
+import { GET_CUSTOMERS_CURSOR, GET_CUSTOMER_BY_ID, SOFT_DELETE_CUSTOMER, SEND_REMINDER_EMAIL, CREATE_CUSTOMER, UPDATE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RATES_HISTORY_BY_VERSION, GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Select } from '@/components/ui/Select';
 import { StatusField } from '@/components/common';
@@ -244,6 +244,15 @@ const DOCUMENT_TYPE_OPTIONS = [
     { label: 'Other', value: 'other' }
 ];
 
+const NOTE_TYPE_OPTIONS = [
+    { label: 'General', value: 'general' },
+    { label: 'Follow Up', value: 'follow_up' },
+    { label: 'Billing', value: 'billing' },
+    { label: 'Technical', value: 'technical' },
+    { label: 'Sales', value: 'sales' },
+    { label: 'Other', value: 'other' }
+];
+
 
 
 
@@ -379,12 +388,18 @@ export function CustomersPage() {
     const [detailsModalOpen, setDetailsModalOpen] = useState(false);
     const [selectedCustomerDetails, setSelectedCustomerDetails] = useState<CustomerDetails | null>(null);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+    const [previewModalOpen, setPreviewModalOpen] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState('');
+    const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     // Detail Section State
     const [selectedDetailSection, setSelectedDetailSection] = useState<'info' | 'location' | 'account' | 'rates' | 'solar' | 'debit' | 'vpp' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills'>('info');
 
     // Notes State
     const [noteText, setNoteText] = useState('');
+    const [noteFollowUp, setNoteFollowUp] = useState('');
+    const [noteAssignedTo, setNoteAssignedTo] = useState('');
+    const [noteType, setNoteType] = useState('general');
     const [isAddingNote, setIsAddingNote] = useState(false);
     const [noteModalOpen, setNoteModalOpen] = useState(false);
 
@@ -416,7 +431,7 @@ export function CustomersPage() {
     });
 
     // Notes query and mutations
-    const { data: notesData, loading: notesLoading, refetch: refetchNotes } = useQuery(GET_CUSTOMER_NOTES, {
+    const { data: notesData, loading: notesLoading, error: notesError, refetch: refetchNotes } = useQuery(GET_CUSTOMER_NOTES, {
         variables: { customerUid: selectedCustomerDetails?.uid || '' },
         skip: !selectedCustomerDetails?.uid || selectedDetailSection !== 'notes',
         fetchPolicy: 'network-only',
@@ -424,6 +439,16 @@ export function CustomersPage() {
 
     const [createNote] = useMutation(CREATE_CUSTOMER_NOTE);
     const [deleteNote] = useMutation(DELETE_CUSTOMER_NOTE);
+
+    // Fetch users for note assignment
+    const { data: userData } = useQuery(GET_USERS, {
+        variables: { limit: 100 }, // Fetch enough users for the dropdown
+    });
+
+    const userOptions = userData?.users?.data?.map((u: any) => ({
+        label: u.name || 'Unknown User',
+        value: u.uid
+    })) || [];
 
     const handleAddNote = async () => {
         if (!noteText.trim() || !selectedCustomerDetails?.uid) return;
@@ -433,9 +458,15 @@ export function CustomersPage() {
                 variables: {
                     customerUid: selectedCustomerDetails.uid,
                     message: noteText.trim(),
+                    followUp: noteFollowUp || undefined,
+                    assignedTo: noteAssignedTo || undefined,
+                    type: noteType || 'general'
                 },
             });
             setNoteText('');
+            setNoteFollowUp('');
+            setNoteAssignedTo('');
+            setNoteType('general');
             refetchNotes();
             toast.success('Note added successfully');
         } catch (error: any) {
@@ -453,6 +484,15 @@ export function CustomersPage() {
         } catch (error: any) {
             toast.error(error.message || 'Failed to delete note');
         }
+    };
+
+    const handlePreviewOffer = async (uid: string) => {
+        // Construct the preview URL (using the environment variable or baseURL)
+        const baseUrl = apiAxios.defaults.baseURL || '';
+        const url = `${baseUrl}/api/agreement/preview/${uid}`;
+        setIsLoadingPreview(true);
+        setPreviewUrl(url);
+        setPreviewModalOpen(true);
     };
 
     // Document handlers
@@ -1882,6 +1922,18 @@ export function CustomersPage() {
                                     <p className="text-xs text-muted-foreground">Track each milestone and when it happened.</p>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    {selectedCustomerDetails && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900/30"
+                                            onClick={() => handlePreviewOffer(selectedCustomerDetails.uid)}
+                                            isLoading={isLoadingPreview}
+                                            leftIcon={<EyeIcon size={14} />}
+                                        >
+                                            Preview Offer
+                                        </Button>
+                                    )}
                                     {selectedCustomerDetails.status !== 5 && (
                                         <Button
                                             size="sm"
@@ -2663,7 +2715,7 @@ export function CustomersPage() {
                                             <div className="space-y-6">
                                                 {selectedCustomerDetails.ratePlan.offers.map((offer, idx) => {
                                                     const discount = selectedCustomerDetails.discount ?? 0;
-                                                    const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0;
+                                                    const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0;
                                                     const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0;
 
                                                     return (
@@ -2676,30 +2728,43 @@ export function CustomersPage() {
                                                                         <h4 className="text-sm font-bold uppercase tracking-wide">Energy Rates</h4>
                                                                     </div>
                                                                     <div className="space-y-3">
-                                                                        {(offer.peak ?? 0) > 0 && (
-                                                                            <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.peak ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Peak</div>
-                                                                            </div>
-                                                                        )}
-                                                                        {(offer.offPeak ?? 0) > 0 && (
-                                                                            <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.offPeak ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Off-Peak</div>
-                                                                            </div>
-                                                                        )}
-                                                                        {(offer.shoulder ?? 0) > 0 && (
-                                                                            <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.shoulder ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Shoulder</div>
-                                                                            </div>
-                                                                        )}
-                                                                        {(offer.anytime ?? 0) > 0 && (
-                                                                            <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-orange-600 dark:text-orange-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.anytime ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                <div className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider opacity-80">Anytime</div>
-                                                                            </div>
-                                                                        )}
+                                                                        {[
+                                                                            { label: 'Peak', value: offer.peak, type: 'peak' },
+                                                                            { label: 'Off-Peak', value: offer.offPeak, type: 'offPeak' },
+                                                                            { label: 'Shoulder', value: offer.shoulder, type: 'shoulder' },
+                                                                            { label: 'Anytime', value: offer.anytime, type: 'anytime' }
+                                                                        ]
+                                                                            .filter(rate => (rate.value ?? 0) > 0)
+                                                                            .sort((a, b) => calculateDiscountedRate(a.value ?? 0, discount) - calculateDiscountedRate(b.value ?? 0, discount))
+                                                                            .map((rate, idx) => {
+                                                                                const isAnytime = rate.type === 'anytime';
+                                                                                const price = calculateDiscountedRate(rate.value ?? 0, discount);
+
+                                                                                return (
+                                                                                    <div
+                                                                                        key={idx}
+                                                                                        className={cn(
+                                                                                            "border rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm",
+                                                                                            isAnytime
+                                                                                                ? "bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800"
+                                                                                                : "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800"
+                                                                                        )}
+                                                                                    >
+                                                                                        <div className={cn(
+                                                                                            "font-bold text-base tracking-tight",
+                                                                                            isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
+                                                                                        )}>
+                                                                                            ${price.toFixed(4)}/kWh
+                                                                                        </div>
+                                                                                        <div className={cn(
+                                                                                            "text-[10px] font-bold uppercase tracking-wider opacity-80",
+                                                                                            isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
+                                                                                        )}>
+                                                                                            {rate.label}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
                                                                     </div>
                                                                 </div>
 
@@ -2737,30 +2802,34 @@ export function CustomersPage() {
                                                                             <h4 className="text-sm font-bold uppercase tracking-wide">Solar FiT</h4>
                                                                         </div>
                                                                         <div className="space-y-3">
-                                                                            {(offer.fit ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fit ?? 0).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">Feed-in</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {(offer.fitPeak ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitPeak ?? 0).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">PREMIUM FIT</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {(offer.fitCritical ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitCritical ?? 0).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">CRITICAL EVENT FIT</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {(offer.fitVpp ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitVpp ?? 0).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">BASE FIT</div>
-                                                                                </div>
-                                                                            )}
+                                                                            {[
+                                                                                { label: 'Feed-in', value: offer.fit, type: 'fit' },
+                                                                                { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
+                                                                                { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
+                                                                                { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' }
+                                                                            ]
+                                                                                .filter(rate => {
+                                                                                    if ((rate.value ?? 0) <= 0) return false;
+                                                                                    const isVppActive = selectedCustomerDetails.vppDetails?.vpp === 1;
+                                                                                    const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
+
+                                                                                    if (rate.type === 'fit') return !isVppActive;
+                                                                                    return isVppActive || !hasSolar;
+                                                                                })
+                                                                                .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+                                                                                .map((rate, idx) => (
+                                                                                    <div
+                                                                                        key={idx}
+                                                                                        className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
+                                                                                    >
+                                                                                        <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">
+                                                                                            ${(rate.value ?? 0).toFixed(4)}/kWh
+                                                                                        </div>
+                                                                                        <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">
+                                                                                            {rate.label}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -2773,18 +2842,24 @@ export function CustomersPage() {
                                                                             <h4 className="text-sm font-bold uppercase tracking-wide">Controlled Load</h4>
                                                                         </div>
                                                                         <div className="space-y-3">
-                                                                            {(offer.cl1Usage ?? 0) > 0 && (
-                                                                                <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.cl1Usage ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Usage</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {(offer.cl2Usage ?? 0) > 0 && (
-                                                                                <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.cl2Usage ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Usage</div>
-                                                                                </div>
-                                                                            )}
+                                                                            {[
+                                                                                { label: 'CL1 Usage', value: offer.cl1Usage, type: 'cl1_usage' },
+                                                                                { label: 'CL2 Usage', value: offer.cl2Usage, type: 'cl2_usage' },
+                                                                                { label: 'CL1 Supply', value: offer.cl1Supply, type: 'cl1_supply' },
+                                                                                { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply' }
+                                                                            ]
+                                                                                .filter(rate => (rate.value ?? 0) > 0)
+                                                                                .map((rate, idx) => {
+                                                                                    const isUsage = rate.type.endsWith('_usage');
+                                                                                    const price = isUsage ? calculateDiscountedRate(rate.value ?? 0, discount) : (rate.value ?? 0);
+                                                                                    const unit = isUsage ? 'kWh' : 'day';
+                                                                                    return (
+                                                                                        <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${price.toFixed(4)}/{unit}</div>
+                                                                                            <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{rate.label}</div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -2798,8 +2873,6 @@ export function CustomersPage() {
                                         )}
                                     </div>
                                 )}
-
-
 
                                 {selectedDetailSection === 'solar' && (
                                     <div className="space-y-4 animate-in fade-in duration-300">
@@ -3147,40 +3220,106 @@ export function CustomersPage() {
                                             </Button>
                                         </div>
 
-                                        {/* Notes List */}
-                                        <div className="flex-1 overflow-y-auto space-y-2 max-h-[350px]">
+                                        {/* Notes List - Standard View */}
+                                        <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[400px]">
                                             {notesLoading ? (
-                                                <div className="flex items-center justify-center py-6">
-                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
+                                                <div className="flex items-center justify-center py-12">
+                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                                                </div>
+                                            ) : notesError ? (
+                                                <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-6 text-center">
+                                                    <InfoIcon className="w-8 h-8 text-destructive mx-auto mb-3" />
+                                                    <h4 className="text-sm font-semibold text-destructive mb-1">Failed to load notes</h4>
+                                                    <p className="text-xs text-destructive/80 mb-4">{notesError.message}</p>
+                                                    <Button variant="outline" size="sm" onClick={() => refetchNotes()}>
+                                                        Try Again
+                                                    </Button>
                                                 </div>
                                             ) : notesData?.customerNotes?.length > 0 ? (
-                                                notesData.customerNotes.map((note: any) => (
-                                                    <div key={note.uid} className="bg-muted/30 border border-border/50 rounded-lg p-3 group hover:bg-muted/50 transition-colors">
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div className="flex-1 space-y-1">
-                                                                <p className="text-sm text-foreground whitespace-pre-wrap leading-snug">{note.message}</p>
-                                                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                                                    <span className="font-medium">{note.createdByName || 'Unknown'}</span>
-                                                                    <span>•</span>
-                                                                    <span>{formatSydneyTime(note.createdAt)}</span>
+                                                <div className="space-y-3">
+                                                    {notesData.customerNotes.map((note: any) => {
+                                                        const typeConfig: Record<string, { color: string, icon: any, bg: string }> = {
+                                                            sales: { color: 'text-emerald-700', bg: 'bg-emerald-100', icon: ActivityIcon },
+                                                            technical: { color: 'text-blue-700', bg: 'bg-blue-100', icon: Settings2Icon },
+                                                            billing: { color: 'text-amber-700', bg: 'bg-amber-100', icon: ZapIcon },
+                                                            follow_up: { color: 'text-purple-700', bg: 'bg-purple-100', icon: CalendarIcon },
+                                                            general: { color: 'text-slate-700', bg: 'bg-slate-100', icon: InfoIcon }
+                                                        };
+                                                        const normalizedType = (note.type || 'general').toLowerCase();
+                                                        const config = typeConfig[normalizedType] || typeConfig.general;
+                                                        const IconComponent = config.icon;
+
+                                                        return (
+                                                            <div key={note.uid} className="bg-white dark:bg-neutral-900 border border-border/60 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                                                <div className="p-4">
+                                                                    <div className="flex items-start justify-between mb-2">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1", config.bg, config.color)}>
+                                                                                <IconComponent className="w-2.5 h-2.5" />
+                                                                                {note.type || 'General'}
+                                                                            </span>
+                                                                            {/* <span className="text-[10px] text-muted-foreground">•</span>
+                                                                            <span className="text-[10px] text-muted-foreground font-medium">#{note.uid.slice(-6)}</span> */}
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => handleDeleteNote(note.uid)}
+                                                                            className="text-muted-foreground hover:text-destructive transition-colors"
+                                                                            title="Delete note"
+                                                                        >
+                                                                            <XIcon className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+
+                                                                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed mb-4">
+                                                                        {note.message}
+                                                                    </p>
+
+                                                                    <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/40 text-[10px]">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-bold">
+                                                                                    {note.createdByName?.charAt(0) || 'U'}
+                                                                                </div>
+                                                                                <div className="flex flex-col">
+                                                                                    <span className="text-foreground font-semibold">{note.createdByName || 'Unknown'}</span>
+                                                                                    <span className="text-muted-foreground">{formatSydneyTime(note.createdAt, 'DD/MM/YYYY h:mm A')}</span>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {note.assignedToUser?.name && (
+                                                                                <div className="flex items-center gap-1.5 border-l border-border/50 pl-3">
+                                                                                    <UserIcon className="w-3 h-3 text-primary" />
+                                                                                    <div className="flex flex-col">
+                                                                                        <span className="text-muted-foreground uppercase text-[8px] font-bold tracking-tighter">Assigned To</span>
+                                                                                        <span className="text-foreground font-semibold">{note.assignedToUser.name}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {note.followUp && (
+                                                                            <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                                                                <CalendarIcon className="w-3 h-3" />
+                                                                                <span className="font-bold">Follow-up: {formatSydneyTime(note.followUp, 'DD/MM/YYYY')}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                            <button
-                                                                onClick={() => handleDeleteNote(note.uid)}
-                                                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-all"
-                                                                title="Delete note"
-                                                            >
-                                                                <XIcon className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))
+                                                        );
+                                                    })}
+                                                </div>
                                             ) : (
-                                                <div className="text-center py-8">
-                                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-2">
-                                                        <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                                <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/5 border-2 border-dashed border-border/40 rounded-2xl">
+                                                    <div className="w-12 h-12 rounded-full bg-muted/20 flex items-center justify-center mb-3">
+                                                        <InfoIcon className="w-6 h-6 text-muted-foreground/30" />
                                                     </div>
-                                                    <p className="text-xs text-muted-foreground">No notes yet</p>
+                                                    <h4 className="text-sm font-semibold text-foreground">No notes recorded</h4>
+                                                    <p className="text-xs text-muted-foreground mt-1 max-w-[180px]">Add a new note to start tracking customer interactions.</p>
+                                                    <Button variant="ghost" size="sm" className="mt-4 text-xs h-8" onClick={() => setNoteModalOpen(true)}>
+                                                        <PlusIcon className="w-3.5 h-3.5 mr-1.5" />
+                                                        Add First Note
+                                                    </Button>
                                                 </div>
                                             )}
                                         </div>
@@ -3411,16 +3550,71 @@ export function CustomersPage() {
                     </>
                 }
             >
-                <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                        Add an internal note about this customer.
-                    </p>
-                    <textarea
-                        value={noteText}
-                        onChange={(e) => setNoteText(e.target.value)}
-                        placeholder="Write a note..."
-                        className="w-full min-h-[120px] p-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
-                        autoFocus
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase text-muted-foreground">Note Message</label>
+                        <textarea
+                            value={noteText}
+                            onChange={(e) => setNoteText(e.target.value)}
+                            placeholder="Write a note..."
+                            className="w-full min-h-[100px] p-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                            autoFocus
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Note Type</label>
+                            <Select
+                                options={NOTE_TYPE_OPTIONS}
+                                value={noteType}
+                                onChange={(val) => setNoteType(val as string)}
+                                className="w-full"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Assigned To</label>
+                            <Select
+                                options={userOptions}
+                                value={noteAssignedTo}
+                                onChange={(val) => setNoteAssignedTo(val as string)}
+                                placeholder="Select a user..."
+                                className="w-full"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Follow-up Date</label>
+                            <Input
+                                type="date"
+                                value={noteFollowUp}
+                                onChange={(e) => setNoteFollowUp(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={previewModalOpen}
+                onClose={() => setPreviewModalOpen(false)}
+                title="Offer Summary Preview"
+                size="full"
+            >
+                <div className="h-[80vh] w-full bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden flex flex-col relative">
+                    {isLoadingPreview && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 dark:bg-black/80 z-10">
+                            <ActivityIcon className="h-10 w-10 text-primary animate-pulse mb-3" />
+                            <p className="text-sm font-medium text-foreground">Generating PDF Preview...</p>
+                            <p className="text-xs text-muted-foreground mt-1">This may take a few seconds</p>
+                        </div>
+                    )}
+                    <iframe
+                        src={previewUrl}
+                        className="w-full h-full border-0"
+                        title="PDF Preview"
+                        onLoad={() => setIsLoadingPreview(false)}
                     />
                 </div>
             </Modal>

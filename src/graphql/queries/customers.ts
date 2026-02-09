@@ -478,6 +478,7 @@ export const GET_CUSTOMER_BY_ID = gql`
             emailSent
             utilmateStatus
             rateVersion
+            offerVersion
             viewCode
             isActive
             isDeleted
@@ -789,6 +790,7 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
                 optIn
             }
             rateVersion
+            offerVersion
             ratePlan {
                 uid
                 codes

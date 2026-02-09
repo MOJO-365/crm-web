@@ -223,8 +223,8 @@ const SummaryItem = ({ icon: Icon, label, value, className }: { icon: any, label
 // RATE DETAILS COMPONENT
 // ============================================================================
 
-const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) => {
-    const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0;
+const RateDetailsView = ({ offer, discount, hasSolar, vpp }: { offer: any, discount: number, hasSolar: boolean, vpp: boolean }) => {
+    const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0;
     const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0;
 
     return (
@@ -237,30 +237,33 @@ const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) 
                         <Settings2Icon size={14} />
                         <span className="text-xs font-bold uppercase tracking-wide">Energy Rates</span>
                     </div>
-                    {offer.peak > 0 && (
-                        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center">
-                            <div className="text-blue-600 dark:text-blue-400 font-bold text-sm">${calculateDiscountedRate(offer.peak, discount).toFixed(4)}/kWh</div>
-                            <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Peak</div>
-                        </div>
-                    )}
-                    {offer.offPeak > 0 && (
-                        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center">
-                            <div className="text-blue-600 dark:text-blue-400 font-bold text-sm">${calculateDiscountedRate(offer.offPeak, discount).toFixed(4)}/kWh</div>
-                            <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Off-Peak</div>
-                        </div>
-                    )}
-                    {offer.shoulder > 0 && (
-                        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center">
-                            <div className="text-blue-600 dark:text-blue-400 font-bold text-sm">${calculateDiscountedRate(offer.shoulder, discount).toFixed(4)}/kWh</div>
-                            <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Shoulder</div>
-                        </div>
-                    )}
-                    {offer.anytime > 0 && (
-                        <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 text-center">
-                            <div className="text-orange-600 dark:text-orange-400 font-bold text-sm">${calculateDiscountedRate(offer.anytime, discount).toFixed(4)}/kWh</div>
-                            <div className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider opacity-80">Anytime</div>
-                        </div>
-                    )}
+                    {[
+                        { label: 'Peak', value: offer.peak, type: 'peak' },
+                        { label: 'Off-Peak', value: offer.offPeak, type: 'offPeak' },
+                        { label: 'Shoulder', value: offer.shoulder, type: 'shoulder' },
+                        { label: 'Anytime', value: offer.anytime, type: 'anytime' }
+                    ]
+                        .filter(rate => (rate.value ?? 0) > 0)
+                        .sort((a, b) => calculateDiscountedRate(a.value ?? 0, discount) - calculateDiscountedRate(b.value ?? 0, discount))
+                        .map((rate, idx) => {
+                            const isAnytime = rate.type === 'anytime';
+                            const price = calculateDiscountedRate(rate.value ?? 0, discount);
+                            return (
+                                <div key={idx} className={cn(
+                                    "border rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm",
+                                    isAnytime ? "bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800" : "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800"
+                                )}>
+                                    <div className={cn(
+                                        "font-bold text-sm",
+                                        isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
+                                    )}>${price.toFixed(4)}/kWh</div>
+                                    <div className={cn(
+                                        "text-[10px] font-bold uppercase tracking-wider opacity-80",
+                                        isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
+                                    )}>{rate.label}</div>
+                                </div>
+                            );
+                        })}
                 </div>
 
                 {/* Column 2: Supply Charges */}
@@ -269,7 +272,7 @@ const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) 
                         <PlugIcon size={14} />
                         <span className="text-xs font-bold uppercase tracking-wide">Supply Charges</span>
                     </div>
-                    <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center">
+                    <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                         <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${offer.supplyCharge.toFixed(4)}/day</div>
                         <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
                     </div>
@@ -279,7 +282,7 @@ const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) 
                                 <ActivityIcon size={14} />
                                 <span className="text-xs font-bold uppercase tracking-wide">VPP Orchestration Charges</span>
                             </div>
-                            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center">
+                            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                 <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">${offer.vppOrcharge.toFixed(4)}/day</div>
                                 <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">Orchestration</div>
                             </div>
@@ -294,30 +297,24 @@ const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) 
                             <ZapIcon size={14} />
                             <span className="text-xs font-bold uppercase tracking-wide">Solar FiT</span>
                         </div>
-                        {(offer.fit || 0) > 0 && (
-                            <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center">
-                                <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${offer.fit.toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">Feed-in</div>
-                            </div>
-                        )}
-                        {(offer.fitPeak || 0) > 0 && (
-                            <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center">
-                                <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${offer.fitPeak.toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">PREMIUM FIT</div>
-                            </div>
-                        )}
-                        {(offer.fitCritical || 0) > 0 && (
-                            <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center">
-                                <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${offer.fitCritical.toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">CRITICAL EVENT FIT</div>
-                            </div>
-                        )}
-                        {(offer.fitVpp || 0) > 0 && (
-                            <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center">
-                                <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${offer.fitVpp.toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">BASE FIT</div>
-                            </div>
-                        )}
+                        {[
+                            { label: 'Feed-in', value: offer.fit, type: 'fit' },
+                            { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
+                            { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
+                            { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' }
+                        ]
+                            .filter(rate => {
+                                if ((rate.value ?? 0) <= 0) return false;
+                                if (rate.type === 'fit') return !vpp;
+                                return vpp || !hasSolar;
+                            })
+                            .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+                            .map((rate, idx) => (
+                                <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
+                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${(rate.value ?? 0).toFixed(4)}/kWh</div>
+                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">{rate.label}</div>
+                                </div>
+                            ))}
                     </div>
                 )}
 
@@ -328,18 +325,24 @@ const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) 
                             <PlugIcon size={14} />
                             <span className="text-xs font-bold uppercase tracking-wide">Controlled Load</span>
                         </div>
-                        {offer.cl1Usage > 0 && (
-                            <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center">
-                                <div className="text-green-600 dark:text-green-400 font-bold text-sm">${calculateDiscountedRate(offer.cl1Usage, discount).toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Usage</div>
-                            </div>
-                        )}
-                        {offer.cl2Usage > 0 && (
-                            <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center">
-                                <div className="text-green-600 dark:text-green-400 font-bold text-sm">${calculateDiscountedRate(offer.cl2Usage, discount).toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Usage</div>
-                            </div>
-                        )}
+                        {[
+                            { label: 'CL1 Usage', value: offer.cl1Usage, type: 'cl1_usage' },
+                            { label: 'CL2 Usage', value: offer.cl2Usage, type: 'cl2_usage' },
+                            { label: 'CL1 Supply', value: offer.cl1Supply, type: 'cl1_supply' },
+                            { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply' }
+                        ]
+                            .filter(rate => (rate.value ?? 0) > 0)
+                            .map((rate, idx) => {
+                                const isUsage = rate.type.endsWith('_usage');
+                                const price = isUsage ? calculateDiscountedRate(rate.value ?? 0, discount) : (rate.value ?? 0);
+                                const unit = isUsage ? 'kWh' : 'day';
+                                return (
+                                    <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
+                                        <div className="text-green-600 dark:text-green-400 font-bold text-sm">${price.toFixed(4)}/{unit}</div>
+                                        <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{rate.label}</div>
+                                    </div>
+                                );
+                            })}
                     </div>
                 )}
             </div>
@@ -400,7 +403,7 @@ export const CustomerFormPage = () => {
     const [uploadingIdentityProof, setUploadingIdentityProof] = useState(false);
 
     const { data: activeRatesData } = useQuery(GET_ACTIVE_RATES_HISTORY, {
-        fetchPolicy: 'cache-first',
+        fetchPolicy: 'network-only',
     });
 
     const [checkAddressExists] = useLazyQuery(CHECK_ADDRESS_EXISTS);
@@ -1139,7 +1142,7 @@ export const CustomerFormPage = () => {
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="font-medium text-foreground">VPP Participant</span>
-                                                    <span className="text-xs text-muted-foreground">Enrol customer in Virtual Power Plant</span>
+                                                    <span className="text-xs text-muted-foreground">Enroll customer in Virtual Power Plant</span>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3">
@@ -1349,7 +1352,7 @@ export const CustomerFormPage = () => {
                                     <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
                                         {selectedRatePlan?.offers?.map((offer) => {
                                             const discount = formData.discount || 0;
-                                            const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0;
+                                            const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0;
                                             const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0;
 
                                             // Calculate yearly savings estimation
@@ -1453,29 +1456,33 @@ export const CustomerFormPage = () => {
                                                                     <h4 className="text-sm font-bold uppercase tracking-wide">Solar FiT</h4>
                                                                 </div>
                                                                 <div className="space-y-3">
-                                                                    {(offer.fit ?? 0) > 0 && (
+                                                                    {(offer.fit ?? 0) > 0 && !formData.vpp && (
                                                                         <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
                                                                             <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fit ?? 0).toFixed(4)}/kWh</div>
                                                                             <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">Feed-in</div>
                                                                         </div>
                                                                     )}
-                                                                    {(offer.fitPeak ?? 0) > 0 && (
-                                                                        <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitPeak ?? 0).toFixed(4)}/kWh</div>
-                                                                            <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT Peak</div>
-                                                                        </div>
-                                                                    )}
-                                                                    {(offer.fitCritical ?? 0) > 0 && (
-                                                                        <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitCritical ?? 0).toFixed(4)}/kWh</div>
-                                                                            <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT Critical</div>
-                                                                        </div>
-                                                                    )}
-                                                                    {(offer.fitVpp ?? 0) > 0 && (
-                                                                        <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitVpp ?? 0).toFixed(4)}/kWh</div>
-                                                                            <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT VPP</div>
-                                                                        </div>
+                                                                    {(formData.vpp || !formData.hasSolar) && (
+                                                                        <>
+                                                                            {(offer.fitPeak ?? 0) > 0 && (
+                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitPeak ?? 0).toFixed(4)}/kWh</div>
+                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">PREMIUM FiT</div>
+                                                                                </div>
+                                                                            )}
+                                                                            {(offer.fitCritical ?? 0) > 0 && (
+                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitCritical ?? 0).toFixed(4)}/kWh</div>
+                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">CRITICAL EVENT FiT</div>
+                                                                                </div>
+                                                                            )}
+                                                                            {(offer.fitVpp ?? 0) > 0 && (
+                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitVpp ?? 0).toFixed(4)}/kWh</div>
+                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">BASE FIT</div>
+                                                                                </div>
+                                                                            )}
+                                                                        </>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -1495,10 +1502,22 @@ export const CustomerFormPage = () => {
                                                                             <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Usage</div>
                                                                         </div>
                                                                     )}
+                                                                    {(offer.cl1Supply ?? 0) > 0 && (
+                                                                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${(offer.cl1Supply ?? 0).toFixed(4)}/day</div>
+                                                                            <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Supply</div>
+                                                                        </div>
+                                                                    )}
                                                                     {(offer.cl2Usage ?? 0) > 0 && (
                                                                         <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
                                                                             <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.cl2Usage ?? 0, discount).toFixed(4)}/kWh</div>
                                                                             <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Usage</div>
+                                                                        </div>
+                                                                    )}
+                                                                    {(offer.cl2Supply ?? 0) > 0 && (
+                                                                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${(offer.cl2Supply ?? 0).toFixed(4)}/day</div>
+                                                                            <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Supply</div>
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -1737,7 +1756,12 @@ export const CustomerFormPage = () => {
 
                                         {/* Rate Details - Full Width Section */}
                                         {selectedRatePlan?.offers?.[0] && (
-                                            <RateDetailsView offer={selectedRatePlan.offers[0]} discount={formData.discount || 0} />
+                                            <RateDetailsView
+                                                offer={selectedRatePlan.offers[0]}
+                                                discount={formData.discount || 0}
+                                                hasSolar={formData.hasSolar}
+                                                vpp={formData.vpp}
+                                            />
                                         )}
 
                                         {(formData.hasSolar || formData.batteryBrand || formData.vpp) && (
@@ -1755,10 +1779,10 @@ export const CustomerFormPage = () => {
 
                                                     <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
                                                         <p className="font-medium text-xs uppercase text-muted-foreground mb-1">VPP Participant</p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">Battery Brand:</span> <span className="font-medium">{formData.batteryBrand || '—'}</span></p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">SN Number:</span> <span className="font-medium">{formData.snNumber || '—'}</span></p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">Battery Capacity:</span> <span className="font-medium">{formData.batteryCapacity ? `${formData.batteryCapacity} kW` : '—'}</span></p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">Export Limit:</span> <span className="font-medium">{formData.exportLimit ? `${formData.exportLimit} kW` : '—'}</span></p>
+                                                        {formData.batteryBrand && <p className="flex justify-between"><span className="text-muted-foreground">Battery Brand:</span> <span className="font-medium">{formData.batteryBrand}</span></p>}
+                                                        {formData.snNumber && <p className="flex justify-between"><span className="text-muted-foreground">SN Number:</span> <span className="font-medium">{formData.snNumber}</span></p>}
+                                                        {formData.batteryCapacity && <p className="flex justify-between"><span className="text-muted-foreground">Battery Capacity:</span> <span className="font-medium">{formData.batteryCapacity} kW</span></p>}
+                                                        {formData.exportLimit && <p className="flex justify-between"><span className="text-muted-foreground">Export Limit:</span> <span className="font-medium">{formData.exportLimit} kW</span></p>}
                                                         <div className="flex justify-between items-start gap-2">
                                                             <span className="text-muted-foreground shrink-0">Signup Bonus:</span>
                                                             <span className="font-medium text-right text-green-600">$50 monthly bill credit for 12 months (total $600)</span>
