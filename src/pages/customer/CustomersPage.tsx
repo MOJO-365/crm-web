@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useLazyQuery, useMutation } from '@apollo/client';
 import { calculateDiscountedRate } from '../../lib/rate-utils';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { DataTable, type Column, Modal } from '@/components/common';
 import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
-    ActivityIcon, InfoIcon
+    EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
+    IdCardIcon
 } from '@/components/icons';
-import { GET_CUSTOMERS_CURSOR, GET_CUSTOMER_BY_ID, SOFT_DELETE_CUSTOMER, SEND_REMINDER_EMAIL, CREATE_CUSTOMER, UPDATE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RATES_HISTORY_BY_VERSION, GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE } from '@/graphql';
+import { GET_CUSTOMERS_CURSOR, GET_CUSTOMER_BY_ID, SOFT_DELETE_CUSTOMER, SEND_REMINDER_EMAIL, CREATE_CUSTOMER, UPDATE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RATES_HISTORY_BY_VERSION, GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS, GET_NOTE_TYPES, CREATE_NOTE_TYPE } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Select } from '@/components/ui/Select';
 import { StatusField } from '@/components/common';
@@ -18,10 +20,12 @@ import { ConfirmationPopover } from '@/components/ui/ConfirmationPopover';
 import { formatSydneyTime } from '@/lib/date';
 import {
     //  apolloClient,
-    secondaryApiAxios
+    secondaryApiAxios,
+    apiAxios
 } from '@/lib/apollo';
 import { cn } from '@/lib/utils';
 import BulkEmailModal from './BulkEmailModal';
+
 import { SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, DNSP_OPTIONS, DISCOUNT_OPTIONS, CUSTOMER_STATUS_OPTIONS, VPP_OPTIONS, VPP_CONNECTED_OPTIONS, ULTIMATE_STATUS_OPTIONS, MSAT_CONNECTED_OPTIONS, ID_TYPE_MAP, BATTERY_BRAND_OPTIONS } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -49,6 +53,8 @@ interface Customer {
     status: number | string;
     tariffCode?: string;
     discount?: string;
+    previousBill?: { path: string; filename?: string };
+    identityProof?: { path: string; filename?: string };
     createdAt: string;
     rateVersion?: number;
     address?: CustomerAddress;
@@ -98,9 +104,13 @@ interface CustomerDetails {
     dob?: string;
     propertyType?: number;
     status: number;
+    previousBill?: { uid: string; path: string; filename?: string };
+    identityProof?: { uid: string; path: string; filename?: string };
     discount?: number;
     tariffCode?: string;
     signDate?: string;
+    signedPdfPath?: string;
+    emailSent?: number;
     phoneVerifiedAt?: string;
     address?: CustomerAddress & { nmi?: string };
     enrollmentDetails?: {
@@ -212,12 +222,30 @@ interface CustomerDetails {
         firstDebitDate?: string;
         optIn?: number;
     };
+    documents?: Array<{
+        id: string;
+        uid: string;
+        type?: string;
+        name?: string;
+        filename?: string;
+        path?: string;
+        size?: number;
+        mimeType?: string;
+        createdAt: string;
+        createdBy?: string;
+        createdByUser?: {
+            name: string;
+        };
+    }>;
 }
 
-
-
-
-
+const DOCUMENT_TYPE_OPTIONS = [
+    { label: 'Solar Contract', value: 'solar_contract' },
+    { label: 'Connection Approval', value: 'connection_approval' },
+    { label: 'Electrical Certificate', value: 'electrical_certificate' },
+    { label: 'Site Photos', value: 'site_photos' },
+    { label: 'Other', value: 'other' }
+];
 
 const ToggleSwitch = ({ checked, onChange, disabled }: { checked: boolean, onChange: (checked: boolean) => void, disabled?: boolean }) => (
     <button
@@ -316,6 +344,7 @@ export function CustomersPage() {
     const canCreate = useAuthStore((state) => state.canCreateInMenu('customers'));
     const canEdit = useAuthStore((state) => state.canEditInMenu('customers'));
     const canDelete = useAuthStore((state) => state.canDeleteInMenu('customers'));
+    const canManageNoteTypes = useAuthStore((state) => state.hasFeatureAccess('feature_manage_note_types'));
     const [searchFilters, setSearchFilters] = useState<SearchFilters>({
         id: '',
         name: '',
@@ -330,8 +359,6 @@ export function CustomersPage() {
         utilmateStatus: '',
         msatConnected: '',
     });
-
-
 
     const [debouncedFilters, setDebouncedFilters] = useState(searchFilters);
     const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
@@ -351,14 +378,32 @@ export function CustomersPage() {
     const [detailsModalOpen, setDetailsModalOpen] = useState(false);
     const [selectedCustomerDetails, setSelectedCustomerDetails] = useState<CustomerDetails | null>(null);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+    const [previewModalOpen, setPreviewModalOpen] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState('');
+    const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     // Detail Section State
-    const [selectedDetailSection, setSelectedDetailSection] = useState<'info' | 'location' | 'account' | 'rates' | 'solar' | 'debit' | 'vpp' | 'utilmate' | 'notes'>('info');
+    const [selectedDetailSection, setSelectedDetailSection] = useState<'info' | 'location' | 'account' | 'rates' | 'solar' | 'debit' | 'vpp' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills'>('info');
 
     // Notes State
     const [noteText, setNoteText] = useState('');
+    const [noteFollowUp, setNoteFollowUp] = useState<Date | null>(null);
+    const [noteAssignedTo, setNoteAssignedTo] = useState('');
+    const [noteType, setNoteType] = useState('');
     const [isAddingNote, setIsAddingNote] = useState(false);
     const [noteModalOpen, setNoteModalOpen] = useState(false);
+    const [isAddingNewTypeInline, setIsAddingNewTypeInline] = useState(false);
+    const [newTypeName, setNewTypeName] = useState('');
+    const [isAddingNoteType, setIsAddingNoteType] = useState(false);
+
+    // Document operations state
+    const [isDeletingDocument, setIsDeletingDocument] = useState<string | null>(null);
+    const [isUploadingDocument, setIsUploadingDocument] = useState<string | null>(null);
+    const [isAddingDocument, setIsAddingDocument] = useState(false);
+    const [newDocumentType, setNewDocumentType] = useState<string>('');
+    const previousBillInputRef = useRef<HTMLInputElement>(null);
+    const identityProofInputRef = useRef<HTMLInputElement>(null);
+    const newDocumentInputRef = useRef<HTMLInputElement>(null);
 
     // Reset section when modal opens/customer changes
     useEffect(() => {
@@ -370,6 +415,7 @@ export function CustomersPage() {
     // Lazy query for customer details
     const [fetchCustomerDetails] = useLazyQuery(GET_CUSTOMER_BY_ID, {
         fetchPolicy: 'network-only',
+        errorPolicy: 'all',
     });
 
     // Lazy query for fetching all filtered customer IDs (for Select All)
@@ -378,7 +424,7 @@ export function CustomersPage() {
     });
 
     // Notes query and mutations
-    const { data: notesData, loading: notesLoading, refetch: refetchNotes } = useQuery(GET_CUSTOMER_NOTES, {
+    const { data: notesData, loading: notesLoading, error: notesError, refetch: refetchNotes } = useQuery(GET_CUSTOMER_NOTES, {
         variables: { customerUid: selectedCustomerDetails?.uid || '' },
         skip: !selectedCustomerDetails?.uid || selectedDetailSection !== 'notes',
         fetchPolicy: 'network-only',
@@ -386,6 +432,21 @@ export function CustomersPage() {
 
     const [createNote] = useMutation(CREATE_CUSTOMER_NOTE);
     const [deleteNote] = useMutation(DELETE_CUSTOMER_NOTE);
+    const [createNoteType] = useMutation(CREATE_NOTE_TYPE);
+
+    const { data: noteTypesData, refetch: refetchNoteTypes } = useQuery(GET_NOTE_TYPES, {
+        fetchPolicy: 'network-only'
+    });
+
+    // Fetch users for note assignment
+    const { data: userData } = useQuery(GET_USERS, {
+        variables: { limit: 100 }, // Fetch enough users for the dropdown
+    });
+
+    const userOptions = userData?.users?.data?.map((u: any) => ({
+        label: u.name || 'Unknown User',
+        value: u.uid
+    })) || [];
 
     const handleAddNote = async () => {
         if (!noteText.trim() || !selectedCustomerDetails?.uid) return;
@@ -395,15 +456,42 @@ export function CustomersPage() {
                 variables: {
                     customerUid: selectedCustomerDetails.uid,
                     message: noteText.trim(),
+                    followUp: noteFollowUp || undefined,
+                    assignedTo: noteAssignedTo || undefined,
+                    type: noteType // This is now a UID
                 },
             });
             setNoteText('');
+            setNoteFollowUp(null);
+            setNoteAssignedTo('');
+            setNoteType('');
             refetchNotes();
             toast.success('Note added successfully');
         } catch (error: any) {
             toast.error(error.message || 'Failed to add note');
         } finally {
             setIsAddingNote(false);
+        }
+    };
+
+    const handleCreateNoteType = async () => {
+        if (!newTypeName.trim()) return;
+        setIsAddingNoteType(true);
+        try {
+            const { data } = await createNoteType({
+                variables: { name: newTypeName.trim() }
+            });
+            if (data?.createNoteType?.uid) {
+                toast.success('Note type added successfully');
+                setNewTypeName('');
+                setIsAddingNewTypeInline(false);
+                await refetchNoteTypes();
+                setNoteType(data.createNoteType.uid);
+            }
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to create note type');
+        } finally {
+            setIsAddingNoteType(false);
         }
     };
 
@@ -414,6 +502,106 @@ export function CustomersPage() {
             toast.success('Note deleted');
         } catch (error: any) {
             toast.error(error.message || 'Failed to delete note');
+        }
+    };
+
+    const handlePreviewOffer = async (uid: string) => {
+        setIsLoadingPreview(true);
+        const baseUrl = apiAxios.defaults.baseURL || '';
+
+        // If we have a signed PDF path, show that instead of the preview
+        if (selectedCustomerDetails?.signedPdfPath) {
+            const url = `${baseUrl}/api/documents/${encodeURIComponent(selectedCustomerDetails.signedPdfPath).replace(/%2F/g, '/')}`;
+            setPreviewUrl(url);
+        } else {
+            // Construct the preview URL (using the environment variable or baseURL)
+            const url = `${baseUrl}/api/agreement/preview/${uid}`;
+            setPreviewUrl(url);
+        }
+
+        setPreviewModalOpen(true);
+    };
+
+    // Document handlers
+    const handleDeleteDocument = async (docPath: string) => {
+        if (!selectedCustomerDetails?.customerId) return;
+
+        setIsDeletingDocument(docPath);
+        try {
+            // Use the full docPath directly - the API uses wildcard routing to handle nested paths
+            // encodeURIComponent ensures special characters are properly encoded
+            await apiAxios.delete(`/api/documents/${encodeURIComponent(docPath).replace(/%2F/g, '/')}`);
+
+            // Refetch customer details to update UI
+            const result = await fetchCustomerDetails({
+                variables: { uid: selectedCustomerDetails.uid }
+            });
+            if (result.data?.customer) {
+                setSelectedCustomerDetails(result.data.customer);
+            }
+
+            toast.success('Document deleted successfully');
+        } catch (error: any) {
+            console.error('Error deleting document:', error);
+            toast.error(error.response?.data?.error || 'Failed to delete document');
+        } finally {
+            setIsDeletingDocument(null);
+        }
+    };
+
+    const handleUploadDocument = async (documentType: string, file: File, startDate?: string, endDate?: string) => {
+        if (!file) return;
+        if (!selectedCustomerDetails?.customerId || !selectedCustomerDetails?.uid) return;
+
+        setIsUploadingDocument(documentType);
+        try {
+            const formData = new FormData();
+            formData.append('customerId', selectedCustomerDetails.customerId);
+            formData.append('customer_uid', selectedCustomerDetails.uid);
+            let apiDocType = documentType;
+            let docName = documentType;
+
+            if (documentType === 'previousBill') {
+                apiDocType = 'previous_bill';
+                docName = 'Previous Bill';
+            } else if (documentType === 'identityProof') {
+                apiDocType = 'identity_proof';
+                docName = 'Identity Proof';
+            } else {
+                // For other documents, try to find a nice label or just use the type
+                const option = DOCUMENT_TYPE_OPTIONS.find(o => o.value === documentType);
+                docName = option ? option.label : documentType;
+            }
+
+            formData.append('documentType', apiDocType);
+            formData.append('name', docName);
+            if (startDate) formData.append('startDate', startDate);
+            if (endDate) formData.append('endDate', endDate);
+            formData.append('file', file);
+
+            await apiAxios.post('/api/documents/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            // Refetch customer details to update UI
+            const result = await fetchCustomerDetails({
+                variables: { uid: selectedCustomerDetails.uid }
+            });
+            if (result.data?.customer) {
+                setSelectedCustomerDetails(result.data.customer);
+            }
+
+            toast.success('Document uploaded successfully');
+            setIsAddingDocument(false);
+            setNewDocumentType('');
+            // Reset dates
+            setBillStartDate('');
+            setBillEndDate('');
+        } catch (error: any) {
+            console.error('Error uploading document:', error);
+            toast.error(error.response?.data?.error || 'Failed to upload document');
+        } finally {
+            setIsUploadingDocument(null);
         }
     };
 
@@ -487,6 +675,15 @@ export function CustomersPage() {
         }
     }, [data, currentPage]);
 
+
+    const noteTypeOptions = [
+        { label: 'Select a note type...', value: '' },
+        ...(noteTypesData?.noteTypes?.map((t: any) => ({
+            label: t.name,
+            value: t.uid
+        })) || []),
+    ];
+
     const handlePageChange = (newPage: number) => {
         if (newPage < 1) return;
         // Prevent going to next page if we don't have a cursor for it, unless it's page 1
@@ -524,6 +721,10 @@ export function CustomersPage() {
         inverterCapacity: '',
         checkCode: ''
     });
+
+    // Date state for electricity bill upload
+    const [billStartDate, setBillStartDate] = useState<string>('');
+    const [billEndDate, setBillEndDate] = useState<string>('');
     const [vppConnectModalOpen, setVppConnectModalOpen] = useState(false);
     const [utilmateConnectModalOpen, setUtilmateConnectModalOpen] = useState(false);
 
@@ -615,6 +816,7 @@ export function CustomersPage() {
                 vppDetails: {
                     ...selectedCustomerDetails.vppDetails,
                     vpp: 1,
+                    vppConnected: input.vppDetails.vppConnected,
                     vppSignupBonus: input.vppDetails.vppSignupBonus
                 },
                 batteryDetails: input.batteryDetails
@@ -1156,11 +1358,21 @@ export function CustomersPage() {
         setSelectedCustomerDetails(null);
 
         try {
-            const { data } = await fetchCustomerDetails({
+            const result = await fetchCustomerDetails({
                 variables: { uid: customer.uid }
             });
-            if (data?.customer) {
-                setSelectedCustomerDetails(data.customer);
+
+            console.log('fetchCustomerDetails result:', result);
+
+            if (result.error) {
+                console.error('GraphQL error:', result.error);
+            }
+
+            if (result.data?.customer) {
+                console.log('Setting customer details:', result.data.customer);
+                setSelectedCustomerDetails(result.data.customer);
+            } else {
+                console.warn('No customer data in response:', result.data);
             }
         } catch (err) {
             console.error('Failed to fetch customer details:', err);
@@ -1746,6 +1958,18 @@ export function CustomersPage() {
                                     <p className="text-xs text-muted-foreground">Track each milestone and when it happened.</p>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    {selectedCustomerDetails && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900/30"
+                                            onClick={() => handlePreviewOffer(selectedCustomerDetails.uid)}
+                                            isLoading={isLoadingPreview}
+                                            leftIcon={<EyeIcon size={14} />}
+                                        >
+                                            {selectedCustomerDetails.signedPdfPath ? 'View Signed Agreement' : 'Preview Offer'}
+                                        </Button>
+                                    )}
                                     {selectedCustomerDetails.status !== 5 && (
                                         <Button
                                             size="sm"
@@ -1781,7 +2005,7 @@ export function CustomersPage() {
                                         { label: 'VPP connect', date: null, completed: selectedCustomerDetails.vppDetails?.vppConnected === 1, showToggle: true, disabled: selectedCustomerDetails.status < 2, step: 3 },
                                     ] : []),
                                     { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1, step: 4 },
-                                    { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: selectedCustomerDetails.msatDetails?.msatConnected !== 1, step: 5 },
+                                    { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.msatDetails?.msatConnected !== 1, step: 5 },
                                 ].map((item, index, arr) => (
                                     <div key={index} className="relative flex flex-col items-center" style={{ width: `${100 / arr.length}%` }}>
                                         {index > 0 && (
@@ -1978,6 +2202,36 @@ export function CustomersPage() {
                                         ),
                                     }] : []),
                                     {
+                                        id: 'electricity_bills',
+                                        label: 'Electricity Bills',
+                                        mobileLabel: 'Bills',
+                                        icon: (
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${selectedDetailSection === 'electricity_bills' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/50 dark:text-yellow-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                                                <ZapIcon className="w-4 h-4" />
+                                            </div>
+                                        ),
+                                        badge: (selectedCustomerDetails.documents?.some(d => d.type === '2')) ? (
+                                            <span className="ml-auto px-2 py-0.5 text-[10px] font-medium bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400 rounded-full hidden lg:block">
+                                                {selectedCustomerDetails.documents?.filter(d => d.type === '2').length}
+                                            </span>
+                                        ) : undefined
+                                    },
+                                    {
+                                        id: 'documents',
+                                        label: 'Documents',
+                                        mobileLabel: 'Docs',
+                                        icon: (
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${selectedDetailSection === 'documents' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/50 dark:text-orange-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                                                <IdCardIcon className="w-4 h-4" />
+                                            </div>
+                                        ),
+                                        badge: (selectedCustomerDetails.previousBill?.path || selectedCustomerDetails.identityProof?.path) ? (
+                                            <span className="ml-auto px-2 py-0.5 text-[10px] font-medium bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-400 rounded-full hidden lg:block">
+                                                Active
+                                            </span>
+                                        ) : undefined
+                                    },
+                                    {
                                         id: 'notes',
                                         label: 'Notes',
                                         mobileLabel: 'Notes',
@@ -1990,7 +2244,7 @@ export function CustomersPage() {
                                 ].map((item) => (
                                     <button
                                         key={item.id}
-                                        onClick={() => setSelectedDetailSection(item.id as 'info' | 'location' | 'account' | 'rates' | 'solar' | 'debit' | 'vpp' | 'utilmate' | 'notes')}
+                                        onClick={() => setSelectedDetailSection(item.id as 'info' | 'location' | 'account' | 'rates' | 'solar' | 'debit' | 'vpp' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills')}
                                         className={`flex-1 flex flex-col lg:flex-row items-center lg:w-full gap-1 lg:gap-3 p-2 rounded-xl text-sm font-medium transition-all ${selectedDetailSection === item.id
                                             ? 'bg-card shadow-sm border border-border text-foreground ring-1 ring-primary/5'
                                             : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
@@ -2007,6 +2261,398 @@ export function CustomersPage() {
 
                             {/* Content Area */}
                             <div className="w-full flex-1 bg-card rounded-xl border border-border p-4 shadow-sm min-h-[400px] flex flex-col">
+                                {selectedDetailSection === 'electricity_bills' && (
+                                    <div className="space-y-4 animate-in fade-in duration-300">
+                                        <div className="flex items-center justify-between border-b border-border pb-4">
+                                            <div>
+                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Electricity Bills</h3>
+                                                <p className="text-[10px] text-muted-foreground">Manage electricity bill documents</p>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                                onClick={() => setIsAddingDocument(true)}
+                                            >
+                                                <PlusIcon className="w-4 h-4 mr-1" />
+                                                Add Bill
+                                            </Button>
+                                        </div>
+
+                                        {/* Hidden file input for bill upload */}
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                            className="hidden"
+                                            ref={newDocumentInputRef}
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) handleUploadDocument('electricity_bill', file, billStartDate, billEndDate);
+                                                e.target.value = '';
+                                            }}
+                                        />
+
+                                        <Modal
+                                            isOpen={isAddingDocument}
+                                            onClose={() => setIsAddingDocument(false)}
+                                            title="Upload Electricity Bill"
+                                            size="md"
+                                        >
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-medium text-foreground">Start Date</label>
+                                                        <Input
+                                                            type="date"
+                                                            value={billStartDate}
+                                                            onChange={(e) => setBillStartDate(e.target.value)}
+                                                            className="w-full"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-medium text-foreground">End Date</label>
+                                                        <Input
+                                                            type="date"
+                                                            value={billEndDate}
+                                                            onChange={(e) => setBillEndDate(e.target.value)}
+                                                            className="w-full"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex justify-end gap-3 pt-4">
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={() => setIsAddingDocument(false)}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                                        disabled={isUploadingDocument !== null}
+                                                        onClick={() => newDocumentInputRef.current?.click()}
+                                                        isLoading={isUploadingDocument === 'electricity_bill'}
+                                                    >
+                                                        <UploadIcon className="w-4 h-4 mr-2" />
+                                                        Select File & Upload
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </Modal>
+
+                                        <div className="overflow-hidden rounded-xl border border-border bg-background">
+                                            <div className="overflow-auto max-h-[300px]">
+                                                <table className="w-full text-left text-sm">
+                                                    <thead className="bg-muted/50 border-b border-border">
+                                                        <tr>
+                                                            <th className="px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Document Name</th>
+                                                            <th className="px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Start Date</th>
+                                                            <th className="px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">End Date</th>
+                                                            <th className="px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Uploaded By</th>
+                                                            <th className="px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Uploaded At</th>
+                                                            <th className="px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px] text-right">Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-border">
+                                                        {(selectedCustomerDetails.documents?.filter(d => d.type === '2') || []).length > 0 ? (
+                                                            selectedCustomerDetails.documents?.filter(d => d.type === '2').map((doc, idx) => (
+                                                                <tr key={idx} className="hover:bg-muted/30 transition-colors group">
+                                                                    <td className="px-4 py-3">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="w-8 h-8 rounded flex items-center justify-center bg-yellow-100 text-yellow-600 dark:bg-yellow-900/50 dark:text-yellow-400">
+                                                                                <ZapIcon className="w-4 h-4" />
+                                                                            </div>
+                                                                            <div className="flex flex-col">
+                                                                                <span className="font-medium text-foreground">{doc.name || 'Electricity Bill'}</span>
+                                                                                <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={doc.filename}>{doc.filename}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                                                                        {(doc as any).startDate ? formatSydneyTime((doc as any).startDate, 'DD/MM/YYYY') : <span className="text-muted-foreground italic">—</span>}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                                                                        {(doc as any).endDate ? formatSydneyTime((doc as any).endDate, 'DD/MM/YYYY') : <span className="text-muted-foreground italic">—</span>}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-muted-foreground">
+                                                                        <span className="text-foreground font-medium">{(doc as any).createdByUser?.name || (doc as any).createdBy || 'System'}</span>
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                                                                        {doc.createdAt ? formatSydneyTime(doc.createdAt) : <span className="text-muted-foreground italic">—</span>}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-right">
+                                                                        <div className="flex items-center justify-end gap-2">
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                className="h-8 px-3 text-xs font-medium border-border hover:bg-muted transition-colors"
+                                                                                onClick={() => window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/documents/${encodeURIComponent(doc.path!).replace(/%2F/g, '/')}`, '_blank')}
+                                                                            >
+                                                                                <EyeIcon className="w-3.5 h-3.5 mr-1.5" />
+                                                                                View
+                                                                            </Button>
+                                                                            <ConfirmationPopover
+                                                                                title="Delete Bill"
+                                                                                description="Are you sure you want to delete this bill? This action cannot be undone."
+                                                                                confirmText="Delete"
+                                                                                onConfirm={() => handleDeleteDocument(doc.path!)}
+                                                                                confirmVariant="destructive"
+                                                                            >
+                                                                                <Button
+                                                                                    variant="outline"
+                                                                                    size="sm"
+                                                                                    className="h-8 px-3 text-xs font-medium border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-900/30"
+                                                                                    disabled={isDeletingDocument === doc.path}
+                                                                                    isLoading={isDeletingDocument === doc.path}
+                                                                                    loadingText="Deleting..."
+                                                                                >
+                                                                                    <TrashIcon className="w-3.5 h-3.5 mr-1.5" />
+                                                                                    Delete
+                                                                                </Button>
+                                                                            </ConfirmationPopover>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ))
+                                                        ) : (
+                                                            <tr>
+                                                                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-xs">
+                                                                    No electricity bills uploaded yet.
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedDetailSection === 'documents' && (
+                                    <div className="space-y-4 animate-in fade-in duration-300">
+                                        <div className="flex items-center justify-between border-b border-border pb-4">
+                                            <div>
+                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Documents</h3>
+                                                <p className="text-[10px] text-muted-foreground">Manage customer documents</p>
+                                            </div>
+                                            {!isAddingDocument && (
+                                                <Button
+                                                    size="sm"
+                                                    className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                                    onClick={() => setIsAddingDocument(true)}
+                                                >
+                                                    <PlusIcon className="w-4 h-4 mr-1" />
+                                                    Add Document
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {/* Hidden file inputs for upload */}
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                            className="hidden"
+                                            ref={previousBillInputRef}
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) handleUploadDocument('previousBill', file);
+                                                e.target.value = '';
+                                            }}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                            className="hidden"
+                                            ref={identityProofInputRef}
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) handleUploadDocument('identityProof', file);
+                                                e.target.value = '';
+                                            }}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                            className="hidden"
+                                            ref={newDocumentInputRef}
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file && newDocumentType) handleUploadDocument(newDocumentType, file);
+                                                e.target.value = '';
+                                            }}
+                                        />
+
+                                        {isAddingDocument && (
+                                            <div className="bg-muted/30 border border-dashed border-border rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+                                                <div className="flex items-end gap-3">
+                                                    <div className="flex-1 space-y-2">
+                                                        <label className="text-xs font-semibold uppercase text-muted-foreground">Document Type</label>
+                                                        <Select
+                                                            options={DOCUMENT_TYPE_OPTIONS}
+                                                            value={newDocumentType}
+                                                            onChange={(val) => setNewDocumentType(val as string)}
+                                                            placeholder="Select Type..."
+                                                            className="w-full bg-background"
+                                                        />
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                setIsAddingDocument(false);
+                                                                setNewDocumentType('');
+                                                            }}
+                                                            className="border-input hover:bg-accent hover:text-accent-foreground"
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                        <Button
+                                                            className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                                            disabled={!newDocumentType || isUploadingDocument !== null}
+                                                            onClick={() => newDocumentInputRef.current?.click()}
+                                                            isLoading={isUploadingDocument !== null && isUploadingDocument === newDocumentType}
+                                                        >
+                                                            <UploadIcon className="w-4 h-4 mr-2" />
+                                                            Select File & Upload
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="overflow-hidden rounded-xl border border-border bg-background">
+                                            <table className="w-full text-left text-sm">
+                                                <thead className="bg-muted/50 border-b border-border">
+                                                    <tr>
+                                                        <th className="px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Document Type</th>
+                                                        <th className="px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Uploaded By</th>
+                                                        <th className="px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Uploaded At</th>
+                                                        <th className="px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px] text-right">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-border">
+                                                    {[
+                                                        {
+                                                            doc: selectedCustomerDetails.previousBill,
+                                                            label: 'Previous Bill',
+                                                            type: 'previousBill'
+                                                        },
+                                                        {
+                                                            doc: selectedCustomerDetails.identityProof,
+                                                            label: 'Identity Proof',
+                                                            type: 'identityProof'
+                                                        },
+                                                        ...(selectedCustomerDetails.documents?.filter(d =>
+                                                            d.uid !== selectedCustomerDetails.previousBill?.uid &&
+                                                            d.uid !== selectedCustomerDetails.identityProof?.uid &&
+                                                            d.type !== '2' // Exclude electricity bills
+                                                        ).map(d => {
+                                                            const option = DOCUMENT_TYPE_OPTIONS.find(o => o.value === d.type);
+                                                            // If type is generic '0' or mismatched, prioritize the saved name
+                                                            const label = (d.type === '0' || !option) && d.name ? d.name : (option ? option.label : d.type || 'Document');
+
+                                                            return {
+                                                                doc: d,
+                                                                label: label,
+                                                                type: d.type || 'other'
+                                                            };
+                                                        }) || [])
+                                                    ].map((item, idx) => (
+                                                        <tr key={idx} className="hover:bg-muted/30 transition-colors group">
+                                                            <td className="px-4 py-3">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className={cn(
+                                                                        "w-8 h-8 rounded flex items-center justify-center",
+                                                                        item.doc?.path ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                                                                    )}>
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                    <div className="flex flex-col">
+                                                                        <span className="font-medium text-foreground">{item.label}</span>
+                                                                        {item.doc?.filename && (
+                                                                            <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={item.doc.filename}>
+                                                                                {item.doc.filename}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-muted-foreground">
+                                                                {item.doc?.path ? (
+                                                                    <span className="text-foreground font-medium">
+                                                                        {(item.doc as any).createdByUser?.name || (item.doc as any).createdBy || 'System'}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-muted-foreground italic">—</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                                                                {item.doc?.path && (item.doc as any).createdAt
+                                                                    ? formatSydneyTime((item.doc as any).createdAt)
+                                                                    : <span className="text-muted-foreground italic">—</span>
+                                                                }
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    {item.doc?.path ? (
+                                                                        <>
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                className="h-8 px-3 text-xs font-medium border-border hover:bg-muted transition-colors"
+                                                                                onClick={() => window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/documents/${encodeURIComponent(item.doc!.path!).replace(/%2F/g, '/')}`, '_blank')}
+                                                                            >
+                                                                                <EyeIcon className="w-3.5 h-3.5 mr-1.5" />
+                                                                                View
+                                                                            </Button>
+                                                                            <ConfirmationPopover
+                                                                                title="Delete Document"
+                                                                                description={`Are you sure you want to delete this ${item.label}? This action cannot be undone.`}
+                                                                                confirmText="Delete"
+                                                                                onConfirm={() => handleDeleteDocument(item.doc!.path!)}
+                                                                                confirmVariant="destructive"
+                                                                            >
+                                                                                <Button
+                                                                                    variant="outline"
+                                                                                    size="sm"
+                                                                                    className="h-8 px-3 text-xs font-medium border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-900/30"
+                                                                                    disabled={isDeletingDocument === item.doc!.path}
+                                                                                    isLoading={isDeletingDocument === item.doc!.path}
+                                                                                    loadingText="Deleting..."
+                                                                                >
+                                                                                    <TrashIcon className="w-3.5 h-3.5 mr-1.5" />
+                                                                                    Delete
+                                                                                </Button>
+                                                                            </ConfirmationPopover>
+                                                                        </>
+                                                                    ) : (
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-8 px-3 text-xs font-medium border-primary/50 text-primary hover:bg-primary/10"
+                                                                            // Only allow upload for mapped types if it is specifically previousBill or identityProof
+                                                                            onClick={() => {
+                                                                                if (item.type === 'previousBill') previousBillInputRef.current?.click();
+                                                                                else if (item.type === 'identityProof') identityProofInputRef.current?.click();
+                                                                            }}
+                                                                            disabled={isUploadingDocument === item.type}
+                                                                            isLoading={isUploadingDocument === item.type}
+                                                                            loadingText="Uploading..."
+                                                                        >
+                                                                            <UploadIcon className="w-3.5 h-3.5 mr-1.5" />
+                                                                            Upload
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                    </div>
+                                )}
                                 {selectedDetailSection === 'info' && (
                                     <div className="space-y-3 animate-in fade-in duration-300">
                                         <div className="flex items-center justify-between border-b border-border pb-3">
@@ -2105,7 +2751,7 @@ export function CustomersPage() {
                                             <div className="space-y-6">
                                                 {selectedCustomerDetails.ratePlan.offers.map((offer, idx) => {
                                                     const discount = selectedCustomerDetails.discount ?? 0;
-                                                    const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0;
+                                                    const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0;
                                                     const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0;
 
                                                     return (
@@ -2118,30 +2764,43 @@ export function CustomersPage() {
                                                                         <h4 className="text-sm font-bold uppercase tracking-wide">Energy Rates</h4>
                                                                     </div>
                                                                     <div className="space-y-3">
-                                                                        {(offer.peak ?? 0) > 0 && (
-                                                                            <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.peak ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Peak</div>
-                                                                            </div>
-                                                                        )}
-                                                                        {(offer.offPeak ?? 0) > 0 && (
-                                                                            <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.offPeak ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Off-Peak</div>
-                                                                            </div>
-                                                                        )}
-                                                                        {(offer.shoulder ?? 0) > 0 && (
-                                                                            <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.shoulder ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Shoulder</div>
-                                                                            </div>
-                                                                        )}
-                                                                        {(offer.anytime ?? 0) > 0 && (
-                                                                            <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-orange-600 dark:text-orange-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.anytime ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                <div className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider opacity-80">Anytime</div>
-                                                                            </div>
-                                                                        )}
+                                                                        {[
+                                                                            { label: 'Peak', value: offer.peak, type: 'peak' },
+                                                                            { label: 'Off-Peak', value: offer.offPeak, type: 'offPeak' },
+                                                                            { label: 'Shoulder', value: offer.shoulder, type: 'shoulder' },
+                                                                            { label: 'Anytime', value: offer.anytime, type: 'anytime' }
+                                                                        ]
+                                                                            .filter(rate => (rate.value ?? 0) > 0)
+                                                                            .sort((a, b) => calculateDiscountedRate(a.value ?? 0, discount) - calculateDiscountedRate(b.value ?? 0, discount))
+                                                                            .map((rate, idx) => {
+                                                                                const isAnytime = rate.type === 'anytime';
+                                                                                const price = calculateDiscountedRate(rate.value ?? 0, discount);
+
+                                                                                return (
+                                                                                    <div
+                                                                                        key={idx}
+                                                                                        className={cn(
+                                                                                            "border rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm",
+                                                                                            isAnytime
+                                                                                                ? "bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800"
+                                                                                                : "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800"
+                                                                                        )}
+                                                                                    >
+                                                                                        <div className={cn(
+                                                                                            "font-bold text-base tracking-tight",
+                                                                                            isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
+                                                                                        )}>
+                                                                                            ${price.toFixed(4)}/kWh
+                                                                                        </div>
+                                                                                        <div className={cn(
+                                                                                            "text-[10px] font-bold uppercase tracking-wider opacity-80",
+                                                                                            isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
+                                                                                        )}>
+                                                                                            {rate.label}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
                                                                     </div>
                                                                 </div>
 
@@ -2179,30 +2838,34 @@ export function CustomersPage() {
                                                                             <h4 className="text-sm font-bold uppercase tracking-wide">Solar FiT</h4>
                                                                         </div>
                                                                         <div className="space-y-3">
-                                                                            {(offer.fit ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fit ?? 0).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">Feed-in</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {(offer.fitPeak ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitPeak ?? 0).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT Peak</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {(offer.fitCritical ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitCritical ?? 0).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT Critical</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {(offer.fitVpp ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitVpp ?? 0).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT VPP</div>
-                                                                                </div>
-                                                                            )}
+                                                                            {[
+                                                                                { label: 'Feed-in', value: offer.fit, type: 'fit' },
+                                                                                { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
+                                                                                { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
+                                                                                { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' }
+                                                                            ]
+                                                                                .filter(rate => {
+                                                                                    if ((rate.value ?? 0) <= 0) return false;
+                                                                                    const isVppActive = selectedCustomerDetails.vppDetails?.vpp === 1;
+                                                                                    const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
+
+                                                                                    if (rate.type === 'fit') return !isVppActive;
+                                                                                    return isVppActive || !hasSolar;
+                                                                                })
+                                                                                .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+                                                                                .map((rate, idx) => (
+                                                                                    <div
+                                                                                        key={idx}
+                                                                                        className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
+                                                                                    >
+                                                                                        <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">
+                                                                                            ${(rate.value ?? 0).toFixed(4)}/kWh
+                                                                                        </div>
+                                                                                        <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">
+                                                                                            {rate.label}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -2215,18 +2878,24 @@ export function CustomersPage() {
                                                                             <h4 className="text-sm font-bold uppercase tracking-wide">Controlled Load</h4>
                                                                         </div>
                                                                         <div className="space-y-3">
-                                                                            {(offer.cl1Usage ?? 0) > 0 && (
-                                                                                <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.cl1Usage ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Usage</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {(offer.cl2Usage ?? 0) > 0 && (
-                                                                                <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.cl2Usage ?? 0, discount).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Usage</div>
-                                                                                </div>
-                                                                            )}
+                                                                            {[
+                                                                                { label: 'CL1 Usage', value: offer.cl1Usage, type: 'cl1_usage' },
+                                                                                { label: 'CL2 Usage', value: offer.cl2Usage, type: 'cl2_usage' },
+                                                                                { label: 'CL1 Supply', value: offer.cl1Supply, type: 'cl1_supply' },
+                                                                                { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply' }
+                                                                            ]
+                                                                                .filter(rate => (rate.value ?? 0) > 0)
+                                                                                .map((rate, idx) => {
+                                                                                    const isUsage = rate.type.endsWith('_usage');
+                                                                                    const price = isUsage ? calculateDiscountedRate(rate.value ?? 0, discount) : (rate.value ?? 0);
+                                                                                    const unit = isUsage ? 'kWh' : 'day';
+                                                                                    return (
+                                                                                        <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${price.toFixed(4)}/{unit}</div>
+                                                                                            <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{rate.label}</div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -2240,8 +2909,6 @@ export function CustomersPage() {
                                         )}
                                     </div>
                                 )}
-
-
 
                                 {selectedDetailSection === 'solar' && (
                                     <div className="space-y-4 animate-in fade-in duration-300">
@@ -2589,40 +3256,104 @@ export function CustomersPage() {
                                             </Button>
                                         </div>
 
-                                        {/* Notes List */}
-                                        <div className="flex-1 overflow-y-auto space-y-2 max-h-[350px]">
+                                        {/* Notes List - Standard View */}
+                                        <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[400px]">
                                             {notesLoading ? (
-                                                <div className="flex items-center justify-center py-6">
-                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
+                                                <div className="flex items-center justify-center py-12">
+                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                                                </div>
+                                            ) : notesError ? (
+                                                <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-6 text-center">
+                                                    <InfoIcon className="w-8 h-8 text-destructive mx-auto mb-3" />
+                                                    <h4 className="text-sm font-semibold text-destructive mb-1">Failed to load notes</h4>
+                                                    <p className="text-xs text-destructive/80 mb-4">{notesError.message}</p>
+                                                    <Button variant="outline" size="sm" onClick={() => refetchNotes()}>
+                                                        Try Again
+                                                    </Button>
                                                 </div>
                                             ) : notesData?.customerNotes?.length > 0 ? (
-                                                notesData.customerNotes.map((note: any) => (
-                                                    <div key={note.uid} className="bg-muted/30 border border-border/50 rounded-lg p-3 group hover:bg-muted/50 transition-colors">
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div className="flex-1 space-y-1">
-                                                                <p className="text-sm text-foreground whitespace-pre-wrap leading-snug">{note.message}</p>
-                                                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                                                    <span className="font-medium">{note.createdByName || 'Unknown'}</span>
-                                                                    <span>•</span>
-                                                                    <span>{formatSydneyTime(note.createdAt)}</span>
+                                                <div className="space-y-3">
+                                                    {notesData.customerNotes.map((note: any) => {
+                                                        const typeConfig: Record<string, { color: string, icon: any, bg: string }> = {
+                                                            sales: { color: 'text-emerald-700', bg: 'bg-emerald-100', icon: ActivityIcon },
+                                                            technical: { color: 'text-blue-700', bg: 'bg-blue-100', icon: Settings2Icon },
+                                                            billing: { color: 'text-amber-700', bg: 'bg-amber-100', icon: ZapIcon },
+                                                            follow_up: { color: 'text-purple-700', bg: 'bg-purple-100', icon: CalendarIcon },
+                                                            general: { color: 'text-slate-700', bg: 'bg-slate-100', icon: InfoIcon }
+                                                        };
+                                                        const normalizedType = (note.type || 'general').toLowerCase();
+                                                        const config = typeConfig[normalizedType] || typeConfig.general;
+                                                        const IconComponent = config.icon;
+
+                                                        return (
+                                                            <div key={note.uid} className="bg-white dark:bg-neutral-900 border border-border/60 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                                                <div className="p-4">
+                                                                    <div className="flex items-start justify-between mb-2">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1", config.bg, config.color)}>
+                                                                                <IconComponent className="w-2.5 h-2.5" />
+                                                                                {note.noteTypeDetails?.name || note.type || 'General'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => handleDeleteNote(note.uid)}
+                                                                            className="text-muted-foreground hover:text-destructive transition-colors"
+                                                                            title="Delete note"
+                                                                        >
+                                                                            <XIcon className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+
+                                                                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed mb-4">
+                                                                        {note.message}
+                                                                    </p>
+
+                                                                    <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/40 text-[10px]">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-bold">
+                                                                                    {note.createdByName?.charAt(0) || 'U'}
+                                                                                </div>
+                                                                                <div className="flex flex-col">
+                                                                                    <span className="text-foreground font-semibold">{note.createdByName || 'Unknown'}</span>
+                                                                                    <span className="text-muted-foreground">{formatSydneyTime(note.createdAt, 'DD/MM/YYYY h:mm A')}</span>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {note.assignedToUser?.name && (
+                                                                                <div className="flex items-center gap-1.5 border-l border-border/50 pl-3">
+                                                                                    <UserIcon className="w-3 h-3 text-primary" />
+                                                                                    <div className="flex flex-col">
+                                                                                        <span className="text-muted-foreground uppercase text-[8px] font-bold tracking-tighter">Assigned To</span>
+                                                                                        <span className="text-foreground font-semibold">{note.assignedToUser.name}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {note.followUp && (
+                                                                            <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                                                                <CalendarIcon className="w-3 h-3" />
+                                                                                <span className="font-bold">Follow-up: {formatSydneyTime(note.followUp, 'DD/MM/YYYY')}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                            <button
-                                                                onClick={() => handleDeleteNote(note.uid)}
-                                                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-all"
-                                                                title="Delete note"
-                                                            >
-                                                                <XIcon className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))
+                                                        );
+                                                    })}
+                                                </div>
                                             ) : (
-                                                <div className="text-center py-8">
-                                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-2">
-                                                        <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                                <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/5 border-2 border-dashed border-border/40 rounded-2xl">
+                                                    <div className="w-12 h-12 rounded-full bg-muted/20 flex items-center justify-center mb-3">
+                                                        <InfoIcon className="w-6 h-6 text-muted-foreground/30" />
                                                     </div>
-                                                    <p className="text-xs text-muted-foreground">No notes yet</p>
+                                                    <h4 className="text-sm font-semibold text-foreground">No notes recorded</h4>
+                                                    <p className="text-xs text-muted-foreground mt-1 max-w-[180px]">Add a new note to start tracking customer interactions.</p>
+                                                    <Button variant="ghost" size="sm" className="mt-4 text-xs h-8" onClick={() => setNoteModalOpen(true)}>
+                                                        <PlusIcon className="w-3.5 h-3.5 mr-1.5" />
+                                                        Add First Note
+                                                    </Button>
                                                 </div>
                                             )}
                                         </div>
@@ -2853,19 +3584,110 @@ export function CustomersPage() {
                     </>
                 }
             >
-                <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                        Add an internal note about this customer.
-                    </p>
-                    <textarea
-                        value={noteText}
-                        onChange={(e) => setNoteText(e.target.value)}
-                        placeholder="Write a note..."
-                        className="w-full min-h-[120px] p-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
-                        autoFocus
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase text-muted-foreground">Note Message</label>
+                        <textarea
+                            value={noteText}
+                            onChange={(e) => setNoteText(e.target.value)}
+                            placeholder="Write a note..."
+                            className="w-full min-h-[100px] p-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                            autoFocus
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">Note Type</label>
+                                {canManageNoteTypes && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsAddingNewTypeInline(!isAddingNewTypeInline);
+                                            setNewTypeName('');
+                                        }}
+                                        className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                    >
+                                        {isAddingNewTypeInline ? 'Cancel' : '+ Add New Type'}
+                                    </button>
+                                )}
+                            </div>
+                            {canManageNoteTypes && isAddingNewTypeInline ? (
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Type name..."
+                                        value={newTypeName}
+                                        onChange={(e) => setNewTypeName(e.target.value)}
+                                        className="h-9"
+                                        autoFocus
+                                    />
+                                    <Button
+                                        size="sm"
+                                        className="h-9 px-3 bg-neutral-900 text-white hover:bg-neutral-800"
+                                        onClick={handleCreateNoteType}
+                                        disabled={!newTypeName.trim() || isAddingNoteType}
+                                        isLoading={isAddingNoteType}
+                                    >
+                                        Add
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Select
+                                    options={noteTypeOptions}
+                                    value={noteType}
+                                    onChange={(val) => setNoteType(val as string)}
+                                    className="w-full"
+                                />
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Assigned To</label>
+                            <Select
+                                options={userOptions}
+                                value={noteAssignedTo}
+                                onChange={(val) => setNoteAssignedTo(val as string)}
+                                placeholder="Select a user..."
+                                className="w-full"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <DatePicker
+                                label="Follow-up Date"
+                                value={noteFollowUp}
+                                onChange={(date) => setNoteFollowUp(date)}
+                                placeholder="Select follow-up date..."
+                            />
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={previewModalOpen}
+                onClose={() => setPreviewModalOpen(false)}
+                title={selectedCustomerDetails?.signedPdfPath ? "Signed Agreement" : "Offer Summary Preview"}
+                size="full"
+            >
+                <div className="h-[80vh] w-full bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden flex flex-col relative">
+                    {isLoadingPreview && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 dark:bg-black/80 z-10">
+                            <ActivityIcon className="h-10 w-10 text-primary animate-pulse mb-3" />
+                            <p className="text-sm font-medium text-foreground">Generating PDF Preview...</p>
+                            <p className="text-xs text-muted-foreground mt-1">This may take a few seconds</p>
+                        </div>
+                    )}
+                    <iframe
+                        src={previewUrl}
+                        className="w-full h-full border-0"
+                        title={selectedCustomerDetails?.signedPdfPath ? "Signed Agreement" : "PDF Preview"}
+                        onLoad={() => setIsLoadingPreview(false)}
                     />
                 </div>
             </Modal>
+
         </div>
     );
 }

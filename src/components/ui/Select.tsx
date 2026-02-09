@@ -73,7 +73,7 @@ export function Select({
         }
 
         return options.filter(option =>
-            option.label.toLowerCase().includes(searchQuery.toLowerCase())
+            (option.label || '').toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [options, searchQuery, value, multiple]);
 
@@ -115,7 +115,7 @@ export function Select({
         if (selectedValues.length === 0) return '';
         if (multiple) {
             return selectedValues
-                .map(v => options.find(o => o.value === v)?.label)
+                .map(v => options.find(o => o.value === v)?.label || '')
                 .filter(Boolean)
                 .join(', ');
         }

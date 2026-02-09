@@ -8,22 +8,80 @@ export const GET_CUSTOMER_NOTES = gql`
             customerUid
             userUid
             message
+            followUp
+            assignedTo
+            assignedToUser {
+                uid
+                name
+            }
+            type
+            noteTypeDetails {
+                uid
+                name
+                color
+            }
             createdAt
             createdByName
         }
     }
 `;
 
+export const GET_NOTE_TYPES = gql`
+    query GetNoteTypes {
+        noteTypes {
+            uid
+            name
+            color
+        }
+    }
+`;
+
+export const CREATE_NOTE_TYPE = gql`
+    mutation CreateNoteType($name: String!, $color: String) {
+        createNoteType(name: $name, color: $color) {
+            uid
+            name
+            color
+        }
+    }
+`;
+
 export const CREATE_CUSTOMER_NOTE = gql`
-    mutation CreateCustomerNote($customerUid: String!, $message: String!) {
-        createCustomerNote(customerUid: $customerUid, message: $message) {
+    mutation CreateCustomerNote($customerUid: String!, $message: String!, $followUp: Date, $assignedTo: String, $type: String) {
+        createCustomerNote(customerUid: $customerUid, message: $message, followUp: $followUp, assignedTo: $assignedTo, type: $type) {
             id
             uid
             customerUid
             userUid
             message
+            followUp
+            assignedTo
+            assignedToUser {
+                uid
+                name
+            }
+            type
+            noteTypeDetails {
+                uid
+                name
+                color
+            }
             createdAt
             createdByName
+        }
+    }
+`;
+
+export const UPDATE_CUSTOMER_NOTE = gql`
+    mutation UpdateCustomerNote($uid: String!, $message: String, $followUp: Date, $assignedTo: String, $type: String) {
+        updateCustomerNote(uid: $uid, message: $message, followUp: $followUp, assignedTo: $assignedTo, type: $type) {
+            id
+            uid
+            message
+            followUp
+            assignedTo
+            type
+            updatedAt
         }
     }
 `;

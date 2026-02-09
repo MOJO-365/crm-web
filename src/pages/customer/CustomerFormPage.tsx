@@ -42,6 +42,11 @@ import {
 } from '@/components/icons';
 import { sendVerification, checkVerification } from '@/lib/twilio';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
+import {
+    uploadDocument,
+    // getDocumentPreviewUrl, isImageFile, isPdfFile,
+} from '@/lib/document-upload';
+import DocumentPreview from '@/components/common/DocumentPreview';
 import LocationAutocomplete from '../LocationAutocomplete';
 import { Modal } from '@/components/common/Modal';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -81,7 +86,7 @@ const ToggleSwitch = ({ checked, onChange }: { checked: boolean, onChange: (chec
 // TYPES
 // ============================================================================
 
-import type { CustomerFormData, RatePlan } from '@/types';
+import type { CustomerFormData, RatePlan, CustomerDocument } from '@/types';
 
 // ============================================================================
 // CONSTANTS
@@ -138,8 +143,13 @@ const initialFormData: CustomerFormData = {
     firstDebitDate: '',
     tariffCode: '',
     discount: 0,
-    previousBillPath: '',
-    identityProof: '',
+    previousBill: null,
+    identityProof: null,
+};
+
+const generateGEECustomerId = () => {
+    const randomNum = Math.floor(10000 + Math.random() * 90000);
+    return `GEE${randomNum}`;
 };
 
 const streetTypeOptions = [
@@ -204,11 +214,17 @@ const SummaryItem = ({ icon: Icon, label, value, className }: { icon: any, label
 );
 
 // ============================================================================
+// DOCUMENT PREVIEW COMPONENT
+// ============================================================================
+
+
+
+// ============================================================================
 // RATE DETAILS COMPONENT
 // ============================================================================
 
-const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) => {
-    const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0;
+const RateDetailsView = ({ offer, discount, hasSolar, vpp }: { offer: any, discount: number, hasSolar: boolean, vpp: boolean }) => {
+    const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0;
     const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0;
 
     return (
@@ -221,30 +237,33 @@ const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) 
                         <Settings2Icon size={14} />
                         <span className="text-xs font-bold uppercase tracking-wide">Energy Rates</span>
                     </div>
-                    {offer.peak > 0 && (
-                        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center">
-                            <div className="text-blue-600 dark:text-blue-400 font-bold text-sm">${calculateDiscountedRate(offer.peak, discount).toFixed(4)}/kWh</div>
-                            <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Peak</div>
-                        </div>
-                    )}
-                    {offer.offPeak > 0 && (
-                        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center">
-                            <div className="text-blue-600 dark:text-blue-400 font-bold text-sm">${calculateDiscountedRate(offer.offPeak, discount).toFixed(4)}/kWh</div>
-                            <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Off-Peak</div>
-                        </div>
-                    )}
-                    {offer.shoulder > 0 && (
-                        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center">
-                            <div className="text-blue-600 dark:text-blue-400 font-bold text-sm">${calculateDiscountedRate(offer.shoulder, discount).toFixed(4)}/kWh</div>
-                            <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Shoulder</div>
-                        </div>
-                    )}
-                    {offer.anytime > 0 && (
-                        <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 text-center">
-                            <div className="text-orange-600 dark:text-orange-400 font-bold text-sm">${calculateDiscountedRate(offer.anytime, discount).toFixed(4)}/kWh</div>
-                            <div className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider opacity-80">Anytime</div>
-                        </div>
-                    )}
+                    {[
+                        { label: 'Peak', value: offer.peak, type: 'peak' },
+                        { label: 'Off-Peak', value: offer.offPeak, type: 'offPeak' },
+                        { label: 'Shoulder', value: offer.shoulder, type: 'shoulder' },
+                        { label: 'Anytime', value: offer.anytime, type: 'anytime' }
+                    ]
+                        .filter(rate => (rate.value ?? 0) > 0)
+                        .sort((a, b) => calculateDiscountedRate(a.value ?? 0, discount) - calculateDiscountedRate(b.value ?? 0, discount))
+                        .map((rate, idx) => {
+                            const isAnytime = rate.type === 'anytime';
+                            const price = calculateDiscountedRate(rate.value ?? 0, discount);
+                            return (
+                                <div key={idx} className={cn(
+                                    "border rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm",
+                                    isAnytime ? "bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800" : "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800"
+                                )}>
+                                    <div className={cn(
+                                        "font-bold text-sm",
+                                        isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
+                                    )}>${price.toFixed(4)}/kWh</div>
+                                    <div className={cn(
+                                        "text-[10px] font-bold uppercase tracking-wider opacity-80",
+                                        isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
+                                    )}>{rate.label}</div>
+                                </div>
+                            );
+                        })}
                 </div>
 
                 {/* Column 2: Supply Charges */}
@@ -253,7 +272,7 @@ const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) 
                         <PlugIcon size={14} />
                         <span className="text-xs font-bold uppercase tracking-wide">Supply Charges</span>
                     </div>
-                    <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center">
+                    <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                         <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${offer.supplyCharge.toFixed(4)}/day</div>
                         <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
                     </div>
@@ -263,7 +282,7 @@ const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) 
                                 <ActivityIcon size={14} />
                                 <span className="text-xs font-bold uppercase tracking-wide">VPP Orchestration Charges</span>
                             </div>
-                            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center">
+                            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                 <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">${offer.vppOrcharge.toFixed(4)}/day</div>
                                 <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">Orchestration</div>
                             </div>
@@ -278,30 +297,24 @@ const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) 
                             <ZapIcon size={14} />
                             <span className="text-xs font-bold uppercase tracking-wide">Solar FiT</span>
                         </div>
-                        {(offer.fit || 0) > 0 && (
-                            <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center">
-                                <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${offer.fit.toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">Feed-in</div>
-                            </div>
-                        )}
-                        {(offer.fitPeak || 0) > 0 && (
-                            <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center">
-                                <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${offer.fitPeak.toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT Peak</div>
-                            </div>
-                        )}
-                        {(offer.fitCritical || 0) > 0 && (
-                            <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center">
-                                <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${offer.fitCritical.toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT Critical</div>
-                            </div>
-                        )}
-                        {(offer.fitVpp || 0) > 0 && (
-                            <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center">
-                                <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${offer.fitVpp.toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT VPP</div>
-                            </div>
-                        )}
+                        {[
+                            { label: 'Feed-in', value: offer.fit, type: 'fit' },
+                            { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
+                            { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
+                            { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' }
+                        ]
+                            .filter(rate => {
+                                if ((rate.value ?? 0) <= 0) return false;
+                                if (rate.type === 'fit') return !vpp;
+                                return vpp || !hasSolar;
+                            })
+                            .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+                            .map((rate, idx) => (
+                                <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
+                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${(rate.value ?? 0).toFixed(4)}/kWh</div>
+                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">{rate.label}</div>
+                                </div>
+                            ))}
                     </div>
                 )}
 
@@ -312,18 +325,24 @@ const RateDetailsView = ({ offer, discount }: { offer: any, discount: number }) 
                             <PlugIcon size={14} />
                             <span className="text-xs font-bold uppercase tracking-wide">Controlled Load</span>
                         </div>
-                        {offer.cl1Usage > 0 && (
-                            <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center">
-                                <div className="text-green-600 dark:text-green-400 font-bold text-sm">${calculateDiscountedRate(offer.cl1Usage, discount).toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Usage</div>
-                            </div>
-                        )}
-                        {offer.cl2Usage > 0 && (
-                            <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center">
-                                <div className="text-green-600 dark:text-green-400 font-bold text-sm">${calculateDiscountedRate(offer.cl2Usage, discount).toFixed(4)}/kWh</div>
-                                <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Usage</div>
-                            </div>
-                        )}
+                        {[
+                            { label: 'CL1 Usage', value: offer.cl1Usage, type: 'cl1_usage' },
+                            { label: 'CL2 Usage', value: offer.cl2Usage, type: 'cl2_usage' },
+                            { label: 'CL1 Supply', value: offer.cl1Supply, type: 'cl1_supply' },
+                            { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply' }
+                        ]
+                            .filter(rate => (rate.value ?? 0) > 0)
+                            .map((rate, idx) => {
+                                const isUsage = rate.type.endsWith('_usage');
+                                const price = isUsage ? calculateDiscountedRate(rate.value ?? 0, discount) : (rate.value ?? 0);
+                                const unit = isUsage ? 'kWh' : 'day';
+                                return (
+                                    <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
+                                        <div className="text-green-600 dark:text-green-400 font-bold text-sm">${price.toFixed(4)}/{unit}</div>
+                                        <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{rate.label}</div>
+                                    </div>
+                                );
+                            })}
                     </div>
                 )}
             </div>
@@ -378,8 +397,13 @@ export const CustomerFormPage = () => {
         fetchPolicy: 'network-only',
     });
 
+    // Document upload state
+    const [generatedCustomerId] = useState(() => isEditMode ? (customerData?.customer?.customerId || generateGEECustomerId()) : generateGEECustomerId());
+    const [uploadingPreviousBill, setUploadingPreviousBill] = useState(false);
+    const [uploadingIdentityProof, setUploadingIdentityProof] = useState(false);
+
     const { data: activeRatesData } = useQuery(GET_ACTIVE_RATES_HISTORY, {
-        fetchPolicy: 'cache-first',
+        fetchPolicy: 'network-only',
     });
 
     const [checkAddressExists] = useLazyQuery(CHECK_ADDRESS_EXISTS);
@@ -502,6 +526,8 @@ export const CustomerFormPage = () => {
                 firstDebitDate: c.debitDetails?.firstDebitDate ? c.debitDetails.firstDebitDate.split('T')[0] : '',
                 tariffCode: c.tariffCode || '',
                 discount: c.discount || 0,
+                previousBill: c.previousBill || null,
+                identityProof: c.identityProof || null,
             });
 
             if (c.phoneVerifiedAt) {
@@ -866,7 +892,10 @@ export const CustomerFormPage = () => {
                     vppSignupBonus: formData.vppSignupBonus ? parseFloat(formData.vppSignupBonus) : undefined,
                 },
                 debitDetails: undefined,
+                previousBill: formData.previousBill?.uid,
+                identityProof: formData.identityProof?.uid,
                 rateVersion: activeRateVersion,
+                customerId: isEditMode ? undefined : generatedCustomerId,
             };
 
             if (isEditMode) {
@@ -1113,7 +1142,7 @@ export const CustomerFormPage = () => {
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="font-medium text-foreground">VPP Participant</span>
-                                                    <span className="text-xs text-muted-foreground">Enrol customer in Virtual Power Plant</span>
+                                                    <span className="text-xs text-muted-foreground">Enroll customer in Virtual Power Plant</span>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3">
@@ -1323,7 +1352,7 @@ export const CustomerFormPage = () => {
                                     <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
                                         {selectedRatePlan?.offers?.map((offer) => {
                                             const discount = formData.discount || 0;
-                                            const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0;
+                                            const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0;
                                             const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0;
 
                                             // Calculate yearly savings estimation
@@ -1427,29 +1456,33 @@ export const CustomerFormPage = () => {
                                                                     <h4 className="text-sm font-bold uppercase tracking-wide">Solar FiT</h4>
                                                                 </div>
                                                                 <div className="space-y-3">
-                                                                    {(offer.fit ?? 0) > 0 && (
+                                                                    {(offer.fit ?? 0) > 0 && !formData.vpp && (
                                                                         <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
                                                                             <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fit ?? 0).toFixed(4)}/kWh</div>
                                                                             <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">Feed-in</div>
                                                                         </div>
                                                                     )}
-                                                                    {(offer.fitPeak ?? 0) > 0 && (
-                                                                        <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitPeak ?? 0).toFixed(4)}/kWh</div>
-                                                                            <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT Peak</div>
-                                                                        </div>
-                                                                    )}
-                                                                    {(offer.fitCritical ?? 0) > 0 && (
-                                                                        <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitCritical ?? 0).toFixed(4)}/kWh</div>
-                                                                            <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT Critical</div>
-                                                                        </div>
-                                                                    )}
-                                                                    {(offer.fitVpp ?? 0) > 0 && (
-                                                                        <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitVpp ?? 0).toFixed(4)}/kWh</div>
-                                                                            <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">FiT VPP</div>
-                                                                        </div>
+                                                                    {(formData.vpp || !formData.hasSolar) && (
+                                                                        <>
+                                                                            {(offer.fitPeak ?? 0) > 0 && (
+                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitPeak ?? 0).toFixed(4)}/kWh</div>
+                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">PREMIUM FiT</div>
+                                                                                </div>
+                                                                            )}
+                                                                            {(offer.fitCritical ?? 0) > 0 && (
+                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitCritical ?? 0).toFixed(4)}/kWh</div>
+                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">CRITICAL EVENT FiT</div>
+                                                                                </div>
+                                                                            )}
+                                                                            {(offer.fitVpp ?? 0) > 0 && (
+                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitVpp ?? 0).toFixed(4)}/kWh</div>
+                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">BASE FIT</div>
+                                                                                </div>
+                                                                            )}
+                                                                        </>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -1469,10 +1502,22 @@ export const CustomerFormPage = () => {
                                                                             <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Usage</div>
                                                                         </div>
                                                                     )}
+                                                                    {(offer.cl1Supply ?? 0) > 0 && (
+                                                                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${(offer.cl1Supply ?? 0).toFixed(4)}/day</div>
+                                                                            <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Supply</div>
+                                                                        </div>
+                                                                    )}
                                                                     {(offer.cl2Usage ?? 0) > 0 && (
                                                                         <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
                                                                             <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.cl2Usage ?? 0, discount).toFixed(4)}/kWh</div>
                                                                             <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Usage</div>
+                                                                        </div>
+                                                                    )}
+                                                                    {(offer.cl2Supply ?? 0) > 0 && (
+                                                                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${(offer.cl2Supply ?? 0).toFixed(4)}/day</div>
+                                                                            <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Supply</div>
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -1518,24 +1563,83 @@ export const CustomerFormPage = () => {
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                                             <Field label="Previous Bill">
-                                                <input
-                                                    type="file"
-                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                    onChange={(e) => {
-                                                        // Handle file upload or state update here
-                                                        console.log('Previous Bill selected:', e.target.files?.[0]);
-                                                    }}
-                                                />
+                                                <div className="space-y-2">
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        disabled={uploadingPreviousBill}
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+
+                                                            setUploadingPreviousBill(true);
+                                                            try {
+                                                                // Use generatedCustomerId for new customers, or existing customerId/uid for edits
+                                                                // For new customers, we use generatedCustomerId for both customerId and uid params to ensure folder creation matches
+                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
+                                                                const result = await uploadDocument(file, targetId!, 'previous_bill', isEditMode ? (uid || undefined) : generatedCustomerId, 'Previous Bill');
+                                                                updateField('previousBill', {
+                                                                    id: result.id,
+                                                                    uid: result.uid,
+                                                                    filename: result.filename,
+                                                                    path: result.path,
+                                                                    size: result.size,
+                                                                    mimeType: result.contentType || 'application/pdf',
+                                                                    createdAt: new Date().toISOString()
+                                                                } as CustomerDocument);
+                                                                toast.success('Previous bill uploaded successfully');
+                                                            } catch (error) {
+                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload file');
+                                                            } finally {
+                                                                setUploadingPreviousBill(false);
+                                                            }
+                                                        }}
+                                                    />
+                                                    {uploadingPreviousBill && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
+                                                    {formData.previousBill && !uploadingPreviousBill && (
+                                                        <DocumentPreview path={formData.previousBill.path} label="Previous Bill" />
+                                                    )}
+                                                </div>
                                             </Field>
                                             <Field label="Identity Proof">
-                                                <input
-                                                    type="file"
-                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                    onChange={(e) => {
-                                                        // Handle file upload or state update here
-                                                        console.log('Identity Proof selected:', e.target.files?.[0]);
-                                                    }}
-                                                />
+                                                <div className="space-y-2">
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        disabled={uploadingIdentityProof}
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+
+                                                            setUploadingIdentityProof(true);
+                                                            try {
+                                                                // Use generatedCustomerId for new customers, or existing customerId/uid for edits
+                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
+                                                                const result = await uploadDocument(file, targetId!, 'identity_proof', isEditMode ? (uid || undefined) : generatedCustomerId, 'Identity Proof');
+                                                                updateField('identityProof', {
+                                                                    id: result.id,
+                                                                    uid: result.uid,
+                                                                    filename: result.filename,
+                                                                    path: result.path,
+                                                                    size: result.size,
+                                                                    mimeType: result.contentType || 'application/pdf',
+                                                                    createdAt: new Date().toISOString()
+                                                                } as CustomerDocument);
+                                                                toast.success('Identity proof uploaded successfully');
+                                                            } catch (error) {
+                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload file');
+                                                            } finally {
+                                                                setUploadingIdentityProof(false);
+                                                            }
+                                                        }}
+                                                    />
+                                                    {uploadingIdentityProof && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
+                                                    {formData.identityProof && !uploadingIdentityProof && (
+                                                        <DocumentPreview path={formData.identityProof.path} label="Identity Proof" />
+                                                    )}
+                                                </div>
                                             </Field>
                                         </div>
                                         <div className="flex flex-wrap gap-6 pt-2">
@@ -1652,7 +1756,12 @@ export const CustomerFormPage = () => {
 
                                         {/* Rate Details - Full Width Section */}
                                         {selectedRatePlan?.offers?.[0] && (
-                                            <RateDetailsView offer={selectedRatePlan.offers[0]} discount={formData.discount || 0} />
+                                            <RateDetailsView
+                                                offer={selectedRatePlan.offers[0]}
+                                                discount={formData.discount || 0}
+                                                hasSolar={formData.hasSolar}
+                                                vpp={formData.vpp}
+                                            />
                                         )}
 
                                         {(formData.hasSolar || formData.batteryBrand || formData.vpp) && (
@@ -1670,10 +1779,10 @@ export const CustomerFormPage = () => {
 
                                                     <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
                                                         <p className="font-medium text-xs uppercase text-muted-foreground mb-1">VPP Participant</p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">Battery Brand:</span> <span className="font-medium">{formData.batteryBrand || '—'}</span></p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">SN Number:</span> <span className="font-medium">{formData.snNumber || '—'}</span></p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">Battery Capacity:</span> <span className="font-medium">{formData.batteryCapacity ? `${formData.batteryCapacity} kW` : '—'}</span></p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">Export Limit:</span> <span className="font-medium">{formData.exportLimit ? `${formData.exportLimit} kW` : '—'}</span></p>
+                                                        {formData.batteryBrand && <p className="flex justify-between"><span className="text-muted-foreground">Battery Brand:</span> <span className="font-medium">{formData.batteryBrand}</span></p>}
+                                                        {formData.snNumber && <p className="flex justify-between"><span className="text-muted-foreground">SN Number:</span> <span className="font-medium">{formData.snNumber}</span></p>}
+                                                        {formData.batteryCapacity && <p className="flex justify-between"><span className="text-muted-foreground">Battery Capacity:</span> <span className="font-medium">{formData.batteryCapacity} kW</span></p>}
+                                                        {formData.exportLimit && <p className="flex justify-between"><span className="text-muted-foreground">Export Limit:</span> <span className="font-medium">{formData.exportLimit} kW</span></p>}
                                                         <div className="flex justify-between items-start gap-2">
                                                             <span className="text-muted-foreground shrink-0">Signup Bonus:</span>
                                                             <span className="font-medium text-right text-green-600">$50 monthly bill credit for 12 months (total $600)</span>
@@ -1690,6 +1799,21 @@ export const CustomerFormPage = () => {
                                                 <div className="flex gap-4">
                                                     {formData.concession && <span className="px-2 py-1 bg-card rounded border border-amber-200 dark:border-amber-700 text-xs font-medium text-amber-900 dark:text-amber-300">Concession Card Holder</span>}
                                                     {formData.lifeSupport && <span className="px-2 py-1 bg-card rounded border border-amber-200 dark:border-amber-700 text-xs font-medium text-amber-900 dark:text-amber-300">Life Support Equipment</span>}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Uploaded Documents */}
+                                        {(formData.previousBill || formData.identityProof) && (
+                                            <div className="md:col-span-2 p-4 bg-muted/50 rounded-lg">
+                                                <h3 className="font-medium mb-3 flex items-center gap-2"><IdCardIcon size={16} className="text-blue-600" /> Uploaded Documents</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    {formData.previousBill && (
+                                                        <DocumentPreview path={formData.previousBill.path} label="Previous Bill" />
+                                                    )}
+                                                    {formData.identityProof && (
+                                                        <DocumentPreview path={formData.identityProof.path} label="Identity Proof" />
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
