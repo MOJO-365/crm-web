@@ -4,6 +4,7 @@ import { useQuery, useLazyQuery, useMutation } from '@apollo/client';
 import { calculateDiscountedRate } from '../../lib/rate-utils';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { DataTable, type Column, Modal } from '@/components/common';
 import {
     PlusIcon, PencilIcon,
@@ -11,7 +12,7 @@ import {
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
     IdCardIcon
 } from '@/components/icons';
-import { GET_CUSTOMERS_CURSOR, GET_CUSTOMER_BY_ID, SOFT_DELETE_CUSTOMER, SEND_REMINDER_EMAIL, CREATE_CUSTOMER, UPDATE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RATES_HISTORY_BY_VERSION, GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS } from '@/graphql';
+import { GET_CUSTOMERS_CURSOR, GET_CUSTOMER_BY_ID, SOFT_DELETE_CUSTOMER, SEND_REMINDER_EMAIL, CREATE_CUSTOMER, UPDATE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RATES_HISTORY_BY_VERSION, GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS, GET_NOTE_TYPES, CREATE_NOTE_TYPE } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Select } from '@/components/ui/Select';
 import { StatusField } from '@/components/common';
@@ -108,6 +109,8 @@ interface CustomerDetails {
     discount?: number;
     tariffCode?: string;
     signDate?: string;
+    signedPdfPath?: string;
+    emailSent?: number;
     phoneVerifiedAt?: string;
     address?: CustomerAddress & { nmi?: string };
     enrollmentDetails?: {
@@ -244,20 +247,6 @@ const DOCUMENT_TYPE_OPTIONS = [
     { label: 'Other', value: 'other' }
 ];
 
-const NOTE_TYPE_OPTIONS = [
-    { label: 'General', value: 'general' },
-    { label: 'Follow Up', value: 'follow_up' },
-    { label: 'Billing', value: 'billing' },
-    { label: 'Technical', value: 'technical' },
-    { label: 'Sales', value: 'sales' },
-    { label: 'Other', value: 'other' }
-];
-
-
-
-
-
-
 const ToggleSwitch = ({ checked, onChange, disabled }: { checked: boolean, onChange: (checked: boolean) => void, disabled?: boolean }) => (
     <button
         type="button"
@@ -355,6 +344,7 @@ export function CustomersPage() {
     const canCreate = useAuthStore((state) => state.canCreateInMenu('customers'));
     const canEdit = useAuthStore((state) => state.canEditInMenu('customers'));
     const canDelete = useAuthStore((state) => state.canDeleteInMenu('customers'));
+    const canManageNoteTypes = useAuthStore((state) => state.hasFeatureAccess('feature_manage_note_types'));
     const [searchFilters, setSearchFilters] = useState<SearchFilters>({
         id: '',
         name: '',
@@ -397,11 +387,14 @@ export function CustomersPage() {
 
     // Notes State
     const [noteText, setNoteText] = useState('');
-    const [noteFollowUp, setNoteFollowUp] = useState('');
+    const [noteFollowUp, setNoteFollowUp] = useState<Date | null>(null);
     const [noteAssignedTo, setNoteAssignedTo] = useState('');
-    const [noteType, setNoteType] = useState('general');
+    const [noteType, setNoteType] = useState('');
     const [isAddingNote, setIsAddingNote] = useState(false);
     const [noteModalOpen, setNoteModalOpen] = useState(false);
+    const [isAddingNewTypeInline, setIsAddingNewTypeInline] = useState(false);
+    const [newTypeName, setNewTypeName] = useState('');
+    const [isAddingNoteType, setIsAddingNoteType] = useState(false);
 
     // Document operations state
     const [isDeletingDocument, setIsDeletingDocument] = useState<string | null>(null);
@@ -439,6 +432,11 @@ export function CustomersPage() {
 
     const [createNote] = useMutation(CREATE_CUSTOMER_NOTE);
     const [deleteNote] = useMutation(DELETE_CUSTOMER_NOTE);
+    const [createNoteType] = useMutation(CREATE_NOTE_TYPE);
+
+    const { data: noteTypesData, refetch: refetchNoteTypes } = useQuery(GET_NOTE_TYPES, {
+        fetchPolicy: 'network-only'
+    });
 
     // Fetch users for note assignment
     const { data: userData } = useQuery(GET_USERS, {
@@ -460,19 +458,40 @@ export function CustomersPage() {
                     message: noteText.trim(),
                     followUp: noteFollowUp || undefined,
                     assignedTo: noteAssignedTo || undefined,
-                    type: noteType || 'general'
+                    type: noteType // This is now a UID
                 },
             });
             setNoteText('');
-            setNoteFollowUp('');
+            setNoteFollowUp(null);
             setNoteAssignedTo('');
-            setNoteType('general');
+            setNoteType('');
             refetchNotes();
             toast.success('Note added successfully');
         } catch (error: any) {
             toast.error(error.message || 'Failed to add note');
         } finally {
             setIsAddingNote(false);
+        }
+    };
+
+    const handleCreateNoteType = async () => {
+        if (!newTypeName.trim()) return;
+        setIsAddingNoteType(true);
+        try {
+            const { data } = await createNoteType({
+                variables: { name: newTypeName.trim() }
+            });
+            if (data?.createNoteType?.uid) {
+                toast.success('Note type added successfully');
+                setNewTypeName('');
+                setIsAddingNewTypeInline(false);
+                await refetchNoteTypes();
+                setNoteType(data.createNoteType.uid);
+            }
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to create note type');
+        } finally {
+            setIsAddingNoteType(false);
         }
     };
 
@@ -487,11 +506,19 @@ export function CustomersPage() {
     };
 
     const handlePreviewOffer = async (uid: string) => {
-        // Construct the preview URL (using the environment variable or baseURL)
-        const baseUrl = apiAxios.defaults.baseURL || '';
-        const url = `${baseUrl}/api/agreement/preview/${uid}`;
         setIsLoadingPreview(true);
-        setPreviewUrl(url);
+        const baseUrl = apiAxios.defaults.baseURL || '';
+
+        // If we have a signed PDF path, show that instead of the preview
+        if (selectedCustomerDetails?.signedPdfPath) {
+            const url = `${baseUrl}/api/documents/${encodeURIComponent(selectedCustomerDetails.signedPdfPath).replace(/%2F/g, '/')}`;
+            setPreviewUrl(url);
+        } else {
+            // Construct the preview URL (using the environment variable or baseURL)
+            const url = `${baseUrl}/api/agreement/preview/${uid}`;
+            setPreviewUrl(url);
+        }
+
         setPreviewModalOpen(true);
     };
 
@@ -647,6 +674,15 @@ export function CustomersPage() {
             }
         }
     }, [data, currentPage]);
+
+
+    const noteTypeOptions = [
+        { label: 'Select a note type...', value: '' },
+        ...(noteTypesData?.noteTypes?.map((t: any) => ({
+            label: t.name,
+            value: t.uid
+        })) || []),
+    ];
 
     const handlePageChange = (newPage: number) => {
         if (newPage < 1) return;
@@ -1931,7 +1967,7 @@ export function CustomersPage() {
                                             isLoading={isLoadingPreview}
                                             leftIcon={<EyeIcon size={14} />}
                                         >
-                                            Preview Offer
+                                            {selectedCustomerDetails.signedPdfPath ? 'View Signed Agreement' : 'Preview Offer'}
                                         </Button>
                                     )}
                                     {selectedCustomerDetails.status !== 5 && (
@@ -3256,10 +3292,8 @@ export function CustomersPage() {
                                                                         <div className="flex items-center gap-2">
                                                                             <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1", config.bg, config.color)}>
                                                                                 <IconComponent className="w-2.5 h-2.5" />
-                                                                                {note.type || 'General'}
+                                                                                {note.noteTypeDetails?.name || note.type || 'General'}
                                                                             </span>
-                                                                            {/* <span className="text-[10px] text-muted-foreground">•</span>
-                                                                            <span className="text-[10px] text-muted-foreground font-medium">#{note.uid.slice(-6)}</span> */}
                                                                         </div>
                                                                         <button
                                                                             onClick={() => handleDeleteNote(note.uid)}
@@ -3564,13 +3598,48 @@ export function CustomersPage() {
 
                     <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Note Type</label>
-                            <Select
-                                options={NOTE_TYPE_OPTIONS}
-                                value={noteType}
-                                onChange={(val) => setNoteType(val as string)}
-                                className="w-full"
-                            />
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">Note Type</label>
+                                {canManageNoteTypes && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsAddingNewTypeInline(!isAddingNewTypeInline);
+                                            setNewTypeName('');
+                                        }}
+                                        className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                    >
+                                        {isAddingNewTypeInline ? 'Cancel' : '+ Add New Type'}
+                                    </button>
+                                )}
+                            </div>
+                            {canManageNoteTypes && isAddingNewTypeInline ? (
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Type name..."
+                                        value={newTypeName}
+                                        onChange={(e) => setNewTypeName(e.target.value)}
+                                        className="h-9"
+                                        autoFocus
+                                    />
+                                    <Button
+                                        size="sm"
+                                        className="h-9 px-3 bg-neutral-900 text-white hover:bg-neutral-800"
+                                        onClick={handleCreateNoteType}
+                                        disabled={!newTypeName.trim() || isAddingNoteType}
+                                        isLoading={isAddingNoteType}
+                                    >
+                                        Add
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Select
+                                    options={noteTypeOptions}
+                                    value={noteType}
+                                    onChange={(val) => setNoteType(val as string)}
+                                    className="w-full"
+                                />
+                            )}
                         </div>
 
                         <div className="space-y-2">
@@ -3585,11 +3654,11 @@ export function CustomersPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Follow-up Date</label>
-                            <Input
-                                type="date"
+                            <DatePicker
+                                label="Follow-up Date"
                                 value={noteFollowUp}
-                                onChange={(e) => setNoteFollowUp(e.target.value)}
+                                onChange={(date) => setNoteFollowUp(date)}
+                                placeholder="Select follow-up date..."
                             />
                         </div>
                     </div>
@@ -3599,7 +3668,7 @@ export function CustomersPage() {
             <Modal
                 isOpen={previewModalOpen}
                 onClose={() => setPreviewModalOpen(false)}
-                title="Offer Summary Preview"
+                title={selectedCustomerDetails?.signedPdfPath ? "Signed Agreement" : "Offer Summary Preview"}
                 size="full"
             >
                 <div className="h-[80vh] w-full bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden flex flex-col relative">
@@ -3613,11 +3682,12 @@ export function CustomersPage() {
                     <iframe
                         src={previewUrl}
                         className="w-full h-full border-0"
-                        title="PDF Preview"
+                        title={selectedCustomerDetails?.signedPdfPath ? "Signed Agreement" : "PDF Preview"}
                         onLoad={() => setIsLoadingPreview(false)}
                     />
                 </div>
             </Modal>
+
         </div>
     );
 }

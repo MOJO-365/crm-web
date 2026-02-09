@@ -475,6 +475,7 @@ export const GET_CUSTOMER_BY_ID = gql`
             status
             discount
             signDate
+            signedPdfPath
             emailSent
             utilmateStatus
             rateVersion

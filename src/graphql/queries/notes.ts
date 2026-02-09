@@ -15,8 +15,33 @@ export const GET_CUSTOMER_NOTES = gql`
                 name
             }
             type
+            noteTypeDetails {
+                uid
+                name
+                color
+            }
             createdAt
             createdByName
+        }
+    }
+`;
+
+export const GET_NOTE_TYPES = gql`
+    query GetNoteTypes {
+        noteTypes {
+            uid
+            name
+            color
+        }
+    }
+`;
+
+export const CREATE_NOTE_TYPE = gql`
+    mutation CreateNoteType($name: String!, $color: String) {
+        createNoteType(name: $name, color: $color) {
+            uid
+            name
+            color
         }
     }
 `;
@@ -36,6 +61,11 @@ export const CREATE_CUSTOMER_NOTE = gql`
                 name
             }
             type
+            noteTypeDetails {
+                uid
+                name
+                color
+            }
             createdAt
             createdByName
         }
