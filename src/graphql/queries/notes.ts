@@ -32,62 +32,10 @@ export const GET_NOTE_TYPES = gql`
             uid
             name
             color
-        }
-    }
-`;
-
-export const CREATE_NOTE_TYPE = gql`
-    mutation CreateNoteType($name: String!, $color: String) {
-        createNoteType(name: $name, color: $color) {
-            uid
-            name
-            color
-        }
-    }
-`;
-
-export const CREATE_CUSTOMER_NOTE = gql`
-    mutation CreateCustomerNote($customerUid: String!, $message: String!, $followUp: Date, $assignedTo: String, $type: String) {
-        createCustomerNote(customerUid: $customerUid, message: $message, followUp: $followUp, assignedTo: $assignedTo, type: $type) {
-            id
-            uid
-            customerUid
-            userUid
-            message
-            followUp
-            assignedTo
-            assignedToUser {
-                uid
-                name
-            }
-            type
-            noteTypeDetails {
-                uid
-                name
-                color
-            }
+            isActive
             createdAt
-            createdByName
+            createdBy
         }
     }
 `;
 
-export const UPDATE_CUSTOMER_NOTE = gql`
-    mutation UpdateCustomerNote($uid: String!, $message: String, $followUp: Date, $assignedTo: String, $type: String) {
-        updateCustomerNote(uid: $uid, message: $message, followUp: $followUp, assignedTo: $assignedTo, type: $type) {
-            id
-            uid
-            message
-            followUp
-            assignedTo
-            type
-            updatedAt
-        }
-    }
-`;
-
-export const DELETE_CUSTOMER_NOTE = gql`
-    mutation DeleteCustomerNote($uid: String!) {
-        deleteCustomerNote(uid: $uid)
-    }
-`;

@@ -48,10 +48,22 @@ export const StatusField: React.FC<StatusFieldProps> = ({
             label = String(value || '-');
         }
     } else if (type === 'user_status') {
-        const valStr = String(value || '');
-        label = valStr === 'ACTIVE' ? 'Active' : valStr === 'INACTIVE' ? 'Inactive' : valStr;
-        if (valStr === 'ACTIVE') colorClass = 'text-green-600 bg-green-50 dark:bg-green-900/10 dark:text-green-400';
-        else if (valStr === 'INACTIVE') colorClass = 'text-red-600 bg-red-50 dark:bg-red-900/10 dark:text-red-400';
+        const valStr = String(value ?? '');
+        // Handle numeric 1/0 as Active/Inactive
+        let displayLabel = valStr;
+        let effectiveStatus = valStr;
+
+        if (valStr === '1' || valStr === 'ACTIVE') {
+            displayLabel = 'Active';
+            effectiveStatus = 'ACTIVE';
+            colorClass = 'text-green-600 bg-green-50 dark:bg-green-900/10 dark:text-green-400';
+        } else if (valStr === '0' || valStr === 'INACTIVE') {
+            displayLabel = 'Inactive';
+            effectiveStatus = 'INACTIVE';
+            colorClass = 'text-red-600 bg-red-50 dark:bg-red-900/10 dark:text-red-400';
+        }
+
+        label = displayLabel;
     } else if (type === 'dnsp') {
         const valStr = value !== null && value !== undefined ? String(value) : '';
         label = DNSP_MAP[valStr] || valStr || '-';

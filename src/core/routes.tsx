@@ -20,6 +20,8 @@ const EmailTemplatesPage = lazy(() => import('@/pages/email/EmailTemplatesPage')
 const EmailLogsPage = lazy(() => import('@/pages/email/EmailLogsPage').then(m => ({ default: m.EmailLogsPage })));
 const EmailSendPage = lazy(() => import('@/pages/email/EmailSendPage').then(m => ({ default: m.EmailSendPage })));
 const ProfilePage = lazy(() => import('@/pages/user/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const DocumentTypesPage = lazy(() => import('@/pages/master/DocumentTypesPage').then(m => ({ default: m.DocumentTypesPage })));
+const NoteTypesPage = lazy(() => import('@/pages/master/NoteTypesPage').then(m => ({ default: m.NoteTypesPage })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -72,6 +74,10 @@ const router = createBrowserRouter(
                 <Route path="/email-templates" element={<RequirePermission menuCode="email_templates"><EmailTemplatesPage /></RequirePermission>} />
                 <Route path="/email-logs" element={<RequirePermission menuCode="email_logs"><EmailLogsPage /></RequirePermission>} />
                 <Route path="/email-send" element={<RequirePermission menuCode="email_templates"><EmailSendPage /></RequirePermission>} />
+
+                {/* Master Routes */}
+                <Route path="/document-types" element={<RequirePermission menuCode="document_types"><DocumentTypesPage /></RequirePermission>} />
+                <Route path="/note-types" element={<RequirePermission menuCode="note_types"><NoteTypesPage /></RequirePermission>} />
 
                 {/* General authenticated routes */}
                 <Route path="/change-password" element={<ChangePasswordPage />} />

@@ -12,7 +12,7 @@ import {
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
     IdCardIcon
 } from '@/components/icons';
-import { GET_CUSTOMERS_CURSOR, GET_CUSTOMER_BY_ID, SOFT_DELETE_CUSTOMER, SEND_REMINDER_EMAIL, CREATE_CUSTOMER, UPDATE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RATES_HISTORY_BY_VERSION, GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS, GET_NOTE_TYPES, CREATE_NOTE_TYPE } from '@/graphql';
+import { GET_CUSTOMERS_CURSOR, GET_CUSTOMER_BY_ID, SOFT_DELETE_CUSTOMER, SEND_REMINDER_EMAIL, CREATE_CUSTOMER, UPDATE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RATES_HISTORY_BY_VERSION, GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS, GET_NOTE_TYPES, CREATE_NOTE_TYPE, GET_DOCUMENT_TYPES, CREATE_DOCUMENT_TYPE } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Select } from '@/components/ui/Select';
 import { StatusField } from '@/components/common';
@@ -104,8 +104,8 @@ interface CustomerDetails {
     dob?: string;
     propertyType?: number;
     status: number;
-    previousBill?: { uid: string; path: string; filename?: string };
-    identityProof?: { uid: string; path: string; filename?: string };
+    previousBill?: { uid: string; path: string; filename?: string; documentType?: { uid: string; name: string; color: string; category?: string } };
+    identityProof?: { uid: string; path: string; filename?: string; documentType?: { uid: string; name: string; color: string; category?: string } };
     discount?: number;
     tariffCode?: string;
     signDate?: string;
@@ -231,6 +231,12 @@ interface CustomerDetails {
         path?: string;
         size?: number;
         mimeType?: string;
+        documentType?: { // Added field to hold document type details
+            uid: string;
+            name: string;
+            color: string;
+            category?: string;
+        };
         createdAt: string;
         createdBy?: string;
         createdByUser?: {
@@ -240,10 +246,6 @@ interface CustomerDetails {
 }
 
 const DOCUMENT_TYPE_OPTIONS = [
-    { label: 'Solar Contract', value: 'solar_contract' },
-    { label: 'Connection Approval', value: 'connection_approval' },
-    { label: 'Electrical Certificate', value: 'electrical_certificate' },
-    { label: 'Site Photos', value: 'site_photos' },
     { label: 'Other', value: 'other' }
 ];
 
@@ -345,6 +347,7 @@ export function CustomersPage() {
     const canEdit = useAuthStore((state) => state.canEditInMenu('customers'));
     const canDelete = useAuthStore((state) => state.canDeleteInMenu('customers'));
     const canManageNoteTypes = useAuthStore((state) => state.hasFeatureAccess('feature_manage_note_types'));
+    const canManageDocumentTypes = useAuthStore((state) => state.hasFeatureAccess('feature_manage_document_types'));
     const [searchFilters, setSearchFilters] = useState<SearchFilters>({
         id: '',
         name: '',
@@ -401,6 +404,10 @@ export function CustomersPage() {
     const [isUploadingDocument, setIsUploadingDocument] = useState<string | null>(null);
     const [isAddingDocument, setIsAddingDocument] = useState(false);
     const [newDocumentType, setNewDocumentType] = useState<string>('');
+    const [isAddingNewDocTypeInline, setIsAddingNewDocTypeInline] = useState(false);
+    const [newDocTypeName, setNewDocTypeName] = useState('');
+    const [newDocTypeCategory, setNewDocTypeCategory] = useState('0');
+    const [isAddingDocType, setIsAddingDocType] = useState(false);
     const previousBillInputRef = useRef<HTMLInputElement>(null);
     const identityProofInputRef = useRef<HTMLInputElement>(null);
     const newDocumentInputRef = useRef<HTMLInputElement>(null);
@@ -433,6 +440,7 @@ export function CustomersPage() {
     const [createNote] = useMutation(CREATE_CUSTOMER_NOTE);
     const [deleteNote] = useMutation(DELETE_CUSTOMER_NOTE);
     const [createNoteType] = useMutation(CREATE_NOTE_TYPE);
+    const [createDocumentTypeMutation] = useMutation(CREATE_DOCUMENT_TYPE);
 
     const { data: noteTypesData, refetch: refetchNoteTypes } = useQuery(GET_NOTE_TYPES, {
         fetchPolicy: 'network-only'
@@ -447,6 +455,40 @@ export function CustomersPage() {
         label: u.name || 'Unknown User',
         value: u.uid
     })) || [];
+
+    const { data: documentTypesData, refetch: refetchDocumentTypes } = useQuery(GET_DOCUMENT_TYPES, {
+        fetchPolicy: 'cache-and-network'
+    });
+
+    const docTypeOptions = [
+        ...(documentTypesData?.documentTypes?.map((t: any) => ({
+            label: t.name,
+            value: t.uid
+        })) || DOCUMENT_TYPE_OPTIONS)
+    ];
+
+    const handleCreateDocumentType = async () => {
+        if (!newDocTypeName.trim()) return;
+        setIsAddingDocType(true);
+        try {
+            await createDocumentTypeMutation({
+                variables: {
+                    name: newDocTypeName.trim(),
+                    category: newDocTypeCategory,
+                    color: newDocTypeCategory === '2' ? '#eab308' : '#64748b' // Default colors
+                }
+            });
+            await refetchDocumentTypes();
+            setNewDocTypeName('');
+            setIsAddingNewDocTypeInline(false);
+            toast.success('Document type created');
+        } catch (error: any) {
+            console.error('Error creating document type:', error);
+            toast.error(error.message || 'Failed to create document type');
+        } finally {
+            setIsAddingDocType(false);
+        }
+    };
 
     const handleAddNote = async () => {
         if (!noteText.trim() || !selectedCustomerDetails?.uid) return;
@@ -559,18 +601,24 @@ export function CustomersPage() {
             formData.append('customerId', selectedCustomerDetails.customerId);
             formData.append('customer_uid', selectedCustomerDetails.uid);
             let apiDocType = documentType;
-            let docName = documentType;
+            let docName = '';
 
-            if (documentType === 'previousBill') {
-                apiDocType = 'previous_bill';
+            // Find the label from dynamic options
+            const option = docTypeOptions.find((o: any) => o.value === documentType);
+
+            if (option) {
+                docName = option.label;
+                apiDocType = option.value;
+            } else if (documentType === 'previousBill') {
+                const billType = docTypeOptions.find(o => o.label === 'Previous Bill');
+                apiDocType = billType?.value || 'previous_bill';
                 docName = 'Previous Bill';
             } else if (documentType === 'identityProof') {
-                apiDocType = 'identity_proof';
+                const idType = docTypeOptions.find(o => o.label === 'Identity Proof');
+                apiDocType = idType?.value || 'identity_proof';
                 docName = 'Identity Proof';
             } else {
-                // For other documents, try to find a nice label or just use the type
-                const option = DOCUMENT_TYPE_OPTIONS.find(o => o.value === documentType);
-                docName = option ? option.label : documentType;
+                docName = documentType;
             }
 
             formData.append('documentType', apiDocType);
@@ -2210,9 +2258,9 @@ export function CustomersPage() {
                                                 <ZapIcon className="w-4 h-4" />
                                             </div>
                                         ),
-                                        badge: (selectedCustomerDetails.documents?.some(d => d.type === '2')) ? (
+                                        badge: (selectedCustomerDetails.documents?.some(d => d.documentType?.category === '2')) ? (
                                             <span className="ml-auto px-2 py-0.5 text-[10px] font-medium bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400 rounded-full hidden lg:block">
-                                                {selectedCustomerDetails.documents?.filter(d => d.type === '2').length}
+                                                {selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2').length}
                                             </span>
                                         ) : undefined
                                     },
@@ -2353,8 +2401,8 @@ export function CustomersPage() {
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-border">
-                                                        {(selectedCustomerDetails.documents?.filter(d => d.type === '2') || []).length > 0 ? (
-                                                            selectedCustomerDetails.documents?.filter(d => d.type === '2').map((doc, idx) => (
+                                                        {(selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2') || []).length > 0 ? (
+                                                            selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2').map((doc, idx) => (
                                                                 <tr key={idx} className="hover:bg-muted/30 transition-colors group">
                                                                     <td className="px-4 py-3">
                                                                         <div className="flex items-center gap-2">
@@ -2362,7 +2410,7 @@ export function CustomersPage() {
                                                                                 <ZapIcon className="w-4 h-4" />
                                                                             </div>
                                                                             <div className="flex flex-col">
-                                                                                <span className="font-medium text-foreground">{doc.name || 'Electricity Bill'}</span>
+                                                                                <span className="font-medium text-foreground">{doc.documentType?.name || doc.name || 'Electricity Bill'}</span>
                                                                                 <span className="text-xs text-muted-foreground truncate max-w-[180px]" title={doc.filename}>{doc.filename}</span>
                                                                             </div>
                                                                         </div>
@@ -2484,14 +2532,61 @@ export function CustomersPage() {
                                             <div className="bg-muted/30 border border-dashed border-border rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
                                                 <div className="flex items-end gap-3">
                                                     <div className="flex-1 space-y-2">
-                                                        <label className="text-xs font-semibold uppercase text-muted-foreground">Document Type</label>
-                                                        <Select
-                                                            options={DOCUMENT_TYPE_OPTIONS}
-                                                            value={newDocumentType}
-                                                            onChange={(val) => setNewDocumentType(val as string)}
-                                                            placeholder="Select Type..."
-                                                            className="w-full bg-background"
-                                                        />
+                                                        <div className="flex items-center justify-between">
+                                                            <label className="text-xs font-semibold uppercase text-muted-foreground">Document Type</label>
+                                                            {canManageDocumentTypes && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setIsAddingNewDocTypeInline(!isAddingNewDocTypeInline);
+                                                                        setNewDocTypeName('');
+                                                                    }}
+                                                                    className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                                                >
+                                                                    {isAddingNewDocTypeInline ? 'Cancel' : '+ Add New Type'}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        {isAddingNewDocTypeInline ? (
+                                                            <div className="flex flex-col gap-2 p-2 border border-border rounded-lg bg-background/50">
+                                                                <div className="flex gap-2">
+                                                                    <Input
+                                                                        placeholder="Type name..."
+                                                                        value={newDocTypeName}
+                                                                        onChange={(e) => setNewDocTypeName(e.target.value)}
+                                                                        className="h-9 flex-1"
+                                                                        autoFocus
+                                                                    />
+                                                                    <Select
+                                                                        options={[
+                                                                            { label: 'Personal (0)', value: '0' },
+                                                                            { label: 'Signed (1)', value: '1' },
+                                                                            { label: 'Electricity (2)', value: '2' }
+                                                                        ]}
+                                                                        value={newDocTypeCategory}
+                                                                        onChange={(val) => setNewDocTypeCategory(val as string)}
+                                                                        className="h-9 w-32"
+                                                                    />
+                                                                </div>
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="h-9 w-full bg-neutral-900 text-white hover:bg-neutral-800"
+                                                                    onClick={handleCreateDocumentType}
+                                                                    disabled={!newDocTypeName.trim() || isAddingDocType}
+                                                                    isLoading={isAddingDocType}
+                                                                >
+                                                                    Add Document Type
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <Select
+                                                                options={docTypeOptions}
+                                                                value={newDocumentType}
+                                                                onChange={(val) => setNewDocumentType(val as string)}
+                                                                placeholder="Select Type..."
+                                                                className="w-full bg-background"
+                                                            />
+                                                        )}
                                                     </div>
                                                     <div className="flex gap-2">
                                                         <Button
@@ -2532,22 +2627,20 @@ export function CustomersPage() {
                                                     {[
                                                         {
                                                             doc: selectedCustomerDetails.previousBill,
-                                                            label: 'Previous Bill',
+                                                            label: selectedCustomerDetails.previousBill?.documentType?.name || 'Previous Bill',
                                                             type: 'previousBill'
                                                         },
                                                         {
                                                             doc: selectedCustomerDetails.identityProof,
-                                                            label: 'Identity Proof',
+                                                            label: selectedCustomerDetails.identityProof?.documentType?.name || 'Identity Proof',
                                                             type: 'identityProof'
                                                         },
                                                         ...(selectedCustomerDetails.documents?.filter(d =>
                                                             d.uid !== selectedCustomerDetails.previousBill?.uid &&
                                                             d.uid !== selectedCustomerDetails.identityProof?.uid &&
-                                                            d.type !== '2' // Exclude electricity bills
+                                                            (d.documentType?.category === '0' || d.documentType?.category === '1' || (d.documentType?.category === undefined && d.type !== '2'))
                                                         ).map(d => {
-                                                            const option = DOCUMENT_TYPE_OPTIONS.find(o => o.value === d.type);
-                                                            // If type is generic '0' or mismatched, prioritize the saved name
-                                                            const label = (d.type === '0' || !option) && d.name ? d.name : (option ? option.label : d.type || 'Document');
+                                                            const label = d.documentType?.name || d.name || 'Document';
 
                                                             return {
                                                                 doc: d,
