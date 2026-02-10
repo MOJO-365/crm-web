@@ -833,20 +833,22 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    {currentFeatures.map(feature => (
-                                                        <div key={feature.uid} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
-                                                            <div>
-                                                                <p className="font-medium text-gray-800 dark:text-gray-200">{feature.name}</p>
-                                                                <p className="text-xs text-gray-500 dark:text-gray-400">{feature.description || feature.code}</p>
+                                                    {currentFeatures
+                                                        .filter(feature => feature.menuUid === selectedMenuUid)
+                                                        .map(feature => (
+                                                            <div key={feature.uid} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
+                                                                <div>
+                                                                    <p className="font-medium text-gray-800 dark:text-gray-200">{feature.name}</p>
+                                                                    <p className="text-xs text-gray-500 dark:text-gray-400">{feature.description || feature.code}</p>
+                                                                </div>
+                                                                <TriStateToggle
+                                                                    value={getUserFeaturePermission(feature.uid)}
+                                                                    onChange={(val) => handleFeaturePermissionChange(feature.uid, val)}
+                                                                    roleValue={getRoleFeaturePermission(feature.uid)}
+                                                                    label={getUserFeaturePermission(feature.uid) === true ? 'Allowed' : (getUserFeaturePermission(feature.uid) === false ? 'Denied' : (getRoleFeaturePermission(feature.uid) ? 'Inherit (Allow)' : 'Inherit (Deny)'))}
+                                                                />
                                                             </div>
-                                                            <TriStateToggle
-                                                                value={getUserFeaturePermission(feature.uid)}
-                                                                onChange={(val) => handleFeaturePermissionChange(feature.uid, val)}
-                                                                roleValue={getRoleFeaturePermission(feature.uid)}
-                                                                label={getUserFeaturePermission(feature.uid) === true ? 'Allowed' : (getUserFeaturePermission(feature.uid) === false ? 'Denied' : (getRoleFeaturePermission(feature.uid) ? 'Inherit (Allow)' : 'Inherit (Deny)'))}
-                                                            />
-                                                        </div>
-                                                    ))}
+                                                        ))}
                                                 </div>
                                             </div>
                                         )}
@@ -879,7 +881,7 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
                                                 <div className="grid grid-cols-1 gap-4">
                                                     {currentChildMenus.map((child: Menu) => (
                                                         <div key={child.uid} className="bg-white dark:bg-gray-900 p-5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
-                                                            <div className="flex items-center justify-between">
+                                                            <div className="flex items-center justify-between mb-4">
                                                                 <div className="flex items-center gap-3">
                                                                     <div
                                                                         className={cn(
@@ -914,6 +916,31 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
                                                                     })}
                                                                 </div>
                                                             </div>
+
+                                                            {/* Features for this specific child menu */}
+                                                            {currentFeatures.filter(f => f.menuUid === child.uid).length > 0 && (
+                                                                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                                                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Linked Features</h5>
+                                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                        {currentFeatures
+                                                                            .filter(f => f.menuUid === child.uid)
+                                                                            .map(feature => (
+                                                                                <div key={feature.uid} className="flex items-center justify-between p-2.5 rounded-lg bg-gray-50/50 dark:bg-gray-950/50 border border-gray-100 dark:border-gray-800">
+                                                                                    <div>
+                                                                                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{feature.name}</p>
+                                                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400">{feature.description || feature.code}</p>
+                                                                                    </div>
+                                                                                    <TriStateToggle
+                                                                                        value={getUserFeaturePermission(feature.uid)}
+                                                                                        onChange={(val) => handleFeaturePermissionChange(feature.uid, val)}
+                                                                                        roleValue={getRoleFeaturePermission(feature.uid)}
+                                                                                        label={getUserFeaturePermission(feature.uid) === true ? 'Allowed' : (getUserFeaturePermission(feature.uid) === false ? 'Denied' : (getRoleFeaturePermission(feature.uid) ? 'Inherit (Allow)' : 'Inherit (Deny)'))}
+                                                                                    />
+                                                                                </div>
+                                                                            ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>

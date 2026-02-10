@@ -493,6 +493,12 @@ export const GET_CUSTOMER_BY_ID = gql`
                 path
                 size
                 mimeType
+                documentType {
+                    uid
+                    name
+                    color
+                    category
+                }
                 createdAt
                 updatedAt
                 createdBy
@@ -509,6 +515,12 @@ export const GET_CUSTOMER_BY_ID = gql`
                 path
                 size
                 mimeType
+                documentType {
+                    uid
+                    name
+                    color
+                    category
+                }
                 createdAt
                 updatedAt
                 createdBy
@@ -652,6 +664,12 @@ export const GET_CUSTOMER_BY_ID = gql`
                 path
                 size
                 mimeType
+                documentType {
+                    uid
+                    name
+                    color
+                    category
+                }
                 startDate
                 endDate
                 createdAt
@@ -851,6 +869,18 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
                     name
                 }
             }
+        }
+    }
+`;
+
+export const GET_DOCUMENT_TYPES = gql`
+    query GetDocumentTypes {
+        documentTypes {
+            uid
+            name
+            color
+            category
+            isActive
         }
     }
 `;

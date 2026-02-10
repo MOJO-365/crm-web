@@ -24,6 +24,8 @@ export * from './mutations/permissions';
 export * from './mutations/roles';
 export * from './mutations/userPermissions';
 export * from './mutations/emailTemplates';
+export * from './mutations/documents';
+export * from './mutations/notes';
 
 // Queries
 export * from './queries/emailTemplates';

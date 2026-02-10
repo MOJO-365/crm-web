@@ -39,6 +39,9 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     email_templates: CopyIcon,
     email_logs: FileTextIcon,
     email_send: SendIcon,
+    master: ShieldCheckIcon,
+    document_types: FileTextIcon,
+    note_types: CopyIcon
 };
 
 // Path mapping
@@ -52,6 +55,8 @@ const pathMap: Record<string, string> = {
     email_templates: '/email-templates', // Keep existing if needed, or update if route changed
     email_logs: '/email-logs',
     email_send: '/email-send',
+    document_types: '/document-types',
+    note_types: '/note-types'
     // user_management and email have no path, they are groupers
 };
 
