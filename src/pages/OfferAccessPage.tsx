@@ -1594,6 +1594,16 @@ export const OfferAccessPage = () => {
                                             >
                                                 Virtual Power Plant Program Terms and Conditions
                                             </a>
+                                            {', '}
+                                            <a
+                                                href="/onboarding/GEE-VPP-TC-Ver01.pdf"
+                                                className="underline hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
+                                                style={{ color: '#4B8A10' }}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                VPP Terms & Conditions
+                                            </a>
                                         </>
                                     )}
                                     {' and '}
