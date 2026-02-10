@@ -1,8 +1,7 @@
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Popover } from '@/components/ui/Popover';
-import { Button } from '@/components/ui/Button';
 
 interface ColorPickerProps {
     color?: string;
