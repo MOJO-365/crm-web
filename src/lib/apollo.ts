@@ -113,7 +113,7 @@ export const apolloClient = new ApolloClient({
 export const apiAxios = axiosInstance;
 
 // Secondary API instance
-const secondaryApiUrl = import.meta.env.VITE_SECOND_API_URL;
+const secondaryApiUrl = import.meta.env.VITE_SECOND_API_URL || (import.meta.env.PROD ? '/api2' : 'http://localhost:8080');
 export const secondaryApiAxios = axios.create({
     baseURL: secondaryApiUrl,
     headers: {

@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
-import { Button, Input, DatePicker, Select, Tooltip, Switch as ToggleSwitch, ConfirmationPopover } from '@/components/ui';
+import { Button, Input, DatePicker, Select, Tooltip, Switch as ToggleSwitch, ConfirmationPopover, Popover } from '@/components/ui';
 import { Modal, StatusField } from '@/components/common';
 import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
-    IdCardIcon, ArrowLeftIcon, PhoneIcon
+    IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon
 } from '@/components/icons';
 import {
     GET_CUSTOMER_BY_ID, SEND_REMINDER_EMAIL,
@@ -311,6 +311,7 @@ export function CustomerDetailsPage() {
     const [freezeModalOpen, setFreezeModalOpen] = useState(false);
     // const [customerToFreeze, setCustomerToFreeze] = useState<CustomerDetails | null>(null); // Not needed since we use selectedCustomerDetails
     const [markingNotInterested, setMarkingNotInterested] = useState(false);
+    const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
 
     // VPP Form State
     const [isEditingVpp, setIsEditingVpp] = useState(false);
@@ -1211,56 +1212,80 @@ export function CustomerDetailsPage() {
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2 shrink-0 self-end md:self-start">
-                        {selectedCustomerDetails && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-10 px-4 border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900/30"
-                                onClick={() => handlePreviewOffer(selectedCustomerDetails.uid)}
-                                isLoading={isLoadingPreview}
-                                leftIcon={<EyeIcon size={14} />}
-                            >
-                                {selectedCustomerDetails.signedPdfPath ? 'View Signed Agreement' : 'Preview Offer'}
-                            </Button>
-                        )}
-                        {selectedCustomerDetails && selectedCustomerDetails.status !== 5 && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-10 px-4 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-900/30"
-                                onClick={handleMarkNotInterested}
-                                disabled={markingNotInterested}
-                                isLoading={markingNotInterested}
-                                loadingText="Updating..."
-                                leftIcon={<XIcon size={14} />}
-                            >
-                                Not Interested
-                            </Button>
-                        )}
-                        {selectedCustomerDetails && selectedCustomerDetails.status === 3 && (
-                            <Button
-                                size="sm"
-                                className="h-10 px-4 bg-neutral-900 text-white hover:bg-neutral-800"
-                                onClick={() => handleFreezeClick()}
-                                disabled={freezingCustomer}
-                                isLoading={freezingCustomer}
-                                loadingText="Freezing..."
-                                leftIcon={<ZapIcon size={14} />}
-                            >
-                                Freeze
-                            </Button>
-                        )}
-                        {canEdit && (
-                            <Button onClick={() => navigate(`/customers/${uid}/edit`)} variant="outline" className="h-10 px-4">
-                                <PencilIcon className="mr-2 h-4 w-4" />
-                                Edit Customer
-                            </Button>
-                        )}
-                        <Button variant="outline" onClick={() => navigate('/customers')} className="h-10 px-4">
-                            <ArrowLeftIcon className="mr-2 h-4 w-4" />
+                    <div className="flex items-center gap-2 shrink-0 self-end md:self-start">
+                        <Button variant="outline" onClick={() => navigate('/customers')} className="h-9 px-3 text-sm">
+                            <ArrowLeftIcon className="mr-1.5 h-3.5 w-3.5" />
                             Back
                         </Button>
+                        {canEdit && (
+                            <Button onClick={() => navigate(`/customers/${uid}/edit`)} variant="outline" className="h-9 px-3 text-sm">
+                                <PencilIcon className="mr-1.5 h-3.5 w-3.5" />
+                                Edit
+                            </Button>
+                        )}
+                        {selectedCustomerDetails && (
+                            (() => {
+                                const hasPreview = true;
+                                const hasNotInterested = selectedCustomerDetails.status !== 5;
+                                const hasFreeze = selectedCustomerDetails.status === 3;
+                                const hasActions = hasPreview || hasNotInterested || hasFreeze;
+                                if (!hasActions) return null;
+                                return (
+                                    <Popover
+                                        trigger={
+                                            <Button variant="outline" className="h-9 w-9 p-0 flex items-center justify-center">
+                                                <MoreHorizontalIcon size={16} />
+                                            </Button>
+                                        }
+                                        content={
+                                            <div className="py-1.5 min-w-[200px]">
+                                                <button
+                                                    onClick={() => {
+                                                        handlePreviewOffer(selectedCustomerDetails.uid);
+                                                    }}
+                                                    disabled={isLoadingPreview}
+                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+                                                >
+                                                    <EyeIcon size={15} className="text-muted-foreground" />
+                                                    {isLoadingPreview ? 'Loading...' : (selectedCustomerDetails.signedPdfPath ? 'View Signed Agreement' : 'Preview Offer')}
+                                                </button>
+                                                {hasNotInterested && (
+                                                    <button
+                                                        onClick={() => {
+                                                            handleMarkNotInterested();
+                                                        }}
+                                                        disabled={markingNotInterested}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                                                    >
+                                                        <XIcon size={15} />
+                                                        {markingNotInterested ? 'Updating...' : 'Not Interested'}
+                                                    </button>
+                                                )}
+                                                {hasFreeze && (
+                                                    <>
+                                                        <div className="my-1 border-t border-border" />
+                                                        <button
+                                                            onClick={() => {
+                                                                handleFreezeClick();
+                                                            }}
+                                                            disabled={freezingCustomer}
+                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+                                                        >
+                                                            <ZapIcon size={15} className="text-amber-500" />
+                                                            {freezingCustomer ? 'Freezing...' : 'Freeze'}
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        }
+                                        isOpen={actionsMenuOpen}
+                                        onOpenChange={setActionsMenuOpen}
+                                        placement="bottom-end"
+                                        showArrow={false}
+                                    />
+                                );
+                            })()
+                        )}
                     </div>
                 </div>
             </div>
