@@ -80,8 +80,6 @@ export const GET_RATES_HISTORY = gql`
             createdAt
             createdBy
             createdByName
-            createdBy
-            createdByName
             activeVersion
             newRecord
         }

@@ -11,6 +11,7 @@ const UsersPage = lazy(() => import('@/pages/user/UsersPage').then(m => ({ defau
 const ChangePasswordPage = lazy(() => import('@/pages/user/ChangePasswordPage').then(m => ({ default: m.ChangePasswordPage })));
 const CustomersPage = lazy(() => import('@/pages/customer/CustomersPage').then(m => ({ default: m.CustomersPage })));
 const CustomerFormPage = lazy(() => import('@/pages/customer/CustomerFormPage').then(m => ({ default: m.CustomerFormPage })));
+const CustomerDetailsPage = lazy(() => import('@/pages/customer/CustomerDetailsPage').then(m => ({ default: m.CustomerDetailsPage })));
 const RatesPage = lazy(() => import('@/pages/rates/RatesPage').then(m => ({ default: m.RatesPage })));
 const OfferAccessPage = lazy(() => import('@/pages/OfferAccessPage').then(m => ({ default: m.OfferAccessPage })));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
@@ -66,7 +67,8 @@ const router = createBrowserRouter(
                 {/* Routes with specific menu permissions */}
                 <Route path="/customers" element={<RequirePermission menuCode="customers"><CustomersPage /></RequirePermission>} />
                 <Route path="/customers/new" element={<RequirePermission menuCode="customers"><CustomerFormPage /></RequirePermission>} />
-                <Route path="/customers/:uid" element={<RequirePermission menuCode="customers"><CustomerFormPage /></RequirePermission>} />
+                <Route path="/customers/:uid" element={<RequirePermission menuCode="customers"><CustomerDetailsPage /></RequirePermission>} />
+                <Route path="/customers/:uid/edit" element={<RequirePermission menuCode="customers"><CustomerFormPage /></RequirePermission>} />
                 <Route path="/users" element={<RequirePermission menuCode="users"><UsersPage /></RequirePermission>} />
                 <Route path="/roles" element={<RequirePermission menuCode="roles"><RolePage /></RequirePermission>} />
                 <Route path="/rates" element={<RequirePermission menuCode="rates"><RatesPage /></RequirePermission>} />
