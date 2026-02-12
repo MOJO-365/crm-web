@@ -11,14 +11,18 @@ export const CREATE_CUSTOMER_NOTE = gql`
             followUp
             assignedTo
             assignedToUser {
+                uid
                 name
+            }
+            noteTypeDetails {
+                uid
+                name
+                color
             }
             type
             createdAt
             createdBy
-            createdByUser {
-                name
-            }
+            createdByName
         }
     }
 `;

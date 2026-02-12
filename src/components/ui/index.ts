@@ -5,3 +5,4 @@ export { Tooltip, type TooltipProps, type TooltipPosition } from './Tooltip';
 export { Switch } from './Switch';
 export { DatePicker, type DatePickerProps } from './DatePicker';
 export { HtmlEditor, type HtmlEditorProps } from './HtmlEditor';
+export { ConfirmationPopover } from './ConfirmationPopover';
