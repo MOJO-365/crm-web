@@ -33,3 +33,7 @@ export * from './queries/emailLogs';
 export * from './queries/emailSettings';
 export * from './queries/notes';
 
+// Notification Entities
+export * from './queries/notificationEntities';
+export * from './mutations/notificationEntities';
+

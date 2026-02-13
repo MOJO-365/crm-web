@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { Modal } from '@/components/common';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { GET_EMAIL_TEMPLATES, GET_EMAIL_TEMPLATE, GET_CUSTOMER_BY_ID, SEND_BULK_EMAIL, GET_NOTIFICATION_ENTITIES } from '@/graphql';
+import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
-import { GET_EMAIL_TEMPLATES, GET_EMAIL_TEMPLATE } from '../../graphql/queries/emailTemplates';
-import { GET_CUSTOMER_BY_ID } from '../../graphql/queries/customers';
-import { SEND_BULK_EMAIL } from '../../graphql/mutations/emailTemplates';
 import { toast } from 'react-toastify';
 
 interface BulkEmailModalProps {
@@ -20,6 +19,15 @@ interface AttachmentFile {
     size: number;
     type: string;
     file: File;
+}
+
+interface NotificationEntity {
+    uid: string;
+    fromEmail: string;
+    userUid?: string;
+    preference?: number; // 1 = System, 0 = Entity
+    isActive: number;
+    bccEmail?: string;
 }
 
 // Function to replace email variables with customer data
@@ -68,15 +76,33 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
     const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
     const [step, setStep] = useState<'compose' | 'confirm'>('compose');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const user = useAuthStore(state => state.user);
 
     const isSingleCustomer = selectedCustomerIds.length === 1;
 
     // Fetch Templates
-    const { data, loading: loadingTemplates, error: errorTemplates } = useQuery(GET_EMAIL_TEMPLATES, {
+    const { data: templatesData, loading: loadingTemplates, error: errorTemplates } = useQuery(GET_EMAIL_TEMPLATES, {
         variables: { limit: 100, status: 1 },
         skip: !isOpen,
         fetchPolicy: 'network-only'
     });
+
+    const { data: entityData } = useQuery(GET_NOTIFICATION_ENTITIES, {
+        fetchPolicy: 'cache-and-network',
+        skip: !isOpen || !user?.uid
+    });
+
+    const myEntity = useMemo(() => {
+        if (!entityData?.notificationEntities || !user?.uid) return null;
+        return entityData.notificationEntities.find((e: NotificationEntity) => e.userUid === user.uid);
+    }, [entityData, user?.uid]);
+
+    const fromEmailDisplay = useMemo(() => {
+        if (myEntity && myEntity.isActive && myEntity.preference !== 1) {
+            return myEntity.fromEmail;
+        }
+        return 'System Default Email'; // Or specific system email if known, but "System Default" is clear
+    }, [myEntity]);
 
     // Fetch Single Template for Preview
     const { data: templateData, loading: loadingTemplate } = useQuery(GET_EMAIL_TEMPLATE, {
@@ -133,11 +159,29 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
         if (isOpen) {
             setSelectedTemplateUid('');
             setCcEmails('');
-            setBccEmails('');
+            // setBccEmails(''); // Logic moved to separate effect to handle prefill
             setAttachments([]);
             setStep('compose');
+
+            // Prefill BCC if available immediately (or handle in separate effect)
+            // But to avoid flicker/race, better to set it here if available?
+            // But myEntity depends on query which might be loading.
+            // So simpler to just clear here and let the other effect fill it.
+            setBccEmails('');
         }
     }, [isOpen]);
+
+    // Prefill BCC from entity
+    useEffect(() => {
+        if (isOpen && myEntity?.bccEmail) {
+            setBccEmails(prev => {
+                // If currently empty, fill it. If user populated it (race?), keep user input?
+                // Since on open we clear it, 'prev' is likely empty or system initialized.
+                // If it's just '' (from clear), we fill it.
+                return prev ? prev : (myEntity.bccEmail || '');
+            });
+        }
+    }, [isOpen, myEntity?.bccEmail]);
 
     const handleFileSelect = (files: FileList | null) => {
         if (!files) return;
@@ -209,7 +253,7 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
         setStep('compose');
     };
 
-    const templates = data?.emailTemplates?.data || [];
+    const templates = templatesData?.emailTemplates?.data || [];
     const options = templates.map((t: any) => ({ value: t.uid, label: t.name }));
 
     const isPreviewLoading = loadingTemplate || (isSingleCustomer && loadingCustomer);
@@ -253,9 +297,10 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Left Column - Form */}
                     <div className="space-y-4">
+                        {/* 
                         <p className="text-sm text-gray-600 dark:text-gray-400">
                             Select an email template to send to the <strong>{selectedCustomerIds.length}</strong> selected customers.
-                        </p>
+                        </p> */}
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Email Template <span className="text-red-500">*</span></label>
@@ -378,6 +423,14 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
                             <div className="flex-1 flex flex-col rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
                                 {/* Form-style Header */}
                                 <div className="border-b border-gray-200 dark:border-gray-800">
+                                    {/* From Field */}
+                                    <div className="flex items-center px-4 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+                                        <span className="text-sm text-gray-500 dark:text-gray-400 w-16">From</span>
+                                        <div className="flex-1 text-sm text-gray-800 dark:text-gray-200 font-medium">
+                                            {fromEmailDisplay}
+                                        </div>
+                                    </div>
+
                                     {/* To Field */}
                                     <div className="flex items-center px-4 py-2 border-b border-gray-100 dark:border-gray-800">
                                         <span className="text-sm text-gray-500 dark:text-gray-400 w-16">To</span>
@@ -501,6 +554,10 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
 
                             <div className="space-y-3">
                                 <div className="flex items-start gap-3 pb-3 border-b border-gray-100 dark:border-gray-800">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400 w-24 flex-shrink-0">From</span>
+                                    <span className="text-sm font-medium text-gray-900 dark:text-gray-200">{fromEmailDisplay}</span>
+                                </div>
+                                <div className="flex items-start gap-3 pb-3 border-b border-gray-100 dark:border-gray-800">
                                     <span className="text-sm text-gray-500 dark:text-gray-400 w-24 flex-shrink-0">Template</span>
                                     <span className="text-sm font-medium text-gray-900 dark:text-gray-200">{selectedTemplate?.name || '—'}</span>
                                 </div>
@@ -563,6 +620,12 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
                         <div className="flex-1 flex flex-col rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 min-h-[400px]">
                             {/* Form-style Header */}
                             <div className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+                                <div className="flex items-center px-4 py-2 border-b border-gray-100 dark:border-gray-800">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400 w-16">From</span>
+                                    <div className="flex-1 text-sm text-gray-800 dark:text-gray-200 font-medium">
+                                        {fromEmailDisplay}
+                                    </div>
+                                </div>
                                 <div className="flex items-center px-4 py-2 border-b border-gray-100 dark:border-gray-800">
                                     <span className="text-sm text-gray-500 dark:text-gray-400 w-16">To</span>
                                     <div className="flex-1 text-sm text-gray-800 dark:text-gray-200">
