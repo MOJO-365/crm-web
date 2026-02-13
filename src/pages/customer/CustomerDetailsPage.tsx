@@ -7,7 +7,7 @@ import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
-    IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon
+    IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon
 } from '@/components/icons';
 import {
     GET_CUSTOMER_BY_ID, SEND_REMINDER_EMAIL,
@@ -19,7 +19,7 @@ import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
 import { cn } from '@/lib/utils';
 
-import { SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS } from '@/lib/constants';
+import { SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS, ID_TYPE_MAP } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
@@ -279,7 +279,7 @@ export function CustomerDetailsPage() {
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     // Detail Section State
-    const [selectedDetailSection, setSelectedDetailSection] = useState<'location' | 'account' | 'rates' | 'solar_vpp' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills'>('location');
+    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'solar_vpp' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills'>('general');
 
     // Notes State
     const [noteText, setNoteText] = useState('');
@@ -330,6 +330,7 @@ export function CustomerDetailsPage() {
     const [billEndDate, setBillEndDate] = useState<string>('');
     const [vppConnectModalOpen, setVppConnectModalOpen] = useState(false);
     const [utilmateConnectModalOpen, setUtilmateConnectModalOpen] = useState(false);
+    const [isGeneratingCredentials, setIsGeneratingCredentials] = useState(false);
 
     // Utilmate Form State
     const [isEditingUtilmate, setIsEditingUtilmate] = useState(false);
@@ -339,6 +340,25 @@ export function CustomerDetailsPage() {
         utilmateConnected: 0,
         utilmateConnectedAt: ''
     });
+
+    // Tabs responsive state
+    const [maxVisibleTabs, setMaxVisibleTabs] = useState(100);
+    const [overflowOpen, setOverflowOpen] = useState(false);
+
+    useEffect(() => {
+        const handleResize = () => {
+            const width = window.innerWidth;
+            if (width < 640) setMaxVisibleTabs(2);
+            else if (width < 768) setMaxVisibleTabs(3);
+            else if (width < 1024) setMaxVisibleTabs(5);
+            else if (width < 1280) setMaxVisibleTabs(7);
+            else setMaxVisibleTabs(100);
+        };
+
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Queries
     const { loading: isLoadingDetails, refetch: refetchCustomer } = useQuery(GET_CUSTOMER_BY_ID, {
@@ -844,20 +864,7 @@ export function CustomerDetailsPage() {
 
 
         try {
-            // Priority: Sync with secondary API first
-            try {
-                await secondaryApiAxios.post('/api/v1/utilmate/user/add-user-battery', {
-                    user_id: selectedCustomerDetails.customerId,
-                    battery_brand: selectedCustomerDetails.batteryDetails?.batterybrand || '',
-                    sn_number: selectedCustomerDetails.batteryDetails?.snnumber || '',
-                    check_code: selectedCustomerDetails.batteryDetails?.checkCode || '',
-                    battery_usable_capacity: 0,
-                    inverter_capacity: 0
-                });
-            } catch (secErr: any) {
-                console.error('Failed to sync with secondary API during disconnection', secErr);
-                throw new Error(secErr.response?.data?.message || 'Failed to sync with secondary system. VPP status not updated.');
-            }
+
 
             await updateCustomer({
                 variables: {
@@ -1027,24 +1034,13 @@ export function CustomerDetailsPage() {
 
 
         try {
-            // Priority: Sync with secondary API first
-            try {
-                await secondaryApiAxios.post('/api/v1/utilmate/user/add-user', {
-                    account_number: selectedCustomerDetails.utilmateDetails?.accountNumber || '',
-                    site_identifier: selectedCustomerDetails.utilmateDetails?.siteIdentifier || '',
-                    gee_id: selectedCustomerDetails.customerId || selectedCustomerDetails.uid,
-                    dnsp: (selectedCustomerDetails.ratePlan?.dnsp !== undefined && selectedCustomerDetails.ratePlan?.dnsp !== null) ? (DNSP_LABELS[selectedCustomerDetails.ratePlan.dnsp as keyof typeof DNSP_LABELS] || '') : '',
-                    nmi_number: selectedCustomerDetails.address?.nmi || ''
-                });
-            } catch (secErr: any) {
-                console.error('Failed to sync with secondary API during Utilmate disconnection', secErr);
-                throw new Error(secErr.response?.data?.message || 'Failed to sync with secondary system. Utilmate status not updated.');
-            }
+
 
             await updateCustomer({
                 variables: {
                     uid: customerUid,
                     input: {
+                        utilmateStatus: newValue ? 1 : 0,
                         utilmateDetails: {
                             utilmateConnected: newValue ? 1 : 0,
                             utilmateConnectedAt: newValue ? now : undefined,
@@ -1092,6 +1088,7 @@ export function CustomerDetailsPage() {
 
             const now = new Date().toISOString();
             const input: any = {
+                utilmateStatus: 1,
                 utilmateDetails: {
                     siteIdentifier: utilmateForm.siteIdentifier || undefined,
                     accountNumber: utilmateForm.accountNumber || undefined,
@@ -1121,6 +1118,20 @@ export function CustomerDetailsPage() {
         } catch (error: any) {
             console.error('Error connecting Utilmate:', error);
             toast.error(error.message || 'Failed to connect Utilmate');
+        }
+    };
+
+    const handleGenerateCredentials = async (customerUid: string) => {
+        setIsGeneratingCredentials(true);
+        try {
+            await secondaryApiAxios.post(`/api/v1/utilmate/user/generate-credentials/${customerUid}`);
+            toast.success('Credentials generated successfully');
+        } catch (error: any) {
+            console.error('Error generating credentials:', error);
+            const message = error.response?.data?.message || error.message || 'Failed to generate credentials';
+            toast.error(message);
+        } finally {
+            setIsGeneratingCredentials(false);
         }
     };
 
@@ -1204,9 +1215,9 @@ export function CustomerDetailsPage() {
                                 </div>
                                 <div className="flex items-center gap-2.5 text-sm text-foreground/80">
                                     <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground">
-                                        <CalendarIcon size={14} />
+                                        <MapPinIcon size={14} />
                                     </div>
-                                    <span className="font-medium"><span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mr-1.5">Birth Date</span>{selectedCustomerDetails?.dob ? formatSydneyTime(selectedCustomerDetails.dob) : '-'}</span>
+                                    <span className="font-medium" title={selectedCustomerDetails?.address?.fullAddress || '-'}>{selectedCustomerDetails?.address?.fullAddress || '-'}</span>
                                 </div>
                             </div>
                         </div>
@@ -1217,7 +1228,7 @@ export function CustomerDetailsPage() {
                             <ArrowLeftIcon className="mr-1.5 h-3.5 w-3.5" />
                             Back
                         </Button>
-                        {canEdit && (
+                        {canEdit && selectedCustomerDetails && selectedCustomerDetails.status !== 3 && (
                             <Button onClick={() => navigate(`/customers/${uid}/edit`)} variant="outline" className="h-9 px-3 text-sm">
                                 <PencilIcon className="mr-1.5 h-3.5 w-3.5" />
                                 Edit
@@ -1417,6 +1428,28 @@ export function CustomerDetailsPage() {
                                                 </ConfirmationPopover>
                                             </div>
                                         )}
+                                        {item.step === 5 && item.completed && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="mt-2 h-7 text-[10px] px-2 relative z-30"
+                                                disabled={isGeneratingCredentials}
+                                                onClick={() => handleGenerateCredentials(selectedCustomerDetails.customerId || selectedCustomerDetails.uid)}
+
+                                            >
+                                                {isGeneratingCredentials ? (
+                                                    <>
+                                                        <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
+                                                        Generating...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <IdCardIcon size={12} className="mr-1" />
+                                                        Generate Credentials
+                                                    </>
+                                                )}
+                                            </Button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -1428,114 +1461,142 @@ export function CustomerDetailsPage() {
                     {/* Horizontal Tabs Layout */}
                     <div className="flex flex-col bg-card rounded-lg border border-border overflow-hidden min-h-[600px]">
                         {/* Tab Navigation */}
-                        <div className="border-b border-border bg-muted/30 flex overflow-x-auto no-scrollbar">
-                            {[
-                                { id: 'location', label: 'Location', icon: UserIcon },
-                                { id: 'account', label: 'Account', icon: Settings2Icon },
-                                { id: 'rates', label: 'Rates', icon: ZapIcon },
-                                { id: 'solar_vpp', label: 'Solar & VPP', icon: ZapIcon },
-                                { id: 'debit', label: 'Debit', icon: IdCardIcon },
-                                { id: 'utilmate', label: 'Utilmate', icon: ZapIcon },
-                                { id: 'notes', label: 'Notes', icon: Settings2Icon, badge: notesData?.customerNotes?.length },
-                                { id: 'documents', label: 'Documents', icon: UploadIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2')).length },
-                                { id: 'electricity_bills', label: 'Electricity Bills', icon: ZapIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2' || d.type === '2').length }
-                            ].filter(item => {
-                                if (item.id === 'solar_vpp') {
-                                    return selectedCustomerDetails.solarDetails?.hassolar === 1 ||
-                                        selectedCustomerDetails.vppDetails?.vpp === 1 ||
-                                        selectedCustomerDetails.ratePlan?.vpp === 1;
+                        <div className="border-b border-border bg-muted/30 flex items-center px-2 gap-1">
+                            {(() => {
+                                const allTabs = [
+                                    { id: 'general', label: 'General', icon: Settings2Icon },
+                                    { id: 'rates', label: 'Rates', icon: ZapIcon },
+                                    { id: 'solar_vpp', label: 'Solar & VPP', icon: ZapIcon },
+                                    { id: 'debit', label: 'Debit', icon: IdCardIcon },
+                                    { id: 'utilmate', label: 'Utilmate', icon: ZapIcon },
+                                    { id: 'notes', label: 'Notes', icon: Settings2Icon, badge: notesData?.customerNotes?.length },
+                                    { id: 'documents', label: 'Documents', icon: UploadIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2')).length },
+                                    { id: 'electricity_bills', label: 'Electricity Bills', icon: ZapIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2' || d.type === '2').length }
+                                ].filter(item => {
+                                    if (item.id === 'solar_vpp') {
+                                        const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
+                                        const isVpp = selectedCustomerDetails.vppDetails?.vpp === 1;
+
+                                        // Tab should strictly be shown ONLY if one of these is true
+                                        return hasSolar || isVpp;
+                                    }
+                                    if (item.id === 'debit') {
+                                        return !!selectedCustomerDetails.debitDetails && selectedCustomerDetails.debitDetails.optIn === 1;
+                                    }
+                                    if (item.id === 'utilmate') {
+                                        return !!selectedCustomerDetails.utilmateDetails && selectedCustomerDetails.utilmateDetails.utilmateConnected === 1;
+                                    }
+                                    return true;
+                                });
+
+
+
+                                let primaryTabs = allTabs.slice(0, maxVisibleTabs);
+                                let overflowTabs = allTabs.slice(maxVisibleTabs);
+                                const isOverflowActive = overflowTabs.some(t => t.id === selectedDetailSection);
+
+                                // If the selected tab is in the overflow, swap it with the last visible tab
+                                if (isOverflowActive && primaryTabs.length > 0) {
+                                    const selectedTabIndex = overflowTabs.findIndex(t => t.id === selectedDetailSection);
+                                    if (selectedTabIndex !== -1) {
+                                        const selectedTab = overflowTabs[selectedTabIndex];
+                                        const lastPrimaryTab = primaryTabs[primaryTabs.length - 1];
+
+                                        // create new arrays
+                                        primaryTabs = [...primaryTabs.slice(0, primaryTabs.length - 1), selectedTab];
+                                        overflowTabs = [...overflowTabs];
+                                        overflowTabs[selectedTabIndex] = lastPrimaryTab;
+                                    }
                                 }
-                                if (item.id === 'debit') {
-                                    return !!selectedCustomerDetails.debitDetails && selectedCustomerDetails.debitDetails.optIn === 1;
-                                }
-                                if (item.id === 'utilmate') {
-                                    return !!selectedCustomerDetails.utilmateDetails && selectedCustomerDetails.utilmateDetails.utilmateConnected === 1;
-                                }
-                                return true;
-                            }).map((item) => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => setSelectedDetailSection(item.id as any)}
-                                    className={cn(
-                                        "flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors duration-200 border-b-2 whitespace-nowrap outline-none",
-                                        selectedDetailSection === item.id
-                                            ? "border-primary bg-background text-primary"
-                                            : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                                    )}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <item.icon className="w-4 h-4" />
-                                        {item.label}
-                                    </div>
-                                    {item.badge !== undefined && item.badge > 0 && (
-                                        <span className={cn(
-                                            "px-2 py-0.5 rounded-full text-xs font-bold",
-                                            selectedDetailSection === item.id
-                                                ? "bg-primary/10 text-primary"
-                                                : "bg-muted text-muted-foreground"
-                                        )}>
-                                            {item.badge}
-                                        </span>
-                                    )}
-                                </button>
-                            ))}
+
+                                return (
+                                    <>
+                                        {primaryTabs.map((item) => (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => setSelectedDetailSection(item.id as any)}
+                                                className={cn(
+                                                    "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 border-b-2 whitespace-nowrap outline-none",
+                                                    selectedDetailSection === item.id
+                                                        ? "border-primary bg-background text-primary"
+                                                        : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                                )}
+                                            >
+                                                <item.icon className="w-4 h-4" />
+                                                <span className="hidden sm:inline">{item.label}</span>
+                                                <span className="sm:hidden">{item.label.split(' ')[0]}</span>
+                                                {item.badge !== undefined && item.badge > 0 && (
+                                                    <span className={cn(
+                                                        "px-2 py-0.5 rounded-full text-xs font-bold",
+                                                        selectedDetailSection === item.id
+                                                            ? "bg-primary/10 text-primary"
+                                                            : "bg-muted text-muted-foreground"
+                                                    )}>
+                                                        {item.badge}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        ))}
+
+                                        {overflowTabs.length > 0 && (
+                                            <Popover
+                                                trigger={
+                                                    <button
+                                                        className={cn(
+                                                            "flex items-center gap-2 px-3 py-3 text-sm font-medium transition-colors duration-200 border-b-2 whitespace-nowrap outline-none ml-auto",
+                                                            overflowTabs.some(t => t.id === selectedDetailSection)
+                                                                ? "border-primary bg-background text-primary"
+                                                                : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                                        )}
+                                                    >
+                                                        <MoreHorizontalIcon size={18} />
+                                                        {overflowTabs.some(t => t.id === selectedDetailSection) && (
+                                                            <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-bold">
+                                                                {overflowTabs.find(t => t.id === selectedDetailSection)?.label}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                }
+                                                content={
+                                                    <div className="py-1 min-w-[200px]">
+                                                        {overflowTabs.map(item => (
+                                                            <button
+                                                                key={item.id}
+                                                                onClick={() => {
+                                                                    setSelectedDetailSection(item.id as any);
+                                                                    setOverflowOpen(false);
+                                                                }}
+                                                                className={cn(
+                                                                    "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors text-left",
+                                                                    selectedDetailSection === item.id
+                                                                        ? "bg-primary/10 text-primary font-medium"
+                                                                        : "text-foreground hover:bg-muted/70"
+                                                                )}
+                                                            >
+                                                                <item.icon className="w-4 h-4 shrink-0" />
+                                                                <span>{item.label}</span>
+                                                                {item.badge !== undefined && item.badge > 0 && (
+                                                                    <span className="ml-auto bg-muted px-1.5 py-0.5 rounded-full text-[10px]">{item.badge}</span>
+                                                                )}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                }
+                                                isOpen={overflowOpen}
+                                                onOpenChange={setOverflowOpen}
+                                                placement="bottom-end"
+                                                showArrow={false}
+                                            />
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
 
                         {/* Content Area */}
                         <div className="flex-1 p-6 overflow-y-auto">
 
-
-                            {selectedDetailSection === 'location' && (
-                                <div className="space-y-6 animate-in fade-in duration-300">
-                                    <div className="flex items-center justify-between border-b border-border pb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center text-sky-600 dark:text-sky-400">
-                                                <UserIcon size={20} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Location Details</h3>
-                                                <p className="text-xs text-muted-foreground">Address & property details</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="col-span-2 space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Full Address</label>
-                                            <p className="font-medium">{selectedCustomerDetails.address?.fullAddress || '-'}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Unit Number</label>
-                                            <p className="font-medium">{selectedCustomerDetails.address?.unitNumber || '-'}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Street Number</label>
-                                            <p className="font-medium">{selectedCustomerDetails.address?.streetNumber || '-'}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Street Name</label>
-                                            <p className="font-medium">{selectedCustomerDetails.address?.streetName || '-'}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Street Type</label>
-                                            <p className="font-medium">{selectedCustomerDetails.address?.streetType || '-'}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Suburb</label>
-                                            <p className="font-medium">{selectedCustomerDetails.address?.suburb || '-'}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">State</label>
-                                            <p className="font-medium">{selectedCustomerDetails.address?.state || '-'}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Postcode</label>
-                                            <p className="font-medium">{selectedCustomerDetails.address?.postcode || '-'}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {selectedDetailSection === 'account' && (
+                            {selectedDetailSection === 'general' && (
                                 <div className="space-y-6 animate-in fade-in duration-300">
                                     <div className="flex items-center justify-between border-b border-border pb-4">
                                         <div className="flex items-center gap-3">
@@ -1543,15 +1604,61 @@ export function CustomerDetailsPage() {
                                                 <Settings2Icon size={20} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Account Details</h3>
+                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">General Details</h3>
                                                 <p className="text-xs text-muted-foreground">NMI, connection & enrollment</p>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Birth Date</label>
+                                            <p className="font-medium">
+                                                {selectedCustomerDetails.dob ? formatSydneyTime(selectedCustomerDetails.dob) : '-'}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">NMI</label>
-                                            <p className="font-medium text-primary">{selectedCustomerDetails.address?.nmi || '-'}</p>
+                                            <p className="font-medium">{selectedCustomerDetails.address?.nmi || '-'}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Type</label>
+                                            <p className="font-medium">
+                                                {selectedCustomerDetails.businessName ? 'Commercial' : 'Residential'}
+                                            </p>
+                                        </div>
+                                        {selectedCustomerDetails.businessName && (
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">Business</label>
+                                                <p className="font-medium">{selectedCustomerDetails.businessName}</p>
+                                            </div>
+                                        )}
+                                        {selectedCustomerDetails.abn && (
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">ABN</label>
+                                                <p className="font-medium">{selectedCustomerDetails.abn}</p>
+                                            </div>
+                                        )}
+                                        <div className="col-span-2 grid grid-cols-3 gap-6">
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">ID Type</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.idtype !== undefined && selectedCustomerDetails.enrollmentDetails?.idtype !== null
+                                                        ? ID_TYPE_MAP[selectedCustomerDetails.enrollmentDetails.idtype] || '-'
+                                                        : '-'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">ID Number</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.idnumber || '-'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">Expiry</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.idexpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.idexpiry) : '-'}
+                                                </p>
+                                            </div>
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">Connection Date</label>
@@ -1575,7 +1682,7 @@ export function CustomerDetailsPage() {
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">Life Support</label>
-                                            <p className={cn("font-medium", selectedCustomerDetails.enrollmentDetails?.lifesupport ? "text-red-600" : "text-green-600")}>
+                                            <p className="font-medium">
                                                 {selectedCustomerDetails.enrollmentDetails?.lifesupport ? 'Yes' : 'No'}
                                             </p>
                                         </div>
@@ -2043,7 +2150,7 @@ export function CustomerDetailsPage() {
                                             />
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    {/* <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">MSAT Status</label>
                                             <div className="flex items-center gap-2 mt-1">
@@ -2056,7 +2163,7 @@ export function CustomerDetailsPage() {
                                                 </span>
                                             </div>
                                         </div>
-                                    </div>
+                                    </div> */}
 
                                     {selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1 && (
                                         <div className="space-y-4 pt-4 border-t border-dashed">
@@ -2882,7 +2989,7 @@ export function CustomerDetailsPage() {
                 isOpen={noteModalOpen}
                 onClose={() => { setNoteModalOpen(false); setNoteText(''); }}
                 title="Add Note"
-                size="sm"
+                size="lg"
                 footer={
                     <>
                         <Button
@@ -2907,16 +3014,7 @@ export function CustomerDetailsPage() {
                 }
             >
                 <div className="space-y-4">
-                    <div className="space-y-2">
-                        <label className="text-xs font-semibold uppercase text-muted-foreground">Note Message</label>
-                        <textarea
-                            value={noteText}
-                            onChange={(e) => setNoteText(e.target.value)}
-                            placeholder="Write a note..."
-                            className="w-full min-h-[100px] p-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
-                            autoFocus
-                        />
-                    </div>
+
 
                     <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
@@ -2983,6 +3081,16 @@ export function CustomerDetailsPage() {
                                 placeholder="Select follow-up date..."
                             />
                         </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase text-muted-foreground">Note Message</label>
+                        <textarea
+                            value={noteText}
+                            onChange={(e) => setNoteText(e.target.value)}
+                            placeholder="Write a note..."
+                            className="w-full min-h-[100px] p-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y"
+                            autoFocus
+                        />
                     </div>
                 </div>
             </Modal>
