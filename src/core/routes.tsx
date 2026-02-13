@@ -23,6 +23,7 @@ const EmailSendPage = lazy(() => import('@/pages/email/EmailSendPage').then(m =>
 const ProfilePage = lazy(() => import('@/pages/user/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const DocumentTypesPage = lazy(() => import('@/pages/master/DocumentTypesPage').then(m => ({ default: m.DocumentTypesPage })));
 const NoteTypesPage = lazy(() => import('@/pages/master/NoteTypesPage').then(m => ({ default: m.NoteTypesPage })));
+const NotificationEntitiesPage = lazy(() => import('@/pages/master/NotificationEntitiesPage').then(m => ({ default: m.NotificationEntitiesPage })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -80,6 +81,7 @@ const router = createBrowserRouter(
                 {/* Master Routes */}
                 <Route path="/document-types" element={<RequirePermission menuCode="document_types"><DocumentTypesPage /></RequirePermission>} />
                 <Route path="/note-types" element={<RequirePermission menuCode="note_types"><NoteTypesPage /></RequirePermission>} />
+                <Route path="/notification_entity" element={<RequirePermission menuCode="notification_entity"><NotificationEntitiesPage /></RequirePermission>} />
 
                 {/* General authenticated routes */}
                 <Route path="/change-password" element={<ChangePasswordPage />} />
