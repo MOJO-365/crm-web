@@ -4,6 +4,11 @@ export interface CustomerFormData {
     lastName: string;
     email: string;
     phone: string;
+    gender: number;
+    relationshipStatus: number;
+    enquiryAmount: string;
+    checkCreditScore: boolean;
+    employerName: string;
     dob: string;
     propertyType: number; // 0 = residential, 1 = commercial
     businessName: string;
@@ -45,6 +50,12 @@ export interface CustomerFormData {
     idNumber: string;
     idState: string;
     idExpiry: string;
+
+    // Driver's License Details
+    licenseNumber: string;
+    licenseState: string;
+    licenseExpiry: string;
+
     concession: boolean;
     lifeSupport: boolean;
     billingPreference: number;
@@ -68,6 +79,7 @@ export interface CustomerFormData {
     // Documents
     previousBill?: CustomerDocument | null;
     identityProof?: CustomerDocument | null;
+    licenseDocument?: CustomerDocument | null;
 }
 
 export interface CustomerDocument {

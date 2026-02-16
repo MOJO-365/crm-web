@@ -28,6 +28,32 @@ const CUSTOMER_FULL_RESPONSE = `
     emailSent
     isActive
     isDeleted
+    gender
+    relationshipStatus
+    enquiryAmount
+    checkCreditScore
+    employerName
+    previousBill {
+        uid
+        path
+        filename
+        mimeType
+        size
+    }
+    identityProof {
+        uid
+        path
+        filename
+        mimeType
+        size
+    }
+    licenseDocument {
+        uid
+        path
+        filename
+        mimeType
+        size
+    }
     createdAt
     updatedAt
     enrollmentDetails {
@@ -42,6 +68,9 @@ const CUSTOMER_FULL_RESPONSE = `
         concession
         lifesupport
         billingpreference
+        licenseNumber
+        licenseState
+        licenseExpiry
     }
     address {
         id

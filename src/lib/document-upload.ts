@@ -4,7 +4,7 @@
  */
 import { apiAxios } from './apollo';
 
-export type DocumentType = 'identity_proof' | 'previous_bill' | 'electricity_bill';
+export type DocumentType = 'identity_proof' | 'previous_bill' | 'electricity_bill' | 'drivers_license';
 
 export interface UploadDocumentResult {
     id: number;

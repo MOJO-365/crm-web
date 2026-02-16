@@ -7,7 +7,7 @@ import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
-    IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon
+    IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon, LockIcon
 } from '@/components/icons';
 import {
     GET_CUSTOMER_BY_ID, SEND_REMINDER_EMAIL,
@@ -78,6 +78,7 @@ interface CustomerDetails {
     status: number;
     previousBill?: DocumentItem;
     identityProof?: DocumentItem;
+    licenseDocument?: DocumentItem;
     discount?: number;
     tariffCode?: string;
     signDate?: string;
@@ -92,9 +93,12 @@ interface CustomerDetails {
         idnumber?: string;
         idstate?: string;
         idexpiry?: string;
-        concession?: number;
-        lifesupport?: number;
+        concession?: boolean;
+        lifesupport?: boolean;
         billingpreference?: number;
+        licenseNumber?: string;
+        licenseState?: string;
+        licenseExpiry?: string;
     };
     ratePlan?: {
         uid?: string;
@@ -302,6 +306,7 @@ export function CustomerDetailsPage() {
     const [isAddingDocType, setIsAddingDocType] = useState(false);
     const previousBillInputRef = useRef<HTMLInputElement>(null);
     const identityProofInputRef = useRef<HTMLInputElement>(null);
+    const licenseDocumentInputRef = useRef<HTMLInputElement>(null);
     const newDocumentInputRef = useRef<HTMLInputElement>(null);
 
     // Action states
@@ -348,11 +353,11 @@ export function CustomerDetailsPage() {
     useEffect(() => {
         const handleResize = () => {
             const width = window.innerWidth;
-            if (width < 640) setMaxVisibleTabs(2);
-            else if (width < 768) setMaxVisibleTabs(3);
-            else if (width < 1024) setMaxVisibleTabs(5);
-            else if (width < 1280) setMaxVisibleTabs(7);
-            else setMaxVisibleTabs(100);
+            if (width < 640) setMaxVisibleTabs(3); // Mobile: Icons only (fits more)
+            else if (width < 768) setMaxVisibleTabs(3); // Tablet Potrait
+            else if (width < 1024) setMaxVisibleTabs(4); // Tablet Landscape
+            else if (width < 1280) setMaxVisibleTabs(6); // Laptop
+            else setMaxVisibleTabs(8); // Desktop
         };
 
         handleResize();
@@ -590,6 +595,10 @@ export function CustomerDetailsPage() {
                 const idType = docTypeOptions.find(o => o.label === 'Identity Proof');
                 apiDocType = idType?.value || 'identity_proof';
                 docName = 'Identity Proof';
+            } else if (documentType === 'licenseDocument') {
+                const licType = docTypeOptions.find(o => o.label === 'Driver\'s License') || docTypeOptions.find(o => o.label === 'License');
+                apiDocType = licType?.value || 'license_document';
+                docName = 'Driver\'s License';
             } else {
                 docName = documentType;
             }
@@ -1282,7 +1291,7 @@ export function CustomerDetailsPage() {
                                                             disabled={freezingCustomer}
                                                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
                                                         >
-                                                            <ZapIcon size={15} className="text-amber-500" />
+                                                            <LockIcon size={15} className="text-slate-500" />
                                                             {freezingCustomer ? 'Freezing...' : 'Freeze'}
                                                         </button>
                                                     </>
@@ -1308,7 +1317,6 @@ export function CustomerDetailsPage() {
                 </div>
             ) : selectedCustomerDetails ? (
                 <div className="space-y-6">
-                    {/* Progress Timeline */}
                     {/* Progress Timeline */}
                     <div className="bg-card text-card-foreground rounded-lg border border-border p-8 space-y-6">
                         <div className="bg-muted/50 rounded-xl p-4">
@@ -1521,10 +1529,10 @@ export function CustomerDetailsPage() {
                                                         ? "border-primary bg-background text-primary"
                                                         : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                                                 )}
+                                                title={item.label}
                                             >
                                                 <item.icon className="w-4 h-4" />
                                                 <span className="hidden sm:inline">{item.label}</span>
-                                                <span className="sm:hidden">{item.label.split(' ')[0]}</span>
                                                 {item.badge !== undefined && item.badge > 0 && (
                                                     <span className={cn(
                                                         "px-2 py-0.5 rounded-full text-xs font-bold",
@@ -1660,6 +1668,29 @@ export function CustomerDetailsPage() {
                                                 </p>
                                             </div>
                                         </div>
+
+                                        {/* Driver's License Details */}
+                                        <div className="col-span-2 grid grid-cols-3 gap-6 pt-4 border-t border-border">
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">License Number</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.licenseNumber || '-'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">License State</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.licenseState || '-'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">License Expiry</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.licenseExpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.licenseExpiry) : '-'}
+                                                </p>
+                                            </div>
+                                        </div>
+
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">Connection Date</label>
                                             <p className="font-medium">
@@ -2085,7 +2116,7 @@ export function CustomerDetailsPage() {
                                             {[
                                                 { label: 'Bank Name', value: selectedCustomerDetails.debitDetails.bankName },
                                                 { label: 'BSB', value: selectedCustomerDetails.debitDetails.bsb },
-                                                { label: 'Account Number', value: selectedCustomerDetails.debitDetails.accountNumber },
+                                                { label: 'Account Number', value: selectedCustomerDetails.debitDetails.accountNumber ? `•••• ${selectedCustomerDetails.debitDetails.accountNumber.slice(-4)}` : '-' },
                                             ].map((item, i) => (
                                                 <div key={i} className="bg-white dark:bg-neutral-950 rounded-xl p-4 border border-border/50 hover:border-border transition-colors">
                                                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{item.label}</span>
@@ -2252,6 +2283,17 @@ export function CustomerDetailsPage() {
                                         type="file"
                                         accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
                                         className="hidden"
+                                        ref={licenseDocumentInputRef}
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleUploadDocument('licenseDocument', file);
+                                            e.target.value = '';
+                                        }}
+                                    />
+                                    <input
+                                        type="file"
+                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                        className="hidden"
                                         ref={newDocumentInputRef}
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
@@ -2274,7 +2316,7 @@ export function CustomerDetailsPage() {
                                                 <tr className="bg-muted/30 border-b border-border animate-in fade-in slide-in-from-top-1">
                                                     <td className="px-4 py-4">
                                                         <div className="space-y-2">
-                                                            <div className="flex items-center justify-between">
+                                                            <div className="flex items-end justify-between">
                                                                 <label className="text-[10px] font-bold uppercase text-muted-foreground leading-none">Choose Type</label>
                                                                 {canManageDocumentTypes && (
                                                                     <button
@@ -2331,9 +2373,9 @@ export function CustomerDetailsPage() {
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic">—</td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic">—</td>
-                                                    <td className="px-4 py-4 text-right">
+                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                    <td className="px-4 py-4 text-right align-bottom">
                                                         <div className="flex flex-col gap-2 items-end">
                                                             <div className="flex gap-2">
                                                                 <Button
@@ -2376,9 +2418,16 @@ export function CustomerDetailsPage() {
                                                         type: 'identityProof',
                                                         category: '0'
                                                     },
+                                                    {
+                                                        doc: selectedCustomerDetails.licenseDocument,
+                                                        label: selectedCustomerDetails.licenseDocument?.documentType?.name || 'Driver\'s License',
+                                                        type: 'licenseDocument',
+                                                        category: '0'
+                                                    },
                                                     ...(selectedCustomerDetails?.documents?.filter(d =>
                                                         d.uid !== selectedCustomerDetails?.previousBill?.uid &&
                                                         d.uid !== selectedCustomerDetails?.identityProof?.uid &&
+                                                        d.uid !== selectedCustomerDetails?.licenseDocument?.uid &&
                                                         (d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2'))
                                                     ).map(d => ({
                                                         doc: d,
@@ -2466,6 +2515,7 @@ export function CustomerDetailsPage() {
                                                                         onClick={() => {
                                                                             if (item.type === 'previousBill') previousBillInputRef.current?.click();
                                                                             else if (item.type === 'identityProof') identityProofInputRef.current?.click();
+                                                                            else if (item.type === 'licenseDocument') licenseDocumentInputRef.current?.click();
                                                                         }}
                                                                         disabled={isUploadingDocument === item.type}
                                                                         isLoading={isUploadingDocument === item.type}
@@ -2524,7 +2574,7 @@ export function CustomerDetailsPage() {
                                             </thead>
                                             <tbody className="divide-y divide-border">
                                                 <tr className="bg-muted/30 border-b border-border animate-in fade-in slide-in-from-top-1">
-                                                    <td className="px-4 py-4">
+                                                    <td className="px-4 py-4 align-bottom">
                                                         <div className="space-y-2">
                                                             <label className="text-[10px] font-bold uppercase text-muted-foreground leading-none">Select Period</label>
                                                             <div className="flex gap-2 items-center">
@@ -2544,9 +2594,9 @@ export function CustomerDetailsPage() {
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic">—</td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic">—</td>
-                                                    <td className="px-4 py-4 text-right">
+                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                    <td className="px-4 py-4 text-right align-bottom">
                                                         <div className="flex gap-2 justify-end">
                                                             <Button
                                                                 variant="outline"

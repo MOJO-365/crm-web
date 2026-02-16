@@ -25,6 +25,11 @@ export const GET_CUSTOMERS = gql`
                 utilmateStatus
                 utilmateUpdatedAt
                 utilmateUploadedManually
+                gender
+                relationshipStatus
+                enquiryAmount
+                checkCreditScore
+                employerName
                 signDate
                 signedPdfPath
                 pdfAudit
@@ -235,6 +240,11 @@ export const GET_CUSTOMERS_LIST = gql`
                 utilmateStatus
                 utilmateUpdatedAt
                 utilmateUploadedManually
+                gender
+                relationshipStatus
+                enquiryAmount
+                checkCreditScore
+                employerName
                 signDate
                 signedPdfPath
                 pdfAudit
@@ -479,6 +489,12 @@ export const GET_CUSTOMER_BY_ID = gql`
             emailSent
             utilmateStatus
             rateVersion
+            gender
+            relationshipStatus
+            enquiryAmount
+            checkCreditScore
+            employerName
+            offerVersion
             offerVersion
             viewCode
             isActive
@@ -508,6 +524,28 @@ export const GET_CUSTOMER_BY_ID = gql`
                 }
             }
             identityProof {
+                id
+                uid
+                customerUid
+                filename
+                path
+                size
+                mimeType
+                documentType {
+                    uid
+                    name
+                    color
+                    category
+                }
+                createdAt
+                updatedAt
+                createdBy
+                createdByUser {
+                    uid
+                    name
+                }
+            }
+            licenseDocument {
                 id
                 uid
                 customerUid
@@ -649,6 +687,9 @@ export const GET_CUSTOMER_BY_ID = gql`
                 concession
                 lifesupport
                 billingpreference
+                licenseNumber
+                licenseState
+                licenseExpiry
                 isActive
                 isDeleted
                 createdAt

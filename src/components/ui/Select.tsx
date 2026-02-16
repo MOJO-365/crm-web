@@ -27,6 +27,7 @@ export interface SelectProps {
     className?: string;
     containerClassName?: string;
     required?: boolean;
+    onBlur?: React.FocusEventHandler<HTMLInputElement>;
 }
 
 export function Select({
@@ -42,6 +43,7 @@ export function Select({
     className,
     containerClassName,
     required,
+    onBlur,
 }: SelectProps) {
     const [isOpen, setIsOpen] = React.useState(false);
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -268,6 +270,7 @@ export function Select({
                         onFocus={() => !disabled && setIsOpen(true)}
                         placeholder={multiple && selectedValues.length > 0 ? displayLabel : placeholder}
                         disabled={disabled}
+                        onBlur={onBlur}
                         className={cn(
                             "flex-1 min-w-0 bg-transparent border-none outline-none placeholder:text-muted-foreground truncate",
                             "disabled:cursor-not-allowed"

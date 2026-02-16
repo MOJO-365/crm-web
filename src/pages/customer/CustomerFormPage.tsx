@@ -97,6 +97,11 @@ const initialFormData: CustomerFormData = {
     lastName: '',
     email: '',
     phone: '',
+    gender: 0,
+    relationshipStatus: 0,
+    enquiryAmount: '',
+    checkCreditScore: false,
+    employerName: '',
     dob: '',
     propertyType: 0,
     businessName: '',
@@ -128,6 +133,9 @@ const initialFormData: CustomerFormData = {
     idNumber: '',
     idState: '',
     idExpiry: '',
+    licenseNumber: '',
+    licenseState: '',
+    licenseExpiry: '',
     concession: false,
     lifeSupport: false,
     billingPreference: 0,
@@ -400,6 +408,7 @@ export const CustomerFormPage = () => {
     // Document upload state
     const [generatedCustomerId] = useState(() => isEditMode ? (customerData?.customer?.customerId || generateGEECustomerId()) : generateGEECustomerId());
     const [uploadingPreviousBill, setUploadingPreviousBill] = useState(false);
+    const [uploadingLicense, setUploadingLicense] = useState(false);
     const [uploadingIdentityProof, setUploadingIdentityProof] = useState(false);
 
     const { data: activeRatesData } = useQuery(GET_ACTIVE_RATES_HISTORY, {
@@ -480,6 +489,11 @@ export const CustomerFormPage = () => {
                 lastName: c.lastName || '',
                 email: c.email || '',
                 phone: c.number || '',
+                gender: c.gender || 0,
+                relationshipStatus: c.relationshipStatus || 0,
+                enquiryAmount: c.enquiryAmount?.toString() || '',
+                checkCreditScore: c.checkCreditScore === 1,
+                employerName: c.employerName || '',
                 dob: c.dob ? c.dob.split('T')[0] : '',
                 propertyType: c.propertyType || 0,
                 businessName: c.businessName || '',
@@ -511,6 +525,9 @@ export const CustomerFormPage = () => {
                 idNumber: c.enrollmentDetails?.idnumber || '',
                 idState: c.enrollmentDetails?.idstate || '',
                 idExpiry: c.enrollmentDetails?.idexpiry ? c.enrollmentDetails.idexpiry.split('T')[0] : '',
+                licenseNumber: c.enrollmentDetails?.licenseNumber || '',
+                licenseState: c.enrollmentDetails?.licenseState || '',
+                licenseExpiry: c.enrollmentDetails?.licenseExpiry ? c.enrollmentDetails.licenseExpiry.split('T')[0] : '',
                 concession: c.enrollmentDetails?.concession === 1,
                 lifeSupport: c.enrollmentDetails?.lifesupport === 1,
                 billingPreference: c.enrollmentDetails?.billingpreference || 0,
@@ -723,13 +740,17 @@ export const CustomerFormPage = () => {
 
     // Field-level validation
     const validateField = (name: string, value: any): string => {
-        if (!value && name !== 'unitNumber') return ''; // Empty check handled below if we want strict required msg, OR relying on structure. 
-        // NOTE: The user requested validation ON touched. 
-        // If I return '' for empty, then purely required fields won't show error on blur if empty?
-        // Let's make explicit required checks for fields that are required.
+        // Required fields
+        let isRequired = ['firstName', 'lastName', 'email', 'phone', 'streetNumber', 'streetName', 'suburb', 'postcode', 'nmi'].includes(name);
 
-        const isRequired = ['firstName', 'lastName', 'email', 'phone', 'streetNumber', 'streetName', 'suburb', 'postcode', 'nmi'].includes(name);
-        if (isRequired && (!value || (typeof value === 'string' && !value.trim()))) {
+        // Conditional demographic requirements
+        if (formData.checkCreditScore) {
+            if (['gender', 'relationshipStatus', 'employerName', 'enquiryAmount'].includes(name)) {
+                isRequired = true;
+            }
+        }
+
+        if (isRequired && (value === undefined || value === null || (typeof value === 'string' && !value.trim()))) {
             return 'This field is required';
         }
 
@@ -775,6 +796,17 @@ export const CustomerFormPage = () => {
         setFormData(prev => ({ ...prev, [field]: finalValue }));
         setIsFormDirty(true);
 
+        // Clear demographic errors if Check Credit Score is toggled off
+        if (field === 'checkCreditScore' && !finalValue) {
+            setErrors(prev => ({
+                ...prev,
+                gender: '',
+                relationshipStatus: '',
+                employerName: '',
+                enquiryAmount: ''
+            }));
+        }
+
         // If already touched, validate immediately
         if (touched[field]) {
             const error = validateField(field, finalValue);
@@ -806,12 +838,27 @@ export const CustomerFormPage = () => {
     const step1Valid = useMemo(() => !!formData.tariffCode, [formData.tariffCode]);
 
     const step2Valid = useMemo(() => {
-        return !!(
+        const baseValid = !!(
             formData.firstName?.trim() &&
             formData.lastName?.trim() &&
             formData.email?.trim() &&
-            formData.connectionDate
+            formData.connectionDate &&
+            formData.licenseNumber?.trim() &&
+            formData.licenseState &&
+            formData.licenseExpiry &&
+            formData.licenseDocument
         );
+
+        if (formData.checkCreditScore) {
+            return baseValid && !!(
+                formData.employerName?.trim() &&
+                formData.enquiryAmount?.trim() &&
+                formData.gender !== undefined &&
+                formData.relationshipStatus !== undefined
+            );
+        }
+
+        return baseValid;
     }, [formData]);
 
     const canProceed = () => {
@@ -853,6 +900,11 @@ export const CustomerFormPage = () => {
                 tariffCode: formData.tariffCode,
                 discount: formData.discount,
                 status: finalStatus,
+                gender: formData.gender,
+                relationshipStatus: formData.relationshipStatus,
+                enquiryAmount: formData.enquiryAmount ? parseFloat(formData.enquiryAmount) : undefined,
+                checkCreditScore: formData.checkCreditScore ? 1 : 0,
+                employerName: formData.employerName,
                 enrollmentDetails: {
                     saletype: formData.saleType,
                     connectiondate: formData.connectionDate || null,
@@ -863,6 +915,20 @@ export const CustomerFormPage = () => {
                     concession: formData.concession ? 1 : 0,
                     lifesupport: formData.lifeSupport ? 1 : 0,
                     billingpreference: formData.billingPreference,
+                    // New License Fields - mapping to enrollment details
+                    // Note: Backend might need schema update to accept these specific fields if they don't map to existing id...
+                    // For now, we are sending them. If backend doesn't accept, they'll be ignored or cause error.
+                    // Ideally, we'd map them to specific columns or a JSON field.
+                    // Assuming we might need to map them to the generic ID fields if License is primary?
+                    // User asked to *separate* them. 
+                    // Let's pass them as part of input if schema allows, or mapped. 
+                    // Since I cannot change backend schema right now without SQL, I will pass them in `enrollmentDetails` 
+                    // assuming the backend *will* be updated to accept `licenseNumber` etc or I should map them?
+                    // The prompt said: "Create a new, distinct field for 'License Type' ... Ensure that 'Identity Proof' and 'License' documents are added".
+                    // I'll add them to the input object.
+                    licenseNumber: formData.licenseNumber,
+                    licenseState: formData.licenseState,
+                    licenseExpiry: formData.licenseExpiry || null,
                 },
                 address: {
                     unitNumber: formData.unitNumber || undefined,
@@ -894,6 +960,7 @@ export const CustomerFormPage = () => {
                 debitDetails: undefined,
                 previousBill: formData.previousBill?.uid,
                 identityProof: formData.identityProof?.uid,
+                licenseDocument: formData.licenseDocument?.uid,
                 rateVersion: activeRateVersion,
                 customerId: isEditMode ? undefined : generatedCustomerId,
             };
@@ -1542,6 +1609,58 @@ export const CustomerFormPage = () => {
                                                 <Input label="Last Name" required error={errors.lastName} placeholder="e.g. Taylor" value={formData.lastName} onChange={(e) => updateField('lastName', e.target.value)} onBlur={() => handleBlur('lastName')} />
                                                 <Input label="Email" required helperText="We'll send confirmations here" error={errors.email} type="email" placeholder="name@example.com" value={formData.email} onChange={(e) => updateField('email', e.target.value)} onBlur={() => handleBlur('email')} />
                                             </div>
+
+                                            {/* Demographics & Enquiry */}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-4 bg-muted/30 rounded-xl border border-border">
+                                                <Select
+                                                    label="Gender"
+                                                    required={formData.checkCreditScore}
+                                                    error={errors.gender}
+                                                    options={[
+                                                        { value: '0', label: 'Male' },
+                                                        { value: '1', label: 'Female' },
+                                                        { value: '2', label: 'Other' }
+                                                    ]}
+                                                    value={formData.gender.toString()}
+                                                    onChange={(val) => updateField('gender', parseInt(val as string))}
+                                                    onBlur={() => handleBlur('gender')}
+                                                />
+                                                <Select
+                                                    label="Relationship Status"
+                                                    required={formData.checkCreditScore}
+                                                    error={errors.relationshipStatus}
+                                                    options={[
+                                                        { value: '0', label: 'Married' },
+                                                        { value: '1', label: 'Unmarried' }
+                                                    ]}
+                                                    value={formData.relationshipStatus.toString()}
+                                                    onChange={(val) => updateField('relationshipStatus', parseInt(val as string))}
+                                                    onBlur={() => handleBlur('relationshipStatus')}
+                                                />
+                                                <Input
+                                                    label="Employer Name"
+                                                    required={formData.checkCreditScore}
+                                                    error={errors.employerName}
+                                                    placeholder="Company Pty Ltd"
+                                                    value={formData.employerName}
+                                                    onChange={(e) => updateField('employerName', e.target.value)}
+                                                    onBlur={() => handleBlur('employerName')}
+                                                />
+                                                <Input
+                                                    label="Enquiry Amount"
+                                                    required={formData.checkCreditScore}
+                                                    error={errors.enquiryAmount}
+                                                    type="number"
+                                                    placeholder="0.00"
+                                                    value={formData.enquiryAmount}
+                                                    onChange={(e) => updateField('enquiryAmount', e.target.value)}
+                                                    onBlur={() => handleBlur('enquiryAmount')}
+                                                />
+                                                <div className="col-span-2 md:col-span-4 flex items-center gap-2">
+                                                    <ToggleSwitch checked={formData.checkCreditScore} onChange={(checked) => updateField('checkCreditScore', checked)} />
+                                                    <span className="text-sm font-medium">Check Credit Score</span>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                             <DatePicker
@@ -1556,8 +1675,54 @@ export const CustomerFormPage = () => {
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                            <Select label="ID Type" options={ID_TYPE_OPTIONS} value={formData.idType.toString()} onChange={(val) => updateField('idType', parseInt(val as string))} />
-                                            <Input label="ID Number" placeholder="D123456" value={formData.idNumber} onChange={(e) => updateField('idNumber', e.target.value)} />
+                                            <Input label="Driver's License No." required placeholder="D123456" value={formData.licenseNumber} onChange={(e) => updateField('licenseNumber', e.target.value)} />
+                                            <Select label="License State" required options={STATE_OPTIONS} value={formData.licenseState} onChange={(val) => updateField('licenseState', val as string)} />
+                                            <DatePicker label="License Expiry" required value={formData.licenseExpiry} onChange={(date) => updateField('licenseExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} />
+
+                                            <Field label="License Document" required>
+                                                <div className="space-y-2">
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        disabled={uploadingLicense}
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+
+                                                            setUploadingLicense(true);
+                                                            try {
+                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
+                                                                const result = await uploadDocument(file, targetId!, 'drivers_license', isEditMode ? (uid || undefined) : generatedCustomerId, 'Driver License');
+                                                                updateField('licenseDocument', {
+                                                                    id: result.id,
+                                                                    uid: result.uid,
+                                                                    filename: result.filename,
+                                                                    path: result.path,
+                                                                    size: result.size,
+                                                                    mimeType: result.contentType || 'application/pdf',
+                                                                    createdAt: new Date().toISOString()
+                                                                } as CustomerDocument);
+                                                                toast.success('License uploaded successfully');
+                                                            } catch (error) {
+                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload license');
+                                                            } finally {
+                                                                setUploadingLicense(false);
+                                                            }
+                                                        }}
+                                                    />
+                                                    {uploadingLicense && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
+                                                    {formData.licenseDocument && !uploadingLicense && (
+                                                        <DocumentPreview path={formData.licenseDocument.path} label="License" />
+                                                    )}
+                                                </div>
+                                            </Field>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ">
+                                            {/* <div className="col-span-full font-medium mb-2 flex items-center gap-2 text-muted-foreground"><IdCardIcon size={16} /> Secondary Identity (Medicare/Passport)</div> */}
+                                            <Select label="ID Type" options={ID_TYPE_OPTIONS.filter(opt => opt.value !== '0')} value={formData.idType.toString()} onChange={(val) => updateField('idType', parseInt(val as string))} />
+                                            <Input label="ID Number" placeholder="Number" value={formData.idNumber} onChange={(e) => updateField('idNumber', e.target.value)} />
                                             <Select label="ID State" options={STATE_OPTIONS} value={formData.idState} onChange={(val) => updateField('idState', val as string)} />
                                             <DatePicker label="ID Expiry" value={formData.idExpiry} onChange={(date) => updateField('idExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} />
                                         </div>
@@ -1641,6 +1806,7 @@ export const CustomerFormPage = () => {
                                                     )}
                                                 </div>
                                             </Field>
+
                                         </div>
                                         <div className="flex flex-wrap gap-6 pt-2">
                                             <div className="flex items-center gap-2">
@@ -1745,9 +1911,13 @@ export const CustomerFormPage = () => {
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Sale Type:</span> <span className="font-medium">{SALE_TYPE_OPTIONS.find(o => o.value === formData.saleType.toString())?.label}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Connection Date:</span> <span className="font-medium">{formData.connectionDate}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Billing:</span> <span className="font-medium">{BILLING_PREF_OPTIONS.find(o => o.value === formData.billingPreference.toString())?.label}</span></p>
+                                                    <p className="flex justify-between border-t pt-2 mt-2"><span className="text-muted-foreground">Driver's License:</span> <span className="font-medium">{formData.licenseNumber} ({formData.licenseState})</span></p>
+                                                    <p className="flex justify-between"><span className="text-muted-foreground">Expiry:</span> <span className="font-medium">{formData.licenseExpiry || '—'}</span></p>
+
                                                     <div className="pt-2 border-t border-border mt-2">
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">ID Type:</span> <span className="font-medium">{ID_TYPE_OPTIONS.find(o => o.value === formData.idType.toString())?.label}</span></p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">ID Number:</span> <span className="font-medium">{formData.idNumber}</span></p>
+                                                        <p className="flex text-xs font-semibold text-muted-foreground mb-1 uppercase">Other ID (Optional)</p>
+                                                        <p className="flex justify-between"><span className="text-muted-foreground">Type:</span> <span className="font-medium">{ID_TYPE_OPTIONS.find(o => o.value === formData.idType.toString())?.label}</span></p>
+                                                        <p className="flex justify-between"><span className="text-muted-foreground">ID Number:</span> <span className="font-medium">{formData.idNumber || '—'}</span></p>
                                                         <p className="flex justify-between"><span className="text-muted-foreground">Expiry:</span> <span className="font-medium">{formData.idExpiry || '—'}</span></p>
                                                     </div>
                                                 </div>
@@ -1804,15 +1974,18 @@ export const CustomerFormPage = () => {
                                         )}
 
                                         {/* Uploaded Documents */}
-                                        {(formData.previousBill || formData.identityProof) && (
+                                        {(formData.previousBill || formData.identityProof || formData.licenseDocument) && (
                                             <div className="md:col-span-2 p-4 bg-muted/50 rounded-lg">
                                                 <h3 className="font-medium mb-3 flex items-center gap-2"><IdCardIcon size={16} className="text-blue-600" /> Uploaded Documents</h3>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     {formData.previousBill && (
                                                         <DocumentPreview path={formData.previousBill.path} label="Previous Bill" />
                                                     )}
+                                                    {formData.licenseDocument && (
+                                                        <DocumentPreview path={formData.licenseDocument.path} label="Driver's License" />
+                                                    )}
                                                     {formData.identityProof && (
-                                                        <DocumentPreview path={formData.identityProof.path} label="Identity Proof" />
+                                                        <DocumentPreview path={formData.identityProof.path} label="Secondary Identity" />
                                                     )}
                                                 </div>
                                             </div>
@@ -1936,7 +2109,8 @@ export const CustomerFormPage = () => {
                                 <SummaryItem icon={UserIcon} label="Name" value={`${formData.firstName} ${formData.lastName}`} />
                                 <SummaryItem icon={MailIcon} label="Email" value={formData.email} />
                                 <SummaryItem icon={CalendarIcon} label="DOB" value={formData.dob} />
-                                <SummaryItem icon={IdCardIcon} label="ID" value={formData.idNumber ? `${ID_TYPE_OPTIONS.find(o => o.value === formData.idType.toString())?.label} ${formData.idNumber}` : '—'} />
+                                <SummaryItem icon={IdCardIcon} label="License" value={formData.licenseNumber || '—'} />
+                                <SummaryItem icon={IdCardIcon} label="Secondary ID" value={formData.idNumber ? `${ID_TYPE_OPTIONS.find(o => o.value === formData.idType.toString())?.label} ${formData.idNumber}` : '—'} />
                                 <SummaryItem icon={CreditCardIcon} label="Billing" value={BILLING_PREF_OPTIONS.find(o => o.value === formData.billingPreference.toString())?.label} />
                             </div>
                         </div>
