@@ -69,6 +69,11 @@ export function EmailSendPage() {
                 'GEE Disclosure Statement.pdf',
                 'GEE Withdrawal Form.pdf'
             ]
+        },
+        {
+            type: 'CUSTOMER_CREDENTIALS',
+            label: 'Customer Credentials',
+            description: 'Sent to customers with their login credentials and app download links',
         }
     ];
 

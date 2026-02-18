@@ -7,19 +7,19 @@ import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
-    IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon
+    IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon, LockIcon
 } from '@/components/icons';
 import {
-    GET_CUSTOMER_BY_ID, SEND_REMINDER_EMAIL,
-    UPDATE_CUSTOMER, GET_RATES_HISTORY_BY_VERSION, GET_CUSTOMER_NOTES,
-    CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS, GET_NOTE_TYPES,
-    CREATE_NOTE_TYPE, GET_DOCUMENT_TYPES, CREATE_DOCUMENT_TYPE, CREATE_CUSTOMER
+    GET_DOCUMENT_TYPES, CREATE_DOCUMENT_TYPE, CREATE_CUSTOMER, SEND_OFFER_EMAIL,
+    GET_CUSTOMER_BY_ID, SEND_REMINDER_EMAIL, UPDATE_CUSTOMER, GET_RATES_HISTORY_BY_VERSION,
+    GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS, GET_NOTE_TYPES,
+    CREATE_NOTE_TYPE, SEND_CUSTOMER_CREDENTIALS_EMAIL
 } from '@/graphql';
 import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
 import { cn } from '@/lib/utils';
 
-import { SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS, ID_TYPE_MAP } from '@/lib/constants';
+import { SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS, ID_TYPE_MAP, RISK_STATUS_MAP, GENDER_LABELS, RELATIONSHIP_STATUS_LABELS } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
@@ -78,13 +78,23 @@ interface CustomerDetails {
     status: number;
     previousBill?: DocumentItem;
     identityProof?: DocumentItem;
+    licenseDocument?: DocumentItem;
+    gender?: number;
+    relationshipStatus?: number;
+    enquiryAmount?: string | number;
+    checkCreditScore?: number;
+    employerName?: string;
+    creditScore?: number;
+    isCreditScoreFetched?: number;
     discount?: number;
     tariffCode?: string;
     signDate?: string;
     signedPdfPath?: string;
     emailSent?: number;
+    offerEmailSentAt?: string;
     phoneVerifiedAt?: string;
     address?: CustomerAddress;
+    riskStatus?: number;
     enrollmentDetails?: {
         saletype?: number;
         connectiondate?: string;
@@ -92,9 +102,12 @@ interface CustomerDetails {
         idnumber?: string;
         idstate?: string;
         idexpiry?: string;
-        concession?: number;
-        lifesupport?: number;
+        concession?: boolean;
+        lifesupport?: boolean;
         billingpreference?: number;
+        licenseNumber?: string;
+        licenseState?: string;
+        licenseExpiry?: string;
     };
     ratePlan?: {
         uid?: string;
@@ -302,6 +315,7 @@ export function CustomerDetailsPage() {
     const [isAddingDocType, setIsAddingDocType] = useState(false);
     const previousBillInputRef = useRef<HTMLInputElement>(null);
     const identityProofInputRef = useRef<HTMLInputElement>(null);
+    const licenseDocumentInputRef = useRef<HTMLInputElement>(null);
     const newDocumentInputRef = useRef<HTMLInputElement>(null);
 
     // Action states
@@ -328,6 +342,9 @@ export function CustomerDetailsPage() {
     // Date state for electricity bill upload
     const [billStartDate, setBillStartDate] = useState<string>('');
     const [billEndDate, setBillEndDate] = useState<string>('');
+    const [isCheckingCreditScore, setIsCheckingCreditScore] = useState(false);
+    const [showManualOfferButton, setShowManualOfferButton] = useState(false);
+    const [isSendingOffer, setIsSendingOffer] = useState(false);
     const [vppConnectModalOpen, setVppConnectModalOpen] = useState(false);
     const [utilmateConnectModalOpen, setUtilmateConnectModalOpen] = useState(false);
     const [isGeneratingCredentials, setIsGeneratingCredentials] = useState(false);
@@ -348,11 +365,11 @@ export function CustomerDetailsPage() {
     useEffect(() => {
         const handleResize = () => {
             const width = window.innerWidth;
-            if (width < 640) setMaxVisibleTabs(2);
-            else if (width < 768) setMaxVisibleTabs(3);
-            else if (width < 1024) setMaxVisibleTabs(5);
-            else if (width < 1280) setMaxVisibleTabs(7);
-            else setMaxVisibleTabs(100);
+            if (width < 640) setMaxVisibleTabs(3); // Mobile: Icons only (fits more)
+            else if (width < 768) setMaxVisibleTabs(3); // Tablet Potrait
+            else if (width < 1024) setMaxVisibleTabs(4); // Tablet Landscape
+            else if (width < 1280) setMaxVisibleTabs(6); // Laptop
+            else setMaxVisibleTabs(8); // Desktop
         };
 
         handleResize();
@@ -419,11 +436,13 @@ export function CustomerDetailsPage() {
     // Mutations
     const [createNote] = useMutation(CREATE_CUSTOMER_NOTE);
     const [deleteNote] = useMutation(DELETE_CUSTOMER_NOTE);
+    const [sendOfferEmail] = useMutation(SEND_OFFER_EMAIL);
     const [createNoteType] = useMutation(CREATE_NOTE_TYPE);
     const [createDocumentTypeMutation] = useMutation(CREATE_DOCUMENT_TYPE);
     const [sendReminderEmail] = useMutation(SEND_REMINDER_EMAIL);
     const [createCustomer] = useMutation(CREATE_CUSTOMER);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
+    const [sendCustomerCredentialsEmail] = useMutation(SEND_CUSTOMER_CREDENTIALS_EMAIL);
 
     // Effects
     useEffect(() => {
@@ -590,6 +609,10 @@ export function CustomerDetailsPage() {
                 const idType = docTypeOptions.find(o => o.label === 'Identity Proof');
                 apiDocType = idType?.value || 'identity_proof';
                 docName = 'Identity Proof';
+            } else if (documentType === 'licenseDocument') {
+                const licType = docTypeOptions.find(o => o.label === 'Driver\'s License') || docTypeOptions.find(o => o.label === 'License');
+                apiDocType = licType?.value || 'license_document';
+                docName = 'Driver\'s License';
             } else {
                 docName = documentType;
             }
@@ -900,7 +923,7 @@ export function CustomerDetailsPage() {
                 await secondaryApiAxios.post('/api/v1/utilmate/user/add-user-battery', {
                     user_id: selectedCustomerDetails.customerId,
                     battery_brand: vppForm.batteryBrand,
-                    sn_number: vppForm.snNumber,
+                    battery_sn_number: vppForm.snNumber,
                     check_code: vppForm.checkCode,
                     battery_usable_capacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : 0,
                     inverter_capacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : 0
@@ -1121,11 +1144,32 @@ export function CustomerDetailsPage() {
         }
     };
 
-    const handleGenerateCredentials = async (customerUid: string) => {
+    const handleGenerateCredentials = async (customerId: string) => {
         setIsGeneratingCredentials(true);
         try {
-            await secondaryApiAxios.post(`/api/v1/utilmate/user/generate-credentials/${customerUid}`);
+            const response = await secondaryApiAxios.post(`/api/v1/utilmate/user/generate-credentials/${customerId}`);
+            const password = response.data;
+
             toast.success('Credentials generated successfully');
+
+            if (password && selectedCustomerDetails) {
+                try {
+                    const { data } = await sendCustomerCredentialsEmail({
+                        variables: {
+                            customerUid: selectedCustomerDetails.uid,
+                            password
+                        }
+                    });
+                    if (data?.sendCustomerCredentialsEmail?.success) {
+                        toast.success('Credentials email sent successfully');
+                    } else {
+                        toast.error(data?.sendCustomerCredentialsEmail?.message || 'Failed to send credentials email');
+                    }
+                } catch (emailErr: any) {
+                    console.error('Error sending credentials email:', emailErr);
+                    toast.error('Credentials generated but email failed to send');
+                }
+            }
         } catch (error: any) {
             console.error('Error generating credentials:', error);
             const message = error.response?.data?.message || error.message || 'Failed to generate credentials';
@@ -1136,6 +1180,166 @@ export function CustomerDetailsPage() {
     };
 
 
+
+    const handleCheckCreditScore = async (customerUid: string) => {
+        if (!selectedCustomerDetails) return;
+        setIsCheckingCreditScore(true);
+        try {
+            // Construct Equifax API Payload
+            /*
+            const dynamicEquifaxPayload = {
+                "first-name": selectedCustomerDetails.firstName,
+                "first-given-name": selectedCustomerDetails.lastName,
+                "address": {
+                    "street-name": selectedCustomerDetails.address?.streetName || '',
+                    "street-type": selectedCustomerDetails.address?.streetType || '',
+                    "suburb": selectedCustomerDetails.address?.suburb || '',
+                    "state-code": selectedCustomerDetails.address?.state || ''
+                },
+                "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
+                "gender-code": selectedCustomerDetails.gender === 0 ? 'M' : 'F',
+                "date-of-birth": selectedCustomerDetails.dob ? new Date(selectedCustomerDetails.dob).toISOString().split('T')[0] : '',
+                "employer-name": selectedCustomerDetails.employerName || '',
+                "account-type-code": "CC",
+                "enquiry-amount": Number(selectedCustomerDetails.enquiryAmount) || 0,
+                "relationship-code": String(selectedCustomerDetails.relationshipStatus || '1'),
+                "client-reference": `${selectedCustomerDetails.customerId || selectedCustomerDetails.uid}-${Date.now()}`,
+                "enquiry-client-reference": selectedCustomerDetails.number || ''
+            };
+            */
+
+            /*
+            const equifaxPayload = {
+                "first-name": "Pal",
+                "first-given-name": "Patel",
+                "address": {
+                    "street-name": "COOYAL",
+                    "street-type": "PL",
+                    "suburb": "GLENWOOD",
+                    "state-code": "NSW"
+                },
+                "license-number": "DL123456",
+                "gender-code": "M",
+                "date-of-birth": "2003-03-19",
+                "employer-name": "DATA FISH PTY LTD",
+                "account-type-code": "CC",
+                "enquiry-amount": 1000,
+                "relationship-code": "1",
+                "client-reference": "T3D-20251209051318-ed8bc2",
+                "enquiry-client-reference": "12344556"
+            };
+            */
+
+            // Call secondary API (Commented out for testing with static score)
+            // const response = await secondaryApiAxios.post('/api/v1/equifax/user/get-credit-report', equifaxPayload);
+
+            // Extract score_masterscale if available
+            // const score = response.data?.creditScoreData?.score?.score_masterscale;
+
+            // STATIC SCORE FOR TESTING
+            const score = 654;
+            console.log('Using static credit score for testing:', score);
+
+            let riskStatus: number | undefined = undefined;
+            if (score !== undefined && score !== null) {
+                const scoreNum = parseInt(score.toString());
+                if (scoreNum < 200) riskStatus = 1;
+                else if (scoreNum < 300) riskStatus = 2;
+                else if (scoreNum < 600) riskStatus = 3;
+                else if (scoreNum < 700) riskStatus = 4;
+                else riskStatus = 5;
+            }
+
+            // If API call succeeds, update backend status
+            await updateCustomer({
+                variables: {
+                    uid: customerUid,
+                    input: {
+                        isCreditScoreFetched: 1,
+                        creditScore: score ? parseInt(score.toString()) : undefined,
+                        riskStatus: riskStatus
+                    }
+                }
+            });
+            setSelectedCustomerDetails({
+                ...selectedCustomerDetails,
+                isCreditScoreFetched: 1,
+                creditScore: score ? parseInt(score.toString()) : undefined,
+                riskStatus: riskStatus
+            });
+            toast.success('Credit score checked and updated');
+
+            // --- Automation logic based on credit score ---
+            if (score && parseInt(score.toString()) > 600) {
+                // Automatically send offer
+                setIsSendingOffer(true);
+                try {
+                    const result: any = await sendOfferEmail({
+                        variables: { customerUid }
+                    });
+
+                    if (result.data?.sendOfferEmail?.success) {
+                        const { data } = await refetchCustomer();
+
+                        if (data?.customer) {
+                            setSelectedCustomerDetails(data.customer);
+                        }
+
+                        if (data?.customer?.emailSent === 1 || data?.customer?.offerEmailSentAt || data?.customer?.status >= 2) {
+                            toast.success('Offer email sent and status updated');
+                        } else {
+                            toast.success('Offer email sent');
+                        }
+                    } else {
+                        toast.error(result.data?.sendOfferEmail?.message || 'Failed to send offer email');
+                    }
+                } catch (offerErr: any) {
+                    console.error('Failed to send offer automatically:', offerErr);
+                    toast.error(offerErr.message || 'Failed to send offer email');
+                } finally {
+                    setIsSendingOffer(false);
+                }
+            } else if (score && parseInt(score.toString()) >= 400 && parseInt(score.toString()) <= 600) {
+                // Show manual send offer button
+                setShowManualOfferButton(true);
+            }
+            // ----------------------------------------------
+
+        } catch (error: any) {
+            console.error('Error checking credit score:', error);
+            toast.error(error.message || 'Failed to update credit score');
+        } finally {
+            setIsCheckingCreditScore(false);
+            setIsSendingOffer(false);
+        }
+    };
+
+    const handleManualSendOffer = async (customerUid: string) => {
+        setIsSendingOffer(true);
+        try {
+            const result: any = await sendOfferEmail({
+                variables: { customerUid }
+            });
+            if (result.data?.sendOfferEmail?.success) {
+                toast.success('Offer email sent successfully');
+                const { data } = await refetchCustomer();
+                if (data?.customer) {
+                    setSelectedCustomerDetails(data.customer);
+                }
+                setShowManualOfferButton(false);
+                setIsSendingOffer(false);
+            } else {
+                toast.error(result.data?.sendOfferEmail?.message || 'Failed to send offer email');
+                setIsSendingOffer(false);
+            }
+        } catch (error: any) {
+            console.error('Error sending manual offer:', error);
+            toast.error(error.message || 'Error sending offer email');
+            setIsSendingOffer(false);
+        } finally {
+            // setIsSendingOffer(false); // Removed from finally block
+        }
+    };
 
     const handleSendReminder = async (customerUid: string) => {
         setSendingReminder(true);
@@ -1193,6 +1397,13 @@ export function CustomerDetailsPage() {
                                             }}
                                         />
                                     )}
+                                    {/* {selectedCustomerDetails?.riskStatus !== undefined && selectedCustomerDetails.riskStatus !== null && (
+                                        <StatusField
+                                            value={selectedCustomerDetails.riskStatus}
+                                            type="risk_status"
+                                            mode="badge"
+                                        />
+                                    )} */}
                                 </div>
                                 <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                     <span className="bg-muted px-2 py-0.5 rounded text-xs">Customer ID: </span>
@@ -1282,7 +1493,7 @@ export function CustomerDetailsPage() {
                                                             disabled={freezingCustomer}
                                                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
                                                         >
-                                                            <ZapIcon size={15} className="text-amber-500" />
+                                                            <LockIcon size={15} className="text-slate-500" />
                                                             {freezingCustomer ? 'Freezing...' : 'Freeze'}
                                                         </button>
                                                     </>
@@ -1309,7 +1520,6 @@ export function CustomerDetailsPage() {
             ) : selectedCustomerDetails ? (
                 <div className="space-y-6">
                     {/* Progress Timeline */}
-                    {/* Progress Timeline */}
                     <div className="bg-card text-card-foreground rounded-lg border border-border p-8 space-y-6">
                         <div className="bg-muted/50 rounded-xl p-4">
                             <div className="flex items-center justify-between mb-3">
@@ -1321,20 +1531,29 @@ export function CustomerDetailsPage() {
                             </div>
                             <div className="relative flex justify-between items-start">
                                 {[
-                                    { label: 'Offer sent', date: selectedCustomerDetails.createdAt, completed: true, step: 1 },
-                                    { label: 'Signed by customer', date: selectedCustomerDetails.signDate, completed: !!selectedCustomerDetails.signDate, showReminder: selectedCustomerDetails.status < 2, step: 2 },
-                                    ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
-                                        { label: 'VPP connect', date: null, completed: selectedCustomerDetails.vppDetails?.vppConnected === 1, showToggle: true, disabled: selectedCustomerDetails.status < 2, step: 3 },
+                                    ...(selectedCustomerDetails.checkCreditScore === 1 ? [
+                                        { label: 'Credit score', date: null, completed: selectedCustomerDetails.isCreditScoreFetched === 1, step: 0 },
                                     ] : []),
-                                    { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1, step: 4 },
+                                    { label: 'Offer sent', date: selectedCustomerDetails.offerEmailSentAt, completed: !!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.emailSent === 1, step: 1, isLoading: isSendingOffer },
+                                    { label: 'Signed by customer', date: selectedCustomerDetails.signDate, completed: !!selectedCustomerDetails.signDate, showReminder: !!selectedCustomerDetails.offerEmailSentAt, step: 2 },
+                                    ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
+                                        { label: 'VPP connect', date: null, completed: selectedCustomerDetails.vppDetails?.vppConnected === 1, showToggle: true, disabled: selectedCustomerDetails.status < 3, step: 3 },
+                                    ] : []),
+                                    { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: (selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1) || selectedCustomerDetails.checkCreditScore !== 1, step: 4 },
                                     { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.msatDetails?.msatConnected !== 1, step: 5 },
-                                ].map((item, index, arr) => (
+                                ].map((item: any, index, arr) => (
                                     <div key={index} className="relative flex flex-col items-center" style={{ width: `${100 / arr.length}%` }}>
                                         {index > 0 && (
                                             <div className={`absolute top-[18px] h-0.5 ${item.completed ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} style={{ right: '50%', left: '-50%' }} />
                                         )}
-                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold bg-background border-2 z-10 ${item.completed ? 'border-green-500 text-green-500' : 'border-gray-200 dark:border-gray-600 text-gray-400'}`}>
-                                            {item.completed ? <CheckIcon size={16} strokeWidth={3} /> : index + 1}
+                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold bg-background border-2 z-10 ${item.completed ? 'border-green-500 text-green-500' : item.isLoading ? 'border-primary text-primary' : 'border-gray-200 dark:border-gray-600 text-gray-400'}`}>
+                                            {item.isLoading ? (
+                                                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                            ) : item.completed ? (
+                                                <CheckIcon size={16} strokeWidth={3} />
+                                            ) : (
+                                                index + 1
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-1 mt-2 justify-center z-30 relative">
                                             <span className={`text-xs font-medium ${item.completed ? 'text-foreground' : 'text-muted-foreground'}`}>{item.label}</span>
@@ -1376,7 +1595,8 @@ export function CustomerDetailsPage() {
                                             )}
                                         </div>
                                         {item.date && <span className="text-[10px] text-muted-foreground">{formatSydneyTime(item.date)}</span>}
-                                        {item.showReminder && (
+
+                                        {item.showReminder && !selectedCustomerDetails.signDate && (
                                             <button
                                                 onClick={() => handleSendReminder(selectedCustomerDetails.uid)}
                                                 disabled={sendingReminder || reminderSent}
@@ -1388,6 +1608,45 @@ export function CustomerDetailsPage() {
                                                     <><CheckIcon size={10} />Sent</>
                                                 ) : (
                                                     <><MailIcon size={10} />Send reminder</>
+                                                )}
+                                            </button>
+                                        )}
+
+                                        {item.step === 0 && item.completed && selectedCustomerDetails.creditScore !== undefined && (
+                                            <div className="flex flex-col gap-1.5 mt-2">
+
+                                                <div className="flex items-center">
+                                                    <div className={`text-xs font-bold px-3 py-1 rounded-full border-2 ${RISK_STATUS_MAP[selectedCustomerDetails.riskStatus as number]?.color || 'text-primary bg-primary/5 border-primary/10'}`}>
+                                                        Score: {selectedCustomerDetails.creditScore} • {RISK_STATUS_MAP[selectedCustomerDetails.riskStatus as number]?.label || 'N/A'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {item.step === 0 && !item.completed && (
+                                            <button
+                                                onClick={() => handleCheckCreditScore(selectedCustomerDetails.uid)}
+                                                disabled={isCheckingCreditScore}
+                                                className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg mt-1 relative z-30 bg-primary text-primary-foreground hover:bg-primary/90 ${isCheckingCreditScore ? 'opacity-70' : ''}`}
+                                            >
+                                                {isCheckingCreditScore ? (
+                                                    <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Checking...</>
+                                                ) : (
+                                                    <><ZapIcon size={10} />Check credit score</>
+                                                )}
+                                            </button>
+                                        )}
+
+                                        {item.step === 0 && (showManualOfferButton || (selectedCustomerDetails.isCreditScoreFetched === 1 && selectedCustomerDetails.creditScore !== undefined && selectedCustomerDetails.creditScore <= 600)) && !selectedCustomerDetails.offerEmailSentAt && (
+                                            <button
+                                                onClick={() => handleManualSendOffer(selectedCustomerDetails.uid)}
+                                                disabled={isSendingOffer}
+                                                className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg mt-1 relative z-30 bg-primary text-primary-foreground hover:bg-primary/90 ${isSendingOffer ? 'opacity-70' : ''}`}
+                                            >
+                                                {isSendingOffer ? (
+                                                    <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
+                                                ) : (
+                                                    <><MailIcon size={10} />Send Offer</>
                                                 )}
                                             </button>
                                         )}
@@ -1432,19 +1691,19 @@ export function CustomerDetailsPage() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="mt-2 h-7 text-[10px] px-2 relative z-30"
+                                                className="mt-2 h-7 text-[10px] px-2 relative z-30 bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800 transition-colors"
                                                 disabled={isGeneratingCredentials}
-                                                onClick={() => handleGenerateCredentials(selectedCustomerDetails.customerId || selectedCustomerDetails.uid)}
+                                                onClick={() => selectedCustomerDetails.customerId && handleGenerateCredentials(selectedCustomerDetails.customerId)}
 
                                             >
                                                 {isGeneratingCredentials ? (
                                                     <>
-                                                        <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
+                                                        <div className="w-3 h-3 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mr-1" />
                                                         Generating...
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <IdCardIcon size={12} className="mr-1" />
+                                                        <IdCardIcon size={12} className="mr-1 text-emerald-500" />
                                                         Generate Credentials
                                                     </>
                                                 )}
@@ -1521,10 +1780,10 @@ export function CustomerDetailsPage() {
                                                         ? "border-primary bg-background text-primary"
                                                         : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                                                 )}
+                                                title={item.label}
                                             >
                                                 <item.icon className="w-4 h-4" />
                                                 <span className="hidden sm:inline">{item.label}</span>
-                                                <span className="sm:hidden">{item.label.split(' ')[0]}</span>
                                                 {item.badge !== undefined && item.badge > 0 && (
                                                     <span className={cn(
                                                         "px-2 py-0.5 rounded-full text-xs font-bold",
@@ -1609,21 +1868,25 @@ export function CustomerDetailsPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Birth Date</label>
-                                            <p className="font-medium">
-                                                {selectedCustomerDetails.dob ? formatSydneyTime(selectedCustomerDetails.dob) : '-'}
-                                            </p>
-                                        </div>
+
+                                    {/* Property & Connection */}
+                                    <div className="grid grid-cols-3 gap-6">
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">NMI</label>
                                             <p className="font-medium">{selectedCustomerDetails.address?.nmi || '-'}</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Type</label>
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Property Type</label>
                                             <p className="font-medium">
                                                 {selectedCustomerDetails.businessName ? 'Commercial' : 'Residential'}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Connection Date</label>
+                                            <p className="font-medium">
+                                                {selectedCustomerDetails.enrollmentDetails?.connectiondate
+                                                    ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.connectiondate)
+                                                    : '-'}
                                             </p>
                                         </div>
                                         {selectedCustomerDetails.businessName && (
@@ -1638,34 +1901,14 @@ export function CustomerDetailsPage() {
                                                 <p className="font-medium">{selectedCustomerDetails.abn}</p>
                                             </div>
                                         )}
-                                        <div className="col-span-2 grid grid-cols-3 gap-6">
-                                            <div className="space-y-1">
-                                                <label className="text-xs text-muted-foreground uppercase font-semibold">ID Type</label>
-                                                <p className="font-medium">
-                                                    {selectedCustomerDetails.enrollmentDetails?.idtype !== undefined && selectedCustomerDetails.enrollmentDetails?.idtype !== null
-                                                        ? ID_TYPE_MAP[selectedCustomerDetails.enrollmentDetails.idtype] || '-'
-                                                        : '-'}
-                                                </p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-xs text-muted-foreground uppercase font-semibold">ID Number</label>
-                                                <p className="font-medium">
-                                                    {selectedCustomerDetails.enrollmentDetails?.idnumber || '-'}
-                                                </p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-xs text-muted-foreground uppercase font-semibold">Expiry</label>
-                                                <p className="font-medium">
-                                                    {selectedCustomerDetails.enrollmentDetails?.idexpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.idexpiry) : '-'}
-                                                </p>
-                                            </div>
-                                        </div>
+                                    </div>
+
+                                    {/* Personal Info */}
+                                    <div className="grid grid-cols-3 gap-6 pt-4 border-t border-border/50">
                                         <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Connection Date</label>
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Birth Date</label>
                                             <p className="font-medium">
-                                                {selectedCustomerDetails.enrollmentDetails?.connectiondate
-                                                    ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.connectiondate)
-                                                    : '-'}
+                                                {selectedCustomerDetails.dob ? formatSydneyTime(selectedCustomerDetails.dob) : '-'}
                                             </p>
                                         </div>
                                         <div className="space-y-1">
@@ -1693,6 +1936,84 @@ export function CustomerDetailsPage() {
                                             </p>
                                         </div>
                                     </div>
+
+                                    {/* Identification */}
+                                    <div className="grid grid-cols-3 gap-6 pt-4 border-t border-border/50">
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">ID Type</label>
+                                            <p className="font-medium">
+                                                {selectedCustomerDetails.enrollmentDetails?.idtype !== undefined && selectedCustomerDetails.enrollmentDetails?.idtype !== null
+                                                    ? ID_TYPE_MAP[selectedCustomerDetails.enrollmentDetails.idtype] || '-'
+                                                    : '-'}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">ID Number</label>
+                                            <p className="font-medium">
+                                                {selectedCustomerDetails.enrollmentDetails?.idnumber || '-'}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">ID Expiry</label>
+                                            <p className="font-medium">
+                                                {selectedCustomerDetails.enrollmentDetails?.idexpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.idexpiry) : '-'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Driver's License */}
+                                    <div className="grid grid-cols-3 gap-6 pt-4 border-t border-border/50">
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">License Number</label>
+                                            <p className="font-medium">
+                                                {selectedCustomerDetails.enrollmentDetails?.licenseNumber || '-'}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">License State</label>
+                                            <p className="font-medium">
+                                                {selectedCustomerDetails.enrollmentDetails?.licenseState || '-'}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">License Expiry</label>
+                                            <p className="font-medium">
+                                                {selectedCustomerDetails.enrollmentDetails?.licenseExpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.licenseExpiry) : '-'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Credit Assessment (only when credit check was done) */}
+                                    {selectedCustomerDetails.checkCreditScore === 1 && (
+                                        <div className="grid grid-cols-3 gap-6 pt-4 border-t border-border/50">
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">Gender</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.gender !== undefined && selectedCustomerDetails.gender !== null
+                                                        ? GENDER_LABELS[selectedCustomerDetails.gender as number] || '-'
+                                                        : '-'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">Relationship Status</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.relationshipStatus !== undefined && selectedCustomerDetails.relationshipStatus !== null
+                                                        ? RELATIONSHIP_STATUS_LABELS[selectedCustomerDetails.relationshipStatus as number] || '-'
+                                                        : '-'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">Employer Name</label>
+                                                <p className="font-medium">{selectedCustomerDetails.employerName || '-'}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">Enquiry Amount</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enquiryAmount ? `$${selectedCustomerDetails.enquiryAmount}` : '-'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -2085,7 +2406,7 @@ export function CustomerDetailsPage() {
                                             {[
                                                 { label: 'Bank Name', value: selectedCustomerDetails.debitDetails.bankName },
                                                 { label: 'BSB', value: selectedCustomerDetails.debitDetails.bsb },
-                                                { label: 'Account Number', value: selectedCustomerDetails.debitDetails.accountNumber },
+                                                { label: 'Account Number', value: selectedCustomerDetails.debitDetails.accountNumber ? `•••• ${selectedCustomerDetails.debitDetails.accountNumber.slice(-4)}` : '-' },
                                             ].map((item, i) => (
                                                 <div key={i} className="bg-white dark:bg-neutral-950 rounded-xl p-4 border border-border/50 hover:border-border transition-colors">
                                                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{item.label}</span>
@@ -2252,6 +2573,17 @@ export function CustomerDetailsPage() {
                                         type="file"
                                         accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
                                         className="hidden"
+                                        ref={licenseDocumentInputRef}
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleUploadDocument('licenseDocument', file);
+                                            e.target.value = '';
+                                        }}
+                                    />
+                                    <input
+                                        type="file"
+                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                        className="hidden"
                                         ref={newDocumentInputRef}
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
@@ -2274,7 +2606,7 @@ export function CustomerDetailsPage() {
                                                 <tr className="bg-muted/30 border-b border-border animate-in fade-in slide-in-from-top-1">
                                                     <td className="px-4 py-4">
                                                         <div className="space-y-2">
-                                                            <div className="flex items-center justify-between">
+                                                            <div className="flex items-end justify-between">
                                                                 <label className="text-[10px] font-bold uppercase text-muted-foreground leading-none">Choose Type</label>
                                                                 {canManageDocumentTypes && (
                                                                     <button
@@ -2331,9 +2663,9 @@ export function CustomerDetailsPage() {
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic">—</td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic">—</td>
-                                                    <td className="px-4 py-4 text-right">
+                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                    <td className="px-4 py-4 text-right align-bottom">
                                                         <div className="flex flex-col gap-2 items-end">
                                                             <div className="flex gap-2">
                                                                 <Button
@@ -2376,9 +2708,16 @@ export function CustomerDetailsPage() {
                                                         type: 'identityProof',
                                                         category: '0'
                                                     },
+                                                    {
+                                                        doc: selectedCustomerDetails.licenseDocument,
+                                                        label: selectedCustomerDetails.licenseDocument?.documentType?.name || 'Driver\'s License',
+                                                        type: 'licenseDocument',
+                                                        category: '0'
+                                                    },
                                                     ...(selectedCustomerDetails?.documents?.filter(d =>
                                                         d.uid !== selectedCustomerDetails?.previousBill?.uid &&
                                                         d.uid !== selectedCustomerDetails?.identityProof?.uid &&
+                                                        d.uid !== selectedCustomerDetails?.licenseDocument?.uid &&
                                                         (d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2'))
                                                     ).map(d => ({
                                                         doc: d,
@@ -2466,6 +2805,7 @@ export function CustomerDetailsPage() {
                                                                         onClick={() => {
                                                                             if (item.type === 'previousBill') previousBillInputRef.current?.click();
                                                                             else if (item.type === 'identityProof') identityProofInputRef.current?.click();
+                                                                            else if (item.type === 'licenseDocument') licenseDocumentInputRef.current?.click();
                                                                         }}
                                                                         disabled={isUploadingDocument === item.type}
                                                                         isLoading={isUploadingDocument === item.type}
@@ -2524,7 +2864,7 @@ export function CustomerDetailsPage() {
                                             </thead>
                                             <tbody className="divide-y divide-border">
                                                 <tr className="bg-muted/30 border-b border-border animate-in fade-in slide-in-from-top-1">
-                                                    <td className="px-4 py-4">
+                                                    <td className="px-4 py-4 align-bottom">
                                                         <div className="space-y-2">
                                                             <label className="text-[10px] font-bold uppercase text-muted-foreground leading-none">Select Period</label>
                                                             <div className="flex gap-2 items-center">
@@ -2544,9 +2884,9 @@ export function CustomerDetailsPage() {
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic">—</td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic">—</td>
-                                                    <td className="px-4 py-4 text-right">
+                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                    <td className="px-4 py-4 text-right align-bottom">
                                                         <div className="flex gap-2 justify-end">
                                                             <Button
                                                                 variant="outline"

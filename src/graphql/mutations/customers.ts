@@ -28,6 +28,34 @@ const CUSTOMER_FULL_RESPONSE = `
     emailSent
     isActive
     isDeleted
+    gender
+    relationshipStatus
+    enquiryAmount
+    checkCreditScore
+    employerName
+    creditScore
+    isCreditScoreFetched
+    previousBill {
+        uid
+        path
+        filename
+        mimeType
+        size
+    }
+    identityProof {
+        uid
+        path
+        filename
+        mimeType
+        size
+    }
+    licenseDocument {
+        uid
+        path
+        filename
+        mimeType
+        size
+    }
     createdAt
     updatedAt
     enrollmentDetails {
@@ -42,6 +70,9 @@ const CUSTOMER_FULL_RESPONSE = `
         concession
         lifesupport
         billingpreference
+        licenseNumber
+        licenseState
+        licenseExpiry
     }
     address {
         id
@@ -174,4 +205,19 @@ export const UPLOAD_FILE = gql`
         }
     }
 `;
-
+export const SEND_OFFER_EMAIL = gql`
+    mutation SendOfferEmail($customerUid: String!) {
+        sendOfferEmail(customerUid: $customerUid) {
+            success
+            message
+        }
+    }
+`;
+export const SEND_CUSTOMER_CREDENTIALS_EMAIL = gql`
+    mutation SendCustomerCredentialsEmail($customerUid: String!, $password: String) {
+        sendCustomerCredentialsEmail(customerUid: $customerUid, password: $password) {
+            success
+            message
+        }
+    }
+`;

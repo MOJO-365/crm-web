@@ -7,6 +7,8 @@
         /* Background Colors */
         --background: 0 0% 100%;
         --foreground: 222.2 84% 4.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 222.2 84% 4.9%;
 
         /* Primary - Main brand color (buttons, links, accents) */
         --primary: 82 67% 33%;
@@ -50,6 +52,8 @@
     .dark {
         --background: 222.2 84% 4.9%;
         --foreground: 210 40% 98%;
+        --card: 222.2 84% 7%;
+        --card-foreground: 210 40% 98%;
 
         --primary: 142 76% 45%;
         --primary-hover: 142 76% 55%;

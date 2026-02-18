@@ -9,10 +9,11 @@ import {
     RATE_TYPE_MAP,
     RATE_TYPE_OPTIONS,
     STATE_OPTIONS,
-    VPP_OPTIONS
+    VPP_OPTIONS,
+    RISK_STATUS_MAP
 } from '@/lib/constants';
 
-export type StatusFieldType = 'customer_status' | 'user_status' | 'dnsp' | 'rate_type' | 'state' | 'vpp';
+export type StatusFieldType = 'customer_status' | 'user_status' | 'dnsp' | 'rate_type' | 'state' | 'vpp' | 'risk_status';
 
 interface StatusFieldProps {
     value: string | number | null | undefined;
@@ -80,6 +81,14 @@ export const StatusField: React.FC<StatusFieldProps> = ({
         label = valStr === '1' ? 'With VPP' : 'No VPP';
         if (valStr === '1') colorClass = 'text-green-600 bg-green-50 dark:bg-green-900/10 dark:text-green-400';
         else colorClass = 'text-gray-600 bg-gray-100 dark:bg-gray-800 dark:text-gray-400';
+    } else if (type === 'risk_status') {
+        const valNum = Number(value ?? 0);
+        if (RISK_STATUS_MAP[valNum]) {
+            label = RISK_STATUS_MAP[valNum].label;
+            colorClass = RISK_STATUS_MAP[valNum].color;
+        } else {
+            label = 'Pending Score';
+        }
     }
 
     // 2. Render View Mode
@@ -125,6 +134,11 @@ export const StatusField: React.FC<StatusFieldProps> = ({
         options = STATE_OPTIONS;
     } else if (type === 'vpp') {
         options = VPP_OPTIONS;
+    } else if (type === 'risk_status') {
+        options = Object.entries(RISK_STATUS_MAP).map(([k, v]) => ({
+            value: k,
+            label: v.label
+        }));
     }
 
     if (showAllOption) {
