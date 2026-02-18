@@ -54,6 +54,21 @@ export const CUSTOMER_STATUS_OPTIONS = Object.entries(CUSTOMER_STATUS_MAP).map((
     label: v.label
 }));
 
+// Risk Status
+export const RISK_STATUS_MAP: Record<number, { label: string; color: string }> = {
+    0: { label: 'Pending Score', color: 'text-slate-600 bg-slate-100 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' },
+    1: { label: 'High Risk', color: 'text-red-700 bg-red-50 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50' },
+    2: { label: 'Medium Risk', color: 'text-orange-700 bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-900/50' },
+    3: { label: 'Moderate Risk', color: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/50' },
+    4: { label: 'Low Risk', color: 'text-lime-700 bg-lime-50 border-lime-200 dark:bg-lime-900/20 dark:text-lime-400 dark:border-lime-900/50' },
+    5: { label: 'Very Low Risk', color: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/50' },
+};
+
+export const RISK_STATUS_OPTIONS = Object.entries(RISK_STATUS_MAP).map(([k, v]) => ({
+    value: k,
+    label: v.label
+}));
+
 export const CUSTOMER_LEGACY_STATUS_MAP: Record<string, string> = {
     'ACTIVE': 'text-green-600 bg-green-50 dark:bg-green-900/30 dark:text-green-400',
     'INACTIVE': 'text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400',
@@ -130,6 +145,19 @@ export const ID_TYPE_MAP: Record<number, string> = {
     0: 'Licence',
     1: 'Medicare',
     2: 'Passport',
+};
+
+// Gender
+export const GENDER_LABELS: Record<number, string> = {
+    0: 'Male',
+    1: 'Female',
+    2: 'Other',
+};
+
+// Relationship Status
+export const RELATIONSHIP_STATUS_LABELS: Record<number, string> = {
+    0: 'Married',
+    1: 'Unmarried',
 };
 
 export const ID_TYPE_OPTIONS = [

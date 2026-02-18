@@ -33,6 +33,8 @@ const CUSTOMER_FULL_RESPONSE = `
     enquiryAmount
     checkCreditScore
     employerName
+    creditScore
+    isCreditScoreFetched
     previousBill {
         uid
         path
@@ -203,4 +205,19 @@ export const UPLOAD_FILE = gql`
         }
     }
 `;
-
+export const SEND_OFFER_EMAIL = gql`
+    mutation SendOfferEmail($customerUid: String!) {
+        sendOfferEmail(customerUid: $customerUid) {
+            success
+            message
+        }
+    }
+`;
+export const SEND_CUSTOMER_CREDENTIALS_EMAIL = gql`
+    mutation SendCustomerCredentialsEmail($customerUid: String!, $password: String) {
+        sendCustomerCredentialsEmail(customerUid: $customerUid, password: $password) {
+            success
+            message
+        }
+    }
+`;

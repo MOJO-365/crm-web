@@ -30,6 +30,7 @@ export const GET_CUSTOMERS = gql`
                 enquiryAmount
                 checkCreditScore
                 employerName
+                riskStatus
                 signDate
                 signedPdfPath
                 pdfAudit
@@ -39,6 +40,7 @@ export const GET_CUSTOMERS = gql`
                 isActive
                 isDeleted
                 createdAt
+                offerEmailSentAt
                 updatedAt
                 previousBill {
                     id
@@ -245,6 +247,7 @@ export const GET_CUSTOMERS_LIST = gql`
                 enquiryAmount
                 checkCreditScore
                 employerName
+                riskStatus
                 signDate
                 signedPdfPath
                 pdfAudit
@@ -368,7 +371,8 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
         $searchVpp: Int, 
         $searchVppConnected: Int, 
         $searchUtilmateStatus: Int, 
-        $searchMsatConnected: Int
+        $searchMsatConnected: Int,
+        $searchRiskStatus: Int
     ) {
         customersCursor(
             first: 10000, 
@@ -380,6 +384,7 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
             searchDnsp: $searchDnsp, 
             searchDiscount: $searchDiscount, 
             searchStatus: $searchStatus, 
+            searchRiskStatus: $searchRiskStatus,
             searchVpp: $searchVpp, 
             searchVppConnected: $searchVppConnected, 
             searchUtilmateStatus: $searchUtilmateStatus, 
@@ -396,8 +401,8 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
 `;
 
 export const GET_CUSTOMERS_CURSOR = gql`
-    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchVpp: Int, $searchVppConnected: Int, $searchUtilmateStatus: Int, $searchMsatConnected: Int) {
-        customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchUtilmateStatus: $searchUtilmateStatus, searchMsatConnected: $searchMsatConnected) {
+    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: Int, $searchVpp: Int, $searchVppConnected: Int, $searchUtilmateStatus: Int, $searchMsatConnected: Int) {
+        customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchRiskStatus: $searchRiskStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchUtilmateStatus: $searchUtilmateStatus, searchMsatConnected: $searchMsatConnected) {
             data {
                 id
                 uid
@@ -415,6 +420,7 @@ export const GET_CUSTOMERS_CURSOR = gql`
                 status
                 utilmateStatus
                 rateVersion
+                riskStatus
                 msatDetails {
                   msatConnected
                 }
@@ -494,12 +500,16 @@ export const GET_CUSTOMER_BY_ID = gql`
             enquiryAmount
             checkCreditScore
             employerName
+            creditScore
+            isCreditScoreFetched
+            riskStatus
             offerVersion
             offerVersion
             viewCode
             isActive
             isDeleted
             createdAt
+            offerEmailSentAt
             updatedAt
             previousBill {
                 id

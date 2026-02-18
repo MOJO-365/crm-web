@@ -16,7 +16,8 @@ import {
     CREATE_CUSTOMER,
     UPDATE_CUSTOMER,
 } from '@/graphql';
-import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
+import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, RISK_STATUS_MAP } from '@/lib/constants';
+import { secondaryApiAxios } from '@/lib/apollo';
 import { formatDateTime } from '@/lib/date';
 import {
     ChevronRightIcon,
@@ -39,6 +40,7 @@ import {
     IdCardIcon,
     PhoneIcon,
     ActivityIcon,
+    ShieldCheckIcon,
 } from '@/components/icons';
 import { sendVerification, checkVerification } from '@/lib/twilio';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
@@ -150,6 +152,8 @@ const initialFormData: CustomerFormData = {
     paymentFrequency: 0,
     firstDebitDate: '',
     tariffCode: '',
+    creditScore: undefined,
+    riskStatus: undefined,
     discount: 0,
     previousBill: null,
     identityProof: null,
@@ -373,7 +377,7 @@ export const CustomerFormPage = () => {
 
 
     // Step state
-    const [currentStep, setCurrentStep] = useState<0 | 1 | 2 | 3>(0);
+    const [currentStep, setCurrentStep] = useState<0 | 1 | 2 | 3 | 4>(0);
     const apolloClient = useApolloClient();
 
     // Phone verification state
@@ -543,8 +547,11 @@ export const CustomerFormPage = () => {
                 firstDebitDate: c.debitDetails?.firstDebitDate ? c.debitDetails.firstDebitDate.split('T')[0] : '',
                 tariffCode: c.tariffCode || '',
                 discount: c.discount || 0,
+                creditScore: c.creditScore,
+                riskStatus: c.riskStatus,
                 previousBill: c.previousBill || null,
                 identityProof: c.identityProof || null,
+                licenseDocument: c.licenseDocument || null,
             });
 
             if (c.phoneVerifiedAt) {
@@ -745,7 +752,7 @@ export const CustomerFormPage = () => {
 
         // Conditional demographic requirements
         if (formData.checkCreditScore) {
-            if (['gender', 'relationshipStatus', 'employerName', 'enquiryAmount'].includes(name)) {
+            if (['gender', 'relationshipStatus', 'employerName', 'enquiryAmount', 'dob'].includes(name)) {
                 isRequired = true;
             }
         }
@@ -803,7 +810,8 @@ export const CustomerFormPage = () => {
                 gender: '',
                 relationshipStatus: '',
                 employerName: '',
-                enquiryAmount: ''
+                enquiryAmount: '',
+                dob: ''
             }));
         }
 
@@ -838,11 +846,16 @@ export const CustomerFormPage = () => {
     const step1Valid = useMemo(() => !!formData.tariffCode, [formData.tariffCode]);
 
     const step2Valid = useMemo(() => {
-        const baseValid = !!(
+        return !!(
             formData.firstName?.trim() &&
             formData.lastName?.trim() &&
             formData.email?.trim() &&
-            formData.connectionDate &&
+            formData.connectionDate
+        );
+    }, [formData]);
+
+    const step3Valid = useMemo(() => {
+        const baseValid = !!(
             formData.licenseNumber?.trim() &&
             formData.licenseState &&
             formData.licenseExpiry &&
@@ -854,9 +867,13 @@ export const CustomerFormPage = () => {
                 formData.employerName?.trim() &&
                 formData.enquiryAmount?.trim() &&
                 formData.gender !== undefined &&
-                formData.relationshipStatus !== undefined
+                formData.relationshipStatus !== undefined &&
+                formData.dob
             );
         }
+
+        // If VPP is true, Credit Score check MUST be performed
+        if (formData.vpp) return false;
 
         return baseValid;
     }, [formData]);
@@ -866,11 +883,12 @@ export const CustomerFormPage = () => {
             case 0: return step0Valid;
             case 1: return step1Valid;
             case 2: return step2Valid;
+            case 3: return step3Valid;
             default: return true;
         }
     };
 
-    const allStepsValid = useMemo(() => step0Valid && step1Valid && step2Valid, [step0Valid, step1Valid, step2Valid]);
+    const allStepsValid = useMemo(() => step0Valid && step1Valid && step2Valid && step3Valid, [step0Valid, step1Valid, step2Valid, step3Valid]);
 
     // Submit
     const handleSubmit = async (targetStatus: number = 1) => {
@@ -885,6 +903,119 @@ export const CustomerFormPage = () => {
         // Temporarily disable dirty check to allow navigation
         setIsFormDirty(false);
         try {
+            let creditScoreData = {};
+
+            // Credit Score Check (Only on Create)
+            if (!isEditMode && formData.checkCreditScore) {
+                try {
+                    // Logic mirrored from CustomerDetailsPage.tsx
+                    // const equifaxPayload = {
+                    //     "first-name": formData.firstName,
+                    //     "first-given-name": formData.lastName,
+                    //     "address": {
+                    //         "street-name": formData.streetName,
+                    //         "street-type": formData.streetType,
+                    //         "suburb": formData.suburb,
+                    //         "state-code": formData.state
+                    //     },
+                    //     "license-number": formData.licenseNumber,
+                    //     "gender-code": formData.gender === 0 ? 'M' : 'F',
+                    //     "date-of-birth": formData.dob ? new Date(formData.dob).toISOString().split('T')[0] : '',
+                    //     "employer-name": formData.employerName,
+                    //     "account-type-code": "CC",
+                    //     "enquiry-amount": Number(formData.enquiryAmount) || 0,
+                    //     "relationship-code": String(formData.relationshipStatus || '1'),
+                    //     "client-reference": `REF-${Date.now()}`,
+                    //     "enquiry-client-reference": formData.phone || ''
+                    // };
+                    const equifaxPayload = {
+                        "first-name": "Pal",
+                        "first-given-name": "Patel",
+                        "address": {
+                            "street-name": "COOYAL",
+                            "street-type": "PL",
+                            "suburb": "GLENWOOD",
+                            "state-code": "NSW"
+                        },
+                        "license-number": "DL123456",
+                        "gender-code": "M",
+                        "date-of-birth": "2003-03-19",
+                        "employer-name": "DATA FISH PTY LTD",
+                        "account-type-code": "CC",
+                        "enquiry-amount": 1000,
+                        "relationship-code": "1",
+                        "client-reference": "T3D-20251209051318-ed8bc2",
+                        "enquiry-client-reference": "12344556"
+                    };
+
+                    const response = await secondaryApiAxios.post('/api/v1/equifax/user/get-credit-report', equifaxPayload);
+
+                    let score: number | undefined;
+                    let parsedRiskStatus: number | undefined;
+
+                    // Handle various response formats
+                    if (response.data?.creditScoreData?.score?.score_masterscale) {
+                        // Standard Equifax Nested Response
+                        score = parseInt(response.data.creditScoreData.score.score_masterscale);
+                    } else if (response.data?.creditScore) {
+                        // Direct Object Response
+                        score = parseInt(response.data.creditScore);
+                        if (response.data.riskStatus) parsedRiskStatus = parseInt(response.data.riskStatus);
+                    } else if (Array.isArray(response.data) && response.data.length >= 2) {
+                        // Array Response [riskStatus, creditScore] (or could be [score, risk])
+                        const v1 = parseInt(response.data[0]);
+                        const v2 = parseInt(response.data[1]);
+                        // Heuristic: Score > 100, Risk < 10 typically
+                        if (v1 > 100) { score = v1; parsedRiskStatus = v2; }
+                        else { parsedRiskStatus = v1; score = v2; }
+                    } else if (typeof response.data === 'string') {
+                        // Text response "1 577" or similar
+                        const parts = response.data.trim().split(/\s+/);
+                        if (parts.length >= 2) {
+                            const v1 = parseInt(parts[0]);
+                            const v2 = parseInt(parts[1]);
+                            if (v1 > 100) { score = v1; parsedRiskStatus = v2; }
+                            else { parsedRiskStatus = v1; score = v2; }
+                        } else if (parts.length === 1 && !isNaN(parseInt(parts[0]))) {
+                            score = parseInt(parts[0]);
+                        }
+                    } else if (typeof response.data === 'number') {
+                        score = response.data;
+                    }
+
+                    // Calculate risk status if not provided or potentially wrong from API (e.g. 1 might be a code, not risk status)
+                    if (score !== undefined && !isNaN(score)) {
+                        let potentialRiskStatus = 0;
+                        if (score < 200) potentialRiskStatus = 1;
+                        else if (score < 300) potentialRiskStatus = 2;
+                        else if (score < 600) potentialRiskStatus = 3;
+                        else if (score < 700) potentialRiskStatus = 4;
+                        else potentialRiskStatus = 5;
+
+                        // Prefer calculated risk status if API didn't provide one clearly, or override if needed
+                        if (!parsedRiskStatus || (parsedRiskStatus < 1 || parsedRiskStatus > 5)) {
+                            parsedRiskStatus = potentialRiskStatus;
+                        }
+                    }
+
+                    if (parsedRiskStatus) {
+                        creditScoreData = {
+                            creditScore: score,
+                            isCreditScoreFetched: 1,
+                            riskStatus: parsedRiskStatus
+                        };
+                        toast.success(`Credit check passed. Score: ${score}`);
+                    }
+
+                } catch (error) {
+                    console.error('Credit check failed:', error);
+                    toast.error('Credit check failed. Customer creation aborted.');
+                    setIsFormDirty(true);
+                    setSubmittingStatus(null);
+                    return; // Abort creation if credit check fails (optional, but safer)
+                }
+            }
+
             const input = {
                 email: formData.email,
                 firstName: formData.firstName,
@@ -905,6 +1036,7 @@ export const CustomerFormPage = () => {
                 enquiryAmount: formData.enquiryAmount ? parseFloat(formData.enquiryAmount) : undefined,
                 checkCreditScore: formData.checkCreditScore ? 1 : 0,
                 employerName: formData.employerName,
+                ...creditScoreData, // Add credit score data to input
                 enrollmentDetails: {
                     saletype: formData.saleType,
                     connectiondate: formData.connectionDate || null,
@@ -915,17 +1047,6 @@ export const CustomerFormPage = () => {
                     concession: formData.concession ? 1 : 0,
                     lifesupport: formData.lifeSupport ? 1 : 0,
                     billingpreference: formData.billingPreference,
-                    // New License Fields - mapping to enrollment details
-                    // Note: Backend might need schema update to accept these specific fields if they don't map to existing id...
-                    // For now, we are sending them. If backend doesn't accept, they'll be ignored or cause error.
-                    // Ideally, we'd map them to specific columns or a JSON field.
-                    // Assuming we might need to map them to the generic ID fields if License is primary?
-                    // User asked to *separate* them. 
-                    // Let's pass them as part of input if schema allows, or mapped. 
-                    // Since I cannot change backend schema right now without SQL, I will pass them in `enrollmentDetails` 
-                    // assuming the backend *will* be updated to accept `licenseNumber` etc or I should map them?
-                    // The prompt said: "Create a new, distinct field for 'License Type' ... Ensure that 'Identity Proof' and 'License' documents are added".
-                    // I'll add them to the input object.
                     licenseNumber: formData.licenseNumber,
                     licenseState: formData.licenseState,
                     licenseExpiry: formData.licenseExpiry || null,
@@ -955,7 +1076,7 @@ export const CustomerFormPage = () => {
                 vppDetails: {
                     vpp: formData.vpp ? 1 : 0,
                     vppConnected: formData.vppConnected ? 1 : 0,
-                    vppSignupBonus: formData.vppSignupBonus ? parseFloat(formData.vppSignupBonus) : undefined,
+                    vppSignupBonus: formData.vppSignupBonus ? parseFloat(formData.vppSignupBonus) : (formData.vppSignupBonus === null ? null : undefined),
                 },
                 debitDetails: undefined,
                 previousBill: formData.previousBill?.uid,
@@ -1028,7 +1149,8 @@ export const CustomerFormPage = () => {
                         <div onClick={() => setCurrentStep(0)}><StepBadge index={1} label="Contact" active={currentStep === 0} done={currentStep > 0} status={phoneVerified ? 'Verified' : undefined} statusTone={phoneVerified ? 'success' : undefined} /></div>
                         <div onClick={() => step0Valid && setCurrentStep(1)}><StepBadge index={2} label="Pricing" active={currentStep === 1} done={currentStep > 1} /></div>
                         <div onClick={() => step1Valid && setCurrentStep(2)}><StepBadge index={3} label="Sign-up" active={currentStep === 2} done={currentStep > 2} /></div>
-                        <div onClick={() => step2Valid && setCurrentStep(3)}><StepBadge index={4} label="Confirm" active={currentStep === 3} done={false} /></div>
+                        <div onClick={() => step2Valid && setCurrentStep(3)}><StepBadge index={4} label="Credit Score" active={currentStep === 3} done={currentStep > 3} /></div>
+                        <div onClick={() => step3Valid && setCurrentStep(4)}><StepBadge index={5} label="Confirm" active={currentStep === 4} done={false} /></div>
                     </div>
 
                     {/* Content Card */}
@@ -1236,7 +1358,7 @@ export const CustomerFormPage = () => {
                                                     <Button
                                                         type="button"
                                                         size="sm"
-                                                        onClick={() => updateField('vppSignupBonus', formData.vppSignupBonus === '600' ? '' : '600')}
+                                                        onClick={() => updateField('vppSignupBonus', formData.vppSignupBonus === '600' ? null : '600')}
                                                         className={cn(
                                                             "shrink-0 transition-all font-semibold shadow-sm",
                                                             formData.vppSignupBonus === '600'
@@ -1609,77 +1731,158 @@ export const CustomerFormPage = () => {
                                                 <Input label="Last Name" required error={errors.lastName} placeholder="e.g. Taylor" value={formData.lastName} onChange={(e) => updateField('lastName', e.target.value)} onBlur={() => handleBlur('lastName')} />
                                                 <Input label="Email" required helperText="We'll send confirmations here" error={errors.email} type="email" placeholder="name@example.com" value={formData.email} onChange={(e) => updateField('email', e.target.value)} onBlur={() => handleBlur('email')} />
                                             </div>
-
-                                            {/* Demographics & Enquiry */}
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-4 bg-muted/30 rounded-xl border border-border">
-                                                <Select
-                                                    label="Gender"
-                                                    required={formData.checkCreditScore}
-                                                    error={errors.gender}
-                                                    options={[
-                                                        { value: '0', label: 'Male' },
-                                                        { value: '1', label: 'Female' },
-                                                        { value: '2', label: 'Other' }
-                                                    ]}
-                                                    value={formData.gender.toString()}
-                                                    onChange={(val) => updateField('gender', parseInt(val as string))}
-                                                    onBlur={() => handleBlur('gender')}
-                                                />
-                                                <Select
-                                                    label="Relationship Status"
-                                                    required={formData.checkCreditScore}
-                                                    error={errors.relationshipStatus}
-                                                    options={[
-                                                        { value: '0', label: 'Married' },
-                                                        { value: '1', label: 'Unmarried' }
-                                                    ]}
-                                                    value={formData.relationshipStatus.toString()}
-                                                    onChange={(val) => updateField('relationshipStatus', parseInt(val as string))}
-                                                    onBlur={() => handleBlur('relationshipStatus')}
-                                                />
-                                                <Input
-                                                    label="Employer Name"
-                                                    required={formData.checkCreditScore}
-                                                    error={errors.employerName}
-                                                    placeholder="Company Pty Ltd"
-                                                    value={formData.employerName}
-                                                    onChange={(e) => updateField('employerName', e.target.value)}
-                                                    onBlur={() => handleBlur('employerName')}
-                                                />
-                                                <Input
-                                                    label="Enquiry Amount"
-                                                    required={formData.checkCreditScore}
-                                                    error={errors.enquiryAmount}
-                                                    type="number"
-                                                    placeholder="0.00"
-                                                    value={formData.enquiryAmount}
-                                                    onChange={(e) => updateField('enquiryAmount', e.target.value)}
-                                                    onBlur={() => handleBlur('enquiryAmount')}
-                                                />
-                                                <div className="col-span-2 md:col-span-4 flex items-center gap-2">
-                                                    <ToggleSwitch checked={formData.checkCreditScore} onChange={(checked) => updateField('checkCreditScore', checked)} />
-                                                    <span className="text-sm font-medium">Check Credit Score</span>
-                                                </div>
-                                            </div>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                            <DatePicker
-                                                label="Date of Birth"
-                                                value={formData.dob}
-                                                onChange={(date) => updateField('dob', date ? date.toISOString().split('T')[0] : '')}
-                                                maxDate={new Date()}
-                                            />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                             <Select label="Sale Type" options={SALE_TYPE_OPTIONS} value={formData.saleType.toString()} onChange={(val) => updateField('saleType', parseInt(val as string))} />
                                             <DatePicker label="Connection Date" required value={formData.connectionDate} onChange={(date) => updateField('connectionDate', date ? date.toISOString().split('T')[0] : '')} />
                                             <Select label="Billing Preference" options={BILLING_PREF_OPTIONS} value={formData.billingPreference.toString()} onChange={(val) => updateField('billingPreference', parseInt(val as string))} />
                                         </div>
+                                    </div>
 
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ">
+                                        {/* <div className="col-span-full font-medium mb-2 flex items-center gap-2 text-muted-foreground"><IdCardIcon size={16} /> Secondary Identity (Medicare/Passport)</div> */}
+                                        <Select label="ID Type" options={ID_TYPE_OPTIONS.filter(opt => opt.value !== '0')} value={formData.idType.toString()} onChange={(val) => updateField('idType', parseInt(val as string))} />
+                                        <Input label="ID Number" placeholder="Number" value={formData.idNumber} onChange={(e) => updateField('idNumber', e.target.value)} />
+                                        <Select label="ID State" options={STATE_OPTIONS} value={formData.idState} onChange={(val) => updateField('idState', val as string)} />
+                                        <DatePicker label="ID Expiry" value={formData.idExpiry} onChange={(date) => updateField('idExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                                        <Field label="Previous Bill">
+                                            <div className="space-y-2">
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    disabled={uploadingPreviousBill}
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (!file) return;
+
+                                                        setUploadingPreviousBill(true);
+                                                        try {
+                                                            // Use generatedCustomerId for new customers, or existing customerId/uid for edits
+                                                            // For new customers, we use generatedCustomerId for both customerId and uid params to ensure folder creation matches
+                                                            const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
+                                                            const result = await uploadDocument(file, targetId!, 'previous_bill', isEditMode ? (uid || undefined) : generatedCustomerId, 'Previous Bill');
+                                                            updateField('previousBill', {
+                                                                id: result.id,
+                                                                uid: result.uid,
+                                                                filename: result.filename,
+                                                                path: result.path,
+                                                                size: result.size,
+                                                                mimeType: result.contentType || 'application/pdf',
+                                                                createdAt: new Date().toISOString()
+                                                            } as CustomerDocument);
+                                                            toast.success('Previous bill uploaded successfully');
+                                                        } catch (error) {
+                                                            toast.error(error instanceof Error ? error.message : 'Failed to upload file');
+                                                        } finally {
+                                                            setUploadingPreviousBill(false);
+                                                        }
+                                                    }}
+                                                />
+                                                {uploadingPreviousBill && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
+                                                {formData.previousBill && !uploadingPreviousBill && (
+                                                    <DocumentPreview path={formData.previousBill.path} label="Previous Bill" />
+                                                )}
+                                            </div>
+                                        </Field>
+                                        <Field label="Identity Proof">
+                                            <div className="space-y-2">
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    disabled={uploadingIdentityProof}
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (!file) return;
+
+                                                        setUploadingIdentityProof(true);
+                                                        try {
+                                                            // Use generatedCustomerId for new customers, or existing customerId/uid for edits
+                                                            const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
+                                                            const result = await uploadDocument(file, targetId!, 'identity_proof', isEditMode ? (uid || undefined) : generatedCustomerId, 'Identity Proof');
+                                                            updateField('identityProof', {
+                                                                id: result.id,
+                                                                uid: result.uid,
+                                                                filename: result.filename,
+                                                                path: result.path,
+                                                                size: result.size,
+                                                                mimeType: result.contentType || 'application/pdf',
+                                                                createdAt: new Date().toISOString()
+                                                            } as CustomerDocument);
+                                                            toast.success('Identity proof uploaded successfully');
+                                                        } catch (error) {
+                                                            toast.error(error instanceof Error ? error.message : 'Failed to upload file');
+                                                        } finally {
+                                                            setUploadingIdentityProof(false);
+                                                        }
+                                                    }}
+                                                />
+                                                {uploadingIdentityProof && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
+                                                {formData.identityProof && !uploadingIdentityProof && (
+                                                    <DocumentPreview path={formData.identityProof.path} label="Identity Proof" />
+                                                )}
+                                            </div>
+                                        </Field>
+
+                                    </div>
+                                    <div className="flex flex-wrap gap-6 pt-2">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="concession"
+                                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                                                checked={formData.concession}
+                                                onChange={(e) => {
+                                                    const c = e.target.checked;
+                                                    if (c) {
+                                                        setRestrictedFeatureError(true);
+                                                    } else {
+                                                        updateField('concession', false);
+                                                    }
+                                                }}
+                                            />
+                                            <label htmlFor="concession" className="text-sm cursor-pointer select-none">Concession Card Holder</label>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="lifeSupport"
+                                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                                                checked={formData.lifeSupport}
+                                                onChange={(e) => {
+                                                    const c = e.target.checked;
+                                                    if (c) {
+                                                        setRestrictedFeatureError(true);
+                                                    } else {
+                                                        updateField('lifeSupport', false);
+                                                    }
+                                                }}
+                                            />
+                                            <label htmlFor="lifeSupport" className="text-sm cursor-pointer select-none">Life Support Equipment</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 3: Credit Score */}
+                            {currentStep === 3 && (
+                                <div className="space-y-8">
+                                    <div className="space-y-4">
+                                        <h2 className="text-lg font-semibold text-foreground border-b border-border pb-2 flex items-center gap-2">
+                                            <IdCardIcon size={20} /> Credit Score & Identification
+                                        </h2>
+
+                                        {/* License Details - Standard Grid */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                            <Input label="Driver's License No." required placeholder="D123456" value={formData.licenseNumber} onChange={(e) => updateField('licenseNumber', e.target.value)} />
-                                            <Select label="License State" required options={STATE_OPTIONS} value={formData.licenseState} onChange={(val) => updateField('licenseState', val as string)} />
-                                            <DatePicker label="License Expiry" required value={formData.licenseExpiry} onChange={(date) => updateField('licenseExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} />
+                                            <Input label="Driver's License No." required placeholder="D123456" value={formData.licenseNumber} onChange={(e) => updateField('licenseNumber', e.target.value)} onBlur={() => handleBlur('licenseNumber')} error={errors.licenseNumber} />
+                                            <Select label="License State" required options={STATE_OPTIONS} value={formData.licenseState} onChange={(val) => updateField('licenseState', val as string)} onBlur={() => handleBlur('licenseState')} error={errors.licenseState} />
+                                            <DatePicker label="License Expiry" required value={formData.licenseExpiry} onChange={(date) => updateField('licenseExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} onBlur={() => handleBlur('licenseExpiry')} error={errors.licenseExpiry} />
 
-                                            <Field label="License Document" required>
+                                            <Field label="License Document" required error={errors.licenseDocument}>
                                                 <div className="space-y-2">
                                                     <input
                                                         type="file"
@@ -1689,7 +1892,6 @@ export const CustomerFormPage = () => {
                                                         onChange={async (e) => {
                                                             const file = e.target.files?.[0];
                                                             if (!file) return;
-
                                                             setUploadingLicense(true);
                                                             try {
                                                                 const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
@@ -1703,7 +1905,6 @@ export const CustomerFormPage = () => {
                                                                     mimeType: result.contentType || 'application/pdf',
                                                                     createdAt: new Date().toISOString()
                                                                 } as CustomerDocument);
-                                                                toast.success('License uploaded successfully');
                                                             } catch (error) {
                                                                 toast.error(error instanceof Error ? error.message : 'Failed to upload license');
                                                             } finally {
@@ -1719,140 +1920,133 @@ export const CustomerFormPage = () => {
                                             </Field>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ">
-                                            {/* <div className="col-span-full font-medium mb-2 flex items-center gap-2 text-muted-foreground"><IdCardIcon size={16} /> Secondary Identity (Medicare/Passport)</div> */}
-                                            <Select label="ID Type" options={ID_TYPE_OPTIONS.filter(opt => opt.value !== '0')} value={formData.idType.toString()} onChange={(val) => updateField('idType', parseInt(val as string))} />
-                                            <Input label="ID Number" placeholder="Number" value={formData.idNumber} onChange={(e) => updateField('idNumber', e.target.value)} />
-                                            <Select label="ID State" options={STATE_OPTIONS} value={formData.idState} onChange={(val) => updateField('idState', val as string)} />
-                                            <DatePicker label="ID Expiry" value={formData.idExpiry} onChange={(date) => updateField('idExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} />
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                                            <Field label="Previous Bill">
-                                                <div className="space-y-2">
-                                                    <input
-                                                        type="file"
-                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
-                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                        disabled={uploadingPreviousBill}
-                                                        onChange={async (e) => {
-                                                            const file = e.target.files?.[0];
-                                                            if (!file) return;
-
-                                                            setUploadingPreviousBill(true);
-                                                            try {
-                                                                // Use generatedCustomerId for new customers, or existing customerId/uid for edits
-                                                                // For new customers, we use generatedCustomerId for both customerId and uid params to ensure folder creation matches
-                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
-                                                                const result = await uploadDocument(file, targetId!, 'previous_bill', isEditMode ? (uid || undefined) : generatedCustomerId, 'Previous Bill');
-                                                                updateField('previousBill', {
-                                                                    id: result.id,
-                                                                    uid: result.uid,
-                                                                    filename: result.filename,
-                                                                    path: result.path,
-                                                                    size: result.size,
-                                                                    mimeType: result.contentType || 'application/pdf',
-                                                                    createdAt: new Date().toISOString()
-                                                                } as CustomerDocument);
-                                                                toast.success('Previous bill uploaded successfully');
-                                                            } catch (error) {
-                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload file');
-                                                            } finally {
-                                                                setUploadingPreviousBill(false);
-                                                            }
-                                                        }}
-                                                    />
-                                                    {uploadingPreviousBill && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
-                                                    {formData.previousBill && !uploadingPreviousBill && (
-                                                        <DocumentPreview path={formData.previousBill.path} label="Previous Bill" />
-                                                    )}
+                                        {/* Credit Score Check Toggle Card */}
+                                        <div className={cn(
+                                            "mt-8 overflow-hidden rounded-2xl border transition-all duration-500",
+                                            formData.checkCreditScore
+                                                ? "bg-gradient-to-br from-blue-50/80 via-white to-blue-50/50 border-blue-200 shadow-sm"
+                                                : "bg-card border-border shadow-sm hover:border-neutral-300"
+                                        )}>
+                                            <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={cn(
+                                                        "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all duration-500",
+                                                        formData.checkCreditScore
+                                                            ? "bg-blue-600 text-white shadow-lg shadow-blue-200 rotate-0"
+                                                            : "bg-muted text-muted-foreground rotate-0"
+                                                    )}>
+                                                        <ShieldCheckIcon size={24} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <h3 className="text-base font-semibold text-foreground tracking-tight">
+                                                            Check Credit Score
+                                                        </h3>
+                                                        <p className="font-medium text-[10px] text-muted-foreground uppercase tracking-wider">
+                                                            Identity Verification
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                            </Field>
-                                            <Field label="Identity Proof">
-                                                <div className="space-y-2">
-                                                    <input
-                                                        type="file"
-                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
-                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                        disabled={uploadingIdentityProof}
-                                                        onChange={async (e) => {
-                                                            const file = e.target.files?.[0];
-                                                            if (!file) return;
-
-                                                            setUploadingIdentityProof(true);
-                                                            try {
-                                                                // Use generatedCustomerId for new customers, or existing customerId/uid for edits
-                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
-                                                                const result = await uploadDocument(file, targetId!, 'identity_proof', isEditMode ? (uid || undefined) : generatedCustomerId, 'Identity Proof');
-                                                                updateField('identityProof', {
-                                                                    id: result.id,
-                                                                    uid: result.uid,
-                                                                    filename: result.filename,
-                                                                    path: result.path,
-                                                                    size: result.size,
-                                                                    mimeType: result.contentType || 'application/pdf',
-                                                                    createdAt: new Date().toISOString()
-                                                                } as CustomerDocument);
-                                                                toast.success('Identity proof uploaded successfully');
-                                                            } catch (error) {
-                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload file');
-                                                            } finally {
-                                                                setUploadingIdentityProof(false);
-                                                            }
-                                                        }}
+                                                <div className="flex items-center gap-4 px-4 py-2 bg-background/50 rounded-xl border border-border/50 backdrop-blur-sm self-end md:self-auto">
+                                                    <ToggleSwitch
+                                                        checked={formData.checkCreditScore}
+                                                        onChange={(checked) => updateField('checkCreditScore', checked)}
                                                     />
-                                                    {uploadingIdentityProof && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
-                                                    {formData.identityProof && !uploadingIdentityProof && (
-                                                        <DocumentPreview path={formData.identityProof.path} label="Identity Proof" />
-                                                    )}
                                                 </div>
-                                            </Field>
+                                            </div>
 
-                                        </div>
-                                        <div className="flex flex-wrap gap-6 pt-2">
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    id="concession"
-                                                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                                                    checked={formData.concession}
-                                                    onChange={(e) => {
-                                                        const c = e.target.checked;
-                                                        if (c) {
-                                                            setRestrictedFeatureError(true);
-                                                        } else {
-                                                            updateField('concession', false);
-                                                        }
-                                                    }}
-                                                />
-                                                <label htmlFor="concession" className="text-sm cursor-pointer select-none">Concession Card Holder</label>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    id="lifeSupport"
-                                                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                                                    checked={formData.lifeSupport}
-                                                    onChange={(e) => {
-                                                        const c = e.target.checked;
-                                                        if (c) {
-                                                            setRestrictedFeatureError(true);
-                                                        } else {
-                                                            updateField('lifeSupport', false);
-                                                        }
-                                                    }}
-                                                />
-                                                <label htmlFor="lifeSupport" className="text-sm cursor-pointer select-none">Life Support Equipment</label>
-                                            </div>
+                                            {/* Conditional Demographical Fields - Refined Card */}
+                                            {formData.checkCreditScore && (
+                                                <div className="border-t border-blue-100 bg-white/40 p-6 md:p-8 animate-in fade-in slide-in-from-top-4 duration-700">
+                                                    <div className="flex items-center gap-3 mb-8">
+                                                        <div className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse"></div>
+                                                        <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.2em]">
+                                                            Additional Verification Details
+                                                        </h4>
+                                                        <div className="h-px bg-gradient-to-r from-blue-100 to-transparent flex-1"></div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-8">
+                                                        <div className="space-y-1">
+                                                            <DatePicker
+                                                                label="Date of Birth"
+                                                                required={formData.checkCreditScore}
+                                                                error={errors.dob}
+                                                                value={formData.dob}
+                                                                onChange={(date) => updateField('dob', date ? date.toISOString().split('T')[0] : '')}
+                                                                maxDate={new Date()}
+                                                                onBlur={() => handleBlur('dob')}
+                                                            />
+                                                        </div>
+
+                                                        <div className="space-y-1">
+                                                            <Select
+                                                                label="Gender"
+                                                                required={formData.checkCreditScore}
+                                                                error={errors.gender}
+                                                                options={[
+                                                                    { value: '0', label: 'Male' },
+                                                                    { value: '1', label: 'Female' },
+                                                                    { value: '2', label: 'Other' }
+                                                                ]}
+                                                                value={formData.gender.toString()}
+                                                                onChange={(val) => updateField('gender', parseInt(val as string))}
+                                                                onBlur={() => handleBlur('gender')}
+                                                            />
+                                                        </div>
+
+                                                        <div className="space-y-1">
+                                                            <Select
+                                                                label="Relationship Status"
+                                                                required={formData.checkCreditScore}
+                                                                error={errors.relationshipStatus}
+                                                                options={[
+                                                                    { value: '0', label: 'Married' },
+                                                                    { value: '1', label: 'Unmarried' }
+                                                                ]}
+                                                                value={formData.relationshipStatus.toString()}
+                                                                onChange={(val) => updateField('relationshipStatus', parseInt(val as string))}
+                                                                onBlur={() => handleBlur('relationshipStatus')}
+                                                            />
+                                                        </div>
+
+                                                        <div className="space-y-1 md:col-span-2">
+                                                            <Input
+                                                                label="Employer Name"
+                                                                required={formData.checkCreditScore}
+                                                                error={errors.employerName}
+                                                                placeholder="Company Pty Ltd"
+                                                                value={formData.employerName}
+                                                                onChange={(e) => updateField('employerName', e.target.value)}
+                                                                onBlur={() => handleBlur('employerName')}
+                                                                leftIcon={<ActivityIcon size={16} className="text-blue-500/50" />}
+                                                                className="bg-white/50"
+                                                            />
+                                                        </div>
+
+                                                        <div className="space-y-1">
+                                                            <Input
+                                                                label="Enquiry Amount ($)"
+                                                                required={formData.checkCreditScore}
+                                                                error={errors.enquiryAmount}
+                                                                type="number"
+                                                                placeholder="0.00"
+                                                                value={formData.enquiryAmount}
+                                                                onChange={(e) => updateField('enquiryAmount', e.target.value)}
+                                                                onBlur={() => handleBlur('enquiryAmount')}
+                                                                leftIcon={<CreditCardIcon size={16} className="text-blue-500/50" />}
+                                                                className="bg-white/50 font-mono"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-
-
-
                                 </div>
                             )}
 
-                            {/* Step 3: Confirmation */}
-                            {currentStep === 3 && (
+                            {/* Step 4: Confirmation */}
+                            {currentStep === 4 && (
                                 <div className="space-y-6">
                                     <h2 className="text-lg font-semibold text-foreground border-b border-border pb-2">Review & Confirm</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1872,6 +2066,25 @@ export const CustomerFormPage = () => {
                                                             <p className="flex justify-between"><span className="text-muted-foreground">Show as Business:</span> <span className="font-medium text-xs bg-muted px-1.5 py-0.5 rounded">{formData.showAsBusinessName ? 'Yes' : 'No'}</span></p>
                                                             <p className="flex justify-between"><span className="text-muted-foreground">Show Name in Offer:</span> <span className="font-medium text-xs bg-muted px-1.5 py-0.5 rounded">{(formData.showName ?? true) ? 'Yes' : 'No'}</span></p>
                                                         </>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="font-medium mb-3 flex items-center gap-2"><IdCardIcon size={16} className="text-blue-600" /> Identity & Credit Score</h3>
+                                                <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
+                                                    <p className="flex justify-between border-b pb-2 mb-2"><span className="text-muted-foreground">Driver's License:</span> <span className="font-medium">{formData.licenseNumber} ({formData.licenseState})</span></p>
+                                                    <p className="flex justify-between border-b pb-2 mb-2"><span className="text-muted-foreground">License Expiry:</span> <span className="font-medium">{formData.licenseExpiry || '—'}</span></p>
+
+                                                    <p className="flex justify-between pt-1"><span className="text-muted-foreground">Check Credit Score:</span> <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded uppercase ${formData.checkCreditScore ? 'bg-green-500/10 text-green-600' : 'bg-muted text-muted-foreground'}`}>{formData.checkCreditScore ? 'Enabled' : 'Disabled'}</span></p>
+
+                                                    {formData.checkCreditScore && (
+                                                        <div className="pt-2 mt-2 border-t border-border/50 animate-in fade-in duration-300">
+                                                            <p className="flex justify-between"><span className="text-muted-foreground">Gender:</span> <span className="font-medium">{formData.gender === 0 ? 'Male' : formData.gender === 1 ? 'Female' : 'Other'}</span></p>
+                                                            <p className="flex justify-between"><span className="text-muted-foreground">Relationship Status:</span> <span className="font-medium">{formData.relationshipStatus === 0 ? 'Married' : 'Unmarried'}</span></p>
+                                                            <p className="flex justify-between"><span className="text-muted-foreground">Employer:</span> <span className="font-medium">{formData.employerName || '—'}</span></p>
+                                                            <p className="flex justify-between"><span className="text-muted-foreground">Enquiry Amount:</span> <span className="font-medium">{formData.enquiryAmount ? `$${formData.enquiryAmount}` : '—'}</span></p>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
@@ -1911,8 +2124,6 @@ export const CustomerFormPage = () => {
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Sale Type:</span> <span className="font-medium">{SALE_TYPE_OPTIONS.find(o => o.value === formData.saleType.toString())?.label}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Connection Date:</span> <span className="font-medium">{formData.connectionDate}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Billing:</span> <span className="font-medium">{BILLING_PREF_OPTIONS.find(o => o.value === formData.billingPreference.toString())?.label}</span></p>
-                                                    <p className="flex justify-between border-t pt-2 mt-2"><span className="text-muted-foreground">Driver's License:</span> <span className="font-medium">{formData.licenseNumber} ({formData.licenseState})</span></p>
-                                                    <p className="flex justify-between"><span className="text-muted-foreground">Expiry:</span> <span className="font-medium">{formData.licenseExpiry || '—'}</span></p>
 
                                                     <div className="pt-2 border-t border-border mt-2">
                                                         <p className="flex text-xs font-semibold text-muted-foreground mb-1 uppercase">Other ID (Optional)</p>
@@ -1949,16 +2160,18 @@ export const CustomerFormPage = () => {
 
                                                     <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
                                                         <p className="font-medium text-xs uppercase text-muted-foreground mb-1">VPP Participant</p>
+                                                        <p className="flex justify-between"><span className="text-muted-foreground">VPP Participant:</span> <span className="font-medium">Yes</span></p>
                                                         {formData.batteryBrand && <p className="flex justify-between"><span className="text-muted-foreground">Battery Brand:</span> <span className="font-medium">{formData.batteryBrand}</span></p>}
                                                         {formData.snNumber && <p className="flex justify-between"><span className="text-muted-foreground">SN Number:</span> <span className="font-medium">{formData.snNumber}</span></p>}
                                                         {formData.batteryCapacity && <p className="flex justify-between"><span className="text-muted-foreground">Battery Capacity:</span> <span className="font-medium">{formData.batteryCapacity} kW</span></p>}
                                                         {formData.exportLimit && <p className="flex justify-between"><span className="text-muted-foreground">Export Limit:</span> <span className="font-medium">{formData.exportLimit} kW</span></p>}
-                                                        <div className="flex justify-between items-start gap-2">
-                                                            <span className="text-muted-foreground shrink-0">Signup Bonus:</span>
-                                                            <span className="font-medium text-right text-green-600">$50 monthly bill credit for 12 months (total $600)</span>
-                                                        </div>
+                                                        {formData.vppSignupBonus === '600' && (
+                                                            <div className="flex justify-between items-start gap-2">
+                                                                <span className="text-muted-foreground shrink-0">Signup Bonus:</span>
+                                                                <span className="font-medium text-right text-green-600">$50 monthly bill credit for 12 months (total $600)</span>
+                                                            </div>
+                                                        )}
                                                     </div>
-
                                                 </div>
                                             </div>
                                         )}
@@ -2015,9 +2228,9 @@ export const CustomerFormPage = () => {
                                         Save as Draft
                                     </Button>
                                 )}
-                                {currentStep < 3 && <Button type="button" onClick={() => setCurrentStep((currentStep + 1) as any)} disabled={!canProceed()}>Next</Button>}
+                                {currentStep < 4 && <Button type="button" onClick={() => setCurrentStep((currentStep + 1) as any)} disabled={!canProceed()}>Next</Button>}
 
-                                {currentStep === 3 && (
+                                {currentStep === 4 && (
                                     <>
                                         <Button
                                             type="button"
@@ -2112,11 +2325,26 @@ export const CustomerFormPage = () => {
                                 <SummaryItem icon={IdCardIcon} label="License" value={formData.licenseNumber || '—'} />
                                 <SummaryItem icon={IdCardIcon} label="Secondary ID" value={formData.idNumber ? `${ID_TYPE_OPTIONS.find(o => o.value === formData.idType.toString())?.label} ${formData.idNumber}` : '—'} />
                                 <SummaryItem icon={CreditCardIcon} label="Billing" value={BILLING_PREF_OPTIONS.find(o => o.value === formData.billingPreference.toString())?.label} />
+                                {formData.creditScore !== undefined && (
+                                    <div className="flex items-center gap-2.5 py-2 mt-1 border-t border-border/50">
+                                        <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600 shrink-0">
+                                            <ShieldCheckIcon size={12} />
+                                        </div>
+                                        <div className="space-y-1 flex-1 min-w-0">
+                                            <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider leading-none">Credit Assessment</p>
+                                            <div className="flex items-center">
+                                                <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border-2 ${RISK_STATUS_MAP[formData.riskStatus as number]?.color || 'text-primary bg-primary/5 border-primary/10'}`}>
+                                                    Score: {formData.creditScore} • {RISK_STATUS_MAP[formData.riskStatus as number]?.label || 'N/A'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </aside>
             </div>
-        </div >
+        </div>
     );
 };

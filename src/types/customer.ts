@@ -35,7 +35,7 @@ export interface CustomerFormData {
     // VPP Details
     vpp: boolean;
     vppConnected: boolean;
-    vppSignupBonus: string;
+    vppSignupBonus: string | null;
 
     // Battery Details
     batteryBrand: string;
@@ -74,6 +74,8 @@ export interface CustomerFormData {
 
     // Pricing
     tariffCode: string;
+    creditScore?: number;
+    riskStatus?: number;
     discount: number;
 
     // Documents

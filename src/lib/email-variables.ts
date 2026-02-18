@@ -16,6 +16,7 @@ export const EMAIL_VARIABLES = [
 
     // Verification
     { label: 'Verification Code', value: '[[VERIFICATION_CODE]]', description: 'Email verification code' },
+    { label: 'Customer Password', value: '[[CUSTOMER_PASSWORD]]', description: 'Customer account password' },
 
     // Organization
     { label: 'Org Name', value: '[[ORG_NAME]]', description: 'Organization name' },

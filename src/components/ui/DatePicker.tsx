@@ -39,6 +39,8 @@ export interface DatePickerProps {
     className?: string;
     /** Input ID */
     id?: string;
+    /** onBlur handler */
+    onBlur?: React.FocusEventHandler<HTMLInputElement>;
 }
 
 // ============================================================
@@ -126,6 +128,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
         required,
         className,
         id,
+        onBlur,
     }, ref) => {
         const inputId = id || React.useId();
         const containerRef = React.useRef<HTMLDivElement>(null);
@@ -166,7 +169,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
             if (isOpen && inputRef.current) {
                 const updatePosition = () => {
                     if (!inputRef.current) return;
-                    
+
                     const inputRect = inputRef.current.getBoundingClientRect();
                     const popupHeight = 380; // Approximate height of the calendar popup
                     const popupWidth = 300; // minWidth from style
@@ -176,10 +179,10 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                     // Check if there's enough space below
                     const spaceBelow = viewportHeight - inputRect.bottom;
                     const spaceAbove = inputRect.top;
-                    
+
                     // Determine placement (prefer bottom, but use top if not enough space)
                     const placement = spaceBelow >= popupHeight || spaceBelow > spaceAbove ? 'bottom' : 'top';
-                    
+
                     // Calculate top position (fixed positioning is relative to viewport)
                     let top: number;
                     if (placement === 'bottom') {
@@ -190,12 +193,12 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
 
                     // Calculate left position (align with input, but adjust if it would overflow)
                     let left = inputRect.left;
-                    
+
                     // If popup would overflow on the right, align to the right edge of input
                     if (left + popupWidth > viewportWidth) {
                         left = inputRect.right - popupWidth;
                     }
-                    
+
                     // If popup would overflow on the left, align to the left edge of viewport
                     if (left < 0) {
                         left = 8; // 8px padding from viewport edge
@@ -222,7 +225,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
             function handleClickOutside(event: MouseEvent) {
                 const target = event.target as Node;
                 if (
-                    containerRef.current && 
+                    containerRef.current &&
                     !containerRef.current.contains(target) &&
                     popupRef.current &&
                     !popupRef.current.contains(target)
@@ -299,7 +302,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
             }
         };
 
-        const handleInputBlur = () => {
+        const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
             // If there is an internal error, keep it shown and don't revert immediately
             // so user sees why it failed. However, if they leave it empty/invalid, 
             // we might want to revert logic or keep error. 
@@ -316,6 +319,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                     setInputValue('');
                 }
             }
+            onBlur?.(e);
         };
 
         const isDateInRange = (date: Date): boolean => {
@@ -500,132 +504,132 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                             className={cn(
                                 "fixed z-[9999] p-4 bg-background border border-border rounded-xl shadow-lg"
                             )}
-                            style={{ 
+                            style={{
                                 minWidth: '300px',
                                 top: `${popupPosition.top}px`,
                                 left: `${popupPosition.left}px`
                             }}
                         >
-                        {isYearSelection ? (
-                            <div className="h-64 overflow-y-auto grid grid-cols-4 gap-2">
-                                {Array.from({ length: 150 }, (_, i) => new Date().getFullYear() - 100 + i).map(year => {
-                                    const isDisabled = isYearDisabled(year);
-                                    return (
-                                        <button
-                                            key={year}
-                                            ref={year === viewDate.getFullYear() ? selectedYearRef : undefined}
-                                            type="button"
-                                            disabled={isDisabled}
-                                            onClick={() => {
-                                                setViewDate(new Date(year, viewDate.getMonth(), 1));
-                                                setIsYearSelection(false);
-                                            }}
-                                            className={cn(
-                                                "px-2 py-1 text-sm rounded-md transition-colors",
-                                                year === viewDate.getFullYear()
-                                                    ? "bg-primary text-primary-foreground font-bold"
-                                                    : "hover:bg-muted text-foreground",
-                                                isDisabled && "opacity-40 cursor-not-allowed hover:bg-transparent"
-                                            )}
-                                        >
-                                            {year}
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        ) : (
-                            <>
-                                {/* Header with Month/Year Navigation */}
-                                <div className="flex items-center justify-between mb-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => navigateYear(-1)}
-                                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                        aria-label="Previous year"
-                                    >
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="11 17 6 12 11 7" />
-                                            <polyline points="18 17 13 12 18 7" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => navigateMonth(-1)}
-                                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                        aria-label="Previous month"
-                                    >
-                                        <ChevronLeftIcon size={18} />
-                                    </button>
-
-                                    <div className="flex-1 text-center">
-                                        <div className="flex items-center justify-center gap-1">
-                                            <span className="text-sm font-semibold text-foreground">
-                                                {MONTH_NAMES[viewDate.getMonth()]}
-                                            </span>
+                            {isYearSelection ? (
+                                <div className="h-64 overflow-y-auto grid grid-cols-4 gap-2">
+                                    {Array.from({ length: 150 }, (_, i) => new Date().getFullYear() - 100 + i).map(year => {
+                                        const isDisabled = isYearDisabled(year);
+                                        return (
                                             <button
+                                                key={year}
+                                                ref={year === viewDate.getFullYear() ? selectedYearRef : undefined}
                                                 type="button"
-                                                onClick={() => setIsYearSelection(true)}
-                                                className="text-sm font-semibold text-foreground hover:bg-muted px-2 py-0.5 rounded transition-colors"
+                                                disabled={isDisabled}
+                                                onClick={() => {
+                                                    setViewDate(new Date(year, viewDate.getMonth(), 1));
+                                                    setIsYearSelection(false);
+                                                }}
+                                                className={cn(
+                                                    "px-2 py-1 text-sm rounded-md transition-colors",
+                                                    year === viewDate.getFullYear()
+                                                        ? "bg-primary text-primary-foreground font-bold"
+                                                        : "hover:bg-muted text-foreground",
+                                                    isDisabled && "opacity-40 cursor-not-allowed hover:bg-transparent"
+                                                )}
                                             >
-                                                {viewDate.getFullYear()}
+                                                {year}
                                             </button>
+                                        )
+                                    })}
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Header with Month/Year Navigation */}
+                                    <div className="flex items-center justify-between mb-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => navigateYear(-1)}
+                                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                            aria-label="Previous year"
+                                        >
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="11 17 6 12 11 7" />
+                                                <polyline points="18 17 13 12 18 7" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigateMonth(-1)}
+                                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                            aria-label="Previous month"
+                                        >
+                                            <ChevronLeftIcon size={18} />
+                                        </button>
+
+                                        <div className="flex-1 text-center">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <span className="text-sm font-semibold text-foreground">
+                                                    {MONTH_NAMES[viewDate.getMonth()]}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsYearSelection(true)}
+                                                    className="text-sm font-semibold text-foreground hover:bg-muted px-2 py-0.5 rounded transition-colors"
+                                                >
+                                                    {viewDate.getFullYear()}
+                                                </button>
+                                            </div>
                                         </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => navigateMonth(1)}
+                                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                            aria-label="Next month"
+                                        >
+                                            <ChevronRightIcon size={18} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigateYear(1)}
+                                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                            aria-label="Next year"
+                                        >
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="13 17 18 12 13 7" />
+                                                <polyline points="6 17 11 12 6 7" />
+                                            </svg>
+                                        </button>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => navigateMonth(1)}
-                                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                        aria-label="Next month"
-                                    >
-                                        <ChevronRightIcon size={18} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => navigateYear(1)}
-                                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                        aria-label="Next year"
-                                    >
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="13 17 18 12 13 7" />
-                                            <polyline points="6 17 11 12 6 7" />
-                                        </svg>
-                                    </button>
-                                </div>
+                                    {/* Day Names Header */}
+                                    <div className="grid grid-cols-7 gap-1 mb-2">
+                                        {DAY_NAMES.map(day => (
+                                            <div key={day} className="w-9 h-8 flex items-center justify-center text-xs font-medium text-muted-foreground">
+                                                {day}
+                                            </div>
+                                        ))}
+                                    </div>
 
-                                {/* Day Names Header */}
-                                <div className="grid grid-cols-7 gap-1 mb-2">
-                                    {DAY_NAMES.map(day => (
-                                        <div key={day} className="w-9 h-8 flex items-center justify-center text-xs font-medium text-muted-foreground">
-                                            {day}
-                                        </div>
-                                    ))}
-                                </div>
+                                    {/* Calendar Days Grid */}
+                                    <div className="grid grid-cols-7 gap-1">
+                                        {renderCalendarDays()}
+                                    </div>
 
-                                {/* Calendar Days Grid */}
-                                <div className="grid grid-cols-7 gap-1">
-                                    {renderCalendarDays()}
-                                </div>
-
-                                {/* Today Button */}
-                                <div className="mt-4 pt-3 border-t border-border flex justify-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const today = new Date();
-                                            if (isDateInRange(today)) {
-                                                onChange?.(today);
-                                                setIsOpen(false);
-                                            }
-                                            setViewDate(today);
-                                        }}
-                                        className="text-sm text-primary hover:text-primary-hover font-medium transition-colors"
-                                    >
-                                        Today
-                                    </button>
-                                </div>
-                            </>
-                        )}
+                                    {/* Today Button */}
+                                    <div className="mt-4 pt-3 border-t border-border flex justify-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const today = new Date();
+                                                if (isDateInRange(today)) {
+                                                    onChange?.(today);
+                                                    setIsOpen(false);
+                                                }
+                                                setViewDate(today);
+                                            }}
+                                            className="text-sm text-primary hover:text-primary-hover font-medium transition-colors"
+                                        >
+                                            Today
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </Portal>
                 )}

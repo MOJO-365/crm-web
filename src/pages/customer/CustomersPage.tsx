@@ -14,7 +14,7 @@ import { Select } from '@/components/ui/Select';
 import { StatusField } from '@/components/common';
 import BulkEmailModal from './BulkEmailModal';
 
-import { DNSP_OPTIONS, DISCOUNT_OPTIONS, CUSTOMER_STATUS_OPTIONS, VPP_OPTIONS, VPP_CONNECTED_OPTIONS, ULTIMATE_STATUS_OPTIONS, MSAT_CONNECTED_OPTIONS } from '@/lib/constants';
+import { DNSP_OPTIONS, DISCOUNT_OPTIONS, CUSTOMER_STATUS_OPTIONS, RISK_STATUS_OPTIONS, VPP_OPTIONS, VPP_CONNECTED_OPTIONS, ULTIMATE_STATUS_OPTIONS, MSAT_CONNECTED_OPTIONS } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -62,6 +62,7 @@ interface Customer {
     utilmateDetails?: {
         utilmateConnected?: number;
     };
+    riskStatus?: number;
 }
 
 interface PageInfo {
@@ -92,6 +93,7 @@ interface SearchFilters {
     vppConnected: string;
     utilmateStatus: string;
     msatConnected: string;
+    riskStatus: string;
 }
 
 export function CustomersPage() {
@@ -113,6 +115,7 @@ export function CustomersPage() {
         vppConnected: '',
         utilmateStatus: '',
         msatConnected: '',
+        riskStatus: '',
     });
 
     const [debouncedFilters, setDebouncedFilters] = useState(searchFilters);
@@ -174,6 +177,7 @@ export function CustomersPage() {
             searchVppConnected: debouncedFilters.vppConnected !== '' ? parseInt(debouncedFilters.vppConnected) : undefined,
             searchUtilmateStatus: debouncedFilters.utilmateStatus !== '' ? parseInt(debouncedFilters.utilmateStatus) : undefined,
             searchMsatConnected: debouncedFilters.msatConnected !== '' ? parseInt(debouncedFilters.msatConnected) : undefined,
+            searchRiskStatus: debouncedFilters.riskStatus !== '' ? parseInt(debouncedFilters.riskStatus) : undefined,
         },
         fetchPolicy: 'network-only',
         notifyOnNetworkStatusChange: true,
@@ -298,6 +302,7 @@ export function CustomersPage() {
                     searchVppConnected: debouncedFilters.vppConnected ? parseInt(debouncedFilters.vppConnected) : undefined,
                     searchUtilmateStatus: debouncedFilters.utilmateStatus ? parseInt(debouncedFilters.utilmateStatus) : undefined,
                     searchMsatConnected: debouncedFilters.msatConnected ? parseInt(debouncedFilters.msatConnected) : undefined,
+                    searchRiskStatus: debouncedFilters.riskStatus ? parseInt(debouncedFilters.riskStatus) : undefined,
                 },
             });
 
@@ -407,6 +412,33 @@ export function CustomersPage() {
                     <StatusField
                         type="customer_status"
                         value={row.status}
+                        mode="badge"
+                    />
+                </div>
+            ),
+        },
+        {
+            key: 'riskStatus',
+            header: (
+                <div className="flex flex-col gap-1 items-start">
+                    <div className="h-7 flex items-center">
+                        <span className="text-xs font-semibold uppercase text-muted-foreground">Risk Status</span>
+                    </div>
+                    <Select
+                        options={[{ value: '', label: 'All' }, ...RISK_STATUS_OPTIONS]}
+                        value={searchFilters.riskStatus}
+                        onChange={(val) => handleSearchChange('riskStatus', val as string)}
+                        placeholder="All"
+                        className="h-7 text-xs w-[120px]"
+                    />
+                </div>
+            ),
+            width: 'w-[150px]',
+            render: (row: Customer) => (
+                <div className="whitespace-nowrap">
+                    <StatusField
+                        type="risk_status"
+                        value={row.riskStatus}
                         mode="badge"
                     />
                 </div>
