@@ -1004,7 +1004,7 @@ export const CustomerFormPage = () => {
                             isCreditScoreFetched: 1,
                             riskStatus: parsedRiskStatus
                         };
-                        toast.success(`Credit check passed. Score: ${score}`);
+                        // toast.success(`Credit check passed. Score: ${score}`);
                     }
 
                 } catch (error) {
