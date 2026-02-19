@@ -271,7 +271,7 @@ export const RiskStatusesPage = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold">Risk Statuses</h1>
+                    <h1 className="text-2xl font-bold">Credit Score </h1>
                     <p className="text-muted-foreground">Manage risk status levels and credit score ranges</p>
                 </div>
                 {canCreate && (

@@ -879,9 +879,6 @@ export const CustomerFormPage = () => {
             );
         }
 
-        // If VPP is true, Credit Score check MUST be performed
-        if (formData.vpp) return false;
-
         return baseValid;
     }, [formData]);
 
@@ -1086,6 +1083,7 @@ export const CustomerFormPage = () => {
                 licenseDocument: formData.licenseDocument?.uid,
                 rateVersion: activeRateVersion,
                 customerId: isEditMode ? undefined : generatedCustomerId,
+                triggerWelcomeEmail: isEditMode ? true : undefined,
             };
 
             if (isEditMode) {
