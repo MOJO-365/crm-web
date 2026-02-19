@@ -24,6 +24,7 @@ const ProfilePage = lazy(() => import('@/pages/user/ProfilePage').then(m => ({ d
 const DocumentTypesPage = lazy(() => import('@/pages/master/DocumentTypesPage').then(m => ({ default: m.DocumentTypesPage })));
 const NoteTypesPage = lazy(() => import('@/pages/master/NoteTypesPage').then(m => ({ default: m.NoteTypesPage })));
 const NotificationEntitiesPage = lazy(() => import('@/pages/master/NotificationEntitiesPage').then(m => ({ default: m.NotificationEntitiesPage })));
+const RiskStatusesPage = lazy(() => import('@/pages/master/RiskStatusesPage').then(m => ({ default: m.RiskStatusesPage })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -82,6 +83,7 @@ const router = createBrowserRouter(
                 <Route path="/document-types" element={<RequirePermission menuCode="document_types"><DocumentTypesPage /></RequirePermission>} />
                 <Route path="/note-types" element={<RequirePermission menuCode="note_types"><NoteTypesPage /></RequirePermission>} />
                 <Route path="/notification_entity" element={<RequirePermission menuCode="notification_entity"><NotificationEntitiesPage /></RequirePermission>} />
+                <Route path="/risk-statuses" element={<RequirePermission menuCode="risk_statuses"><RiskStatusesPage /></RequirePermission>} />
 
                 {/* General authenticated routes */}
                 <Route path="/change-password" element={<ChangePasswordPage />} />

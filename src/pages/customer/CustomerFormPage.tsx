@@ -15,8 +15,9 @@ import {
     CHECK_NMI_EXISTS,
     CREATE_CUSTOMER,
     UPDATE_CUSTOMER,
+    GET_RISK_STATUSES,
 } from '@/graphql';
-import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, RISK_STATUS_MAP } from '@/lib/constants';
+import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { secondaryApiAxios } from '@/lib/apollo';
 import { formatDateTime } from '@/lib/date';
 import {
@@ -418,6 +419,12 @@ export const CustomerFormPage = () => {
     const { data: activeRatesData } = useQuery(GET_ACTIVE_RATES_HISTORY, {
         fetchPolicy: 'network-only',
     });
+
+    // Risk statuses from lookup table
+    const { data: riskStatusesData } = useQuery(GET_RISK_STATUSES, {
+        fetchPolicy: 'cache-and-network'
+    });
+    const riskStatuses = riskStatusesData?.riskStatuses || [];
 
     const [checkAddressExists] = useLazyQuery(CHECK_ADDRESS_EXISTS);
     const [checkNmiExists] = useLazyQuery(CHECK_NMI_EXISTS);
@@ -908,26 +915,8 @@ export const CustomerFormPage = () => {
             // Credit Score Check (Only on Create)
             if (!isEditMode && formData.checkCreditScore) {
                 try {
-                    // Logic mirrored from CustomerDetailsPage.tsx
-                    // const equifaxPayload = {
-                    //     "first-name": formData.firstName,
-                    //     "first-given-name": formData.lastName,
-                    //     "address": {
-                    //         "street-name": formData.streetName,
-                    //         "street-type": formData.streetType,
-                    //         "suburb": formData.suburb,
-                    //         "state-code": formData.state
-                    //     },
-                    //     "license-number": formData.licenseNumber,
-                    //     "gender-code": formData.gender === 0 ? 'M' : 'F',
-                    //     "date-of-birth": formData.dob ? new Date(formData.dob).toISOString().split('T')[0] : '',
-                    //     "employer-name": formData.employerName,
-                    //     "account-type-code": "CC",
-                    //     "enquiry-amount": Number(formData.enquiryAmount) || 0,
-                    //     "relationship-code": String(formData.relationshipStatus || '1'),
-                    //     "client-reference": `REF-${Date.now()}`,
-                    //     "enquiry-client-reference": formData.phone || ''
-                    // };
+
+
                     const equifaxPayload = {
                         "first-name": "Pal",
                         "first-given-name": "Patel",
@@ -947,11 +936,30 @@ export const CustomerFormPage = () => {
                         "client-reference": "T3D-20251209051318-ed8bc2",
                         "enquiry-client-reference": "12344556"
                     };
+                    // const equifaxPayload = {
+                    //     "first-name": formData.firstName,
+                    //     "first-given-name": formData.lastName,
+                    //     "address": {
+                    //         "street-name": formData.streetName,
+                    //         "street-type": formData.streetType,
+                    //         "suburb": formData.suburb,
+                    //         "state-code": formData.state
+                    //     },
+                    //     "license-number": formData.licenseNumber,
+                    //     "gender-code": formData.gender === 0 ? 'M' : (formData.gender === 1 ? 'F' : 'O'),
+                    //     "date-of-birth": formData.dob ? new Date(formData.dob).toISOString().split('T')[0] : '',
+                    //     "employer-name": formData.employerName,
+                    //     "account-type-code": "CC",
+                    //     "enquiry-amount": Number(formData.enquiryAmount) || 0,
+                    //     "relationship-code": String(formData.relationshipStatus || '1'),
+                    //     "client-reference": `REF-${Date.now()}`,
+                    //     "enquiry-client-reference": formData.phone || ''
+                    // };
 
                     const response = await secondaryApiAxios.post('/api/v1/equifax/user/get-credit-report', equifaxPayload);
 
                     let score: number | undefined;
-                    let parsedRiskStatus: number | undefined;
+                    let riskStatusUid: string | undefined;
 
                     // Handle various response formats
                     if (response.data?.creditScoreData?.score?.score_masterscale) {
@@ -960,22 +968,18 @@ export const CustomerFormPage = () => {
                     } else if (response.data?.creditScore) {
                         // Direct Object Response
                         score = parseInt(response.data.creditScore);
-                        if (response.data.riskStatus) parsedRiskStatus = parseInt(response.data.riskStatus);
                     } else if (Array.isArray(response.data) && response.data.length >= 2) {
-                        // Array Response [riskStatus, creditScore] (or could be [score, risk])
+                        // Array Response - pick the larger value as score
                         const v1 = parseInt(response.data[0]);
                         const v2 = parseInt(response.data[1]);
-                        // Heuristic: Score > 100, Risk < 10 typically
-                        if (v1 > 100) { score = v1; parsedRiskStatus = v2; }
-                        else { parsedRiskStatus = v1; score = v2; }
+                        score = v1 > 100 ? v1 : v2;
                     } else if (typeof response.data === 'string') {
                         // Text response "1 577" or similar
                         const parts = response.data.trim().split(/\s+/);
                         if (parts.length >= 2) {
                             const v1 = parseInt(parts[0]);
                             const v2 = parseInt(parts[1]);
-                            if (v1 > 100) { score = v1; parsedRiskStatus = v2; }
-                            else { parsedRiskStatus = v1; score = v2; }
+                            score = v1 > 100 ? v1 : v2;
                         } else if (parts.length === 1 && !isNaN(parseInt(parts[0]))) {
                             score = parseInt(parts[0]);
                         }
@@ -983,26 +987,24 @@ export const CustomerFormPage = () => {
                         score = response.data;
                     }
 
-                    // Calculate risk status if not provided or potentially wrong from API (e.g. 1 might be a code, not risk status)
+                    // Look up risk status from the database lookup table by score range
                     if (score !== undefined && !isNaN(score)) {
-                        let potentialRiskStatus = 0;
-                        if (score < 200) potentialRiskStatus = 1;
-                        else if (score < 300) potentialRiskStatus = 2;
-                        else if (score < 600) potentialRiskStatus = 3;
-                        else if (score < 700) potentialRiskStatus = 4;
-                        else potentialRiskStatus = 5;
-
-                        // Prefer calculated risk status if API didn't provide one clearly, or override if needed
-                        if (!parsedRiskStatus || (parsedRiskStatus < 1 || parsedRiskStatus > 5)) {
-                            parsedRiskStatus = potentialRiskStatus;
+                        const matched = riskStatuses.find((rs: any) => {
+                            if (rs.scoreMin === null && rs.scoreMax === null) return false; // Skip "Pending"
+                            const minOk = rs.scoreMin === null || score! >= rs.scoreMin;
+                            const maxOk = rs.scoreMax === null || score! < rs.scoreMax;
+                            return minOk && maxOk;
+                        });
+                        if (matched) {
+                            riskStatusUid = matched.uid;
                         }
                     }
 
-                    if (parsedRiskStatus) {
+                    if (riskStatusUid) {
                         creditScoreData = {
                             creditScore: score,
                             isCreditScoreFetched: 1,
-                            riskStatus: parsedRiskStatus
+                            riskStatus: riskStatusUid
                         };
                         // toast.success(`Credit check passed. Score: ${score}`);
                     }
@@ -2333,8 +2335,8 @@ export const CustomerFormPage = () => {
                                         <div className="space-y-1 flex-1 min-w-0">
                                             <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider leading-none">Credit Assessment</p>
                                             <div className="flex items-center">
-                                                <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border-2 ${RISK_STATUS_MAP[formData.riskStatus as number]?.color || 'text-primary bg-primary/5 border-primary/10'}`}>
-                                                    Score: {formData.creditScore} • {RISK_STATUS_MAP[formData.riskStatus as number]?.label || 'N/A'}
+                                                <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border-2 ${riskStatuses.find((rs: any) => rs.uid === formData.riskStatus)?.color || 'text-primary bg-primary/5 border-primary/10'}`}>
+                                                    Score: {formData.creditScore} • {riskStatuses.find((rs: any) => rs.uid === formData.riskStatus)?.name || 'N/A'}
                                                 </div>
                                             </div>
                                         </div>

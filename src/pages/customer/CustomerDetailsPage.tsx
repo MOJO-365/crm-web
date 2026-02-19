@@ -13,13 +13,13 @@ import {
     GET_DOCUMENT_TYPES, CREATE_DOCUMENT_TYPE, CREATE_CUSTOMER, SEND_OFFER_EMAIL,
     GET_CUSTOMER_BY_ID, SEND_REMINDER_EMAIL, UPDATE_CUSTOMER, GET_RATES_HISTORY_BY_VERSION,
     GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS, GET_NOTE_TYPES,
-    CREATE_NOTE_TYPE, SEND_CUSTOMER_CREDENTIALS_EMAIL
+    CREATE_NOTE_TYPE, SEND_CUSTOMER_CREDENTIALS_EMAIL, GET_RISK_STATUSES
 } from '@/graphql';
 import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
 import { cn } from '@/lib/utils';
 
-import { SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS, ID_TYPE_MAP, RISK_STATUS_MAP, GENDER_LABELS, RELATIONSHIP_STATUS_LABELS } from '@/lib/constants';
+import { SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS, ID_TYPE_MAP, GENDER_LABELS, RELATIONSHIP_STATUS_LABELS } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
@@ -94,7 +94,7 @@ interface CustomerDetails {
     offerEmailSentAt?: string;
     phoneVerifiedAt?: string;
     address?: CustomerAddress;
-    riskStatus?: number;
+    riskStatus?: string;
     enrollmentDetails?: {
         saletype?: number;
         connectiondate?: string;
@@ -417,6 +417,12 @@ export function CustomerDetailsPage() {
     const { data: documentTypesData, refetch: refetchDocumentTypes } = useQuery(GET_DOCUMENT_TYPES, {
         fetchPolicy: 'cache-and-network'
     });
+
+    // Risk statuses from lookup table
+    const { data: riskStatusesData } = useQuery(GET_RISK_STATUSES, {
+        fetchPolicy: 'cache-and-network'
+    });
+    const riskStatuses = riskStatusesData?.riskStatuses || [];
 
     const docTypeOptions = [
         ...(documentTypesData?.documentTypes?.map((t: any) => ({
@@ -1186,29 +1192,26 @@ export function CustomerDetailsPage() {
         setIsCheckingCreditScore(true);
         try {
             // Construct Equifax API Payload
-            /*
-            const dynamicEquifaxPayload = {
-                "first-name": selectedCustomerDetails.firstName,
-                "first-given-name": selectedCustomerDetails.lastName,
-                "address": {
-                    "street-name": selectedCustomerDetails.address?.streetName || '',
-                    "street-type": selectedCustomerDetails.address?.streetType || '',
-                    "suburb": selectedCustomerDetails.address?.suburb || '',
-                    "state-code": selectedCustomerDetails.address?.state || ''
-                },
-                "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
-                "gender-code": selectedCustomerDetails.gender === 0 ? 'M' : 'F',
-                "date-of-birth": selectedCustomerDetails.dob ? new Date(selectedCustomerDetails.dob).toISOString().split('T')[0] : '',
-                "employer-name": selectedCustomerDetails.employerName || '',
-                "account-type-code": "CC",
-                "enquiry-amount": Number(selectedCustomerDetails.enquiryAmount) || 0,
-                "relationship-code": String(selectedCustomerDetails.relationshipStatus || '1'),
-                "client-reference": `${selectedCustomerDetails.customerId || selectedCustomerDetails.uid}-${Date.now()}`,
-                "enquiry-client-reference": selectedCustomerDetails.number || ''
-            };
-            */
+            // const equifaxPayload = {
+            //     "first-name": selectedCustomerDetails.firstName || '',
+            //     "first-given-name": selectedCustomerDetails.lastName || '',
+            //     "address": {
+            //         "street-name": selectedCustomerDetails.address?.streetName || '',
+            //         "street-type": selectedCustomerDetails.address?.streetType || '',
+            //         "suburb": selectedCustomerDetails.address?.suburb || '',
+            //         "state-code": selectedCustomerDetails.address?.state || ''
+            //     },
+            //     "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
+            //     "gender-code": selectedCustomerDetails.gender === 0 ? 'M' : (selectedCustomerDetails.gender === 1 ? 'F' : 'O'),
+            //     "date-of-birth": selectedCustomerDetails.dob ? new Date(selectedCustomerDetails.dob).toISOString().split('T')[0] : '',
+            //     "employer-name": selectedCustomerDetails.employerName || '',
+            //     "account-type-code": "CC",
+            //     "enquiry-amount": Number(selectedCustomerDetails.enquiryAmount) || 0,
+            //     "relationship-code": String(selectedCustomerDetails.relationshipStatus || '1'),
+            //     "client-reference": `${selectedCustomerDetails.customerId || selectedCustomerDetails.uid}-${Date.now()}`,
+            //     "enquiry-client-reference": selectedCustomerDetails.number || ''
+            // };
 
-            /*
             const equifaxPayload = {
                 "first-name": "Pal",
                 "first-given-name": "Patel",
@@ -1228,26 +1231,29 @@ export function CustomerDetailsPage() {
                 "client-reference": "T3D-20251209051318-ed8bc2",
                 "enquiry-client-reference": "12344556"
             };
-            */
+            const response = await secondaryApiAxios.post('/api/v1/equifax/user/get-credit-report', equifaxPayload);
+            const score = response.data?.creditScoreData?.score?.score_masterscale || response.data?.creditScore;
 
-            // Call secondary API (Commented out for testing with static score)
-            // const response = await secondaryApiAxios.post('/api/v1/equifax/user/get-credit-report', equifaxPayload);
+            if (!score) {
+                throw new Error('No credit score returned from Equifax');
+            }
 
-            // Extract score_masterscale if available
-            // const score = response.data?.creditScoreData?.score?.score_masterscale;
+            console.log('Using dynamic credit score from Equifax:', score);
 
-            // STATIC SCORE FOR TESTING
-            const score = 654;
-            console.log('Using static credit score for testing:', score);
-
-            let riskStatus: number | undefined = undefined;
+            // Look up matching risk status from the fetched lookup table
+            let riskStatusUid: string | undefined = undefined;
+            let matchedRiskStatus: any = null;
             if (score !== undefined && score !== null) {
                 const scoreNum = parseInt(score.toString());
-                if (scoreNum < 200) riskStatus = 1;
-                else if (scoreNum < 300) riskStatus = 2;
-                else if (scoreNum < 600) riskStatus = 3;
-                else if (scoreNum < 700) riskStatus = 4;
-                else riskStatus = 5;
+                matchedRiskStatus = riskStatuses.find((rs: any) => {
+                    if (rs.scoreMin === null && rs.scoreMax === null) return false; // Skip "Pending"
+                    const minOk = rs.scoreMin === null || scoreNum >= rs.scoreMin;
+                    const maxOk = rs.scoreMax === null || scoreNum < rs.scoreMax;
+                    return minOk && maxOk;
+                });
+                if (matchedRiskStatus) {
+                    riskStatusUid = matchedRiskStatus.uid;
+                }
             }
 
             // If API call succeeds, update backend status
@@ -1257,7 +1263,7 @@ export function CustomerDetailsPage() {
                     input: {
                         isCreditScoreFetched: 1,
                         creditScore: score ? parseInt(score.toString()) : undefined,
-                        riskStatus: riskStatus
+                        riskStatus: riskStatusUid
                     }
                 }
             });
@@ -1265,13 +1271,13 @@ export function CustomerDetailsPage() {
                 ...selectedCustomerDetails,
                 isCreditScoreFetched: 1,
                 creditScore: score ? parseInt(score.toString()) : undefined,
-                riskStatus: riskStatus
+                riskStatus: riskStatusUid
             });
             toast.success('Credit score checked and updated');
 
-            // --- Automation logic based on credit score ---
-            if (score && parseInt(score.toString()) > 600) {
-                // Automatically send offer
+            // --- Automation logic based on manualOffer flag ---
+            if (matchedRiskStatus && matchedRiskStatus.manualOffer === 0) {
+                // Auto-send offer (manualOffer = 0 means auto)
                 setIsSendingOffer(true);
                 try {
                     const result: any = await sendOfferEmail({
@@ -1299,8 +1305,8 @@ export function CustomerDetailsPage() {
                 } finally {
                     setIsSendingOffer(false);
                 }
-            } else if (score && parseInt(score.toString()) >= 400 && parseInt(score.toString()) <= 600) {
-                // Show manual send offer button
+            } else if (matchedRiskStatus && matchedRiskStatus.manualOffer === 1) {
+                // Show manual send offer button (manualOffer = 1)
                 setShowManualOfferButton(true);
             }
             // ----------------------------------------------
@@ -1397,13 +1403,14 @@ export function CustomerDetailsPage() {
                                             }}
                                         />
                                     )}
-                                    {/* {selectedCustomerDetails?.riskStatus !== undefined && selectedCustomerDetails.riskStatus !== null && (
+                                    {selectedCustomerDetails?.riskStatus !== undefined && selectedCustomerDetails.riskStatus !== null && (
                                         <StatusField
                                             value={selectedCustomerDetails.riskStatus}
                                             type="risk_status"
                                             mode="badge"
+                                            riskStatuses={riskStatuses}
                                         />
-                                    )} */}
+                                    )}
                                 </div>
                                 <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                     <span className="bg-muted px-2 py-0.5 rounded text-xs">Customer ID: </span>
@@ -1616,8 +1623,8 @@ export function CustomerDetailsPage() {
                                             <div className="flex flex-col gap-1.5 mt-2">
 
                                                 <div className="flex items-center">
-                                                    <div className={`text-xs font-bold px-3 py-1 rounded-full border-2 ${RISK_STATUS_MAP[selectedCustomerDetails.riskStatus as number]?.color || 'text-primary bg-primary/5 border-primary/10'}`}>
-                                                        Score: {selectedCustomerDetails.creditScore} • {RISK_STATUS_MAP[selectedCustomerDetails.riskStatus as number]?.label || 'N/A'}
+                                                    <div className={`text-xs font-bold px-3 py-1 rounded-full border-2 ${riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus)?.color || 'text-primary bg-primary/5 border-primary/10'}`}>
+                                                        Score: {selectedCustomerDetails.creditScore} • {riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus)?.name || 'N/A'}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1637,7 +1644,7 @@ export function CustomerDetailsPage() {
                                             </button>
                                         )}
 
-                                        {item.step === 0 && (showManualOfferButton || (selectedCustomerDetails.isCreditScoreFetched === 1 && selectedCustomerDetails.creditScore !== undefined && selectedCustomerDetails.creditScore <= 600)) && !selectedCustomerDetails.offerEmailSentAt && (
+                                        {item.step === 0 && (showManualOfferButton || (selectedCustomerDetails.isCreditScoreFetched === 1 && selectedCustomerDetails.riskStatus !== undefined && (riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus)?.manualOffer === 1))) && !selectedCustomerDetails.offerEmailSentAt && (
                                             <button
                                                 onClick={() => handleManualSendOffer(selectedCustomerDetails.uid)}
                                                 disabled={isSendingOffer}
