@@ -503,6 +503,7 @@ export const GET_CUSTOMER_BY_ID = gql`
             creditScore
             isCreditScoreFetched
             riskStatus
+            emailLogCount
             offerVersion
             offerVersion
             viewCode
