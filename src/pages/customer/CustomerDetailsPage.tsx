@@ -2,24 +2,30 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { Button, Input, DatePicker, Select, Tooltip, Switch as ToggleSwitch, ConfirmationPopover, Popover } from '@/components/ui';
-import { Modal, StatusField } from '@/components/common';
+import { DataTable, Modal, StatusField } from '@/components/common';
 import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
-    IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon, LockIcon
+    IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon, LockIcon,
+    RefreshCwIcon
 } from '@/components/icons';
 import {
     GET_DOCUMENT_TYPES, CREATE_DOCUMENT_TYPE, CREATE_CUSTOMER, SEND_OFFER_EMAIL,
     GET_CUSTOMER_BY_ID, SEND_REMINDER_EMAIL, UPDATE_CUSTOMER, GET_RATES_HISTORY_BY_VERSION,
     GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS, GET_NOTE_TYPES,
-    CREATE_NOTE_TYPE, SEND_CUSTOMER_CREDENTIALS_EMAIL, GET_RISK_STATUSES
+    CREATE_NOTE_TYPE, SEND_CUSTOMER_CREDENTIALS_EMAIL, GET_RISK_STATUSES,
+    GET_CUSTOMER_EMAIL_LOGS
 } from '@/graphql';
 import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
 import { cn } from '@/lib/utils';
 
-import { SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS, ID_TYPE_MAP, GENDER_LABELS, RELATIONSHIP_STATUS_LABELS } from '@/lib/constants';
+import {
+    SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS,
+    ID_TYPE_MAP, GENDER_LABELS, RELATIONSHIP_STATUS_LABELS,
+    EMAIL_STATUS_MAP, EMAIL_TYPE_LABELS
+} from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
@@ -92,6 +98,7 @@ interface CustomerDetails {
     signedPdfPath?: string;
     emailSent?: number;
     offerEmailSentAt?: string;
+    emailLogCount?: number;
     phoneVerifiedAt?: string;
     address?: CustomerAddress;
     riskStatus?: string;
@@ -212,12 +219,39 @@ interface CustomerDetails {
     offerVersion?: number;
 }
 
+interface EmailLog {
+    id: string;
+    customerUid: string;
+    customerId: string | null;
+    emailTo: string | null;
+    emailType: string | null;
+    subject: string | null;
+    body: string | null;
+    status: number;
+    errorMessage: string | null;
+    sentAt: string | null;
+    verifiedAt: string | null;
+    createdAt: string;
+    createdBy: string | null;
+    tenant: string | null;
+    verificationCode: string | null;
+}
+
+interface EmailLogsResponse {
+    customerEmailLogs: {
+        meta: {
+            totalRecords: number;
+            currentPage: number;
+            totalPages: number;
+            recordsPerPage: number;
+        };
+        data: EmailLog[];
+    };
+}
+
 const DOCUMENT_TYPE_OPTIONS = [
     { label: 'Other', value: 'other' }
 ];
-
-
-
 const RateVersionTooltip = ({ version, children }: { version: string, children: React.ReactNode }) => {
     const { data, loading } = useQuery(GET_RATES_HISTORY_BY_VERSION, {
         variables: { version },
@@ -275,6 +309,228 @@ const RateVersionTooltip = ({ version, children }: { version: string, children: 
     );
 };
 
+// ============================================================
+// Customer Email Logs Table Component
+// ============================================================
+
+const CustomerEmailLogsTable = ({ customerUid }: { customerUid: string }) => {
+    const [page, setPage] = useState(1);
+    const [allLogs, setAllLogs] = useState<EmailLog[]>([]);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
+
+    const limit = 15;
+
+    const { data, loading, error, refetch } = useQuery<EmailLogsResponse>(GET_CUSTOMER_EMAIL_LOGS, {
+        variables: {
+            customerUid,
+            page,
+            limit
+        },
+        fetchPolicy: 'cache-and-network',
+    });
+
+    const meta = data?.customerEmailLogs?.meta;
+    const hasMore = meta ? page < meta.totalPages : false;
+
+    useEffect(() => {
+        if (data?.customerEmailLogs?.data) {
+            const fetchedLogs = data.customerEmailLogs.data;
+            if (page === 1) {
+                setAllLogs(fetchedLogs);
+            } else {
+                setAllLogs(prev => {
+                    const existingIds = new Set(prev.map(l => l.id));
+                    const newLogs = fetchedLogs.filter(l => !existingIds.has(l.id));
+                    return [...prev, ...newLogs];
+                });
+            }
+            setIsLoadingMore(false);
+        }
+    }, [data, page]);
+
+    // Poll for updates if any log is 'Pending' (status 0)
+    useEffect(() => {
+        const hasPendingLogs = allLogs.some(log => log.status === 0);
+        let intervalId: NodeJS.Timeout;
+
+        if (hasPendingLogs) {
+            intervalId = setInterval(() => {
+                refetch();
+            }, 3000); // Poll every 3 seconds
+        }
+
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [allLogs, refetch]);
+
+    const handleLoadMore = () => {
+        if (!loading && hasMore) {
+            setIsLoadingMore(true);
+            setPage(prev => prev + 1);
+        }
+    };
+
+    const handleRefresh = async () => {
+        await refetch();
+        toast.success('Email logs refreshed');
+    };
+
+    const columns = [
+        {
+            key: 'subject',
+            header: 'Subject',
+            render: (log: EmailLog) => (
+                <div className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground truncate max-w-[280px]" title={log.subject || ''}>
+                        {log.subject || 'No Subject'}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                        {EMAIL_TYPE_LABELS[log.emailType || ''] || log.emailType}
+                    </span>
+                </div>
+            )
+        },
+        {
+            key: 'status',
+            header: 'Status',
+            width: 'w-[120px]',
+            render: (log: EmailLog) => {
+                const statusInfo = EMAIL_STATUS_MAP[log.status] || { label: 'Unknown', color: 'bg-muted text-muted-foreground' };
+                return (
+                    <span className={cn('px-2.5 py-0.5 text-xs font-semibold rounded-full border', statusInfo.color)}>
+                        {statusInfo.label}
+                    </span>
+                );
+            }
+        },
+        {
+            key: 'sentAt',
+            header: 'Date Sent',
+            width: 'w-[180px]',
+            render: (log: EmailLog) => (
+                <div className="flex flex-col">
+                    <span className="text-sm text-foreground">
+                        {log.sentAt ? formatSydneyTime(log.sentAt) : 'Not Sent'}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                        via {log.emailTo}
+                    </span>
+                </div>
+            )
+        },
+        {
+            key: 'actions',
+            header: (
+                <div className="flex justify-end">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 hover:bg-muted"
+                        onClick={handleRefresh}
+                        title="Refresh Logs"
+                    >
+                        <RefreshCwIcon size={14} className={loading ? 'animate-spin' : ''} />
+                    </Button>
+                </div>
+            ),
+            width: 'w-[80px]',
+            render: (log: EmailLog) => (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => {
+                        setSelectedLog(log);
+                        setDetailModalOpen(true);
+                    }}
+                >
+                    <EyeIcon size={14} />
+                </Button>
+            )
+        }
+    ];
+
+    return (
+        <div className="space-y-4">
+            <DataTable
+                columns={columns as any}
+                data={allLogs}
+                rowKey={(log) => log.id}
+                loading={loading && page === 1}
+                error={error?.message}
+                maxHeightClass="max-h-[500px]"
+                emptyMessage="No emails found for this customer."
+                infiniteScroll
+                hasMore={hasMore}
+                isLoadingMore={isLoadingMore}
+                onLoadMore={handleLoadMore}
+            />
+
+            {/* Email Detail Modal */}
+            <Modal
+                isOpen={detailModalOpen}
+                onClose={() => setDetailModalOpen(false)}
+                title="Email Details"
+                size="full"
+            >
+                {selectedLog && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full min-h-[500px]">
+                        <div className="space-y-4">
+                            <div className="bg-muted/30 p-4 rounded-xl border border-border">
+                                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4">Metadata</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Status</p>
+                                        <div className="mt-1">
+                                            <span className={cn('px-2 py-0.5 text-xs font-bold rounded-full border', EMAIL_STATUS_MAP[selectedLog.status]?.color)}>
+                                                {EMAIL_STATUS_MAP[selectedLog.status]?.label}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Type</p>
+                                        <p className="text-sm font-medium mt-1">{EMAIL_TYPE_LABELS[selectedLog.emailType || ''] || selectedLog.emailType}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Sent To</p>
+                                        <p className="text-sm font-medium mt-1 truncate">{selectedLog.emailTo}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Sent At</p>
+                                        <p className="text-sm font-medium mt-1">{selectedLog.sentAt ? formatSydneyTime(selectedLog.sentAt) : 'N/A'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {selectedLog.errorMessage && (
+                                <div className="p-4 rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800">
+                                    <p className="text-xs font-bold text-red-600 uppercase mb-1">Error</p>
+                                    <p className="text-sm text-red-700">{selectedLog.errorMessage}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex flex-col border border-border rounded-xl overflow-hidden bg-white dark:bg-neutral-900">
+                            <div className="px-4 py-3 bg-muted/30 border-b border-border">
+                                <p className="text-sm font-bold text-foreground truncate">{selectedLog.subject}</p>
+                            </div>
+                            <div className="flex-1 overflow-auto p-4">
+                                <div
+                                    className="prose prose-sm max-w-none dark:prose-invert"
+                                    dangerouslySetInnerHTML={{ __html: selectedLog.body || '' }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+        </div>
+    );
+};
+
 export function CustomerDetailsPage() {
     const { uid } = useParams();
     const navigate = useNavigate();
@@ -292,7 +548,10 @@ export function CustomerDetailsPage() {
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     // Detail Section State
-    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'solar_vpp' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills'>('general');
+    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'solar_vpp' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs'>('general');
+
+    // Email Logs Refresh State
+    const [emailLogsKey, setEmailLogsKey] = useState(0);
 
     // Notes State
     const [noteText, setNoteText] = useState('');
@@ -1296,6 +1555,8 @@ export function CustomerDetailsPage() {
                         } else {
                             toast.success('Offer email sent');
                         }
+                        // Add delay to ensure backend has processed the log
+                        setTimeout(() => setEmailLogsKey((prev) => prev + 1), 1500);
                     } else {
                         toast.error(result.data?.sendOfferEmail?.message || 'Failed to send offer email');
                     }
@@ -1328,6 +1589,7 @@ export function CustomerDetailsPage() {
             });
             if (result.data?.sendOfferEmail?.success) {
                 toast.success('Offer email sent successfully');
+                setTimeout(() => setEmailLogsKey((prev) => prev + 1), 1500);
                 const { data } = await refetchCustomer();
                 if (data?.customer) {
                     setSelectedCustomerDetails(data.customer);
@@ -1357,6 +1619,7 @@ export function CustomerDetailsPage() {
             if (data?.sendReminderEmail?.success) {
                 toast.success(data.sendReminderEmail.message || 'Reminder sent successfully');
                 setReminderSent(true);
+                setTimeout(() => setEmailLogsKey((prev) => prev + 1), 1500);
             } else {
                 toast.error(data?.sendReminderEmail?.message || 'Failed to send reminder');
             }
@@ -1370,173 +1633,192 @@ export function CustomerDetailsPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-card text-card-foreground rounded-xl border border-border p-6 shadow-sm animate-in slide-in-from-top-4 duration-500">
-                <div className="flex flex-col md:flex-row items-start justify-between gap-6">
-                    <div className="flex flex-col sm:flex-row gap-5 items-start">
-                        <div className="w-20 h-20 rounded-2xl bg-primary/5 flex items-center justify-center text-primary border border-primary/10 shrink-0">
-                            <UserIcon size={36} strokeWidth={1.5} />
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <div className="flex flex-wrap items-center gap-3 mb-1">
-                                    <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                                        {selectedCustomerDetails ? `${selectedCustomerDetails.firstName} ${selectedCustomerDetails.lastName}` : 'Customer Details'}
-                                    </h1>
-                                    {selectedCustomerDetails && (
-                                        <StatusField
-                                            value={selectedCustomerDetails.status}
-                                            type="customer_status"
-                                            mode="badge"
-                                            onChange={async (newStatus: any) => {
-                                                try {
-                                                    await updateCustomer({
-                                                        variables: {
-                                                            uid: selectedCustomerDetails.uid,
-                                                            input: { status: Number(newStatus) }
-                                                        }
-                                                    });
-                                                    toast.success('Status updated');
-                                                    setSelectedCustomerDetails({ ...selectedCustomerDetails, status: Number(newStatus) });
-                                                } catch (error) {
-                                                    toast.error('Failed to update status');
-                                                }
-                                            }}
-                                        />
-                                    )}
-                                    {selectedCustomerDetails?.riskStatus !== undefined && selectedCustomerDetails.riskStatus !== null && (
-                                        <StatusField
-                                            value={selectedCustomerDetails.riskStatus}
-                                            type="risk_status"
-                                            mode="badge"
-                                            riskStatuses={riskStatuses}
-                                        />
-                                    )}
-                                </div>
-                                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                    <span className="bg-muted px-2 py-0.5 rounded text-xs">Customer ID: </span>
-                                    {selectedCustomerDetails?.customerId ? `${selectedCustomerDetails.customerId}` : "View and manage customer details"}
-                                </p>
+            <div className="bg-card text-card-foreground rounded-xl border border-border shadow-sm animate-in slide-in-from-top-4 duration-500 overflow-hidden">
+                {/* Profile Header Section */}
+                <div className="p-6">
+                    <div className="flex flex-col md:flex-row items-start justify-between gap-6">
+                        <div className="flex flex-col sm:flex-row gap-5 items-start">
+                            <div className="w-20 h-20 rounded-2xl bg-primary/5 flex items-center justify-center text-primary border border-primary/10 shrink-0">
+                                <UserIcon size={36} strokeWidth={1.5} />
                             </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex flex-wrap items-center gap-3 mb-1">
+                                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                                            {selectedCustomerDetails ? `${selectedCustomerDetails.firstName} ${selectedCustomerDetails.lastName}` : 'Customer Details'}
+                                        </h1>
+                                        {selectedCustomerDetails && (
+                                            <StatusField
+                                                value={selectedCustomerDetails.status}
+                                                type="customer_status"
+                                                mode="badge"
+                                                onChange={async (newStatus: any) => {
+                                                    try {
+                                                        await updateCustomer({
+                                                            variables: {
+                                                                uid: selectedCustomerDetails.uid,
+                                                                input: { status: Number(newStatus) }
+                                                            }
+                                                        });
+                                                        toast.success('Status updated');
+                                                        setSelectedCustomerDetails({ ...selectedCustomerDetails, status: Number(newStatus) });
+                                                    } catch (error) {
+                                                        toast.error('Failed to update status');
+                                                    }
+                                                }}
+                                            />
+                                        )}
+                                        {selectedCustomerDetails?.riskStatus !== undefined && selectedCustomerDetails.riskStatus !== null && (
+                                            <StatusField
+                                                value={selectedCustomerDetails.riskStatus}
+                                                type="risk_status"
+                                                mode="badge"
+                                                riskStatuses={riskStatuses}
+                                            />
+                                        )}
+                                    </div>
+                                    <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                        <span className="bg-muted px-2 py-0.5 rounded text-xs">Customer ID: </span>
+                                        {selectedCustomerDetails?.customerId ? `${selectedCustomerDetails.customerId}` : "View and manage customer details"}
+                                    </p>
+                                </div>
 
-                            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                                <div className="flex items-center gap-2.5 text-sm text-foreground/80">
-                                    <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground">
-                                        <MailIcon size={14} />
-                                    </div>
-                                    <span className="font-medium">{selectedCustomerDetails?.email || '-'}</span>
-                                </div>
-                                <div className="flex items-center gap-2.5 text-sm text-foreground/80">
-                                    <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground">
-                                        <PhoneIcon size={14} />
-                                    </div>
-                                    <span className="font-medium">{selectedCustomerDetails?.number || '-'}</span>
-                                </div>
-                                <div className="flex items-center gap-2.5 text-sm text-foreground/80">
-                                    <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground">
-                                        <MapPinIcon size={14} />
-                                    </div>
-                                    <span className="font-medium" title={selectedCustomerDetails?.address?.fullAddress || '-'}>{selectedCustomerDetails?.address?.fullAddress || '-'}</span>
+                                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                                    <Tooltip content={`Send email to ${selectedCustomerDetails?.email}`} position="bottom">
+                                        <a
+                                            href={`mailto:${selectedCustomerDetails?.email}`}
+                                            className="flex items-center gap-2.5 text-sm text-foreground/80 hover:text-primary transition-colors group"
+                                        >
+                                            <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                                <MailIcon size={14} />
+                                            </div>
+                                            <span className="font-medium">{selectedCustomerDetails?.email || '-'}</span>
+                                        </a>
+                                    </Tooltip>
+
+                                    <Tooltip content={`Call ${selectedCustomerDetails?.number}`} position="bottom">
+                                        <a
+                                            href={`tel:${selectedCustomerDetails?.number}`}
+                                            className="flex items-center gap-2.5 text-sm text-foreground/80 hover:text-primary transition-colors group"
+                                        >
+                                            <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                                <PhoneIcon size={14} />
+                                            </div>
+                                            <span className="font-medium">{selectedCustomerDetails?.number || '-'}</span>
+                                        </a>
+                                    </Tooltip>
+
+                                    <Tooltip content="View on Google Maps" position="bottom">
+                                        <a
+                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedCustomerDetails?.address?.fullAddress || '')}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2.5 text-sm text-foreground/80 hover:text-primary transition-colors group"
+                                        >
+                                            <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                                <MapPinIcon size={14} />
+                                            </div>
+                                            <span className="font-medium truncate max-w-[250px]">
+                                                {selectedCustomerDetails?.address?.fullAddress || '-'}
+                                            </span>
+                                        </a>
+                                    </Tooltip>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="flex items-center gap-2 shrink-0 self-end md:self-start">
-                        <Button variant="outline" onClick={() => navigate('/customers')} className="h-9 px-3 text-sm">
-                            <ArrowLeftIcon className="mr-1.5 h-3.5 w-3.5" />
-                            Back
-                        </Button>
-                        {canEdit && selectedCustomerDetails && selectedCustomerDetails.status !== 3 && (
-                            <Button onClick={() => navigate(`/customers/${uid}/edit`)} variant="outline" className="h-9 px-3 text-sm">
-                                <PencilIcon className="mr-1.5 h-3.5 w-3.5" />
-                                Edit
+                        <div className="flex items-center gap-2 shrink-0 self-end md:self-start">
+                            <Button variant="outline" onClick={() => navigate('/customers')} className="h-9 px-3 text-sm">
+                                <ArrowLeftIcon className="mr-1.5 h-3.5 w-3.5" />
+                                Back
                             </Button>
-                        )}
-                        {selectedCustomerDetails && (
-                            (() => {
-                                const hasPreview = true;
-                                const hasNotInterested = selectedCustomerDetails.status !== 5;
-                                const hasFreeze = selectedCustomerDetails.status === 3;
-                                const hasActions = hasPreview || hasNotInterested || hasFreeze;
-                                if (!hasActions) return null;
-                                return (
-                                    <Popover
-                                        trigger={
-                                            <Button variant="outline" className="h-9 w-9 p-0 flex items-center justify-center">
-                                                <MoreHorizontalIcon size={16} />
-                                            </Button>
-                                        }
-                                        content={
-                                            <div className="py-1.5 min-w-[200px]">
-                                                <button
-                                                    onClick={() => {
-                                                        handlePreviewOffer(selectedCustomerDetails.uid);
-                                                    }}
-                                                    disabled={isLoadingPreview}
-                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
-                                                >
-                                                    <EyeIcon size={15} className="text-muted-foreground" />
-                                                    {isLoadingPreview ? 'Loading...' : (selectedCustomerDetails.signedPdfPath ? 'View Signed Agreement' : 'Preview Offer')}
-                                                </button>
-                                                {hasNotInterested && (
+                            {canEdit && selectedCustomerDetails && selectedCustomerDetails.status !== 3 && (
+                                <Button onClick={() => navigate(`/customers/${uid}/edit`)} variant="outline" className="h-9 px-3 text-sm">
+                                    <PencilIcon className="mr-1.5 h-3.5 w-3.5" />
+                                    Edit
+                                </Button>
+                            )}
+                            {selectedCustomerDetails && (
+                                (() => {
+                                    const hasPreview = true;
+                                    const hasNotInterested = selectedCustomerDetails.status !== 5;
+                                    const hasFreeze = selectedCustomerDetails.status === 3;
+                                    const hasActions = hasPreview || hasNotInterested || hasFreeze;
+                                    if (!hasActions) return null;
+                                    return (
+                                        <Popover
+                                            trigger={
+                                                <Button variant="outline" className="h-9 w-9 p-0 flex items-center justify-center">
+                                                    <MoreHorizontalIcon size={16} />
+                                                </Button>
+                                            }
+                                            content={
+                                                <div className="py-1.5 min-w-[200px]">
                                                     <button
                                                         onClick={() => {
-                                                            handleMarkNotInterested();
+                                                            handlePreviewOffer(selectedCustomerDetails.uid);
                                                         }}
-                                                        disabled={markingNotInterested}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                                                        disabled={isLoadingPreview}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
                                                     >
-                                                        <XIcon size={15} />
-                                                        {markingNotInterested ? 'Updating...' : 'Not Interested'}
+                                                        <EyeIcon size={15} className="text-muted-foreground" />
+                                                        {isLoadingPreview ? 'Loading...' : (selectedCustomerDetails.signedPdfPath ? 'View Signed Agreement' : 'Preview Offer')}
                                                     </button>
-                                                )}
-                                                {hasFreeze && (
-                                                    <>
-                                                        <div className="my-1 border-t border-border" />
+                                                    {hasNotInterested && (
                                                         <button
                                                             onClick={() => {
-                                                                handleFreezeClick();
+                                                                handleMarkNotInterested();
                                                             }}
-                                                            disabled={freezingCustomer}
-                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+                                                            disabled={markingNotInterested}
+                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                                                         >
-                                                            <LockIcon size={15} className="text-slate-500" />
-                                                            {freezingCustomer ? 'Freezing...' : 'Freeze'}
+                                                            <XIcon size={15} />
+                                                            {markingNotInterested ? 'Updating...' : 'Not Interested'}
                                                         </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        }
-                                        isOpen={actionsMenuOpen}
-                                        onOpenChange={setActionsMenuOpen}
-                                        placement="bottom-end"
-                                        showArrow={false}
-                                    />
-                                );
-                            })()
-                        )}
+                                                    )}
+                                                    {hasFreeze && (
+                                                        <>
+                                                            <div className="my-1 border-t border-border" />
+                                                            <button
+                                                                onClick={() => {
+                                                                    handleFreezeClick();
+                                                                }}
+                                                                disabled={freezingCustomer}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+                                                            >
+                                                                <LockIcon size={15} className="text-slate-500" />
+                                                                {freezingCustomer ? 'Freezing...' : 'Freeze'}
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            }
+                                            isOpen={actionsMenuOpen}
+                                            onOpenChange={setActionsMenuOpen}
+                                            placement="bottom-end"
+                                            showArrow={false}
+                                        />
+                                    );
+                                })()
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {isLoadingDetails ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
-                    <p className="mt-4 text-sm text-muted-foreground">Loading customer details...</p>
-                </div>
-            ) : selectedCustomerDetails ? (
-                <div className="space-y-6">
-                    {/* Progress Timeline */}
-                    <div className="bg-card text-card-foreground rounded-lg border border-border p-8 space-y-6">
-                        <div className="bg-muted/50 rounded-xl p-4">
+                {/* Progress Timeline Section (Integrated) */}
+                {selectedCustomerDetails && (
+                    <div className="px-6 pb-6 pt-0">
+                        <div className="bg-muted/30 rounded-xl p-3 border border-border/50">
                             <div className="flex items-center justify-between mb-3">
                                 <div>
-                                    <h3 className="text-sm font-medium text-foreground">Progress timeline</h3>
-                                    <p className="text-xs text-muted-foreground">Track each milestone and when it happened.</p>
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">Journey Progress</h3>
                                 </div>
-
                             </div>
-                            <div className="relative flex justify-between items-start">
+
+                            <div className="relative flex flex-col md:flex-row md:justify-between items-start gap-4 md:gap-0">
+                                {/* Vertical connector line for mobile - hidden on md+ */}
+                                <div className="absolute left-[14px] top-4 bottom-4 w-0.5 bg-gray-200 dark:bg-gray-700 md:hidden z-0" />
+
                                 {[
                                     ...(selectedCustomerDetails.checkCreditScore === 1 ? [
                                         { label: 'Credit score', date: null, completed: selectedCustomerDetails.isCreditScoreFetched === 1, step: 0 },
@@ -1547,180 +1829,205 @@ export function CustomerDetailsPage() {
                                         { label: 'VPP connect', date: null, completed: selectedCustomerDetails.vppDetails?.vppConnected === 1, showToggle: true, disabled: selectedCustomerDetails.status < 3, step: 3 },
                                     ] : []),
                                     { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: (selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1) || selectedCustomerDetails.checkCreditScore !== 1, step: 4 },
-                                    { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.msatDetails?.msatConnected !== 1, step: 5 },
-                                ].map((item: any, index, arr) => (
-                                    <div key={index} className="relative flex flex-col items-center" style={{ width: `${100 / arr.length}%` }}>
+                                    { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: selectedCustomerDetails.msatDetails?.msatConnected !== 1, step: 5 },
+                                ].map((item: any, index) => (
+                                    <div key={index} className="relative flex flex-row md:flex-col items-start md:items-center gap-3 md:gap-0 md:flex-1 w-full md:w-auto">
+                                        {/* Horizontal connector line for desktop */}
                                         {index > 0 && (
-                                            <div className={`absolute top-[18px] h-0.5 ${item.completed ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} style={{ right: '50%', left: '-50%' }} />
+                                            <div className={`hidden md:block absolute top-[14px] h-0.5 ${item.completed ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`} style={{ right: '50%', left: '-50%' }} />
                                         )}
-                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold bg-background border-2 z-10 ${item.completed ? 'border-green-500 text-green-500' : item.isLoading ? 'border-primary text-primary' : 'border-gray-200 dark:border-gray-600 text-gray-400'}`}>
+
+                                        {/* Circle */}
+                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold bg-background border-2 z-10 shrink-0 ${item.completed ? 'border-green-500 text-green-500' : item.isLoading ? 'border-primary text-primary' : 'border-gray-200 dark:border-gray-700 text-gray-400'}`}>
                                             {item.isLoading ? (
-                                                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                                             ) : item.completed ? (
-                                                <CheckIcon size={16} strokeWidth={3} />
+                                                <CheckIcon size={12} strokeWidth={3} />
                                             ) : (
                                                 index + 1
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-1 mt-2 justify-center z-30 relative">
-                                            <span className={`text-xs font-medium ${item.completed ? 'text-foreground' : 'text-muted-foreground'}`}>{item.label}</span>
-                                            {item.step === 4 && (
-                                                <Tooltip
-                                                    position="bottom"
-                                                    className="whitespace-normal min-w-[220px] p-0 overflow-hidden bg-white dark:bg-neutral-900 border border-border shadow-xl text-foreground"
-                                                    content={
-                                                        <div className="flex flex-col text-xs">
-                                                            <div className="px-3 py-2 bg-muted/50 border-b border-border flex items-center gap-2">
-                                                                <div className="w-5 h-5 rounded bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-400">
-                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+
+                                        <div className="flex flex-col md:items-center w-full min-w-0">
+                                            <div className="flex items-center gap-1 md:mt-1.5 justify-start md:justify-center z-30 relative">
+                                                <span className={`text-[11px] font-medium leading-tight ${item.completed ? 'text-foreground' : 'text-muted-foreground'}`}>{item.label}</span>
+                                                {item.step === 4 && (
+                                                    <Tooltip
+                                                        position="bottom"
+                                                        className="whitespace-normal min-w-[220px] p-0 overflow-hidden bg-white dark:bg-neutral-900 border border-border shadow-xl text-foreground"
+                                                        content={
+                                                            <div className="flex flex-col text-[10px]">
+                                                                <div className="px-3 py-1.5 bg-muted/50 border-b border-border flex items-center gap-2">
+                                                                    <div className="w-4 h-4 rounded bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                                                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                                                    </div>
+                                                                    <span className="font-semibold text-[11px]">MSAT Details</span>
                                                                 </div>
-                                                                <span className="font-semibold">MSAT Details</span>
+                                                                <div className="p-2 space-y-1">
+                                                                    <div className="flex justify-between gap-4">
+                                                                        <span className="text-muted-foreground">Status:</span>
+                                                                        <span className={selectedCustomerDetails.msatDetails?.msatConnected === 1 ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                                                                            {selectedCustomerDetails.msatDetails?.msatConnected === 1 ? 'Connected' : 'Not Connected'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex justify-between gap-4">
+                                                                        <span className="text-muted-foreground">Connected:</span>
+                                                                        <span>{selectedCustomerDetails.msatDetails?.msatConnectedAt ? formatSydneyTime(selectedCustomerDetails.msatDetails.msatConnectedAt) : '—'}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between gap-4">
+                                                                        <span className="text-muted-foreground">Updated:</span>
+                                                                        <span>{selectedCustomerDetails.msatDetails?.msatUpdatedAt ? formatSydneyTime(selectedCustomerDetails.msatDetails.msatUpdatedAt) : '—'}</span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                            <div className="p-2 space-y-1">
-                                                                <div className="flex justify-between gap-4">
-                                                                    <span className="text-muted-foreground">Status:</span>
-                                                                    <span className={selectedCustomerDetails.msatDetails?.msatConnected === 1 ? "text-green-600 font-medium" : "text-muted-foreground"}>
-                                                                        {selectedCustomerDetails.msatDetails?.msatConnected === 1 ? 'Connected' : 'Not Connected'}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex justify-between gap-4">
-                                                                    <span className="text-muted-foreground">Connected:</span>
-                                                                    <span>{selectedCustomerDetails.msatDetails?.msatConnectedAt ? formatSydneyTime(selectedCustomerDetails.msatDetails.msatConnectedAt) : '—'}</span>
-                                                                </div>
-                                                                <div className="flex justify-between gap-4">
-                                                                    <span className="text-muted-foreground">Updated:</span>
-                                                                    <span>{selectedCustomerDetails.msatDetails?.msatUpdatedAt ? formatSydneyTime(selectedCustomerDetails.msatDetails.msatUpdatedAt) : '—'}</span>
-                                                                </div>
-                                                            </div>
+                                                        }
+                                                    >
+                                                        <div className="cursor-help text-muted-foreground hover:text-foreground transition-colors p-0.5">
+                                                            <InfoIcon size={12} />
                                                         </div>
-                                                    }
+                                                    </Tooltip>
+                                                )}
+                                            </div>
+                                            {item.date && <span className="text-[9px] text-muted-foreground md:mt-0.5">{formatSydneyTime(item.date)}</span>}
+
+                                            {item.showReminder && !selectedCustomerDetails.signDate && (
+                                                <button
+                                                    onClick={() => handleSendReminder(selectedCustomerDetails.uid)}
+                                                    disabled={sendingReminder || reminderSent}
+                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 ${reminderSent ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground hover:bg-primary/90'} ${sendingReminder ? 'opacity-70' : ''}`}
                                                 >
-                                                    <div className="cursor-help text-muted-foreground hover:text-foreground transition-colors p-1">
-                                                        <InfoIcon size={14} />
-                                                    </div>
-                                                </Tooltip>
+                                                    {sendingReminder ? (
+                                                        <><div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
+                                                    ) : reminderSent ? (
+                                                        <><CheckIcon size={9} />Sent</>
+                                                    ) : (
+                                                        <><MailIcon size={9} />Send reminder</>
+                                                    )}
+                                                </button>
+                                            )}
+
+                                            {item.step === 0 && item.completed && selectedCustomerDetails.creditScore !== undefined && (
+                                                <div className="flex items-center mt-1">
+                                                    {(() => {
+                                                        const match = riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus);
+                                                        const hex = match?.color || '#64748B';
+                                                        const label = match?.name || 'N/A';
+                                                        return (
+                                                            <div
+                                                                className="inline-flex items-center px-1.5 py-0.5 rounded border text-[9px] font-bold"
+                                                                style={{
+                                                                    backgroundColor: `${hex}1A`,
+                                                                    borderColor: `${hex}33`,
+                                                                    color: hex
+                                                                }}
+                                                            >
+                                                                <span
+                                                                    className="w-1 h-1 rounded-full mr-1 shrink-0"
+                                                                    style={{ backgroundColor: hex }}
+                                                                />
+                                                                Score: {selectedCustomerDetails.creditScore} • {label}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            )}
+
+                                            {item.step === 0 && !item.completed && (
+                                                <button
+                                                    onClick={() => handleCheckCreditScore(selectedCustomerDetails.uid)}
+                                                    disabled={isCheckingCreditScore}
+                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 bg-primary text-primary-foreground hover:bg-primary/90 ${isCheckingCreditScore ? 'opacity-70' : ''}`}
+                                                >
+                                                    {isCheckingCreditScore ? (
+                                                        <><div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Checking...</>
+                                                    ) : (
+                                                        <><ZapIcon size={9} />Check credit score</>
+                                                    )}
+                                                </button>
+                                            )}
+
+                                            {item.step === 0 && (showManualOfferButton || (selectedCustomerDetails.isCreditScoreFetched === 1 && selectedCustomerDetails.riskStatus !== undefined && (riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus)?.manualOffer === 1))) && !selectedCustomerDetails.offerEmailSentAt && (
+                                                <button
+                                                    onClick={() => handleManualSendOffer(selectedCustomerDetails.uid)}
+                                                    disabled={isSendingOffer}
+                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 bg-primary text-primary-foreground hover:bg-primary/90 ${isSendingOffer ? 'opacity-70' : ''}`}
+                                                >
+                                                    {isSendingOffer ? (
+                                                        <><div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
+                                                    ) : (
+                                                        <><MailIcon size={9} />Send Offer</>
+                                                    )}
+                                                </button>
+                                            )}
+
+
+                                            {item.showToggle && (
+                                                <div className="mt-1 relative z-30 flex items-center h-6">
+                                                    <ConfirmationPopover
+                                                        title="Disconnect?"
+                                                        description="Are you sure you want to disconnect this service?"
+                                                        enabled={item.completed}
+                                                        onConfirm={() => {
+                                                            if (item.step === 3) handleVppToggle(selectedCustomerDetails.uid, false);
+                                                            else if (item.step === 4) handleMsatToggle(selectedCustomerDetails.uid, false);
+                                                            else if (item.step === 5) handleUtilmateToggle(selectedCustomerDetails.uid, false);
+                                                        }}
+                                                    >
+                                                        <div className="scale-75 origin-left md:origin-center">
+                                                            <ToggleSwitch
+                                                                checked={item.completed}
+                                                                disabled={item.disabled}
+                                                                onChange={(val) => {
+                                                                    if (val) {
+                                                                        if (item.step === 3) handleVppToggle(selectedCustomerDetails.uid, true);
+                                                                        else if (item.step === 4) handleMsatToggle(selectedCustomerDetails.uid, true);
+                                                                        else if (item.step === 5) handleUtilmateToggle(selectedCustomerDetails.uid, true);
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </ConfirmationPopover>
+                                                </div>
+                                            )}
+                                            {item.step === 5 && item.completed && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="mt-1 h-6 text-[9px] px-2 relative z-30 bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800 transition-colors"
+                                                    disabled={isGeneratingCredentials}
+                                                    onClick={() => selectedCustomerDetails.customerId && handleGenerateCredentials(selectedCustomerDetails.customerId)}
+
+                                                >
+                                                    {isGeneratingCredentials ? (
+                                                        <>
+                                                            <div className="w-2.5 h-2.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mr-1" />
+                                                            Gen...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <IdCardIcon size={10} className="mr-1 text-emerald-500" />
+                                                            Credentials
+                                                        </>
+                                                    )}
+                                                </Button>
                                             )}
                                         </div>
-                                        {item.date && <span className="text-[10px] text-muted-foreground">{formatSydneyTime(item.date)}</span>}
-
-                                        {item.showReminder && !selectedCustomerDetails.signDate && (
-                                            <button
-                                                onClick={() => handleSendReminder(selectedCustomerDetails.uid)}
-                                                disabled={sendingReminder || reminderSent}
-                                                className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg mt-1 relative z-30 ${reminderSent ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground hover:bg-primary/90'} ${sendingReminder ? 'opacity-70' : ''}`}
-                                            >
-                                                {sendingReminder ? (
-                                                    <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
-                                                ) : reminderSent ? (
-                                                    <><CheckIcon size={10} />Sent</>
-                                                ) : (
-                                                    <><MailIcon size={10} />Send reminder</>
-                                                )}
-                                            </button>
-                                        )}
-
-                                        {item.step === 0 && item.completed && selectedCustomerDetails.creditScore !== undefined && (
-                                            <div className="flex flex-col gap-1.5 mt-2">
-
-                                                <div className="flex items-center">
-                                                    <div className={`text-xs font-bold px-3 py-1 rounded-full border-2 ${riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus)?.color || 'text-primary bg-primary/5 border-primary/10'}`}>
-                                                        Score: {selectedCustomerDetails.creditScore} • {riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus)?.name || 'N/A'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {item.step === 0 && !item.completed && (
-                                            <button
-                                                onClick={() => handleCheckCreditScore(selectedCustomerDetails.uid)}
-                                                disabled={isCheckingCreditScore}
-                                                className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg mt-1 relative z-30 bg-primary text-primary-foreground hover:bg-primary/90 ${isCheckingCreditScore ? 'opacity-70' : ''}`}
-                                            >
-                                                {isCheckingCreditScore ? (
-                                                    <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Checking...</>
-                                                ) : (
-                                                    <><ZapIcon size={10} />Check credit score</>
-                                                )}
-                                            </button>
-                                        )}
-
-                                        {item.step === 0 && (showManualOfferButton || (selectedCustomerDetails.isCreditScoreFetched === 1 && selectedCustomerDetails.riskStatus !== undefined && (riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus)?.manualOffer === 1))) && !selectedCustomerDetails.offerEmailSentAt && (
-                                            <button
-                                                onClick={() => handleManualSendOffer(selectedCustomerDetails.uid)}
-                                                disabled={isSendingOffer}
-                                                className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg mt-1 relative z-30 bg-primary text-primary-foreground hover:bg-primary/90 ${isSendingOffer ? 'opacity-70' : ''}`}
-                                            >
-                                                {isSendingOffer ? (
-                                                    <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
-                                                ) : (
-                                                    <><MailIcon size={10} />Send Offer</>
-                                                )}
-                                            </button>
-                                        )}
-
-
-                                        {item.showToggle && (
-                                            <div className="mt-1 relative z-30">
-                                                <ConfirmationPopover
-                                                    title="Disconnect?"
-                                                    description="Are you sure you want to disconnect this service?"
-                                                    enabled={item.completed}
-                                                    onConfirm={() => {
-                                                        if (item.step === 3) {
-                                                            handleVppToggle(selectedCustomerDetails.uid, false);
-                                                        } else if (item.step === 4) {
-                                                            handleMsatToggle(selectedCustomerDetails.uid, false);
-                                                        } else if (item.step === 5) {
-                                                            handleUtilmateToggle(selectedCustomerDetails.uid, false);
-                                                        }
-                                                    }}
-                                                >
-                                                    <ToggleSwitch
-                                                        checked={item.completed}
-                                                        disabled={item.disabled}
-                                                        onChange={(val) => {
-                                                            // Only handle turning ON here. Turning OFF is handled by onConfirm.
-                                                            if (val) {
-                                                                if (item.step === 3) {
-                                                                    handleVppToggle(selectedCustomerDetails.uid, true);
-                                                                } else if (item.step === 4) {
-                                                                    handleMsatToggle(selectedCustomerDetails.uid, true);
-                                                                } else if (item.step === 5) {
-                                                                    handleUtilmateToggle(selectedCustomerDetails.uid, true);
-                                                                }
-                                                            }
-                                                        }}
-                                                    />
-                                                </ConfirmationPopover>
-                                            </div>
-                                        )}
-                                        {item.step === 5 && item.completed && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="mt-2 h-7 text-[10px] px-2 relative z-30 bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800 transition-colors"
-                                                disabled={isGeneratingCredentials}
-                                                onClick={() => selectedCustomerDetails.customerId && handleGenerateCredentials(selectedCustomerDetails.customerId)}
-
-                                            >
-                                                {isGeneratingCredentials ? (
-                                                    <>
-                                                        <div className="w-3 h-3 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mr-1" />
-                                                        Generating...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <IdCardIcon size={12} className="mr-1 text-emerald-500" />
-                                                        Generate Credentials
-                                                    </>
-                                                )}
-                                            </Button>
-                                        )}
                                     </div>
                                 ))}
                             </div>
                         </div>
                     </div>
+                )}
+            </div>
+
+            {isLoadingDetails ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+                    <p className="mt-4 text-sm text-muted-foreground">Loading customer details...</p>
+                </div>
+            ) : selectedCustomerDetails ? (
+                <div className="space-y-6">
+
 
 
 
@@ -1737,7 +2044,8 @@ export function CustomerDetailsPage() {
                                     { id: 'utilmate', label: 'Utilmate', icon: ZapIcon },
                                     { id: 'notes', label: 'Notes', icon: Settings2Icon, badge: notesData?.customerNotes?.length },
                                     { id: 'documents', label: 'Documents', icon: UploadIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2')).length },
-                                    { id: 'electricity_bills', label: 'Electricity Bills', icon: ZapIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2' || d.type === '2').length }
+                                    { id: 'electricity_bills', label: 'Electricity Bills', icon: ZapIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2' || d.type === '2').length },
+                                    { id: 'email_logs', label: 'Email Logs', icon: MailIcon }
                                 ].filter(item => {
                                     if (item.id === 'solar_vpp') {
                                         const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
@@ -1751,6 +2059,10 @@ export function CustomerDetailsPage() {
                                     }
                                     if (item.id === 'utilmate') {
                                         return !!selectedCustomerDetails.utilmateDetails && selectedCustomerDetails.utilmateDetails.utilmateConnected === 1;
+                                    }
+                                    if (item.id === 'email_logs') {
+                                        // Show email logs ONLY if there are any logs (count > 0)
+                                        return (selectedCustomerDetails.emailLogCount || 0) > 0;
                                     }
                                     return true;
                                 });
@@ -1780,7 +2092,12 @@ export function CustomerDetailsPage() {
                                         {primaryTabs.map((item) => (
                                             <button
                                                 key={item.id}
-                                                onClick={() => setSelectedDetailSection(item.id as any)}
+                                                onClick={() => {
+                                                    if (item.id === 'email_logs' && selectedDetailSection === 'email_logs') {
+                                                        setEmailLogsKey((prev) => prev + 1);
+                                                    }
+                                                    setSelectedDetailSection(item.id as any);
+                                                }}
                                                 className={cn(
                                                     "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 border-b-2 whitespace-nowrap outline-none",
                                                     selectedDetailSection === item.id
@@ -3000,6 +3317,23 @@ export function CustomerDetailsPage() {
                                             </tbody>
                                         </table>
                                     </div>
+                                </div>
+                            )}
+
+                            {selectedDetailSection === 'email_logs' && selectedCustomerDetails && (selectedCustomerDetails.emailLogCount || 0) > 0 && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    <div className="flex items-center justify-between border-b border-border pb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                                                <MailIcon size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Email Logs</h3>
+                                                <p className="text-xs text-muted-foreground">History of all emails sent to this customer</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <CustomerEmailLogsTable customerUid={selectedCustomerDetails.uid} key={emailLogsKey} />
                                 </div>
                             )}
 
