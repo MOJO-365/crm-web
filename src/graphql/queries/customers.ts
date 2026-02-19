@@ -372,7 +372,7 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
         $searchVppConnected: Int, 
         $searchUtilmateStatus: Int, 
         $searchMsatConnected: Int,
-        $searchRiskStatus: Int
+        $searchRiskStatus: String
     ) {
         customersCursor(
             first: 10000, 
@@ -401,7 +401,7 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
 `;
 
 export const GET_CUSTOMERS_CURSOR = gql`
-    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: Int, $searchVpp: Int, $searchVppConnected: Int, $searchUtilmateStatus: Int, $searchMsatConnected: Int) {
+    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: String, $searchVpp: Int, $searchVppConnected: Int, $searchUtilmateStatus: Int, $searchMsatConnected: Int) {
         customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchRiskStatus: $searchRiskStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchUtilmateStatus: $searchUtilmateStatus, searchMsatConnected: $searchMsatConnected) {
             data {
                 id
@@ -931,6 +931,24 @@ export const GET_DOCUMENT_TYPES = gql`
             name
             color
             category
+            isActive
+        }
+    }
+`;
+
+export const GET_RISK_STATUSES = gql`
+    query GetRiskStatuses {
+        riskStatuses {
+            id
+            uid
+            name
+            code
+            description
+            color
+            scoreMin
+            scoreMax
+            manualOffer
+            sortOrder
             isActive
         }
     }

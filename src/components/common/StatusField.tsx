@@ -9,8 +9,7 @@ import {
     RATE_TYPE_MAP,
     RATE_TYPE_OPTIONS,
     STATE_OPTIONS,
-    VPP_OPTIONS,
-    RISK_STATUS_MAP
+    VPP_OPTIONS
 } from '@/lib/constants';
 
 export type StatusFieldType = 'customer_status' | 'user_status' | 'dnsp' | 'rate_type' | 'state' | 'vpp' | 'risk_status';
@@ -23,6 +22,7 @@ interface StatusFieldProps {
     className?: string;
     placeholder?: string;
     showAllOption?: boolean; // For filter Selects
+    riskStatuses?: Array<{ id: string; uid: string; name: string; code: string; color?: string; sortOrder?: number; isActive?: boolean }>; // Optional dynamic risk statuses
 }
 
 export const StatusField: React.FC<StatusFieldProps> = ({
@@ -33,6 +33,7 @@ export const StatusField: React.FC<StatusFieldProps> = ({
     className = '',
     placeholder,
     showAllOption = false,
+    riskStatuses,
 }) => {
     // 1. Determine Label and Color for View Mode
     let label = '-';
@@ -82,17 +83,51 @@ export const StatusField: React.FC<StatusFieldProps> = ({
         if (valStr === '1') colorClass = 'text-green-600 bg-green-50 dark:bg-green-900/10 dark:text-green-400';
         else colorClass = 'text-gray-600 bg-gray-100 dark:bg-gray-800 dark:text-gray-400';
     } else if (type === 'risk_status') {
-        const valNum = Number(value ?? 0);
-        if (RISK_STATUS_MAP[valNum]) {
-            label = RISK_STATUS_MAP[valNum].label;
-            colorClass = RISK_STATUS_MAP[valNum].color;
+        const valStr = String(value ?? '');
+        // Try dynamic risk statuses first (match by uid), then fall back to static map
+        const dynamicMatch = riskStatuses?.find(rs => rs.uid === valStr);
+        if (dynamicMatch) {
+            label = dynamicMatch.name;
+            colorClass = dynamicMatch.color || colorClass;
         } else {
-            label = 'Pending Score';
+            label = 'Not Required';
         }
     }
 
+    // Helper to render the premium badge
+    const renderBadge = (l: string, c: string, extraClass: string = '') => {
+        const isHex = c.startsWith('#');
+        if (isHex) {
+            return (
+                <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${extraClass}`}
+                    style={{
+                        backgroundColor: `${c}1A`, // 10% opacity
+                        borderColor: `${c}33`,      // 20% opacity
+                        color: c
+                    }}
+                >
+                    <span
+                        className="w-1.5 h-1.5 rounded-full mr-2 shrink-0"
+                        style={{ backgroundColor: c }}
+                    />
+                    {l}
+                </span>
+            );
+        }
+        return (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${c} ${extraClass}`}>
+                {l}
+            </span>
+        );
+    };
+
     // 2. Render View Mode
     if (mode === 'badge') {
+        if (type === 'risk_status' || type === 'customer_status' || type === 'user_status') {
+            return renderBadge(label, colorClass, className);
+        }
+
         // For DNSP/Type/State/VPP, maybe just text or simple badge
         if (type === 'dnsp' || type === 'rate_type' || type === 'state' || type === 'vpp') {
             if (type === 'vpp' || type === 'dnsp') {
@@ -104,11 +139,7 @@ export const StatusField: React.FC<StatusFieldProps> = ({
             }
             return <span className={`text-sm ${className}`}>{label}</span>;
         }
-        return (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass} ${className}`}>
-                {label}
-            </span>
-        );
+        return renderBadge(label, colorClass, className);
     }
 
     if (mode === 'text') {
@@ -135,10 +166,12 @@ export const StatusField: React.FC<StatusFieldProps> = ({
     } else if (type === 'vpp') {
         options = VPP_OPTIONS;
     } else if (type === 'risk_status') {
-        options = Object.entries(RISK_STATUS_MAP).map(([k, v]) => ({
-            value: k,
-            label: v.label
-        }));
+        if (riskStatuses && riskStatuses.length > 0) {
+            options = riskStatuses.map(rs => ({
+                value: rs.uid,
+                label: rs.name
+            }));
+        }
     }
 
     if (showAllOption) {

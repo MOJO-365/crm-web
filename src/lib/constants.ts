@@ -41,12 +41,12 @@ export const ROUTES = {
 
 // Customer Status
 export const CUSTOMER_STATUS_MAP: Record<number, { label: string; color: string }> = {
-    0: { label: 'Draft', color: 'text-gray-600 bg-gray-100 dark:bg-gray-800 dark:text-gray-300' },
-    1: { label: 'Initial Offer', color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400' },
-    2: { label: 'Signature Pending', color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/30 dark:text-orange-400' },
-    3: { label: 'Signed', color: 'text-green-600 bg-green-50 dark:bg-green-900/30 dark:text-green-400' },
-    4: { label: 'Frozen', color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-400' },
-    5: { label: 'Not Interested', color: 'text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400' },
+    0: { label: 'Draft', color: '#6B7280' },
+    1: { label: 'Initial Offer', color: '#3B82F6' },
+    2: { label: 'Signature Pending', color: '#F59E0B' },
+    3: { label: 'Signed', color: '#10B981' },
+    4: { label: 'Frozen', color: '#6366F1' },
+    5: { label: 'Not Interested', color: '#EF4444' },
 };
 
 export const CUSTOMER_STATUS_OPTIONS = Object.entries(CUSTOMER_STATUS_MAP).map(([k, v]) => ({
@@ -56,12 +56,12 @@ export const CUSTOMER_STATUS_OPTIONS = Object.entries(CUSTOMER_STATUS_MAP).map((
 
 // Risk Status
 export const RISK_STATUS_MAP: Record<number, { label: string; color: string }> = {
-    0: { label: 'Pending Score', color: 'text-slate-600 bg-slate-100 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' },
-    1: { label: 'High Risk', color: 'text-red-700 bg-red-50 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50' },
-    2: { label: 'Medium Risk', color: 'text-orange-700 bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-900/50' },
-    3: { label: 'Moderate Risk', color: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/50' },
-    4: { label: 'Low Risk', color: 'text-lime-700 bg-lime-50 border-lime-200 dark:bg-lime-900/20 dark:text-lime-400 dark:border-lime-900/50' },
-    5: { label: 'Very Low Risk', color: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/50' },
+    0: { label: 'Not Required', color: '#64748B' },
+    1: { label: 'High Risk', color: '#EF4444' },
+    2: { label: 'Medium Risk', color: '#F97316' },
+    3: { label: 'Moderate Risk', color: '#F59E0B' },
+    4: { label: 'Low Risk', color: '#84CC16' },
+    5: { label: 'Very Low Risk', color: '#10B981' },
 };
 
 export const RISK_STATUS_OPTIONS = Object.entries(RISK_STATUS_MAP).map(([k, v]) => ({

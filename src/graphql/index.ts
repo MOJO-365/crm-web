@@ -37,3 +37,6 @@ export * from './queries/notes';
 export * from './queries/notificationEntities';
 export * from './mutations/notificationEntities';
 
+// Risk Statuses
+export * from './mutations/riskStatuses';
+

@@ -8,13 +8,13 @@ import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon
 } from '@/components/icons';
-import { GET_CUSTOMERS_CURSOR, SOFT_DELETE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS } from '@/graphql';
+import { GET_CUSTOMERS_CURSOR, SOFT_DELETE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Select } from '@/components/ui/Select';
 import { StatusField } from '@/components/common';
 import BulkEmailModal from './BulkEmailModal';
 
-import { DNSP_OPTIONS, DISCOUNT_OPTIONS, CUSTOMER_STATUS_OPTIONS, RISK_STATUS_OPTIONS, VPP_OPTIONS, VPP_CONNECTED_OPTIONS, ULTIMATE_STATUS_OPTIONS, MSAT_CONNECTED_OPTIONS } from '@/lib/constants';
+import { DNSP_OPTIONS, DISCOUNT_OPTIONS, CUSTOMER_STATUS_OPTIONS, VPP_OPTIONS, VPP_CONNECTED_OPTIONS, ULTIMATE_STATUS_OPTIONS, MSAT_CONNECTED_OPTIONS } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -62,7 +62,7 @@ interface Customer {
     utilmateDetails?: {
         utilmateConnected?: number;
     };
-    riskStatus?: number;
+    riskStatus?: string;
 }
 
 interface PageInfo {
@@ -145,6 +145,9 @@ export function CustomersPage() {
 
     const limit = 20;
 
+    const { data: rsData } = useQuery(GET_RISK_STATUSES);
+    const riskStatuses = rsData?.riskStatuses || [];
+
     // Debounce search and reset pagination
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -177,7 +180,7 @@ export function CustomersPage() {
             searchVppConnected: debouncedFilters.vppConnected !== '' ? parseInt(debouncedFilters.vppConnected) : undefined,
             searchUtilmateStatus: debouncedFilters.utilmateStatus !== '' ? parseInt(debouncedFilters.utilmateStatus) : undefined,
             searchMsatConnected: debouncedFilters.msatConnected !== '' ? parseInt(debouncedFilters.msatConnected) : undefined,
-            searchRiskStatus: debouncedFilters.riskStatus !== '' ? parseInt(debouncedFilters.riskStatus) : undefined,
+            searchRiskStatus: debouncedFilters.riskStatus || undefined,
         },
         fetchPolicy: 'network-only',
         notifyOnNetworkStatusChange: true,
@@ -302,7 +305,7 @@ export function CustomersPage() {
                     searchVppConnected: debouncedFilters.vppConnected ? parseInt(debouncedFilters.vppConnected) : undefined,
                     searchUtilmateStatus: debouncedFilters.utilmateStatus ? parseInt(debouncedFilters.utilmateStatus) : undefined,
                     searchMsatConnected: debouncedFilters.msatConnected ? parseInt(debouncedFilters.msatConnected) : undefined,
-                    searchRiskStatus: debouncedFilters.riskStatus ? parseInt(debouncedFilters.riskStatus) : undefined,
+                    searchRiskStatus: debouncedFilters.riskStatus ? debouncedFilters.riskStatus : undefined,
                 },
             });
 
@@ -425,7 +428,7 @@ export function CustomersPage() {
                         <span className="text-xs font-semibold uppercase text-muted-foreground">Risk Status</span>
                     </div>
                     <Select
-                        options={[{ value: '', label: 'All' }, ...RISK_STATUS_OPTIONS]}
+                        options={[{ value: '', label: 'All' }, ...riskStatuses.map((rs: any) => ({ value: rs.uid, label: rs.name }))]}
                         value={searchFilters.riskStatus}
                         onChange={(val) => handleSearchChange('riskStatus', val as string)}
                         placeholder="All"
@@ -440,6 +443,7 @@ export function CustomersPage() {
                         type="risk_status"
                         value={row.riskStatus}
                         mode="badge"
+                        riskStatuses={riskStatuses}
                     />
                 </div>
             ),
