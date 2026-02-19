@@ -8,14 +8,14 @@ import {
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
     IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon, LockIcon,
-    RefreshCwIcon
+    RefreshCwIcon, SunIcon, CreditCardIcon, FileTextIcon, PercentIcon
 } from '@/components/icons';
 import {
     GET_DOCUMENT_TYPES, CREATE_DOCUMENT_TYPE, CREATE_CUSTOMER, SEND_OFFER_EMAIL,
     GET_CUSTOMER_BY_ID, SEND_REMINDER_EMAIL, UPDATE_CUSTOMER, GET_RATES_HISTORY_BY_VERSION,
     GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS, GET_NOTE_TYPES,
     CREATE_NOTE_TYPE, SEND_CUSTOMER_CREDENTIALS_EMAIL, GET_RISK_STATUSES,
-    GET_CUSTOMER_EMAIL_LOGS
+    GET_CUSTOMER_EMAIL_LOGS, GET_AUDIT_LOGS
 } from '@/graphql';
 import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
@@ -313,6 +313,237 @@ const RateVersionTooltip = ({ version, children }: { version: string, children: 
 // Customer Email Logs Table Component
 // ============================================================
 
+// Table name -> friendly description map for customer activity logs
+const activityTableNameMap: Record<string, string> = {
+    customers: 'Customer Profile',
+    customer_address: 'Address Details',
+    customer_enrollment_details: 'Enrollment Information',
+    customer_solar_system: 'Solar System',
+    customer_battery_system: 'Battery System',
+    customer_vpp: 'VPP Configuration',
+    customer_msat: 'MSAT Connection',
+    customer_debit_details: 'Billing & Debit',
+    customer_documents: 'Documents',
+    rates: 'Rate Plan',
+    rate_offers: 'Rate Offer',
+};
+
+const activityOperationColors: Record<string, { bg: string; label: string }> = {
+    INSERT: { bg: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50', label: 'Created' },
+    UPDATE: { bg: 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-400 dark:border-sky-800/50', label: 'Updated' },
+    DELETE: { bg: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800/50', label: 'Deleted' },
+};
+
+const CustomerActivityLogTable = ({ customerUid }: { customerUid: string }) => {
+    const [page, setPage] = useState(1);
+    const [allLogs, setAllLogs] = useState<any[]>([]);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [expandedUid, setExpandedUid] = useState<string | null>(null);
+    const limit = 20;
+
+    const { data, loading } = useQuery(GET_AUDIT_LOGS, {
+        variables: { page, limit, recordId: customerUid },
+        fetchPolicy: 'cache-and-network',
+    });
+
+    const meta = data?.auditLogs?.meta;
+    const hasMore = meta ? page < meta.totalPages : false;
+
+    useEffect(() => {
+        if (data?.auditLogs?.data) {
+            const fetchedLogs = data.auditLogs.data;
+            if (page === 1) {
+                setAllLogs(fetchedLogs);
+            } else {
+                setAllLogs(prev => {
+                    const existingIds = new Set(prev.map((l: any) => l.id));
+                    const newLogs = fetchedLogs.filter((l: any) => !existingIds.has(l.id));
+                    return [...prev, ...newLogs];
+                });
+            }
+            setIsLoadingMore(false);
+        }
+    }, [data, page]);
+
+    const handleLoadMore = () => {
+        if (!loading && hasMore) {
+            setIsLoadingMore(true);
+            setPage(prev => prev + 1);
+        }
+    };
+
+    const getChangedFields = (oldVals: string | null, newVals: string | null) => {
+        try {
+            const oldObj = oldVals ? JSON.parse(oldVals) : {};
+            const newObj = newVals ? JSON.parse(newVals) : {};
+            const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+            const changes: { field: string; from: any; to: any }[] = [];
+            allKeys.forEach(key => {
+                if (key === 'updated_at' || key === 'created_at' || key === 'uid' || key === 'id' || key === 'tenant') return;
+                const oldVal = oldObj[key];
+                const newVal = newObj[key];
+                if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+                    changes.push({
+                        field: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                        from: oldVal ?? '—',
+                        to: newVal ?? '—',
+                    });
+                }
+            });
+            return changes;
+        } catch {
+            return [];
+        }
+    };
+
+    if (loading && page === 1) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                <p className="mt-3 text-sm text-muted-foreground">Loading activity log...</p>
+            </div>
+        );
+    }
+
+    if (allLogs.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center bg-white dark:bg-neutral-950 rounded-xl border border-dashed border-border">
+                <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground mb-3">
+                    <ActivityIcon size={20} />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground">No activity recorded yet</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">Changes to this customer will appear here.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            {/* Summary */}
+            <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                    Showing {allLogs.length} of {meta?.totalRecords || allLogs.length} activities
+                </p>
+            </div>
+
+            {/* Timeline */}
+            <div className="relative">
+                {/* Vertical line */}
+                <div className="absolute left-[17px] top-2 bottom-2 w-px bg-border" />
+
+                <div className="space-y-1">
+                    {allLogs.map((log: any) => {
+                        const opInfo = activityOperationColors[log.operation] || { bg: 'bg-muted text-muted-foreground', label: log.operation };
+                        const tableLabel = activityTableNameMap[log.tableName] || log.tableName;
+                        const isExpanded = expandedUid === log.uid;
+                        const changes = isExpanded ? getChangedFields(log.oldValues, log.newValues) : [];
+
+                        return (
+                            <div key={log.uid} className="relative pl-10">
+                                {/* Timeline dot */}
+                                <div className={cn(
+                                    "absolute left-[12px] top-4 w-[11px] h-[11px] rounded-full border-2 bg-background z-10",
+                                    log.operation === 'INSERT' ? 'border-emerald-500' :
+                                        log.operation === 'DELETE' ? 'border-rose-500' : 'border-sky-500'
+                                )} />
+
+                                <button
+                                    onClick={() => setExpandedUid(isExpanded ? null : log.uid)}
+                                    className={cn(
+                                        "w-full text-left p-3 rounded-lg border transition-all duration-200 hover:shadow-sm",
+                                        isExpanded
+                                            ? "bg-muted/50 border-border shadow-sm"
+                                            : "bg-background border-border/50 hover:border-border hover:bg-muted/30"
+                                    )}
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <span className={cn('px-2 py-0.5 text-[10px] font-bold rounded-md border uppercase tracking-wide shrink-0', opInfo.bg)}>
+                                                {opInfo.label}
+                                            </span>
+                                            <span className="text-sm font-medium text-foreground truncate">{tableLabel}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                                                {formatSydneyTime(log.changedAt)}
+                                            </span>
+                                            <svg className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", isExpanded && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </button>
+
+                                {/* Expanded Details */}
+                                {isExpanded && (
+                                    <div className="mt-1 ml-1 p-3 bg-muted/30 rounded-lg border border-border/50 animate-in fade-in slide-in-from-top-1 duration-200">
+                                        {log.operation === 'INSERT' && log.newValues ? (
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Created With</p>
+                                                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                                                    {getChangedFields(null, log.newValues).map((c, i) => (
+                                                        <div key={i} className="flex items-baseline gap-2">
+                                                            <span className="text-[11px] text-muted-foreground min-w-[100px]">{c.field}:</span>
+                                                            <span className="text-[11px] font-medium text-foreground truncate">{String(c.to)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : log.operation === 'UPDATE' && changes.length > 0 ? (
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Changes</p>
+                                                <div className="space-y-1.5">
+                                                    {changes.map((c, i) => (
+                                                        <div key={i} className="flex items-baseline gap-2 text-[11px]">
+                                                            <span className="text-muted-foreground min-w-[100px] shrink-0">{c.field}:</span>
+                                                            <span className="text-rose-600 dark:text-rose-400 line-through truncate max-w-[150px]" title={String(c.from)}>{String(c.from)}</span>
+                                                            <span className="text-muted-foreground">→</span>
+                                                            <span className="text-emerald-600 dark:text-emerald-400 font-medium truncate max-w-[150px]" title={String(c.to)}>{String(c.to)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : log.operation === 'DELETE' && log.oldValues ? (
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deleted Record</p>
+                                                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                                                    {getChangedFields(log.oldValues, null).map((c, i) => (
+                                                        <div key={i} className="flex items-baseline gap-2">
+                                                            <span className="text-[11px] text-muted-foreground min-w-[100px]">{c.field}:</span>
+                                                            <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400 line-through truncate">{String(c.from)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground italic">No change details available.</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Load More */}
+            {hasMore && (
+                <div className="flex justify-center pt-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleLoadMore}
+                        isLoading={isLoadingMore}
+                        className="text-xs"
+                    >
+                        Load More Activities
+                    </Button>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const CustomerEmailLogsTable = ({ customerUid }: { customerUid: string }) => {
     const [page, setPage] = useState(1);
     const [allLogs, setAllLogs] = useState<EmailLog[]>([]);
@@ -425,30 +656,27 @@ const CustomerEmailLogsTable = ({ customerUid }: { customerUid: string }) => {
             key: 'actions',
             header: (
                 <div className="flex justify-end">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 hover:bg-muted"
+                    <button
+                        className="p-2 border border-border rounded-lg bg-card hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                         onClick={handleRefresh}
                         title="Refresh Logs"
                     >
                         <RefreshCwIcon size={14} className={loading ? 'animate-spin' : ''} />
-                    </Button>
+                    </button>
                 </div>
             ),
             width: 'w-[80px]',
             render: (log: EmailLog) => (
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
+                <button
+                    className="p-2 border rounded-lg transition-colors bg-white text-blue-600 border-blue-200 hover:bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/40"
                     onClick={() => {
                         setSelectedLog(log);
                         setDetailModalOpen(true);
                     }}
+                    title="View Email Details"
                 >
                     <EyeIcon size={14} />
-                </Button>
+                </button>
             )
         }
     ];
@@ -548,7 +776,7 @@ export function CustomerDetailsPage() {
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     // Detail Section State
-    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'solar_vpp' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs'>('general');
+    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'solar_vpp' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log'>('general');
 
     // Email Logs Refresh State
     const [emailLogsKey, setEmailLogsKey] = useState(0);
@@ -941,7 +1169,8 @@ export function CustomerDetailsPage() {
                     exportlimit: vppForm.exportLimit ? parseFloat(vppForm.exportLimit) : undefined,
                     inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : undefined,
                     checkCode: vppForm.checkCode || undefined,
-                } : undefined
+                } : undefined,
+                skipStatusUpdate: true
             };
 
             await updateCustomer({
@@ -981,7 +1210,8 @@ export function CustomerDetailsPage() {
                     accountNumber: utilmateForm.accountNumber || undefined,
                     utilmateConnected: utilmateForm.utilmateConnected,
                     utilmateConnectedAt: utilmateForm.utilmateConnectedAt || undefined,
-                }
+                },
+                skipStatusUpdate: true
             };
 
             await updateCustomer({
@@ -1160,7 +1390,8 @@ export function CustomerDetailsPage() {
                     input: {
                         vppDetails: {
                             vppConnected: newValue ? 1 : 0
-                        }
+                        },
+                        skipStatusUpdate: true
                     }
                 }
             });
@@ -1211,7 +1442,8 @@ export function CustomerDetailsPage() {
                     exportlimit: vppForm.exportLimit ? parseFloat(vppForm.exportLimit) : undefined,
                     inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : undefined,
                     checkCode: vppForm.checkCode || undefined,
-                } : undefined
+                } : undefined,
+                skipStatusUpdate: true
             };
 
             await updateCustomer({
@@ -1265,7 +1497,8 @@ export function CustomerDetailsPage() {
                             msatConnected: newValue ? 1 : 0,
                             msatConnectedAt: newValue ? now : undefined,
                             msatUpdatedAt: now
-                        }
+                        },
+                        skipStatusUpdate: true
                     }
                 }
             });
@@ -1332,7 +1565,8 @@ export function CustomerDetailsPage() {
                         utilmateDetails: {
                             utilmateConnected: newValue ? 1 : 0,
                             utilmateConnectedAt: newValue ? now : undefined,
-                        }
+                        },
+                        skipStatusUpdate: true
                     }
                 }
             });
@@ -1382,7 +1616,8 @@ export function CustomerDetailsPage() {
                     accountNumber: utilmateForm.accountNumber || undefined,
                     utilmateConnected: 1,
                     utilmateConnectedAt: now,
-                }
+                },
+                skipStatusUpdate: true
             };
 
             await updateCustomer({
@@ -1638,13 +1873,13 @@ export function CustomerDetailsPage() {
                 <div className="p-6">
                     <div className="flex flex-col md:flex-row items-start justify-between gap-6">
                         <div className="flex flex-col sm:flex-row gap-5 items-start">
-                            <div className="w-20 h-20 rounded-2xl bg-primary/5 flex items-center justify-center text-primary border border-primary/10 shrink-0">
-                                <UserIcon size={36} strokeWidth={1.5} />
+                            <div className="w-16 h-16 rounded-2xl bg-primary/5 flex items-center justify-center text-primary border border-primary/10 shrink-0">
+                                <UserIcon size={30} strokeWidth={1.5} />
                             </div>
                             <div className="space-y-4">
                                 <div>
                                     <div className="flex flex-wrap items-center gap-3 mb-1">
-                                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                                        <h1 className="text-xl font-bold tracking-tight text-foreground">
                                             {selectedCustomerDetails ? `${selectedCustomerDetails.firstName} ${selectedCustomerDetails.lastName}` : 'Customer Details'}
                                         </h1>
                                         {selectedCustomerDetails && (
@@ -1683,7 +1918,7 @@ export function CustomerDetailsPage() {
                                     </p>
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                                     <Tooltip content={`Send email to ${selectedCustomerDetails?.email}`} position="bottom">
                                         <a
                                             href={`mailto:${selectedCustomerDetails?.email}`}
@@ -1718,7 +1953,7 @@ export function CustomerDetailsPage() {
                                             <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                                                 <MapPinIcon size={14} />
                                             </div>
-                                            <span className="font-medium truncate max-w-[250px]">
+                                            <span className="font-medium truncate max-w-[350px]">
                                                 {selectedCustomerDetails?.address?.fullAddress || '-'}
                                             </span>
                                         </a>
@@ -1808,13 +2043,7 @@ export function CustomerDetailsPage() {
                 {/* Progress Timeline Section (Integrated) */}
                 {selectedCustomerDetails && (
                     <div className="px-6 pb-6 pt-0">
-                        <div className="bg-muted/30 rounded-xl p-3 border border-border/50">
-                            <div className="flex items-center justify-between mb-3">
-                                <div>
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">Journey Progress</h3>
-                                </div>
-                            </div>
-
+                        <div className="">
                             <div className="relative flex flex-col md:flex-row md:justify-between items-start gap-4 md:gap-0">
                                 {/* Vertical connector line for mobile - hidden on md+ */}
                                 <div className="absolute left-[14px] top-4 bottom-4 w-0.5 bg-gray-200 dark:bg-gray-700 md:hidden z-0" />
@@ -2038,14 +2267,15 @@ export function CustomerDetailsPage() {
                             {(() => {
                                 const allTabs = [
                                     { id: 'general', label: 'General', icon: Settings2Icon },
-                                    { id: 'rates', label: 'Rates', icon: ZapIcon },
-                                    { id: 'solar_vpp', label: 'Solar & VPP', icon: ZapIcon },
-                                    { id: 'debit', label: 'Debit', icon: IdCardIcon },
-                                    { id: 'utilmate', label: 'Utilmate', icon: ZapIcon },
-                                    { id: 'notes', label: 'Notes', icon: Settings2Icon, badge: notesData?.customerNotes?.length },
+                                    { id: 'rates', label: 'Rates', icon: PercentIcon },
+                                    { id: 'solar_vpp', label: 'Solar & VPP', icon: SunIcon },
+                                    { id: 'debit', label: 'Debit', icon: CreditCardIcon },
+                                    { id: 'utilmate', label: 'Utilmate', icon: PlugIcon },
+                                    { id: 'notes', label: 'Notes', icon: FileTextIcon, badge: notesData?.customerNotes?.length },
                                     { id: 'documents', label: 'Documents', icon: UploadIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2')).length },
                                     { id: 'electricity_bills', label: 'Electricity Bills', icon: ZapIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2' || d.type === '2').length },
-                                    { id: 'email_logs', label: 'Email Logs', icon: MailIcon }
+                                    { id: 'email_logs', label: 'Email Logs', icon: MailIcon },
+                                    { id: 'activity_log', label: 'Activity Log', icon: ActivityIcon }
                                 ].filter(item => {
                                     if (item.id === 'solar_vpp') {
                                         const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
@@ -2180,21 +2410,21 @@ export function CustomerDetailsPage() {
                         <div className="flex-1 p-6 overflow-y-auto">
 
                             {selectedDetailSection === 'general' && (
-                                <div className="space-y-6 animate-in fade-in duration-300">
-                                    <div className="flex items-center justify-between border-b border-border pb-4">
+                                <div className="space-y-4 animate-in fade-in duration-300">
+                                    <div className="flex items-center justify-between border-b border-border pb-3">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
                                                 <Settings2Icon size={20} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">General Details</h3>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">General Details</h3>
                                                 <p className="text-xs text-muted-foreground">NMI, connection & enrollment</p>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Property & Connection */}
-                                    <div className="grid grid-cols-3 gap-6">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">NMI</label>
                                             <p className="font-medium">{selectedCustomerDetails.address?.nmi || '-'}</p>
@@ -2228,7 +2458,7 @@ export function CustomerDetailsPage() {
                                     </div>
 
                                     {/* Personal Info */}
-                                    <div className="grid grid-cols-3 gap-6 pt-4 border-t border-border/50">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-border/50">
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">Birth Date</label>
                                             <p className="font-medium">
@@ -2262,7 +2492,7 @@ export function CustomerDetailsPage() {
                                     </div>
 
                                     {/* Identification */}
-                                    <div className="grid grid-cols-3 gap-6 pt-4 border-t border-border/50">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-border/50">
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">ID Type</label>
                                             <p className="font-medium">
@@ -2286,7 +2516,7 @@ export function CustomerDetailsPage() {
                                     </div>
 
                                     {/* Driver's License */}
-                                    <div className="grid grid-cols-3 gap-6 pt-4 border-t border-border/50">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-border/50">
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">License Number</label>
                                             <p className="font-medium">
@@ -2309,7 +2539,7 @@ export function CustomerDetailsPage() {
 
                                     {/* Credit Assessment (only when credit check was done) */}
                                     {selectedCustomerDetails.checkCreditScore === 1 && (
-                                        <div className="grid grid-cols-3 gap-6 pt-4 border-t border-border/50">
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-border/50">
                                             <div className="space-y-1">
                                                 <label className="text-xs text-muted-foreground uppercase font-semibold">Gender</label>
                                                 <p className="font-medium">
@@ -2349,7 +2579,7 @@ export function CustomerDetailsPage() {
                                                 <ZapIcon size={20} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Rate Plan Details</h3>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Rate Plan Details</h3>
                                                 <p className="text-xs text-muted-foreground">Energy rate plan & offers</p>
                                             </div>
                                         </div>
@@ -2544,7 +2774,7 @@ export function CustomerDetailsPage() {
                                                 <ZapIcon size={20} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Solar & VPP</h3>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Solar & VPP</h3>
                                                 <p className="text-xs text-muted-foreground">Solar & VPP configuration</p>
                                             </div>
                                         </div>
@@ -2686,7 +2916,7 @@ export function CustomerDetailsPage() {
                                                 <IdCardIcon size={20} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Direct Debit</h3>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Direct Debit</h3>
                                                 <p className="text-xs text-muted-foreground">Payment configuration & bank details</p>
                                             </div>
                                         </div>
@@ -2782,7 +3012,7 @@ export function CustomerDetailsPage() {
                                                 <PlugIcon size={20} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Utilmate Integration</h3>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Utilmate Integration</h3>
                                                 <p className="text-xs text-muted-foreground">Utilmate & MSAT connection</p>
                                             </div>
                                         </div>
@@ -2864,7 +3094,7 @@ export function CustomerDetailsPage() {
                                                 <UploadIcon size={20} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Documents</h3>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Documents</h3>
                                                 <p className="text-xs text-muted-foreground">Manage customer documents</p>
                                             </div>
                                         </div>
@@ -3157,7 +3387,7 @@ export function CustomerDetailsPage() {
                                                 <ZapIcon size={20} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Electricity Bills</h3>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Electricity Bills</h3>
                                                 <p className="text-xs text-muted-foreground">Bills & usage data</p>
                                             </div>
                                         </div>
@@ -3328,12 +3558,29 @@ export function CustomerDetailsPage() {
                                                 <MailIcon size={20} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Email Logs</h3>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Email Logs</h3>
                                                 <p className="text-xs text-muted-foreground">History of all emails sent to this customer</p>
                                             </div>
                                         </div>
                                     </div>
                                     <CustomerEmailLogsTable customerUid={selectedCustomerDetails.uid} key={emailLogsKey} />
+                                </div>
+                            )}
+
+                            {selectedDetailSection === 'activity_log' && selectedCustomerDetails && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    <div className="flex items-center justify-between border-b border-border pb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400">
+                                                <ActivityIcon size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Activity Log</h3>
+                                                <p className="text-xs text-muted-foreground">All changes made to this customer record</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <CustomerActivityLogTable customerUid={selectedCustomerDetails.uid} />
                                 </div>
                             )}
 
@@ -3346,7 +3593,7 @@ export function CustomerDetailsPage() {
                                                 <Settings2Icon size={20} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-semibold text-foreground tracking-tight">Notes</h3>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Notes</h3>
                                                 <p className="text-xs text-muted-foreground">Activity log & follow-ups</p>
                                             </div>
                                         </div>

@@ -86,7 +86,6 @@ export const AuditLogsPage = () => {
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [historyModalOpen, setHistoryModalOpen] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState<{ tableName: string; recordId: string } | null>(null);
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
 
     const limit = 20;
 
@@ -144,16 +143,7 @@ export const AuditLogsPage = () => {
                 );
             }
 
-            if (page === 1) {
-                setAllLogs(fetchedLogs);
-            } else {
-                setAllLogs(prev => {
-                    const existingIds = new Set(prev.map(l => l.uid));
-                    const newLogs = fetchedLogs.filter(l => !existingIds.has(l.uid));
-                    return [...prev, ...newLogs];
-                });
-            }
-            setIsLoadingMore(false);
+            setAllLogs(fetchedLogs);
         }
     }, [data, page, debouncedSearch]);
 
@@ -165,12 +155,7 @@ export const AuditLogsPage = () => {
         setTableFilter(val);
     };
 
-    const handleLoadMore = () => {
-        if (!loading && hasMore) {
-            setIsLoadingMore(true);
-            setPage(prev => prev + 1);
-        }
-    };
+
 
     // View log details
     const handleViewDetails = (log: AuditLog) => {
@@ -339,16 +324,48 @@ export const AuditLogsPage = () => {
                     columns={columns}
                     data={allLogs}
                     rowKey={(log) => log.uid}
-                    loading={loading && page === 1}
+                    loading={loading}
                     error={error?.message}
                     emptyMessage="No audit logs found matching your criteria."
                     loadingMessage="Loading audit logs..."
-                    infiniteScroll
-                    hasMore={hasMore}
-                    isLoadingMore={isLoadingMore}
-                    onLoadMore={handleLoadMore}
-                    maxHeightClass="max-h-[calc(100vh-300px)]"
+                    maxHeightClass="h-[calc(100vh-350px)]"
                 />
+
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-between px-2 py-4 border-t border-border">
+                    <div className="text-sm text-muted-foreground">
+                        Showing {meta ? Math.min((page - 1) * limit + 1, meta.totalRecords) : 0} to {meta ? Math.min(page * limit, meta.totalRecords) : 0} of {meta?.totalRecords || 0} entries
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1 || loading}
+                        >
+                            Previous
+                        </Button>
+                        <div className="flex items-center gap-1">
+                            {Array.from({ length: Math.min(5, meta?.totalPages || 0) }, (_) => {
+                                // Simple logic to show a window of pages around current page could be added, 
+                                // but for now let's just show current page info or simple controls.
+                                // Actually, simpler: "Page X of Y"
+                                return null;
+                            })}
+                            <span className="text-sm font-medium mx-2">
+                                Page {page} of {meta?.totalPages || 1}
+                            </span>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage(p => Math.min(meta?.totalPages || 1, p + 1))}
+                            disabled={!hasMore && page >= (meta?.totalPages || 1) || loading}
+                        >
+                            Next
+                        </Button>
+                    </div>
+                </div>
             </div>
 
             {/* Detail Modal */}

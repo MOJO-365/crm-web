@@ -1,8 +1,8 @@
 import { gql } from "@apollo/client";
 
 export const GET_AUDIT_LOGS = gql`
-    query AuditLogs($page: Int, $limit: Int, $tableName: String) {
-        auditLogs(page: $page, limit: $limit, tableName: $tableName) {
+    query AuditLogs($page: Int, $limit: Int, $tableName: String, $recordId: String) {
+        auditLogs(page: $page, limit: $limit, tableName: $tableName, recordId: $recordId) {
             meta {
                 totalRecords
                 currentPage
