@@ -18,6 +18,7 @@ import {
     GET_RISK_STATUSES,
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
+import { getData } from 'country-list';
 import { secondaryApiAxios } from '@/lib/apollo';
 import { formatDateTime } from '@/lib/date';
 import {
@@ -135,12 +136,14 @@ const initialFormData: CustomerFormData = {
     idType: 0,
     idNumber: '',
     idState: '',
+    idCountry: '',
     idExpiry: '',
     licenseNumber: '',
     licenseState: '',
     licenseExpiry: '',
     concession: false,
     lifeSupport: false,
+    additionalDocument: null,
     billingPreference: 0,
     directDebit: false,
     accountType: 0,
@@ -415,6 +418,7 @@ export const CustomerFormPage = () => {
     const [uploadingPreviousBill, setUploadingPreviousBill] = useState(false);
     const [uploadingLicense, setUploadingLicense] = useState(false);
     const [uploadingIdentityProof, setUploadingIdentityProof] = useState(false);
+    const [uploadingAdditionalDocument, setUploadingAdditionalDocument] = useState(false);
 
     const { data: activeRatesData } = useQuery(GET_ACTIVE_RATES_HISTORY, {
         fetchPolicy: 'network-only',
@@ -489,6 +493,13 @@ export const CustomerFormPage = () => {
             }));
     }, [ratePlans, formData.state, formData.vpp]);
 
+    const countryOptions = useMemo(() => {
+        return getData().map((country) => ({
+            value: country.code,
+            label: country.name,
+        }));
+    }, []);
+
 
 
     // Load Data
@@ -535,6 +546,7 @@ export const CustomerFormPage = () => {
                 idType: c.enrollmentDetails?.idtype || 0,
                 idNumber: c.enrollmentDetails?.idnumber || '',
                 idState: c.enrollmentDetails?.idstate || '',
+                idCountry: c.enrollmentDetails?.idcountry || '',
                 idExpiry: c.enrollmentDetails?.idexpiry ? c.enrollmentDetails.idexpiry.split('T')[0] : '',
                 licenseNumber: c.enrollmentDetails?.licenseNumber || '',
                 licenseState: c.enrollmentDetails?.licenseState || '',
@@ -559,6 +571,7 @@ export const CustomerFormPage = () => {
                 previousBill: c.previousBill || null,
                 identityProof: c.identityProof || null,
                 licenseDocument: c.licenseDocument || null,
+                additionalDocument: c.additionalDocument || null,
             });
 
             if (c.phoneVerifiedAt) {
@@ -759,7 +772,11 @@ export const CustomerFormPage = () => {
 
         // Conditional demographic requirements
         if (formData.checkCreditScore) {
-            if (['gender', 'relationshipStatus', 'employerName', 'enquiryAmount', 'dob'].includes(name)) {
+            const requiredFields = ['gender', 'relationshipStatus', 'employerName', 'enquiryAmount', 'dob', 'licenseNumber', 'licenseState', 'licenseExpiry'];
+            if (formData.idType === 0) {
+                requiredFields.push('licenseDocument');
+            }
+            if (requiredFields.includes(name)) {
                 isRequired = true;
             }
         }
@@ -862,15 +879,12 @@ export const CustomerFormPage = () => {
     }, [formData]);
 
     const step3Valid = useMemo(() => {
-        const baseValid = !!(
-            formData.licenseNumber?.trim() &&
-            formData.licenseState &&
-            formData.licenseExpiry &&
-            formData.licenseDocument
-        );
-
         if (formData.checkCreditScore) {
-            return baseValid && !!(
+            return !!(
+                formData.licenseNumber?.trim() &&
+                formData.licenseState &&
+                formData.licenseExpiry &&
+                (formData.idType !== 0 || formData.licenseDocument) &&
                 formData.employerName?.trim() &&
                 formData.enquiryAmount?.trim() &&
                 formData.gender !== undefined &&
@@ -879,7 +893,7 @@ export const CustomerFormPage = () => {
             );
         }
 
-        return baseValid;
+        return true;
     }, [formData]);
 
     const canProceed = () => {
@@ -1042,6 +1056,7 @@ export const CustomerFormPage = () => {
                     idtype: formData.idType,
                     idnumber: formData.idNumber || undefined,
                     idstate: formData.idState || undefined,
+                    idcountry: formData.idCountry || undefined,
                     idexpiry: formData.idExpiry || null,
                     concession: formData.concession ? 1 : 0,
                     lifesupport: formData.lifeSupport ? 1 : 0,
@@ -1124,13 +1139,18 @@ export const CustomerFormPage = () => {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [isFormDirty]);
 
+    // Auto-sync License Fields when ID Type is Licence (0)
+    useEffect(() => {
+        if (formData.idType === 0) {
+            updateField('licenseNumber', formData.idNumber);
+            updateField('licenseState', formData.idState);
+            updateField('licenseExpiry', formData.idExpiry);
+        }
+    }, [formData.idType, formData.idNumber, formData.idState, formData.idExpiry]);
+
     if (isEditMode && isLoadingCustomer) {
         return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-900"></div></div>;
     }
-
-    // ========================================================================
-    // RENDER
-    // ========================================================================
 
     return (
         <div className="space-y-6">
@@ -1427,6 +1447,8 @@ export const CustomerFormPage = () => {
                                                 placeholder="1234567890"
                                             />
                                         </div>
+
+                                        {/* Auto-sync License Fields when ID Type is Licence - MOVED TO TOP LEVEL */}
 
                                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-xl border border-border">
                                             <div className="col-span-2 lg:col-span-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Detailed Breakdown</div>
@@ -1729,6 +1751,7 @@ export const CustomerFormPage = () => {
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                                 <Input label="First Name" required error={errors.firstName} placeholder="e.g. Alex" value={formData.firstName} onChange={(e) => updateField('firstName', e.target.value)} onBlur={() => handleBlur('firstName')} />
                                                 <Input label="Last Name" required error={errors.lastName} placeholder="e.g. Taylor" value={formData.lastName} onChange={(e) => updateField('lastName', e.target.value)} onBlur={() => handleBlur('lastName')} />
+                                                <DatePicker label="Date of Birth" required={formData.checkCreditScore} error={errors.dob} value={formData.dob} onChange={(date) => updateField('dob', date ? date.toISOString().split('T')[0] : '')} maxDate={new Date()} onBlur={() => handleBlur('dob')} />
                                                 <Input label="Email" required helperText="We'll send confirmations here" error={errors.email} type="email" placeholder="name@example.com" value={formData.email} onChange={(e) => updateField('email', e.target.value)} onBlur={() => handleBlur('email')} />
                                             </div>
                                         </div>
@@ -1742,9 +1765,40 @@ export const CustomerFormPage = () => {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ">
                                         {/* <div className="col-span-full font-medium mb-2 flex items-center gap-2 text-muted-foreground"><IdCardIcon size={16} /> Secondary Identity (Medicare/Passport)</div> */}
-                                        <Select label="ID Type" options={ID_TYPE_OPTIONS.filter(opt => opt.value !== '0')} value={formData.idType.toString()} onChange={(val) => updateField('idType', parseInt(val as string))} />
+                                        <Select
+                                            label="ID Type"
+                                            options={ID_TYPE_OPTIONS}
+                                            value={formData.idType.toString()}
+                                            onChange={(val) => {
+                                                const newType = parseInt(val as string);
+                                                updateField('idType', newType);
+                                                // Reset state/country fields when type changes to avoid confusion
+                                                if (newType === 2) { // Passport
+                                                    updateField('idState', '');
+                                                } else {
+                                                    updateField('idCountry', '');
+                                                }
+                                            }}
+                                        />
                                         <Input label="ID Number" placeholder="Number" value={formData.idNumber} onChange={(e) => updateField('idNumber', e.target.value)} />
-                                        <Select label="ID State" options={STATE_OPTIONS} value={formData.idState} onChange={(val) => updateField('idState', val as string)} />
+
+                                        {formData.idType === 2 ? (
+                                            <Select
+                                                label="ID Country"
+                                                options={countryOptions}
+                                                value={formData.idCountry}
+                                                onChange={(val) => updateField('idCountry', val as string)}
+                                                placeholder="Select Country"
+                                            />
+                                        ) : (
+                                            <Select
+                                                label="ID State"
+                                                options={STATE_OPTIONS}
+                                                value={formData.idState}
+                                                onChange={(val) => updateField('idState', val as string)}
+                                            />
+                                        )}
+
                                         <DatePicker label="ID Expiry" value={formData.idExpiry} onChange={(date) => updateField('idExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} />
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
@@ -1788,45 +1842,84 @@ export const CustomerFormPage = () => {
                                                 )}
                                             </div>
                                         </Field>
-                                        <Field label="Identity Proof">
-                                            <div className="space-y-2">
-                                                <input
-                                                    type="file"
-                                                    accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
-                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                    disabled={uploadingIdentityProof}
-                                                    onChange={async (e) => {
-                                                        const file = e.target.files?.[0];
-                                                        if (!file) return;
+                                        {formData.idType === 0 ? (
+                                            <Field label="Driver's License" required={formData.checkCreditScore} error={errors.licenseDocument}>
+                                                <div className="space-y-2">
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        disabled={uploadingLicense}
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+                                                            setUploadingLicense(true);
+                                                            try {
+                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
+                                                                const result = await uploadDocument(file, targetId!, 'drivers_license', isEditMode ? (uid || undefined) : generatedCustomerId, 'Driver License');
+                                                                updateField('licenseDocument', {
+                                                                    id: result.id,
+                                                                    uid: result.uid,
+                                                                    filename: result.filename,
+                                                                    path: result.path,
+                                                                    size: result.size,
+                                                                    mimeType: result.contentType || 'application/pdf',
+                                                                    createdAt: new Date().toISOString()
+                                                                } as CustomerDocument);
+                                                            } catch (error) {
+                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload license');
+                                                            } finally {
+                                                                setUploadingLicense(false);
+                                                            }
+                                                        }}
+                                                    />
+                                                    {uploadingLicense && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
+                                                    {formData.licenseDocument && !uploadingLicense && (
+                                                        <DocumentPreview path={formData.licenseDocument.path} label="License" />
+                                                    )}
+                                                </div>
+                                            </Field>
+                                        ) : (
+                                            <Field label="Identity Proof">
+                                                <div className="space-y-2">
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        disabled={uploadingIdentityProof}
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
 
-                                                        setUploadingIdentityProof(true);
-                                                        try {
-                                                            // Use generatedCustomerId for new customers, or existing customerId/uid for edits
-                                                            const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
-                                                            const result = await uploadDocument(file, targetId!, 'identity_proof', isEditMode ? (uid || undefined) : generatedCustomerId, 'Identity Proof');
-                                                            updateField('identityProof', {
-                                                                id: result.id,
-                                                                uid: result.uid,
-                                                                filename: result.filename,
-                                                                path: result.path,
-                                                                size: result.size,
-                                                                mimeType: result.contentType || 'application/pdf',
-                                                                createdAt: new Date().toISOString()
-                                                            } as CustomerDocument);
-                                                            toast.success('Identity proof uploaded successfully');
-                                                        } catch (error) {
-                                                            toast.error(error instanceof Error ? error.message : 'Failed to upload file');
-                                                        } finally {
-                                                            setUploadingIdentityProof(false);
-                                                        }
-                                                    }}
-                                                />
-                                                {uploadingIdentityProof && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
-                                                {formData.identityProof && !uploadingIdentityProof && (
-                                                    <DocumentPreview path={formData.identityProof.path} label="Identity Proof" />
-                                                )}
-                                            </div>
-                                        </Field>
+                                                            setUploadingIdentityProof(true);
+                                                            try {
+                                                                // Use generatedCustomerId for new customers, or existing customerId/uid for edits
+                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
+                                                                const result = await uploadDocument(file, targetId!, 'identity_proof', isEditMode ? (uid || undefined) : generatedCustomerId, 'Identity Proof');
+                                                                updateField('identityProof', {
+                                                                    id: result.id,
+                                                                    uid: result.uid,
+                                                                    filename: result.filename,
+                                                                    path: result.path,
+                                                                    size: result.size,
+                                                                    mimeType: result.contentType || 'application/pdf',
+                                                                    createdAt: new Date().toISOString()
+                                                                } as CustomerDocument);
+                                                                toast.success('Identity proof uploaded successfully');
+                                                            } catch (error) {
+                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload file');
+                                                            } finally {
+                                                                setUploadingIdentityProof(false);
+                                                            }
+                                                        }}
+                                                    />
+                                                    {uploadingIdentityProof && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
+                                                    {formData.identityProof && !uploadingIdentityProof && (
+                                                        <DocumentPreview path={formData.identityProof.path} label="Identity Proof" />
+                                                    )}
+                                                </div>
+                                            </Field>
+                                        )}
 
                                     </div>
                                     <div className="flex flex-wrap gap-6 pt-2">
@@ -1876,49 +1969,6 @@ export const CustomerFormPage = () => {
                                             <IdCardIcon size={20} /> Credit Score & Identification
                                         </h2>
 
-                                        {/* License Details - Standard Grid */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                            <Input label="Driver's License No." required placeholder="D123456" value={formData.licenseNumber} onChange={(e) => updateField('licenseNumber', e.target.value)} onBlur={() => handleBlur('licenseNumber')} error={errors.licenseNumber} />
-                                            <Select label="License State" required options={STATE_OPTIONS} value={formData.licenseState} onChange={(val) => updateField('licenseState', val as string)} onBlur={() => handleBlur('licenseState')} error={errors.licenseState} />
-                                            <DatePicker label="License Expiry" required value={formData.licenseExpiry} onChange={(date) => updateField('licenseExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} onBlur={() => handleBlur('licenseExpiry')} error={errors.licenseExpiry} />
-
-                                            <Field label="License Document" required error={errors.licenseDocument}>
-                                                <div className="space-y-2">
-                                                    <input
-                                                        type="file"
-                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
-                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                        disabled={uploadingLicense}
-                                                        onChange={async (e) => {
-                                                            const file = e.target.files?.[0];
-                                                            if (!file) return;
-                                                            setUploadingLicense(true);
-                                                            try {
-                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
-                                                                const result = await uploadDocument(file, targetId!, 'drivers_license', isEditMode ? (uid || undefined) : generatedCustomerId, 'Driver License');
-                                                                updateField('licenseDocument', {
-                                                                    id: result.id,
-                                                                    uid: result.uid,
-                                                                    filename: result.filename,
-                                                                    path: result.path,
-                                                                    size: result.size,
-                                                                    mimeType: result.contentType || 'application/pdf',
-                                                                    createdAt: new Date().toISOString()
-                                                                } as CustomerDocument);
-                                                            } catch (error) {
-                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload license');
-                                                            } finally {
-                                                                setUploadingLicense(false);
-                                                            }
-                                                        }}
-                                                    />
-                                                    {uploadingLicense && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
-                                                    {formData.licenseDocument && !uploadingLicense && (
-                                                        <DocumentPreview path={formData.licenseDocument.path} label="License" />
-                                                    )}
-                                                </div>
-                                            </Field>
-                                        </div>
 
                                         {/* Credit Score Check Toggle Card */}
                                         <div className={cn(
@@ -2036,6 +2086,96 @@ export const CustomerFormPage = () => {
                                                                 leftIcon={<CreditCardIcon size={16} className="text-blue-500/50" />}
                                                                 className="bg-white/50 font-mono"
                                                             />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* License Details - Standard Grid */}
+                                                    <div className="mt-8 border-t border-blue-100 pt-8">
+                                                        <div className="flex items-center gap-3 mb-6">
+                                                            <div className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse"></div>
+                                                            <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.2em]">
+                                                                License Verification
+                                                            </h4>
+                                                            <div className="h-px bg-gradient-to-r from-blue-100 to-transparent flex-1"></div>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                                            <Input label="Driver's License No." required={formData.checkCreditScore} placeholder="D123456" value={formData.licenseNumber} onChange={(e) => updateField('licenseNumber', e.target.value)} onBlur={() => handleBlur('licenseNumber')} error={errors.licenseNumber} />
+                                                            <Select label="License State" required={formData.checkCreditScore} options={STATE_OPTIONS} value={formData.licenseState} onChange={(val) => updateField('licenseState', val as string)} onBlur={() => handleBlur('licenseState')} error={errors.licenseState} />
+                                                            <DatePicker label="License Expiry" required={formData.checkCreditScore} value={formData.licenseExpiry} onChange={(date) => updateField('licenseExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} onBlur={() => handleBlur('licenseExpiry')} error={errors.licenseExpiry} />
+
+                                                            <Field label="Driver's License" required={formData.checkCreditScore} error={errors.licenseDocument}>
+                                                                <div className="space-y-2">
+                                                                    <input
+                                                                        type="file"
+                                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                        disabled={uploadingLicense}
+                                                                        onChange={async (e) => {
+                                                                            const file = e.target.files?.[0];
+                                                                            if (!file) return;
+                                                                            setUploadingLicense(true);
+                                                                            try {
+                                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
+                                                                                const result = await uploadDocument(file, targetId!, 'drivers_license', isEditMode ? (uid || undefined) : generatedCustomerId, 'Driver License');
+                                                                                updateField('licenseDocument', {
+                                                                                    id: result.id,
+                                                                                    uid: result.uid,
+                                                                                    filename: result.filename,
+                                                                                    path: result.path,
+                                                                                    size: result.size,
+                                                                                    mimeType: result.contentType || 'application/pdf',
+                                                                                    createdAt: new Date().toISOString()
+                                                                                } as CustomerDocument);
+                                                                            } catch (error) {
+                                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload license');
+                                                                            } finally {
+                                                                                setUploadingLicense(false);
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    {uploadingLicense && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
+                                                                    {formData.licenseDocument && !uploadingLicense && (
+                                                                        <DocumentPreview path={formData.licenseDocument.path} label="License" />
+                                                                    )}
+                                                                </div>
+                                                            </Field>
+                                                            <Field label="Additional Document" hint="Optional" error={errors.additionalDocument}>
+                                                                <div className="space-y-2">
+                                                                    <input
+                                                                        type="file"
+                                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                        disabled={uploadingAdditionalDocument}
+                                                                        onChange={async (e) => {
+                                                                            const file = e.target.files?.[0];
+                                                                            if (!file) return;
+                                                                            setUploadingAdditionalDocument(true);
+                                                                            try {
+                                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
+                                                                                const result = await uploadDocument(file, targetId!, 'additional_document', isEditMode ? (uid || undefined) : generatedCustomerId, 'Additional Document');
+                                                                                updateField('additionalDocument', {
+                                                                                    id: result.id,
+                                                                                    uid: result.uid,
+                                                                                    filename: result.filename,
+                                                                                    path: result.path,
+                                                                                    size: result.size,
+                                                                                    mimeType: result.contentType || 'application/pdf',
+                                                                                    createdAt: new Date().toISOString()
+                                                                                } as CustomerDocument);
+                                                                            } catch (error) {
+                                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload document');
+                                                                            } finally {
+                                                                                setUploadingAdditionalDocument(false);
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    {uploadingAdditionalDocument && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
+                                                                    {formData.additionalDocument && !uploadingAdditionalDocument && (
+                                                                        <DocumentPreview path={formData.additionalDocument.path} label="Additional Document" />
+                                                                    )}
+                                                                </div>
+                                                            </Field>
                                                         </div>
                                                     </div>
                                                 </div>

@@ -130,6 +130,7 @@ export const GET_CUSTOMERS = gql`
                     idtype
                     idnumber
                     idstate
+                    idcountry
                     idexpiry
                     concession
                     lifesupport
@@ -694,6 +695,7 @@ export const GET_CUSTOMER_BY_ID = gql`
                 idtype
                 idnumber
                 idstate
+                idcountry
                 idexpiry
                 concession
                 lifesupport
@@ -899,6 +901,7 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
                 idtype
                 idnumber
                 idstate
+                idcountry
                 idexpiry
                 concession
                 lifesupport

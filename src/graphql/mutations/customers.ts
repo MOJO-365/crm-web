@@ -66,6 +66,7 @@ const CUSTOMER_FULL_RESPONSE = `
         idtype
         idnumber
         idstate
+        idcountry
         idexpiry
         concession
         lifesupport

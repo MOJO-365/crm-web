@@ -85,6 +85,7 @@ interface CustomerDetails {
     previousBill?: DocumentItem;
     identityProof?: DocumentItem;
     licenseDocument?: DocumentItem;
+    additionalDocument?: DocumentItem;
     gender?: number;
     relationshipStatus?: number;
     enquiryAmount?: string | number;
@@ -108,6 +109,7 @@ interface CustomerDetails {
         idtype?: number;
         idnumber?: string;
         idstate?: string;
+        idcountry?: string;
         idexpiry?: string;
         concession?: boolean;
         lifesupport?: boolean;
@@ -1284,6 +1286,7 @@ export function CustomerDetailsPage() {
                     idtype: customer.enrollmentDetails.idtype,
                     idnumber: customer.enrollmentDetails.idnumber,
                     idstate: customer.enrollmentDetails.idstate,
+                    idcountry: customer.enrollmentDetails.idcountry,
                     idexpiry: customer.enrollmentDetails.idexpiry,
                     concession: customer.enrollmentDetails.concession,
                     lifesupport: customer.enrollmentDetails.lifesupport,
@@ -2057,7 +2060,7 @@ export function CustomerDetailsPage() {
                                     ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
                                         { label: 'VPP connect', date: null, completed: selectedCustomerDetails.vppDetails?.vppConnected === 1, showToggle: true, disabled: selectedCustomerDetails.status < 3, step: 3 },
                                     ] : []),
-                                    { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: (selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1) || selectedCustomerDetails.checkCreditScore !== 1, step: 4 },
+                                    { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate || (selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1) || selectedCustomerDetails.checkCreditScore !== 1, step: 4 },
                                     { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: selectedCustomerDetails.msatDetails?.msatConnected !== 1, step: 5 },
                                 ].map((item: any, index) => (
                                     <div key={index} className="relative flex flex-row md:flex-col items-start md:items-center gap-3 md:gap-0 md:flex-1 w-full md:w-auto">
@@ -2491,51 +2494,67 @@ export function CustomerDetailsPage() {
                                         </div>
                                     </div>
 
-                                    {/* Identification */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-border/50">
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">ID Type</label>
-                                            <p className="font-medium">
-                                                {selectedCustomerDetails.enrollmentDetails?.idtype !== undefined && selectedCustomerDetails.enrollmentDetails?.idtype !== null
-                                                    ? ID_TYPE_MAP[selectedCustomerDetails.enrollmentDetails.idtype] || '-'
-                                                    : '-'}
-                                            </p>
+                                    {/* Identification / Driver's License */}
+                                    {selectedCustomerDetails.enrollmentDetails?.idtype === 0 ? (
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-border/50">
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">License Number</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.licenseNumber || '-'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">License State</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.licenseState || '-'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">License Expiry</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.licenseExpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.licenseExpiry) : '-'}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">ID Number</label>
-                                            <p className="font-medium">
-                                                {selectedCustomerDetails.enrollmentDetails?.idnumber || '-'}
-                                            </p>
+                                    ) : (
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-border/50">
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">ID Type</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.idtype !== undefined && selectedCustomerDetails.enrollmentDetails?.idtype !== null
+                                                        ? ID_TYPE_MAP[selectedCustomerDetails.enrollmentDetails.idtype] || '-'
+                                                        : '-'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">ID Number</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.idnumber || '-'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">ID Expiry</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.idexpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.idexpiry) : '-'}
+                                                </p>
+                                            </div>
+                                            {selectedCustomerDetails.enrollmentDetails?.idtype === 2 ? (
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-muted-foreground uppercase font-semibold">ID Country</label>
+                                                    <p className="font-medium">
+                                                        {selectedCustomerDetails.enrollmentDetails?.idcountry || '-'}
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-muted-foreground uppercase font-semibold">ID State</label>
+                                                    <p className="font-medium">
+                                                        {selectedCustomerDetails.enrollmentDetails?.idstate || '-'}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">ID Expiry</label>
-                                            <p className="font-medium">
-                                                {selectedCustomerDetails.enrollmentDetails?.idexpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.idexpiry) : '-'}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Driver's License */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-border/50">
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">License Number</label>
-                                            <p className="font-medium">
-                                                {selectedCustomerDetails.enrollmentDetails?.licenseNumber || '-'}
-                                            </p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">License State</label>
-                                            <p className="font-medium">
-                                                {selectedCustomerDetails.enrollmentDetails?.licenseState || '-'}
-                                            </p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">License Expiry</label>
-                                            <p className="font-medium">
-                                                {selectedCustomerDetails.enrollmentDetails?.licenseExpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.licenseExpiry) : '-'}
-                                            </p>
-                                        </div>
-                                    </div>
+                                    )}
 
                                     {/* Credit Assessment (only when credit check was done) */}
                                     {selectedCustomerDetails.checkCreditScore === 1 && (
@@ -3254,32 +3273,44 @@ export function CustomerDetailsPage() {
                                                         doc: selectedCustomerDetails.previousBill,
                                                         label: selectedCustomerDetails.previousBill?.documentType?.name || 'Previous Bill',
                                                         type: 'previousBill',
-                                                        category: '0'
+                                                        category: '0',
+                                                        show: true
                                                     },
                                                     {
                                                         doc: selectedCustomerDetails.identityProof,
                                                         label: selectedCustomerDetails.identityProof?.documentType?.name || 'Identity Proof',
                                                         type: 'identityProof',
-                                                        category: '0'
+                                                        category: '0',
+                                                        show: selectedCustomerDetails.enrollmentDetails?.idtype !== 0
                                                     },
                                                     {
                                                         doc: selectedCustomerDetails.licenseDocument,
                                                         label: selectedCustomerDetails.licenseDocument?.documentType?.name || 'Driver\'s License',
                                                         type: 'licenseDocument',
-                                                        category: '0'
+                                                        category: '0',
+                                                        show: selectedCustomerDetails.enrollmentDetails?.idtype === 0
+                                                    },
+                                                    {
+                                                        doc: selectedCustomerDetails.additionalDocument,
+                                                        label: selectedCustomerDetails.additionalDocument?.documentType?.name || 'Additional Document',
+                                                        type: 'additionalDocument',
+                                                        category: '0',
+                                                        show: !!selectedCustomerDetails.additionalDocument
                                                     },
                                                     ...(selectedCustomerDetails?.documents?.filter(d =>
                                                         d.uid !== selectedCustomerDetails?.previousBill?.uid &&
                                                         d.uid !== selectedCustomerDetails?.identityProof?.uid &&
                                                         d.uid !== selectedCustomerDetails?.licenseDocument?.uid &&
+                                                        d.uid !== selectedCustomerDetails?.additionalDocument?.uid &&
                                                         (d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2'))
                                                     ).map(d => ({
                                                         doc: d,
                                                         label: d.documentType?.name || d.name || 'Document',
                                                         type: d.type || 'other',
-                                                        category: d.documentType?.category || '0'
+                                                        category: d.documentType?.category || '0',
+                                                        show: true
                                                     })) || [])
-                                                ].map((item, idx) => (
+                                                ].filter(item => item.show).map((item, idx) => (
                                                     <tr key={idx} className="hover:bg-muted/30 transition-colors group">
                                                         <td className="px-4 py-3">
                                                             <div className="flex items-center gap-2">
