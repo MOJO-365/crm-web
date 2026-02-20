@@ -1036,6 +1036,30 @@ export const OfferAccessPage = () => {
                                                 <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${(activeOffer.supplyCharge ?? 0).toFixed(4)}/day</div>
                                                 <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
                                             </div>
+
+                                            {((activeOffer.demand ?? 0) > 0 || (activeOffer.demandOp ?? 0) > 0 || (activeOffer.demandP ?? 0) > 0 || (activeOffer.demandS ?? 0) > 0) && (
+                                                <>
+                                                    <div className="flex items-center gap-2 text-rose-500 dark:text-rose-400 mt-4">
+                                                        <RatesIcon size={16} />
+                                                        <h4 className="text-sm font-bold uppercase tracking-wide">Demand Charges</h4>
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                        {[
+                                                            { label: 'Demand', value: activeOffer.demand },
+                                                            { label: 'Demand (Op)', value: activeOffer.demandOp },
+                                                            { label: 'Demand (P)', value: activeOffer.demandP },
+                                                            { label: 'Demand (S)', value: activeOffer.demandS }
+                                                        ]
+                                                            .filter(d => (d.value ?? 0) > 0)
+                                                            .map((d, id) => (
+                                                                <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                    <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${d.value.toFixed(4)}/kVA/day</div>
+                                                                    <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
+                                                                </div>
+                                                            ))}
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
 
                                         {/* VPP Orchestration Charges Sub-section */}

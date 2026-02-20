@@ -2689,6 +2689,31 @@ export function CustomerDetailsPage() {
                                                                         <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${(offer.supplyCharge ?? 0).toFixed(4)}/day</div>
                                                                         <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
                                                                     </div>
+
+                                                                    {((offer.demand ?? 0) > 0 || (offer.demandOp ?? 0) > 0 || (offer.demandP ?? 0) > 0 || (offer.demandS ?? 0) > 0) && (
+                                                                        <>
+                                                                            <div className="flex items-center gap-2 text-rose-500 dark:text-rose-400 mt-4">
+                                                                                <ActivityIcon size={16} />
+                                                                                <h4 className="text-sm font-bold uppercase tracking-wide">Demand Charges</h4>
+                                                                            </div>
+                                                                            <div className="space-y-3">
+                                                                                {[
+                                                                                    { label: 'Demand', value: offer.demand },
+                                                                                    { label: 'Demand (Op)', value: offer.demandOp },
+                                                                                    { label: 'Demand (P)', value: offer.demandP },
+                                                                                    { label: 'Demand (S)', value: offer.demandS }
+                                                                                ]
+                                                                                    .filter((d): d is { label: string, value: number } => (d.value ?? 0) > 0)
+                                                                                    .map((d, id) => (
+                                                                                        <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${d.value.toFixed(4)}/kVA/day</div>
+                                                                                            <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+
                                                                     {(offer.vppOrcharge ?? 0) > 0 && (
                                                                         <>
                                                                             <div className="flex items-center gap-2 text-amber-500 dark:text-amber-400 mt-4">
