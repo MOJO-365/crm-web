@@ -49,6 +49,7 @@ export interface CustomerFormData {
     idType: number;
     idNumber: string;
     idState: string;
+    idCountry: string;
     idExpiry: string;
 
     // Driver's License Details
@@ -82,6 +83,7 @@ export interface CustomerFormData {
     previousBill?: CustomerDocument | null;
     identityProof?: CustomerDocument | null;
     licenseDocument?: CustomerDocument | null;
+    additionalDocument?: CustomerDocument | null;
 }
 
 export interface CustomerDocument {

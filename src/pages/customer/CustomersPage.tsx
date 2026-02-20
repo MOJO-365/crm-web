@@ -372,8 +372,17 @@ export function CustomersPage() {
                     />
                 </div>
             ),
-            width: 'w-[120px]',
-            render: (row) => <span className="font-medium text-foreground">{row.firstName} {row.lastName}</span>,
+            width: 'w-[200px]',
+            render: (row) => {
+                const fullName = `${row.firstName} ${row.lastName}`;
+                return (
+                    <Tooltip content={fullName} fullWidth>
+                        <span className="font-medium text-foreground truncate block max-w-[180px]">
+                            {fullName}
+                        </span>
+                    </Tooltip>
+                );
+            },
         },
         {
             key: 'discount',
@@ -594,7 +603,7 @@ export function CustomersPage() {
         {
             key: 'tariff',
             header: (
-                <div className="flex flex-col gap-1 max-w-[100px]">
+                <div className="flex flex-col gap-1 max-w-[180px]">
                     <div className="h-7 flex items-center">
                         <span className="text-xs font-semibold uppercase text-muted-foreground">Tariff</span>
                     </div>
