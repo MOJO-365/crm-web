@@ -603,7 +603,7 @@ export function CustomersPage() {
         {
             key: 'tariff',
             header: (
-                <div className="flex flex-col gap-1 max-w-[180px]">
+                <div className="flex flex-col gap-1 min-w-[100px]">
                     <div className="h-7 flex items-center">
                         <span className="text-xs font-semibold uppercase text-muted-foreground">Tariff</span>
                     </div>
