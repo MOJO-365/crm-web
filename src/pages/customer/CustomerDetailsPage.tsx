@@ -2060,7 +2060,7 @@ export function CustomerDetailsPage() {
                                     ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
                                         { label: 'VPP connect', date: null, completed: selectedCustomerDetails.vppDetails?.vppConnected === 1, showToggle: true, disabled: selectedCustomerDetails.status < 3, step: 3 },
                                     ] : []),
-                                    { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate || (selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1) || selectedCustomerDetails.checkCreditScore !== 1, step: 4 },
+                                    { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate || (selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1), step: 4 },
                                     { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: selectedCustomerDetails.msatDetails?.msatConnected !== 1, step: 5 },
                                 ].map((item: any, index) => (
                                     <div key={index} className="relative flex flex-row md:flex-col items-start md:items-center gap-3 md:gap-0 md:flex-1 w-full md:w-auto">
