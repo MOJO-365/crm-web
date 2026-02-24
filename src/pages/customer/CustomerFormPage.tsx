@@ -443,7 +443,6 @@ export const CustomerFormPage = () => {
     const [uploadingPreviousBill, setUploadingPreviousBill] = useState(false);
     const [uploadingLicense, setUploadingLicense] = useState(false);
     const [uploadingIdentityProof, setUploadingIdentityProof] = useState(false);
-    const [uploadingAdditionalDocument, setUploadingAdditionalDocument] = useState(false);
 
     const { data: activeRatesData } = useQuery(GET_ACTIVE_RATES_HISTORY, {
         fetchPolicy: 'network-only',
@@ -797,7 +796,7 @@ export const CustomerFormPage = () => {
 
         // Conditional demographic requirements
         if (formData.checkCreditScore) {
-            const requiredFields = ['gender', 'relationshipStatus', 'employerName', 'enquiryAmount', 'dob', 'licenseNumber', 'licenseState', 'licenseExpiry'];
+            const requiredFields = ['gender', 'relationshipStatus', 'enquiryAmount', 'dob', 'licenseNumber', 'licenseState', 'licenseExpiry'];
             if (formData.idType === 0) {
                 requiredFields.push('licenseDocument');
             }
@@ -1126,18 +1125,31 @@ export const CustomerFormPage = () => {
                 triggerWelcomeEmail: isEditMode ? true : undefined,
             };
 
+            let savedCustomer;
             if (isEditMode) {
                 const { data } = await updateCustomer({ variables: { uid, input } });
-                toast.success(data?.updateCustomer?.message || 'Customer updated successfully');
+                savedCustomer = data?.updateCustomer;
+                toast.success(savedCustomer?.message || 'Customer updated successfully');
             } else {
                 const { data } = await createCustomer({ variables: { input } });
-                toast.success(data?.createCustomer?.message || 'Customer created successfully');
+                savedCustomer = data?.createCustomer;
+                toast.success(savedCustomer?.message || 'Customer created successfully');
             }
+
             // Clear customer cache to ensure fresh data on customers page
             apolloClient.cache.evict({ fieldName: 'customers' });
             apolloClient.cache.evict({ fieldName: 'customersCursor' });
             apolloClient.cache.gc();
-            navigate('/customers');
+
+            // Handle redirection
+            const customerUid = savedCustomer?.uid || uid;
+            if (finalStatus === 2 && customerUid) {
+                // Redirect to details page if an offer was sent
+                navigate(`/customer/${customerUid}`);
+            } else {
+                // Otherwise redirect back to the list (for drafts)
+                navigate('/customers');
+            }
         } catch (err: any) {
             console.error('Failed to save customer:', err);
             toast.error(err.message || 'Failed to save customer');
@@ -2111,7 +2123,6 @@ export const CustomerFormPage = () => {
                                                         <div className="space-y-1 md:col-span-2">
                                                             <Input
                                                                 label="Employer Name"
-                                                                required={formData.checkCreditScore}
                                                                 error={errors.employerName}
                                                                 placeholder="Company Pty Ltd"
                                                                 value={formData.employerName}
@@ -2189,42 +2200,7 @@ export const CustomerFormPage = () => {
                                                                     )}
                                                                 </div>
                                                             </Field>
-                                                            <Field label="Additional Document" hint="Optional" error={errors.additionalDocument}>
-                                                                <div className="space-y-2">
-                                                                    <input
-                                                                        type="file"
-                                                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
-                                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                                        disabled={uploadingAdditionalDocument}
-                                                                        onChange={async (e) => {
-                                                                            const file = e.target.files?.[0];
-                                                                            if (!file) return;
-                                                                            setUploadingAdditionalDocument(true);
-                                                                            try {
-                                                                                const targetId = isEditMode ? (customerData?.customer?.customerId || uid) : generatedCustomerId;
-                                                                                const result = await uploadDocument(file, targetId!, 'additional_document', isEditMode ? (uid || undefined) : generatedCustomerId, 'Additional Document');
-                                                                                updateField('additionalDocument', {
-                                                                                    id: result.id,
-                                                                                    uid: result.uid,
-                                                                                    filename: result.filename,
-                                                                                    path: result.path,
-                                                                                    size: result.size,
-                                                                                    mimeType: result.contentType || 'application/pdf',
-                                                                                    createdAt: new Date().toISOString()
-                                                                                } as CustomerDocument);
-                                                                            } catch (error) {
-                                                                                toast.error(error instanceof Error ? error.message : 'Failed to upload document');
-                                                                            } finally {
-                                                                                setUploadingAdditionalDocument(false);
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    {uploadingAdditionalDocument && <p className="text-xs text-muted-foreground animate-pulse">Uploading...</p>}
-                                                                    {formData.additionalDocument && !uploadingAdditionalDocument && (
-                                                                        <DocumentPreview path={formData.additionalDocument.path} label="Additional Document" />
-                                                                    )}
-                                                                </div>
-                                                            </Field>
+
                                                         </div>
                                                     </div>
                                                 </div>

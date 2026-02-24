@@ -22,9 +22,10 @@ export interface Column<T> {
 
 export interface PaginationProps {
     currentPage: number;
-    totalCount?: number;
+    totalCount: number;
     pageSize: number;
     onPageChange: (page: number) => void;
+    onPageSizeChange?: (size: number) => void;
     hasNextPage: boolean;
     hasPreviousPage: boolean;
 }
@@ -307,7 +308,8 @@ export function DataTable<T>({
                                                     {/* bg-local might not be enough to hide content under sticky, needs background color matching row */}
                                                     <div className={cn(
                                                         "absolute inset-0",
-                                                        isSelected ? "bg-muted/30" : "bg-background group-hover:bg-muted"
+                                                        isSelected ? "bg-slate-50 dark:bg-slate-900" : "bg-background group-hover:bg-muted",
+                                                        rowClassName?.(row)
                                                     )} aria-hidden="true" />
                                                     <div className="relative">
                                                         <input
@@ -342,13 +344,13 @@ export function DataTable<T>({
                                                     <td
                                                         key={col.key}
                                                         className={cn(
-                                                            "px-3 py-3 text-sm transition-colors",
+                                                            "px-3 py-3 text-sm transition-colors overflow-hidden",
                                                             // For sticky columns, we need to manually match the row's background color
                                                             // to prevent transparency issues when scrolling
                                                             (isSticky || isRightSticky) && (
                                                                 isSelected
-                                                                    ? "bg-muted/30" // if selected, use selection color
-                                                                    : "bg-background group-hover:bg-muted" // otherwise base bg with group hover support
+                                                                    ? "bg-slate-50 dark:bg-slate-900" // Use solid light background for selected sticky cells
+                                                                    : cn("bg-background group-hover:bg-muted", rowClassName?.(row))
                                                             ),
                                                             isLastSticky && isScrolledHorizontally && "shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]",
                                                             isRightSticky && canScrollRight && "shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]"
@@ -381,40 +383,64 @@ export function DataTable<T>({
 
             {/* Pagination Footer */}
             {pagination && (
-                <div className="flex items-center justify-between px-4 py-3 bg-card border-t border-border rounded-b-md">
-                    <div className="text-sm text-muted-foreground">
-                        {/* Showing X-Y of Z logic could go here, but with cursor pagination we might not know 'Y' easily if not returned, 
-                           but if we have totalCount we can show 'Page X of Y' or similar. 
-                           For now, let's show simple 'Page X' or 'Showing X results' if on first page. 
-                       */}
-                        {pagination.totalCount !== undefined ? (
-                            <span>Total {pagination.totalCount} items</span>
-                        ) : (
-                            <span>Page {pagination.currentPage}</span>
-                        )}
+                <div className="flex items-center justify-between px-6 py-4 bg-background border-t border-border rounded-b-md select-none group/pagination">
+                    {/* Left: Showing X-Y of Z */}
+                    <div className="text-sm text-muted-foreground font-medium">
+                        {(() => {
+                            const start = (pagination.currentPage - 1) * pagination.pageSize + 1;
+                            const end = Math.min(pagination.currentPage * pagination.pageSize, pagination.totalCount);
+                            return (
+                                <span className="flex items-center gap-1">
+                                    Showing <span className="text-foreground font-bold">{start}-{end}</span> of <span className="text-foreground font-bold">{pagination.totalCount}</span> customers
+                                </span>
+                            );
+                        })()}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
-                            disabled={!pagination.hasPreviousPage}
-                            className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md
-                                     bg-background border border-input hover:bg-accent hover:text-accent-foreground
-                                     disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            Previous
-                        </button>
-                        <span className="text-sm font-medium min-w-[3rem] text-center">
-                            Page {pagination.currentPage}
-                        </span>
-                        <button
-                            onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
-                            disabled={!pagination.hasNextPage}
-                            className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md
-                                     bg-background border border-input hover:bg-accent hover:text-accent-foreground
-                                     disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            Next
-                        </button>
+
+                    {/* Right: Rows per page + Navigation */}
+                    <div className="flex items-center gap-8">
+                        {/* Rows per page selector */}
+                        {pagination.onPageSizeChange && (
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Rows per page</span>
+                                <select
+                                    value={pagination.pageSize}
+                                    onChange={(e) => pagination.onPageSizeChange?.(Number(e.target.value))}
+                                    className="h-8 px-2 py-1 text-xs font-bold rounded-md border border-input bg-background hover:bg-accent hover:border-accent-foreground/30 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                >
+                                    {[10, 25, 50, 100].map(size => (
+                                        <option key={size} value={size}>{size}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Navigation Buttons */}
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
+                                disabled={!pagination.hasPreviousPage}
+                                className="h-8 px-3 text-xs font-bold rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                                Previous
+                            </button>
+
+                            <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
+                                Page <span className="text-foreground font-bold px-1.5 py-0.5 bg-accent/50 rounded">{pagination.currentPage}</span>
+                                <span className="opacity-50">of</span>
+                                <span className="text-foreground font-bold">{Math.ceil(pagination.totalCount / pagination.pageSize) || 1}</span>
+                            </div>
+
+                            <button
+                                onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
+                                disabled={!pagination.hasNextPage}
+                                className="h-8 px-3 text-xs font-bold rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 shadow-sm active:scale-95 text-primary"
+                            >
+                                Next
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

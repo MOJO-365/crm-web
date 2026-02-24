@@ -163,6 +163,18 @@ export const SOFT_DELETE_CUSTOMER = gql`
     }
 `;
 
+export const RESTORE_CUSTOMER = gql`
+    mutation RestoreCustomer($uid: String!) {
+        restoreCustomer(uid: $uid)
+    }
+`;
+
+export const HARD_DELETE_CUSTOMER = gql`
+    mutation HardDeleteCustomer($uid: String!) {
+        hardDeleteCustomer(uid: $uid)
+    }
+`;
+
 export const SEND_PHONE_VERIFICATION = gql`
     mutation SendPhoneVerification($phone: String!) {
         sendPhoneVerification(phone: $phone) {
