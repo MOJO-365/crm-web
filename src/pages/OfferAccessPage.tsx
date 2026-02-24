@@ -924,13 +924,15 @@ export const OfferAccessPage = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
                                     {[
                                         { label: 'Has Solar', value: 'Yes' },
-                                        { label: 'Solar Capacity', value: customerData.solarDetails?.solarcapacity ? `${customerData.solarDetails.solarcapacity} kW` : '—' },
-                                        { label: 'Inverter Capacity', value: customerData.solarDetails?.invertercapacity ? `${customerData.solarDetails.invertercapacity} kW` : '—' },
+                                        { label: 'Solar Capacity', value: customerData.solarDetails?.solarcapacity ? `${customerData.solarDetails.solarcapacity} kW` : null },
+                                        { label: 'Inverter Capacity', value: customerData.solarDetails?.invertercapacity ? `${customerData.solarDetails.invertercapacity} kW` : null },
                                     ].map((item, i) => (
-                                        <div key={i}>
-                                            <div className="text-xs text-muted-foreground mb-1">{item.label}</div>
-                                            <div className="text-sm font-medium text-foreground">{item.value}</div>
-                                        </div>
+                                        item.value ? (
+                                            <div key={i}>
+                                                <div className="text-xs text-muted-foreground mb-1">{item.label}</div>
+                                                <div className="text-sm font-medium text-foreground">{item.value}</div>
+                                            </div>
+                                        ) : null
                                     ))}
                                 </div>
                             </div>
