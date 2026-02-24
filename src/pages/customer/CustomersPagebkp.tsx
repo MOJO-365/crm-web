@@ -732,16 +732,16 @@ export function CustomersPage() {
         })) || []),
     ];
 
-    const handlePageChange = (newPage: number) => {
-        if (newPage < 1) return;
-        // Prevent going to next page if we don't have a cursor for it, unless it's page 1
-        if (newPage > currentPage && !pageInfo?.hasNextPage) return;
+    // const handlePageChange = (newPage: number) => {
+    //     if (newPage < 1) return;
+    //     // Prevent going to next page if we don't have a cursor for it, unless it's page 1
+    //     if (newPage > currentPage && !pageInfo?.hasNextPage) return;
 
-        setCurrentPage(newPage);
-        // Deselect when changing pages (optional, but typical for non-persisted selection across pages)
-        // Keeping selection across pages might be desired, current logic allows it if IDs are kept.
-        // Existing logic `setSelectedCustomerIds` persists IDs, so we can keep them.
-    };
+    //     setCurrentPage(newPage);
+    //     // Deselect when changing pages (optional, but typical for non-persisted selection across pages)
+    //     // Keeping selection across pages might be desired, current logic allows it if IDs are kept.
+    //     // Existing logic `setSelectedCustomerIds` persists IDs, so we can keep them.
+    // };
 
     const handleSearchChange = (key: keyof typeof searchFilters, value: string) => {
         setSearchFilters(prev => ({ ...prev, [key]: value }));
@@ -1891,13 +1891,13 @@ export function CustomersPage() {
                     onSelectAll={handleSelectAll}
                     isSelectingAll={isSelectingAll}
                     totalFilteredCount={totalFilteredCount}
-                    pagination={{
-                        currentPage,
-                        pageSize: limit,
-                        onPageChange: handlePageChange,
-                        hasNextPage: !!pageInfo?.hasNextPage,
-                        hasPreviousPage: currentPage > 1,
-                    }}
+                // pagination={{
+                //     currentPage,
+                //     pageSize: limit,
+                //     onPageChange: handlePageChange,
+                //     hasNextPage: !!pageInfo?.hasNextPage,
+                //     hasPreviousPage: currentPage > 1,
+                // }}
                 />
             </div>
 

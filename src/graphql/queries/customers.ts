@@ -373,7 +373,8 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
         $searchVppConnected: Int, 
         $searchUtilmateStatus: Int, 
         $searchMsatConnected: Int,
-        $searchRiskStatus: String
+        $searchRiskStatus: String,
+        $includeDeleted: Boolean
     ) {
         customersCursor(
             first: 10000, 
@@ -389,7 +390,8 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
             searchVpp: $searchVpp, 
             searchVppConnected: $searchVppConnected, 
             searchUtilmateStatus: $searchUtilmateStatus, 
-            searchMsatConnected: $searchMsatConnected
+            searchMsatConnected: $searchMsatConnected,
+            includeDeleted: $includeDeleted
         ) {
             data {
                 uid
@@ -402,37 +404,29 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
 `;
 
 export const GET_CUSTOMERS_CURSOR = gql`
-    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: String, $searchVpp: Int, $searchVppConnected: Int, $searchUtilmateStatus: Int, $searchMsatConnected: Int) {
-        customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchRiskStatus: $searchRiskStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchUtilmateStatus: $searchUtilmateStatus, searchMsatConnected: $searchMsatConnected) {
+    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: String, $searchVpp: Int, $searchVppConnected: Int, $searchUtilmateStatus: Int, $searchMsatConnected: Int, $includeDeleted: Boolean) {
+        customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchRiskStatus: $searchRiskStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchUtilmateStatus: $searchUtilmateStatus, searchMsatConnected: $searchMsatConnected, includeDeleted: $includeDeleted) {
             data {
                 id
                 uid
                 customerId
                 tenant
-                email
                 firstName
                 lastName
-                businessName
-                abn
                 number
-                dob
                 propertyType
                 tariffCode
                 status
                 utilmateStatus
-                rateVersion
                 riskStatus
                 msatDetails {
                   msatConnected
                 }
                 discount
-                createdAt
-                updatedAt
                 ratePlan {
                     id
                     uid
                     dnsp
-                    tariff
                 }
                 vppDetails {
                     vpp
@@ -440,25 +434,12 @@ export const GET_CUSTOMERS_CURSOR = gql`
                     vppSignupBonus
                 }
                 utilmateDetails {
-                    siteIdentifier
-                    accountNumber
                     utilmateConnected
-                    utilmateConnectedAt
                 }
                 address {
-                    id
-                    customerUid
-                    unitNumber
-                    streetNumber
-                    streetName
-                    streetType
-                    suburb
-                    state
-                    postcode
-                    country
-                    nmi
                     fullAddress
                 }
+                isDeleted
             }
             pageInfo {
                 hasNextPage
@@ -506,6 +487,161 @@ export const GET_CUSTOMER_BY_ID = gql`
             riskStatus
             emailLogCount
             offerVersion
+            viewCode
+            isActive
+            isDeleted
+            createdAt
+            offerEmailSentAt
+            updatedAt
+            address {
+                id
+                customerUid
+                unitNumber
+                streetNumber
+                streetName
+                streetType
+                suburb
+                state
+                postcode
+                country
+                nmi
+                fullAddress
+            }
+            ratePlan {
+                uid
+                codes
+                planId
+                dnsp
+                tariff
+                state
+                type
+                vpp
+                discountApplies
+                discountPercentage
+                offers {
+                    uid
+                    offerName
+                    anytime
+                    cl1Supply
+                    cl1Usage
+                    cl2Supply
+                    cl2Usage
+                    demand
+                    demandOp
+                    demandP
+                    demandS
+                    fit
+                    fitPeak
+                    fitCritical
+                    fitVpp
+                    offPeak
+                    peak
+                    shoulder
+                    supplyCharge
+                    vppOrcharge
+                }
+            }
+            # Tab visibility and prefill data
+            vppDetails {
+                vpp
+                vppConnected
+                vppSignupBonus
+            }
+            solarDetails {
+                hassolar
+                solarcapacity
+                invertercapacity
+            }
+            batteryDetails {
+                batterybrand
+                snnumber
+                batterycapacity
+                exportlimit
+                inverterCapacity
+            }
+            enrollmentDetails {
+                saletype
+                connectiondate
+                idtype
+                idnumber
+                idstate
+                idcountry
+                idexpiry
+                concession
+                lifesupport
+                billingpreference
+                licenseNumber
+                licenseState
+                licenseExpiry
+            }
+            debitDetails {
+                optIn
+                accountType
+                firstName
+                lastName
+                bankName
+                bankAddress
+                bsb
+                accountNumber
+                paymentFrequency
+                firstDebitDate
+            }
+            utilmateDetails {
+                utilmateConnected
+            }
+            previousBill {
+                id
+                filename
+                path
+            }
+            identityProof {
+                id
+                filename
+                path
+            }
+            licenseDocument {
+                id
+                filename
+                path
+            }
+           
+        }
+    }
+`;
+
+export const GET_CUSTOMER_GENERAL_DETAILS = gql`
+    query GetCustomerGeneralDetails($uid: String!) {
+        customer(uid: $uid) {
+            uid
+            customerId
+            email
+            firstName
+            lastName
+            businessName
+            abn
+            showAsBusinessName
+            showName
+            number
+            phoneVerifiedAt
+            dob
+            propertyType
+            tariffCode
+            status
+            discount
+            signDate
+            signedPdfPath
+            emailSent
+            utilmateStatus
+            rateVersion
+            gender
+            relationshipStatus
+            enquiryAmount
+            checkCreditScore
+            employerName
+            creditScore
+            isCreditScoreFetched
+            riskStatus
+            emailLogCount
             offerVersion
             viewCode
             isActive
@@ -513,6 +649,207 @@ export const GET_CUSTOMER_BY_ID = gql`
             createdAt
             offerEmailSentAt
             updatedAt
+            address {
+                id
+                customerUid
+                unitNumber
+                streetNumber
+                streetName
+                streetType
+                suburb
+                state
+                postcode
+                country
+                nmi
+                fullAddress
+            }
+            ratePlan {
+                uid
+                codes
+                planId
+                dnsp
+                tariff
+                state
+                type
+                vpp
+                discountApplies
+                discountPercentage
+                offers {
+                    uid
+                    offerName
+                    anytime
+                    cl1Supply
+                    cl1Usage
+                    cl2Supply
+                    cl2Usage
+                    demand
+                    demandOp
+                    demandP
+                    demandS
+                    fit
+                    fitPeak
+                    fitCritical
+                    fitVpp
+                    offPeak
+                    peak
+                    shoulder
+                    supplyCharge
+                    vppOrcharge
+                }
+            }
+            vppDetails {
+                vpp
+                vppConnected
+                vppSignupBonus
+            }
+            solarDetails {
+                hassolar
+                solarcapacity
+                invertercapacity
+            }
+            batteryDetails {
+                batterybrand
+                snnumber
+                batterycapacity
+                exportlimit
+                inverterCapacity
+            }
+            enrollmentDetails {
+                saletype
+                connectiondate
+                idtype
+                idnumber
+                idstate
+                idcountry
+                idexpiry
+                concession
+                lifesupport
+                billingpreference
+                licenseNumber
+                licenseState
+                licenseExpiry
+            }
+            debitDetails {
+                optIn
+                accountType
+                firstName
+                lastName
+                bankName
+                bankAddress
+                bsb
+                accountNumber
+                paymentFrequency
+                firstDebitDate
+            }
+            utilmateDetails {
+                utilmateConnected
+            }
+            previousBill {
+                id
+                filename
+                path
+            }
+            identityProof {
+                id
+                filename
+                path
+            }
+            licenseDocument {
+                id
+                filename
+                path
+            }
+        }
+    }
+`;
+
+export const GET_CUSTOMER_SOLAR_VPP_DETAILS = gql`
+    query GetCustomerSolarVppDetails($uid: String!) {
+        customer(uid: $uid) {
+            uid
+            vppDetails {
+                id
+                customerUid
+                vpp
+                vppConnected
+                vppSignupBonus
+            }
+            solarDetails {
+                id
+                customerUid
+                hassolar
+                solarcapacity
+                invertercapacity
+            }
+            batteryDetails {
+                id
+                customerUid
+                batterybrand
+                snnumber
+                batterycapacity
+                exportlimit
+                inverterCapacity
+                checkCode
+                isActive
+                isDeleted
+                createdAt
+                updatedAt
+            }
+        }
+    }
+`;
+
+export const GET_CUSTOMER_DEBIT_DETAILS = gql`
+    query GetCustomerDebitDetails($uid: String!) {
+        customer(uid: $uid) {
+            uid
+            debitDetails {
+                id
+                customerUid
+                accountType
+                companyName
+                abn
+                firstName
+                lastName
+                bankName
+                bankAddress
+                bsb
+                accountNumber
+                paymentFrequency
+                firstDebitDate
+                optIn
+            }
+        }
+    }
+`;
+
+export const GET_CUSTOMER_UTILMATE_DETAILS = gql`
+    query GetCustomerUtilmateDetails($uid: String!) {
+        customer(uid: $uid) {
+            uid
+            utilmateDetails {
+                id
+                customerUid
+                siteIdentifier
+                accountNumber
+                utilmateConnected
+                utilmateConnectedAt
+            }
+            msatDetails {
+                id
+                customerUid
+                msatConnected
+                msatConnectedAt
+                msatUpdatedAt
+            }
+        }
+    }
+`;
+
+export const GET_CUSTOMER_DOCUMENTS = gql`
+    query GetCustomerDocuments($uid: String!) {
+        customer(uid: $uid) {
+            uid
             previousBill {
                 id
                 uid
@@ -578,135 +915,6 @@ export const GET_CUSTOMER_BY_ID = gql`
                     uid
                     name
                 }
-            }
-            address {
-                id
-                customerUid
-                unitNumber
-                streetNumber
-                streetName
-                streetType
-                suburb
-                state
-                postcode
-                country
-                nmi
-                fullAddress
-            }
-
-            msatDetails {
-                id
-                customerUid
-                msatConnected
-                msatConnectedAt
-                msatUpdatedAt
-            }
-            vppDetails {
-                id
-                customerUid
-                vpp
-                vppConnected
-                vppSignupBonus
-            }
-            solarDetails {
-                id
-                customerUid
-                hassolar
-                solarcapacity
-                invertercapacity
-            }
-            batteryDetails {
-                id
-                customerUid
-                batterybrand
-                snnumber
-                batterycapacity
-                exportlimit
-                inverterCapacity
-                checkCode
-                isActive
-                isDeleted
-                createdAt
-                updatedAt
-            }
-            debitDetails {
-                id
-                customerUid
-                accountType
-                companyName
-                abn
-                firstName
-                lastName
-                bankName
-                bankAddress
-                bsb
-                accountNumber
-                paymentFrequency
-                firstDebitDate
-                optIn
-            }
-            utilmateDetails {
-                id
-                customerUid
-                siteIdentifier
-                accountNumber
-                utilmateConnected
-                utilmateConnectedAt
-            }
-            ratePlan {
-                uid
-                codes
-                planId
-                dnsp
-                tariff
-                state
-                type
-                vpp
-                discountApplies
-                discountPercentage
-                offers {
-                    uid
-                    offerName
-                    anytime
-                    cl1Supply
-                    cl1Usage
-                    cl2Supply
-                    cl2Usage
-                    demand
-                    demandOp
-                    demandP
-                    demandS
-                    fit
-                    fitPeak
-                    fitCritical
-                    fitVpp
-                    offPeak
-                    peak
-                    shoulder
-                    supplyCharge
-                    vppOrcharge
-                }
-            }
-            enrollmentDetails {
-                id
-                customerUid
-                saletype
-                connectiondate
-                idtype
-                idnumber
-                idstate
-                idcountry
-                idexpiry
-                concession
-                lifesupport
-                billingpreference
-                licenseNumber
-                licenseState
-                licenseExpiry
-                isActive
-                isDeleted
-                createdAt
-                updatedAt
             }
             documents {
                 id

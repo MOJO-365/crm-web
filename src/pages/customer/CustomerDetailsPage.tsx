@@ -11,11 +11,29 @@ import {
     RefreshCwIcon, SunIcon, CreditCardIcon, FileTextIcon, PercentIcon
 } from '@/components/icons';
 import {
-    GET_DOCUMENT_TYPES, CREATE_DOCUMENT_TYPE, CREATE_CUSTOMER, SEND_OFFER_EMAIL,
-    GET_CUSTOMER_BY_ID, SEND_REMINDER_EMAIL, UPDATE_CUSTOMER, GET_RATES_HISTORY_BY_VERSION,
-    GET_CUSTOMER_NOTES, CREATE_CUSTOMER_NOTE, DELETE_CUSTOMER_NOTE, GET_USERS, GET_NOTE_TYPES,
-    CREATE_NOTE_TYPE, SEND_CUSTOMER_CREDENTIALS_EMAIL, GET_RISK_STATUSES,
-    GET_CUSTOMER_EMAIL_LOGS, GET_AUDIT_LOGS
+    GET_CUSTOMER_GENERAL_DETAILS,
+    GET_CUSTOMER_SOLAR_VPP_DETAILS,
+    GET_CUSTOMER_DEBIT_DETAILS,
+    GET_CUSTOMER_UTILMATE_DETAILS,
+    GET_CUSTOMER_DOCUMENTS,
+    SOFT_DELETE_CUSTOMER,
+    GET_RATES_HISTORY_BY_VERSION,
+    GET_AUDIT_LOGS,
+    GET_CUSTOMER_EMAIL_LOGS,
+    GET_CUSTOMER_NOTES,
+    GET_NOTE_TYPES,
+    GET_USERS,
+    GET_DOCUMENT_TYPES,
+    GET_RISK_STATUSES,
+    CREATE_CUSTOMER_NOTE,
+    DELETE_CUSTOMER_NOTE,
+    SEND_OFFER_EMAIL,
+    CREATE_NOTE_TYPE,
+    CREATE_DOCUMENT_TYPE,
+    SEND_REMINDER_EMAIL,
+    CREATE_CUSTOMER,
+    UPDATE_CUSTOMER,
+    SEND_CUSTOMER_CREDENTIALS_EMAIL
 } from '@/graphql';
 import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
@@ -101,6 +119,8 @@ interface CustomerDetails {
     offerEmailSentAt?: string;
     emailLogCount?: number;
     phoneVerifiedAt?: string;
+    isActive?: boolean;
+    isDeleted?: boolean;
     address?: CustomerAddress;
     riskStatus?: string;
     enrollmentDetails?: {
@@ -814,6 +834,9 @@ export function CustomerDetailsPage() {
     const [freezeModalOpen, setFreezeModalOpen] = useState(false);
     // const [customerToFreeze, setCustomerToFreeze] = useState<CustomerDetails | null>(null); // Not needed since we use selectedCustomerDetails
     const [markingNotInterested, setMarkingNotInterested] = useState(false);
+    const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deleteConfirmName, setDeleteConfirmName] = useState('');
     const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
 
     // VPP Form State
@@ -854,11 +877,11 @@ export function CustomerDetailsPage() {
     useEffect(() => {
         const handleResize = () => {
             const width = window.innerWidth;
-            if (width < 640) setMaxVisibleTabs(3); // Mobile: Icons only (fits more)
-            else if (width < 768) setMaxVisibleTabs(3); // Tablet Potrait
-            else if (width < 1024) setMaxVisibleTabs(4); // Tablet Landscape
+            if (width < 640) setMaxVisibleTabs(4); // Mobile: Icons only (fits more)
+            else if (width < 768) setMaxVisibleTabs(5); // Tablet Portrait
+            else if (width < 1024) setMaxVisibleTabs(5); // Tablet Landscape
             else if (width < 1280) setMaxVisibleTabs(6); // Laptop
-            else setMaxVisibleTabs(8); // Desktop
+            else setMaxVisibleTabs(12); // Desktop (Show all tabs)
         };
 
         handleResize();
@@ -867,7 +890,7 @@ export function CustomerDetailsPage() {
     }, []);
 
     // Queries
-    const { loading: isLoadingDetails, refetch: refetchCustomer } = useQuery(GET_CUSTOMER_BY_ID, {
+    const { loading: isLoadingDetails, refetch: refetchCustomer } = useQuery(GET_CUSTOMER_GENERAL_DETAILS, {
         variables: { uid },
         fetchPolicy: 'network-only',
         onCompleted: (data) => {
@@ -885,17 +908,19 @@ export function CustomerDetailsPage() {
     // Notes query
     const { data: notesData, loading: notesLoading, refetch: refetchNotes } = useQuery(GET_CUSTOMER_NOTES, {
         variables: { customerUid: uid || '' },
-        skip: !uid,
+        skip: !uid || selectedDetailSection !== 'notes',
         fetchPolicy: 'network-only',
     });
 
     const { data: noteTypesData, refetch: refetchNoteTypes } = useQuery(GET_NOTE_TYPES, {
+        skip: selectedDetailSection !== 'notes' && !noteModalOpen,
         fetchPolicy: 'network-only'
     });
 
     // Fetch users for note assignment
     const { data: userData } = useQuery(GET_USERS, {
         variables: { limit: 100 },
+        skip: selectedDetailSection !== 'notes' && !noteModalOpen,
     });
 
     const userOptions = userData?.users?.data?.map((u: any) => ({
@@ -904,6 +929,7 @@ export function CustomerDetailsPage() {
     })) || [];
 
     const { data: documentTypesData, refetch: refetchDocumentTypes } = useQuery(GET_DOCUMENT_TYPES, {
+        skip: selectedDetailSection !== 'documents' && selectedDetailSection !== 'electricity_bills',
         fetchPolicy: 'cache-and-network'
     });
 
@@ -912,6 +938,55 @@ export function CustomerDetailsPage() {
         fetchPolicy: 'cache-and-network'
     });
     const riskStatuses = riskStatusesData?.riskStatuses || [];
+
+    const loadingGeneral = false; // Replaced by primary query
+
+    const { loading: loadingSolar } = useQuery(GET_CUSTOMER_SOLAR_VPP_DETAILS, {
+        variables: { uid },
+        skip: !uid || (selectedDetailSection !== 'solar_vpp' && !vppConnectModalOpen && !freezeModalOpen),
+        onCompleted: (data) => {
+            if (data?.customer) {
+                setSelectedCustomerDetails(prev => prev ? ({ ...prev, ...data.customer }) : data.customer);
+            }
+        }
+    });
+
+    const { loading: loadingDebit } = useQuery(GET_CUSTOMER_DEBIT_DETAILS, {
+        variables: { uid },
+        skip: !uid || selectedDetailSection !== 'debit',
+        onCompleted: (data) => {
+            if (data?.customer) {
+                setSelectedCustomerDetails(prev => prev ? ({ ...prev, ...data.customer }) : data.customer);
+            }
+        }
+    });
+
+    const { loading: loadingUtilmate } = useQuery(GET_CUSTOMER_UTILMATE_DETAILS, {
+        variables: { uid },
+        skip: !uid || (selectedDetailSection !== 'utilmate' && !utilmateConnectModalOpen),
+        onCompleted: (data) => {
+            if (data?.customer) {
+                setSelectedCustomerDetails(prev => prev ? ({ ...prev, ...data.customer }) : data.customer);
+            }
+        }
+    });
+
+    const { loading: loadingDocuments } = useQuery(GET_CUSTOMER_DOCUMENTS, {
+        variables: { uid },
+        skip: !uid || (selectedDetailSection !== 'documents' && selectedDetailSection !== 'electricity_bills'),
+        onCompleted: (data) => {
+            if (data?.customer) {
+                setSelectedCustomerDetails(prev => prev ? ({ ...prev, ...data.customer }) : data.customer);
+            }
+        }
+    });
+
+    const isTabLoading =
+        (selectedDetailSection === 'general' && loadingGeneral) ||
+        (selectedDetailSection === 'solar_vpp' && loadingSolar) ||
+        (selectedDetailSection === 'debit' && loadingDebit) ||
+        (selectedDetailSection === 'utilmate' && loadingUtilmate) ||
+        ((selectedDetailSection === 'documents' || selectedDetailSection === 'electricity_bills') && loadingDocuments);
 
     const docTypeOptions = [
         ...(documentTypesData?.documentTypes?.map((t: any) => ({
@@ -932,6 +1007,7 @@ export function CustomerDetailsPage() {
     const [createNote] = useMutation(CREATE_CUSTOMER_NOTE);
     const [deleteNote] = useMutation(DELETE_CUSTOMER_NOTE);
     const [sendOfferEmail] = useMutation(SEND_OFFER_EMAIL);
+    const [softDeleteCustomer] = useMutation(SOFT_DELETE_CUSTOMER);
     const [createNoteType] = useMutation(CREATE_NOTE_TYPE);
     const [createDocumentTypeMutation] = useMutation(CREATE_DOCUMENT_TYPE);
     const [sendReminderEmail] = useMutation(SEND_REMINDER_EMAIL);
@@ -1051,7 +1127,8 @@ export function CustomerDetailsPage() {
             const url = `${baseUrl}/api/documents/${encodeURIComponent(selectedCustomerDetails.signedPdfPath).replace(/%2F/g, '/')}`;
             setPreviewUrl(url);
         } else {
-            const url = `${baseUrl}/api/agreement/preview/${uid}`;
+            // Use format=html for much faster preview
+            const url = `${baseUrl}/api/agreement/preview/${uid}?format=html`;
             setPreviewUrl(url);
         }
 
@@ -1244,6 +1321,36 @@ export function CustomerDetailsPage() {
         setFreezeModalOpen(true);
     };
 
+    const handleDeleteCustomer = () => {
+        setDeleteConfirmName('');
+        setDeleteModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!selectedCustomerDetails) return;
+        if (deleteConfirmName !== selectedCustomerDetails.customerId) {
+            toast.error("Customer ID does not match.");
+            return;
+        }
+
+        setIsDeletingCustomer(true);
+        try {
+            await softDeleteCustomer({
+                variables: {
+                    uid: selectedCustomerDetails.uid
+                }
+            });
+            toast.success('Customer deleted successfully');
+            setDeleteModalOpen(false);
+            navigate('/customers');
+        } catch (error: any) {
+            console.error('Error deleting customer:', error);
+            toast.error(error.message || 'Failed to delete customer');
+        } finally {
+            setIsDeletingCustomer(false);
+        }
+    };
+
     const handleConfirmFreeze = async () => {
         const customer = selectedCustomerDetails;
         if (!customer) return;
@@ -1356,6 +1463,8 @@ export function CustomerDetailsPage() {
         }
 
     };
+
+
 
     const handleVppToggle = async (customerUid: string, newValue: boolean) => {
         if (!selectedCustomerDetails) return;
@@ -1970,13 +2079,13 @@ export function CustomerDetailsPage() {
                                 <ArrowLeftIcon className="mr-1.5 h-3.5 w-3.5" />
                                 Back
                             </Button>
-                            {canEdit && selectedCustomerDetails && selectedCustomerDetails.status !== 3 && (
+                            {canEdit && selectedCustomerDetails && !selectedCustomerDetails.isDeleted && selectedCustomerDetails.status !== 3 && (
                                 <Button onClick={() => navigate(`/customers/${uid}/edit`)} variant="outline" className="h-9 px-3 text-sm">
                                     <PencilIcon className="mr-1.5 h-3.5 w-3.5" />
                                     Edit
                                 </Button>
                             )}
-                            {selectedCustomerDetails && (
+                            {selectedCustomerDetails && !selectedCustomerDetails.isDeleted && (
                                 (() => {
                                     const hasPreview = true;
                                     const hasNotInterested = selectedCustomerDetails.status !== 5;
@@ -2026,6 +2135,21 @@ export function CustomerDetailsPage() {
                                                             >
                                                                 <LockIcon size={15} className="text-slate-500" />
                                                                 {freezingCustomer ? 'Freezing...' : 'Freeze'}
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {!selectedCustomerDetails.signedPdfPath && (
+                                                        <>
+                                                            <div className="my-1 border-t border-border" />
+                                                            <button
+                                                                onClick={() => {
+                                                                    handleDeleteCustomer();
+                                                                }}
+                                                                disabled={isDeletingCustomer}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                                                            >
+                                                                <TrashIcon size={15} />
+                                                                {isDeletingCustomer ? 'Deleting...' : 'Delete'}
                                                             </button>
                                                         </>
                                                     )}
@@ -2125,8 +2249,8 @@ export function CustomerDetailsPage() {
                                             {item.showReminder && !selectedCustomerDetails.signDate && (
                                                 <button
                                                     onClick={() => handleSendReminder(selectedCustomerDetails.uid)}
-                                                    disabled={sendingReminder || reminderSent}
-                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 ${reminderSent ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground hover:bg-primary/90'} ${sendingReminder ? 'opacity-70' : ''}`}
+                                                    disabled={sendingReminder || reminderSent || selectedCustomerDetails.isDeleted}
+                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 ${reminderSent ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground hover:bg-primary/90'} ${sendingReminder || selectedCustomerDetails.isDeleted ? 'opacity-70' : ''}`}
                                                 >
                                                     {sendingReminder ? (
                                                         <><div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
@@ -2167,8 +2291,8 @@ export function CustomerDetailsPage() {
                                             {item.step === 0 && !item.completed && (
                                                 <button
                                                     onClick={() => handleCheckCreditScore(selectedCustomerDetails.uid)}
-                                                    disabled={isCheckingCreditScore}
-                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 bg-primary text-primary-foreground hover:bg-primary/90 ${isCheckingCreditScore ? 'opacity-70' : ''}`}
+                                                    disabled={isCheckingCreditScore || selectedCustomerDetails.isDeleted}
+                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 bg-primary text-primary-foreground hover:bg-primary/90 ${isCheckingCreditScore || selectedCustomerDetails.isDeleted ? 'opacity-70' : ''}`}
                                                 >
                                                     {isCheckingCreditScore ? (
                                                         <><div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Checking...</>
@@ -2181,8 +2305,8 @@ export function CustomerDetailsPage() {
                                             {item.step === 0 && (showManualOfferButton || (selectedCustomerDetails.isCreditScoreFetched === 1 && selectedCustomerDetails.riskStatus !== undefined && (riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus)?.manualOffer === 1))) && !selectedCustomerDetails.offerEmailSentAt && (
                                                 <button
                                                     onClick={() => handleManualSendOffer(selectedCustomerDetails.uid)}
-                                                    disabled={isSendingOffer}
-                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 bg-primary text-primary-foreground hover:bg-primary/90 ${isSendingOffer ? 'opacity-70' : ''}`}
+                                                    disabled={isSendingOffer || selectedCustomerDetails.isDeleted}
+                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 bg-primary text-primary-foreground hover:bg-primary/90 ${isSendingOffer || selectedCustomerDetails.isDeleted ? 'opacity-70' : ''}`}
                                                 >
                                                     {isSendingOffer ? (
                                                         <><div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
@@ -2208,7 +2332,7 @@ export function CustomerDetailsPage() {
                                                         <div className="scale-75 origin-left md:origin-center">
                                                             <ToggleSwitch
                                                                 checked={item.completed}
-                                                                disabled={item.disabled}
+                                                                disabled={item.disabled || selectedCustomerDetails.isDeleted}
                                                                 onChange={(val) => {
                                                                     if (val) {
                                                                         if (item.step === 3) handleVppToggle(selectedCustomerDetails.uid, true);
@@ -2226,7 +2350,7 @@ export function CustomerDetailsPage() {
                                                     variant="outline"
                                                     size="sm"
                                                     className="mt-1 h-6 text-[9px] px-2 relative z-30 bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800 transition-colors"
-                                                    disabled={isGeneratingCredentials}
+                                                    disabled={isGeneratingCredentials || selectedCustomerDetails.isDeleted}
                                                     onClick={() => selectedCustomerDetails.customerId && handleGenerateCredentials(selectedCustomerDetails.customerId)}
 
                                                 >
@@ -2274,9 +2398,9 @@ export function CustomerDetailsPage() {
                                     { id: 'solar_vpp', label: 'Solar & VPP', icon: SunIcon },
                                     { id: 'debit', label: 'Debit', icon: CreditCardIcon },
                                     { id: 'utilmate', label: 'Utilmate', icon: PlugIcon },
-                                    { id: 'notes', label: 'Notes', icon: FileTextIcon, badge: notesData?.customerNotes?.length },
                                     { id: 'documents', label: 'Documents', icon: UploadIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2')).length },
                                     { id: 'electricity_bills', label: 'Electricity Bills', icon: ZapIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2' || d.type === '2').length },
+                                    { id: 'notes', label: 'Notes', icon: FileTextIcon, badge: notesData?.customerNotes?.length },
                                     { id: 'email_logs', label: 'Email Logs', icon: MailIcon },
                                     { id: 'activity_log', label: 'Activity Log', icon: ActivityIcon }
                                 ].filter(item => {
@@ -2410,7 +2534,15 @@ export function CustomerDetailsPage() {
                         </div>
 
                         {/* Content Area */}
-                        <div className="flex-1 p-6 overflow-y-auto">
+                        <div className="flex-1 p-6 overflow-y-auto relative">
+                            {isTabLoading && (
+                                <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-[1px] animate-in fade-in duration-300">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                                        <p className="text-sm font-medium text-muted-foreground">Fetching details...</p>
+                                    </div>
+                                </div>
+                            )}
 
                             {selectedDetailSection === 'general' && (
                                 <div className="space-y-4 animate-in fade-in duration-300">
@@ -2847,12 +2979,16 @@ export function CustomerDetailsPage() {
                                             <div className="flex items-center justify-between border-b pb-2">
                                                 <h3 className="text-lg font-semibold">VPP Configuration</h3>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-medium text-muted-foreground">VPP Connected</span>
-                                                    <ToggleSwitch
-                                                        checked={selectedCustomerDetails.vppDetails?.vppConnected === 1}
-                                                        onChange={(checked) => handleVppToggle(selectedCustomerDetails.uid, checked)}
-                                                        disabled={false}
-                                                    />
+                                                    {!selectedCustomerDetails.isDeleted && (
+                                                        <>
+                                                            <span className="text-sm font-medium text-muted-foreground">VPP Connected</span>
+                                                            <ToggleSwitch
+                                                                checked={selectedCustomerDetails.vppDetails?.vppConnected === 1}
+                                                                onChange={(checked) => handleVppToggle(selectedCustomerDetails.uid, checked)}
+                                                                disabled={false}
+                                                            />
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -3201,98 +3337,100 @@ export function CustomerDetailsPage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-border">
-                                                <tr className="bg-muted/30 border-b border-border animate-in fade-in slide-in-from-top-1">
-                                                    <td className="px-4 py-4">
-                                                        <div className="space-y-2">
-                                                            <div className="flex items-end justify-between">
-                                                                <label className="text-[10px] font-bold uppercase text-muted-foreground leading-none">Choose Type</label>
-                                                                {canManageDocumentTypes && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setIsAddingNewDocTypeInline(!isAddingNewDocTypeInline);
-                                                                            setNewDocTypeName('');
-                                                                        }}
-                                                                        className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
-                                                                    >
-                                                                        {isAddingNewDocTypeInline ? 'Cancel' : '+ Add New Type'}
-                                                                    </button>
+                                                {!selectedCustomerDetails?.isDeleted && (
+                                                    <tr className="bg-muted/30 border-b border-border animate-in fade-in slide-in-from-top-1">
+                                                        <td className="px-4 py-4">
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-end justify-between">
+                                                                    <label className="text-[10px] font-bold uppercase text-muted-foreground leading-none">Choose Type</label>
+                                                                    {canManageDocumentTypes && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setIsAddingNewDocTypeInline(!isAddingNewDocTypeInline);
+                                                                                setNewDocTypeName('');
+                                                                            }}
+                                                                            className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                                                        >
+                                                                            {isAddingNewDocTypeInline ? 'Cancel' : '+ Add New Type'}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                {isAddingNewDocTypeInline ? (
+                                                                    <div className="flex flex-col gap-2 p-2 border border-border rounded-lg bg-background/50">
+                                                                        <div className="flex gap-2">
+                                                                            <Input
+                                                                                placeholder="Type name..."
+                                                                                value={newDocTypeName}
+                                                                                onChange={(e) => setNewDocTypeName(e.target.value)}
+                                                                                className="h-8 flex-1 text-xs"
+                                                                                autoFocus
+                                                                            />
+                                                                            <Select
+                                                                                options={[
+                                                                                    { label: 'Personal (0)', value: '0' },
+                                                                                    { label: 'Signed (1)', value: '1' },
+                                                                                    { label: 'Electricity (2)', value: '2' }
+                                                                                ]}
+                                                                                value={newDocTypeCategory}
+                                                                                onChange={(val) => setNewDocTypeCategory(val as string)}
+                                                                                className="h-8 w-28 text-xs"
+                                                                            />
+                                                                        </div>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            className="h-8 w-full bg-neutral-900 text-white hover:bg-neutral-800 text-[10px]"
+                                                                            onClick={handleCreateDocumentType}
+                                                                            disabled={!newDocTypeName.trim() || isAddingDocType}
+                                                                            isLoading={isAddingDocType}
+                                                                        >
+                                                                            Add Document Type
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <Select
+                                                                        options={docTypeOptions.filter(o => o.value !== '2')}
+                                                                        value={newDocumentType}
+                                                                        onChange={(val) => setNewDocumentType(val as string)}
+                                                                        placeholder="Select Type..."
+                                                                        className="w-full bg-background h-9"
+                                                                    />
                                                                 )}
                                                             </div>
-                                                            {isAddingNewDocTypeInline ? (
-                                                                <div className="flex flex-col gap-2 p-2 border border-border rounded-lg bg-background/50">
-                                                                    <div className="flex gap-2">
-                                                                        <Input
-                                                                            placeholder="Type name..."
-                                                                            value={newDocTypeName}
-                                                                            onChange={(e) => setNewDocTypeName(e.target.value)}
-                                                                            className="h-8 flex-1 text-xs"
-                                                                            autoFocus
-                                                                        />
-                                                                        <Select
-                                                                            options={[
-                                                                                { label: 'Personal (0)', value: '0' },
-                                                                                { label: 'Signed (1)', value: '1' },
-                                                                                { label: 'Electricity (2)', value: '2' }
-                                                                            ]}
-                                                                            value={newDocTypeCategory}
-                                                                            onChange={(val) => setNewDocTypeCategory(val as string)}
-                                                                            className="h-8 w-28 text-xs"
-                                                                        />
-                                                                    </div>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                        <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                        <td className="px-4 py-4 text-right align-bottom">
+                                                            <div className="flex flex-col gap-2 items-end">
+                                                                <div className="flex gap-2">
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            setNewDocumentType('');
+                                                                        }}
+                                                                        className="h-8 px-3 text-xs border-input hover:bg-accent hover:text-accent-foreground"
+                                                                    >
+                                                                        Clear
+                                                                    </Button>
                                                                     <Button
                                                                         size="sm"
-                                                                        className="h-8 w-full bg-neutral-900 text-white hover:bg-neutral-800 text-[10px]"
-                                                                        onClick={handleCreateDocumentType}
-                                                                        disabled={!newDocTypeName.trim() || isAddingDocType}
-                                                                        isLoading={isAddingDocType}
+                                                                        className="bg-neutral-900 text-white hover:bg-neutral-800 h-8 px-3 text-xs"
+                                                                        disabled={!newDocumentType || isUploadingDocument !== null}
+                                                                        onClick={() => newDocumentInputRef.current?.click()}
+                                                                        isLoading={isUploadingDocument !== null && isUploadingDocument === newDocumentType}
                                                                     >
-                                                                        Add Document Type
+                                                                        <UploadIcon className="w-3.5 h-3.5 " />
+                                                                        {/* Upload File */}
                                                                     </Button>
                                                                 </div>
-                                                            ) : (
-                                                                <Select
-                                                                    options={docTypeOptions.filter(o => o.value !== '2')}
-                                                                    value={newDocumentType}
-                                                                    onChange={(val) => setNewDocumentType(val as string)}
-                                                                    placeholder="Select Type..."
-                                                                    className="w-full bg-background h-9"
-                                                                />
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
-                                                    <td className="px-4 py-4 text-right align-bottom">
-                                                        <div className="flex flex-col gap-2 items-end">
-                                                            <div className="flex gap-2">
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => {
-                                                                        setNewDocumentType('');
-                                                                    }}
-                                                                    className="h-8 px-3 text-xs border-input hover:bg-accent hover:text-accent-foreground"
-                                                                >
-                                                                    Clear
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    className="bg-neutral-900 text-white hover:bg-neutral-800 h-8 px-3 text-xs"
-                                                                    disabled={!newDocumentType || isUploadingDocument !== null}
-                                                                    onClick={() => newDocumentInputRef.current?.click()}
-                                                                    isLoading={isUploadingDocument !== null && isUploadingDocument === newDocumentType}
-                                                                >
-                                                                    <UploadIcon className="w-3.5 h-3.5 " />
-                                                                    {/* Upload File */}
-                                                                </Button>
+                                                                {isUploadingDocument && isUploadingDocument === newDocumentType && (
+                                                                    <span className="text-[10px] text-primary animate-pulse font-medium">Uploading...</span>
+                                                                )}
                                                             </div>
-                                                            {isUploadingDocument && isUploadingDocument === newDocumentType && (
-                                                                <span className="text-[10px] text-primary animate-pulse font-medium">Uploading...</span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                                        </td>
+                                                    </tr>
+                                                )}
                                                 {selectedCustomerDetails && [
                                                     {
                                                         doc: selectedCustomerDetails.previousBill,
@@ -3473,55 +3611,57 @@ export function CustomerDetailsPage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-border">
-                                                <tr className="bg-muted/30 border-b border-border animate-in fade-in slide-in-from-top-1">
-                                                    <td className="px-4 py-4 align-bottom">
-                                                        <div className="space-y-2">
-                                                            <label className="text-[10px] font-bold uppercase text-muted-foreground leading-none">Select Period</label>
-                                                            <div className="flex gap-2 items-center">
-                                                                <DatePicker
-                                                                    value={billStartDate}
-                                                                    onChange={(d) => setBillStartDate(d ? d.toISOString() : '')}
-                                                                    placeholder="Start Date"
-                                                                    className="h-9 w-[130px] text-xs"
-                                                                />
-                                                                <span className="text-muted-foreground">—</span>
-                                                                <DatePicker
-                                                                    value={billEndDate}
-                                                                    onChange={(d) => setBillEndDate(d ? d.toISOString() : '')}
-                                                                    placeholder="End Date"
-                                                                    className="h-9 w-[130px] text-xs"
-                                                                />
+                                                {!selectedCustomerDetails?.isDeleted && (
+                                                    <tr className="bg-muted/30 border-b border-border animate-in fade-in slide-in-from-top-1">
+                                                        <td className="px-4 py-4 align-bottom">
+                                                            <div className="space-y-2">
+                                                                <label className="text-[10px] font-bold uppercase text-muted-foreground leading-none">Select Period</label>
+                                                                <div className="flex gap-2 items-center">
+                                                                    <DatePicker
+                                                                        value={billStartDate}
+                                                                        onChange={(d) => setBillStartDate(d ? d.toISOString() : '')}
+                                                                        placeholder="Start Date"
+                                                                        className="h-9 w-[130px] text-xs"
+                                                                    />
+                                                                    <span className="text-muted-foreground">—</span>
+                                                                    <DatePicker
+                                                                        value={billEndDate}
+                                                                        onChange={(d) => setBillEndDate(d ? d.toISOString() : '')}
+                                                                        placeholder="End Date"
+                                                                        className="h-9 w-[130px] text-xs"
+                                                                    />
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
-                                                    <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
-                                                    <td className="px-4 py-4 text-right align-bottom">
-                                                        <div className="flex gap-2 justify-end">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    setBillStartDate('');
-                                                                    setBillEndDate('');
-                                                                }}
-                                                                className="h-8 px-3 text-xs border-input hover:bg-accent hover:text-accent-foreground"
-                                                            >
-                                                                Clear
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                className="bg-neutral-900 text-white hover:bg-neutral-800 h-8 px-3 text-xs"
-                                                                disabled={!billStartDate || !billEndDate || isUploadingDocument !== null}
-                                                                onClick={() => newDocumentInputRef.current?.click()}
-                                                                isLoading={isUploadingDocument === '2'}
-                                                            >
-                                                                <UploadIcon className="w-3.5 h-3.5" />
-                                                                {/* Upload Bill */}
-                                                            </Button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                        <td className="px-4 py-4 text-center text-muted-foreground italic"></td>
+                                                        <td className="px-4 py-4 text-right align-bottom">
+                                                            <div className="flex gap-2 justify-end">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        setBillStartDate('');
+                                                                        setBillEndDate('');
+                                                                    }}
+                                                                    className="h-8 px-3 text-xs border-input hover:bg-accent hover:text-accent-foreground"
+                                                                >
+                                                                    Clear
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="bg-neutral-900 text-white hover:bg-neutral-800 h-8 px-3 text-xs"
+                                                                    disabled={!billStartDate || !billEndDate || isUploadingDocument !== null}
+                                                                    onClick={() => newDocumentInputRef.current?.click()}
+                                                                    isLoading={isUploadingDocument === '2'}
+                                                                >
+                                                                    <UploadIcon className="w-3.5 h-3.5" />
+                                                                    {/* Upload Bill */}
+                                                                </Button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
                                                 {(selectedCustomerDetails?.documents?.filter(d => d.documentType?.category === '2' || d.type === '2')?.length || 0) > 0 ? (
                                                     selectedCustomerDetails?.documents
                                                         ?.filter(d => d.documentType?.category === '2' || d.type === '2')
@@ -3653,14 +3793,16 @@ export function CustomerDetailsPage() {
                                                 <p className="text-xs text-muted-foreground">Activity log & follow-ups</p>
                                             </div>
                                         </div>
-                                        <Button
-                                            size="sm"
-                                            className="bg-neutral-900 text-white hover:bg-neutral-800"
-                                            onClick={() => setNoteModalOpen(true)}
-                                            leftIcon={<PlusIcon size={14} />}
-                                        >
-                                            Add Note
-                                        </Button>
+                                        {!selectedCustomerDetails?.isDeleted && (
+                                            <Button
+                                                size="sm"
+                                                className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                                onClick={() => setNoteModalOpen(true)}
+                                                leftIcon={<PlusIcon size={14} />}
+                                            >
+                                                Add Note
+                                            </Button>
+                                        )}
                                     </div>
 
                                     {/* Notes List */}
@@ -3951,21 +4093,49 @@ export function CustomerDetailsPage() {
             {/* Preview Offer Modal */}
             <Modal
                 isOpen={previewModalOpen}
-                onClose={() => setPreviewModalOpen(false)}
+                onClose={() => {
+                    setPreviewModalOpen(false);
+                    // Reset loading state when modal is closed
+                    setIsLoadingPreview(false);
+                }}
                 title="Offer Preview"
                 size="full"
             >
-                <div className="flex-1 h-[70vh] w-full bg-muted/20 rounded-md border overflow-hidden mb-4">
+                <div className="flex-1 h-[70vh] w-full bg-muted/20 rounded-md border overflow-hidden mb-4 relative">
                     {previewUrl ? (
-                        <iframe src={previewUrl} className="w-full h-full" title="Offer Preview" />
+                        <>
+                            {isLoadingPreview && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 z-10">
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+                                    <p className="mt-3 text-sm font-medium text-muted-foreground">Loading preview...</p>
+                                </div>
+                            )}
+                            <iframe
+                                src={previewUrl}
+                                className="w-full h-full"
+                                title="Offer Preview"
+                                onLoad={() => setIsLoadingPreview(false)}
+                            />
+                        </>
                     ) : (
                         <div className="flex items-center justify-center h-full text-muted-foreground">
-                            Loading preview...
+                            <div className="flex flex-col items-center">
+                                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-3" />
+                                <p className="text-sm font-medium">Preparing preview...</p>
+                            </div>
                         </div>
                     )}
                 </div>
                 <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setPreviewModalOpen(false)}>Close</Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            setPreviewModalOpen(false);
+                            setIsLoadingPreview(false);
+                        }}
+                    >
+                        Close
+                    </Button>
                 </div>
             </Modal>
             {/* Add Note Modal */}
@@ -4075,6 +4245,62 @@ export function CustomerDetailsPage() {
                             className="w-full min-h-[100px] p-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y"
                             autoFocus
                         />
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={deleteModalOpen}
+                onClose={() => setDeleteModalOpen(false)}
+                title="Soft Delete / Archive Customer"
+                size="sm"
+                footer={
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeleteModalOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            onClick={handleConfirmDelete}
+                            isLoading={isDeletingCustomer}
+                            disabled={deleteConfirmName !== selectedCustomerDetails?.customerId}
+                            loadingText="Archiving..."
+                        >
+                            Archive Customer
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                        <p className="mb-3">
+                            Are you sure you want to soft-delete customer{' '}
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                                {selectedCustomerDetails?.firstName} {selectedCustomerDetails?.lastName}
+                            </span>?
+                        </p>
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-3 rounded-lg flex items-start gap-3 mb-4">
+                            <InfoIcon size={18} className="text-red-500 shrink-0 mt-0.5" />
+                            <p className="text-xs text-red-700 dark:text-red-400">
+                                This action will archive the record. The customer will be hidden from the primary list but can still be restored later if needed.
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase text-muted-foreground">
+                                To confirm, type <span className="text-foreground tracking-wider select-all">{selectedCustomerDetails?.customerId}</span> below:
+                            </label>
+                            <Input
+                                placeholder="Type Customer ID here..."
+                                value={deleteConfirmName}
+                                onChange={(e) => setDeleteConfirmName(e.target.value)}
+                                className="border-red-200 focus:border-red-500 focus:ring-red-500/20"
+                                autoFocus
+                            />
+                        </div>
                     </div>
                 </div>
             </Modal>

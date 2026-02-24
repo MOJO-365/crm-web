@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useLazyQuery, useMutation } from '@apollo/client';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { DataTable, type Column, Modal } from '@/components/common';
 import {
     PlusIcon, PencilIcon,
-    CheckIcon, XIcon, MailIcon
+    CheckIcon, XIcon, MailIcon, RefreshCwIcon, AlertCircleIcon
 } from '@/components/icons';
-import { GET_CUSTOMERS_CURSOR, SOFT_DELETE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES } from '@/graphql';
+import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { Switch } from '@/components/ui/Switch';
 import { StatusField } from '@/components/common';
 import BulkEmailModal from './BulkEmailModal';
 
@@ -63,6 +65,7 @@ interface Customer {
         utilmateConnected?: number;
     };
     riskStatus?: string;
+    isDeleted?: boolean;
 }
 
 interface PageInfo {
@@ -94,6 +97,7 @@ interface SearchFilters {
     utilmateStatus: string;
     msatConnected: string;
     riskStatus: string;
+    includeDeleted: boolean;
 }
 
 export function CustomersPage() {
@@ -116,6 +120,7 @@ export function CustomersPage() {
         utilmateStatus: '',
         msatConnected: '',
         riskStatus: '',
+        includeDeleted: false,
     });
 
     const [debouncedFilters, setDebouncedFilters] = useState(searchFilters);
@@ -126,11 +131,10 @@ export function CustomersPage() {
 
     const [pageCursors, setPageCursors] = useState<(string | null)[]>([null]); // Index 0 corresponds to page 1's start cursor (which is null)
 
-    // Delete modal state
-    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-    const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
-    const [deleteConfirmName, setDeleteConfirmName] = useState('');
-    const [isDeleting, setIsDeleting] = useState(false);
+    // Restore modal state
+    const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+    const [customerToRestore, setCustomerToRestore] = useState<Customer | null>(null);
+    const [isRestoring, setIsRestoring] = useState(false);
 
     // Lazy query for fetching all filtered customer IDs (for Select All)
     const [fetchAllFilteredIds] = useLazyQuery(GET_ALL_FILTERED_CUSTOMER_IDS, {
@@ -143,7 +147,7 @@ export function CustomersPage() {
     const [isSelectingAll, setIsSelectingAll] = useState(false);
     const [totalFilteredCount, setTotalFilteredCount] = useState<number | undefined>(undefined);
 
-    const limit = 20;
+    const [limit, setLimit] = useState(20);
 
     const { data: rsData } = useQuery(GET_RISK_STATUSES);
     const riskStatuses = rsData?.riskStatuses || [];
@@ -181,6 +185,7 @@ export function CustomersPage() {
             searchUtilmateStatus: debouncedFilters.utilmateStatus !== '' ? parseInt(debouncedFilters.utilmateStatus) : undefined,
             searchMsatConnected: debouncedFilters.msatConnected !== '' ? parseInt(debouncedFilters.msatConnected) : undefined,
             searchRiskStatus: debouncedFilters.riskStatus || undefined,
+            includeDeleted: debouncedFilters.includeDeleted,
         },
         fetchPolicy: 'network-only',
         notifyOnNetworkStatusChange: true,
@@ -223,42 +228,43 @@ export function CustomersPage() {
         // Existing logic `setSelectedCustomerIds` persists IDs, so we can keep them.
     };
 
-    const handleSearchChange = (key: keyof typeof searchFilters, value: string) => {
+    const handleSearchChange = (key: keyof SearchFilters, value: string | boolean) => {
         setSearchFilters(prev => ({ ...prev, [key]: value }));
     };
 
-    const [softDeleteCustomer] = useMutation(SOFT_DELETE_CUSTOMER);
-    // const [createCustomer] = useMutation(CREATE_CUSTOMER);
-    // const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
+    const handlePageSizeChange = (newSize: number) => {
+        setLimit(newSize);
+        setCurrentPage(1);
+        setPageCursors([null]);
+    };
 
-    // const handleDeleteClick = (customer: Customer) => {
-    //     setCustomerToDelete(customer);
-    //     setDeleteConfirmName('');
-    //     setDeleteModalOpen(true);
-    // };
+    const [restoreCustomer] = useMutation(RESTORE_CUSTOMER);
 
-    const handleConfirmDelete = async () => {
-        if (!customerToDelete) return;
-        const confirmValue = customerToDelete.customerId || customerToDelete.uid;
-        if (deleteConfirmName !== confirmValue) return;
+    const handleRestoreCustomerClick = (customer: Customer) => {
+        setCustomerToRestore(customer);
+        setRestoreModalOpen(true);
+    };
 
-        setIsDeleting(true);
+    const handleConfirmRestore = async () => {
+        if (!customerToRestore) return;
+
+        setIsRestoring(true);
         try {
-            const { data: result } = await softDeleteCustomer({
-                variables: { uid: customerToDelete.uid }
+            const { data: result } = await restoreCustomer({
+                variables: { uid: customerToRestore.uid }
             });
 
-            if (result?.softDeleteCustomer) {
-                // Remove from local state immediately
-                setAllCustomers(prev => prev.filter(c => c.uid !== customerToDelete.uid));
-                setDeleteModalOpen(false);
-                setCustomerToDelete(null);
+            if (result?.restoreCustomer) {
+                toast.success('Customer restored successfully');
+                setAllCustomers(prev => prev.map(c => c.uid === customerToRestore.uid ? { ...c, isDeleted: false } : c));
+                setRestoreModalOpen(false);
+                setCustomerToRestore(null);
             }
-        } catch (err) {
-            console.error('Failed to delete customer:', err);
-            alert('Failed to delete customer. Please try again.');
+        } catch (err: any) {
+            console.error('Failed to restore customer:', err);
+            toast.error(err.message || 'Failed to restore customer');
         } finally {
-            setIsDeleting(false);
+            setIsRestoring(false);
         }
     };
 
@@ -306,6 +312,7 @@ export function CustomersPage() {
                     searchUtilmateStatus: debouncedFilters.utilmateStatus ? parseInt(debouncedFilters.utilmateStatus) : undefined,
                     searchMsatConnected: debouncedFilters.msatConnected ? parseInt(debouncedFilters.msatConnected) : undefined,
                     searchRiskStatus: debouncedFilters.riskStatus ? debouncedFilters.riskStatus : undefined,
+                    includeDeleted: debouncedFilters.includeDeleted,
                 },
             });
 
@@ -376,11 +383,18 @@ export function CustomersPage() {
             render: (row) => {
                 const fullName = `${row.firstName} ${row.lastName}`;
                 return (
-                    <Tooltip content={fullName} fullWidth>
-                        <span className="font-medium text-foreground truncate block max-w-[180px]">
-                            {fullName}
-                        </span>
-                    </Tooltip>
+                    <div className="flex flex-col items-start gap-1">
+                        <Tooltip content={fullName} fullWidth>
+                            <span className="font-medium text-foreground truncate block max-w-[180px]">
+                                {fullName}
+                            </span>
+                        </Tooltip>
+                        {row.isDeleted && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                                Deleted
+                            </span>
+                        )}
+                    </div>
                 );
             },
         },
@@ -571,6 +585,7 @@ export function CustomersPage() {
                     />
                 </div>
             ),
+            width: 'w-[120px]',
             render: (row) => <span className="text-foreground">{row.number || '-'}</span>,
         },
         {
@@ -588,6 +603,7 @@ export function CustomersPage() {
                     />
                 </div>
             ),
+            width: 'w-[220px]',
             render: (row) => {
                 const fullAddr = row.address?.fullAddress;
                 if (!fullAddr) return <span className="text-muted-foreground">-</span>;
@@ -615,6 +631,7 @@ export function CustomersPage() {
                     />
                 </div>
             ),
+            width: 'w-[130px]',
             render: (row) => <span className="text-foreground">{row.tariffCode || row.ratePlan?.tariff || '-'}</span>,
         },
         {
@@ -682,7 +699,7 @@ export function CustomersPage() {
                                 </button>
                             </Tooltip>
                         )}
-                        {canEdit && row.status !== 3 && (
+                        {canEdit && row.status !== 3 && !row.isDeleted && (
                             <Tooltip content="Edit Customer">
                                 <button
                                     className="p-2 border border-border rounded-lg bg-card hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
@@ -692,18 +709,16 @@ export function CustomersPage() {
                                 </button>
                             </Tooltip>
                         )}
-                        {/* Delete button hidden
-                        {canDelete && (
-                            <Tooltip content="Delete Customer">
+                        {row.isDeleted && (
+                            <Tooltip content="Restore Customer">
                                 <button
-                                    className="p-2 border border-red-200 rounded-lg bg-white hover:bg-red-50 text-red-600 hover:text-red-700 transition-colors"
-                                    onClick={() => handleDeleteClick(row)}
+                                    className="p-2 border border-green-400 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 transition-colors shadow-sm"
+                                    onClick={() => handleRestoreCustomerClick(row)}
                                 >
-                                    <TrashIcon size={16} />
+                                    <RefreshCwIcon size={16} />
                                 </button>
                             </Tooltip>
                         )}
-                        */}
 
                     </div>
                 </div>
@@ -747,10 +762,32 @@ export function CustomersPage() {
 
             {/* Customers Table */}
             <div className='p-5 bg-background rounded-lg border border-border shadow-sm'>
-                <div className="flex flex-col gap-4 mb-4">
-                    <p className="text-sm font-medium text-muted-foreground">
-                        Total Customers: <span className="text-foreground">{pageInfo?.totalCount ?? 0}</span>
+                <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        Total Customers: <span className="text-foreground font-bold">{pageInfo?.totalCount ?? 0}</span>
+                        {debouncedFilters.includeDeleted && (
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider animate-pulse">
+                                <AlertCircleIcon size={10} />
+                                Including Deleted
+                            </span>
+                        )}
                     </p>
+                    <div className="flex items-center gap-3 px-4 py-2 bg-accent/30 rounded-full border border-border/50 shadow-sm transition-all hover:shadow-md group">
+                        <span className={cn(
+                            "text-xs font-bold uppercase tracking-tight transition-colors",
+                            searchFilters.includeDeleted ? "text-red-600 dark:text-red-400 font-extrabold" : "text-muted-foreground"
+                        )}>
+                            Show Deleted
+                        </span>
+                        <Switch
+                            checked={searchFilters.includeDeleted}
+                            onChange={(checked) => handleSearchChange('includeDeleted', checked)}
+                            className={cn(
+                                "transition-transform group-hover:scale-110",
+                                searchFilters.includeDeleted ? "shadow-[0_0_10px_rgba(220,38,38,0.3)]" : ""
+                            )}
+                        />
+                    </div>
                 </div>
 
                 <DataTable
@@ -761,8 +798,9 @@ export function CustomersPage() {
                     rowKey={(row) => row.uid}
                     emptyMessage='No customers found. Click "Add Customer" to create one.'
                     loadingMessage="Loading customers..."
+                    rowClassName={(row) => row.isDeleted ? 'bg-red-50 dark:bg-red-900/20' : ''}
                     /* Fixed height for pagination - adjusted to ensure footer is visible */
-                    containerHeightClass="h-[calc(100vh-280px)]"
+                    containerHeightClass="h-[calc(100vh-295px)]"
                     enableSelection={true}
                     selectedRowKeys={selectedCustomerIds}
                     onSelectionChange={setSelectedCustomerIds}
@@ -772,7 +810,9 @@ export function CustomersPage() {
                     pagination={{
                         currentPage,
                         pageSize: limit,
+                        totalCount: pageInfo?.totalCount ?? 0,
                         onPageChange: handlePageChange,
+                        onPageSizeChange: handlePageSizeChange,
                         hasNextPage: !!pageInfo?.hasNextPage,
                         hasPreviousPage: currentPage > 1,
                     }}
@@ -791,49 +831,37 @@ export function CustomersPage() {
             />
 
             <Modal
-                isOpen={deleteModalOpen}
-                onClose={() => setDeleteModalOpen(false)}
-                title="Confirm deletion"
+                isOpen={restoreModalOpen}
+                onClose={() => setRestoreModalOpen(false)}
+                title="Confirm Restoration"
                 size="sm"
                 footer={
                     <>
                         <Button
                             variant="ghost"
-                            onClick={() => setDeleteModalOpen(false)}
-                            disabled={isDeleting}
+                            onClick={() => setRestoreModalOpen(false)}
+                            disabled={isRestoring}
                         >
                             Cancel
                         </Button>
                         <Button
-                            variant="destructive"
-                            onClick={handleConfirmDelete}
-                            disabled={!customerToDelete || deleteConfirmName !== (customerToDelete.customerId || customerToDelete.uid) || isDeleting}
-                            isLoading={isDeleting}
-                            loadingText="Deleting..."
+                            variant="default" // Using default primary style for restore
+                            onClick={handleConfirmRestore}
+                            disabled={!customerToRestore || isRestoring}
+                            isLoading={isRestoring}
+                            loadingText="Restoring..."
+                            className="bg-green-600 hover:bg-green-700 text-white"
                         >
-                            Delete
+                            Restore
                         </Button>
                     </>
                 }
             >
                 <div className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        Type the Customer ID <span className="font-semibold text-foreground">{customerToDelete ? (customerToDelete.customerId || customerToDelete.uid) : ''}</span> to delete this customer.
+                        Are you sure you want to restore customer <span className="font-semibold text-foreground">{customerToRestore?.firstName} {customerToRestore?.lastName}</span>?
+                        They will be visible in the active customer lists again.
                     </p>
-                    <Input
-                        placeholder="Enter Customer ID"
-                        value={deleteConfirmName}
-                        onChange={(e) => setDeleteConfirmName(e.target.value)}
-                        autoFocus
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && customerToDelete) {
-                                const confirmValue = customerToDelete.customerId || customerToDelete.uid;
-                                if (deleteConfirmName === confirmValue) {
-                                    handleConfirmDelete();
-                                }
-                            }
-                        }}
-                    />
                 </div>
             </Modal>
 
