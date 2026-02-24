@@ -53,6 +53,11 @@ export function EmailSendPage() {
             description: 'Sent automatically when a new customer is created in the system',
         },
         {
+            type: 'CUSTOMER_UPDATED',
+            label: 'Customer Updated',
+            description: 'Sent automatically when an existing customer is updated in the system',
+        },
+        {
             type: 'REMINDER',
             label: 'Reminder Email',
             description: 'Sent to customers who haven\'t signed their agreement yet',
