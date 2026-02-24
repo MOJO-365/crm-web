@@ -699,16 +699,18 @@ export function CustomersPage() {
                                 </button>
                             </Tooltip>
                         )}
-                        {canEdit && row.status !== 3 && !row.isDeleted && (
-                            <Tooltip content="Edit Customer">
-                                <button
-                                    className="p-2 border border-border rounded-lg bg-card hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                                    onClick={() => handleEdit(row)}
-                                >
-                                    <PencilIcon size={16} />
-                                </button>
-                            </Tooltip>
-                        )}
+                        {canEdit &&
+                            // row.status !== 3 && 
+                            !row.isDeleted && (
+                                <Tooltip content="Edit Customer">
+                                    <button
+                                        className="p-2 border border-border rounded-lg bg-card hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                        onClick={() => handleEdit(row)}
+                                    >
+                                        <PencilIcon size={16} />
+                                    </button>
+                                </Tooltip>
+                            )}
                         {row.isDeleted && (
                             <Tooltip content="Restore Customer">
                                 <button

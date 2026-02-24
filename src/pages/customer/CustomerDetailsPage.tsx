@@ -2079,12 +2079,14 @@ export function CustomerDetailsPage() {
                                 <ArrowLeftIcon className="mr-1.5 h-3.5 w-3.5" />
                                 Back
                             </Button>
-                            {canEdit && selectedCustomerDetails && !selectedCustomerDetails.isDeleted && selectedCustomerDetails.status !== 3 && (
-                                <Button onClick={() => navigate(`/customers/${uid}/edit`)} variant="outline" className="h-9 px-3 text-sm">
-                                    <PencilIcon className="mr-1.5 h-3.5 w-3.5" />
-                                    Edit
-                                </Button>
-                            )}
+                            {canEdit && selectedCustomerDetails && !selectedCustomerDetails.isDeleted &&
+                                //  selectedCustomerDetails.status !== 3 &&
+                                (
+                                    <Button onClick={() => navigate(`/customers/${uid}/edit`)} variant="outline" className="h-9 px-3 text-sm">
+                                        <PencilIcon className="mr-1.5 h-3.5 w-3.5" />
+                                        Edit
+                                    </Button>
+                                )}
                             {selectedCustomerDetails && !selectedCustomerDetails.isDeleted && (
                                 (() => {
                                     const hasPreview = true;
@@ -2180,7 +2182,7 @@ export function CustomerDetailsPage() {
                                         { label: 'Credit score', date: null, completed: selectedCustomerDetails.isCreditScoreFetched === 1, step: 0 },
                                     ] : []),
                                     { label: 'Offer sent', date: selectedCustomerDetails.offerEmailSentAt, completed: !!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.emailSent === 1, step: 1, isLoading: isSendingOffer },
-                                    { label: 'Signed by customer', date: selectedCustomerDetails.signDate, completed: !!selectedCustomerDetails.signDate, showReminder: !!selectedCustomerDetails.offerEmailSentAt, step: 2 },
+                                    { label: 'Signed by customer', date: selectedCustomerDetails.signDate, completed: !!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2, showReminder: !!selectedCustomerDetails.offerEmailSentAt, step: 2 },
                                     ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
                                         { label: 'VPP connect', date: null, completed: selectedCustomerDetails.vppDetails?.vppConnected === 1, showToggle: true, disabled: selectedCustomerDetails.status < 3, step: 3 },
                                     ] : []),

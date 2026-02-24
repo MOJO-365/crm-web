@@ -362,7 +362,7 @@ export const OfferAccessPage = () => {
     }
 
     // Success Page for Signed Customers
-    if (customerData?.signDate) {
+    if (customerData?.signDate && customerData?.status === 3) {
         return (
             <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
                 <div className="w-full max-w-md">
@@ -878,11 +878,11 @@ export const OfferAccessPage = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
                                     {[
                                         { label: 'VPP Enrolled', value: 'Yes' },
-                                        { label: 'VPP Connected', value: customerData.vppDetails?.vppConnected === 1 ? 'Yes' : 'No' },
-                                        { label: 'Signup Bonus', value: customerData.vppDetails?.vppSignupBonus ? '$50 monthly bill credit for 12 months (total $600)' : '—' },
+                                        { label: 'VPP Connected', value: customerData.vppDetails?.vppConnected === 1 ? 'Yes' : null },
+                                        { label: 'Signup Bonus', value: customerData.vppDetails?.vppSignupBonus ? '$50 monthly bill credit for 12 months (total $600)' : null },
                                         ...(customerData.batteryDetails ? [
-                                            { label: 'Battery Brand', value: customerData.batteryDetails.batterybrand },
-                                            { label: 'SN Number', value: customerData.batteryDetails.snnumber },
+                                            { label: 'Battery Brand', value: customerData.batteryDetails.batterybrand || null },
+                                            { label: 'SN Number', value: customerData.batteryDetails.snnumber || null },
                                             { label: 'Battery Capacity', value: customerData.batteryDetails.batterycapacity ? `${customerData.batteryDetails.batterycapacity} kW` : null },
                                             { label: 'Export Limit', value: customerData.batteryDetails.exportlimit ? `${customerData.batteryDetails.exportlimit} kW` : null },
                                         ] : [])

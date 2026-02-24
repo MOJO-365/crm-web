@@ -10,6 +10,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import {
     GET_CUSTOMER_BY_ID,
     GET_ACTIVE_RATES_HISTORY,
+    GET_RATES_HISTORY,
     GET_RATES_HISTORY_BY_VERSION,
     CHECK_ADDRESS_EXISTS,
     CHECK_NMI_EXISTS,
@@ -91,6 +92,11 @@ const ToggleSwitch = ({ checked, onChange }: { checked: boolean, onChange: (chec
 // ============================================================================
 
 import type { CustomerFormData, RatePlan, CustomerDocument } from '@/types';
+
+interface VersionOption {
+    value: string;
+    label: string;
+}
 
 // ============================================================================
 // CONSTANTS
@@ -430,6 +436,7 @@ export const CustomerFormPage = () => {
     const [isCustomDiscountMode, setIsCustomDiscountMode] = useState(false);
     const { hasFeatureAccess } = useAuthStore();
     const canAccessCustomDiscount = hasFeatureAccess('feature_custom_discount');
+    const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
 
     // Queries & Mutations
     const { data: customerData, loading: isLoadingCustomer } = useQuery(GET_CUSTOMER_BY_ID, {
@@ -454,6 +461,36 @@ export const CustomerFormPage = () => {
     });
     const riskStatuses = riskStatusesData?.riskStatuses || [];
 
+    // Fetch all global rate versions for the dropdown
+    const { data: allVersionsData } = useQuery(GET_RATES_HISTORY, {
+        variables: { limit: 100 },
+        fetchPolicy: 'network-only'
+    });
+
+    // Get active rate version for saving to customer
+    const activeRateVersion = useMemo(() => {
+        return activeRatesData?.globalActiveRatesHistory?.version || null;
+    }, [activeRatesData]);
+
+    const versionOptions = useMemo(() => {
+        const versions = allVersionsData?.ratesHistory?.data || [];
+        const options: VersionOption[] = versions.map((v: any) => ({
+            value: v.version,
+            label: `v.${v.version} (${new Date(v.createdAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: '2-digit' })}) ${v.version === activeRateVersion ? '[ACTIVE]' : ''}`
+        }));
+
+        // Add assigned version if not in list
+        const assignedVer = customerData?.customer?.rateVersion;
+        if (assignedVer && !options.some(o => o.value === assignedVer)) {
+            options.push({
+                value: assignedVer,
+                label: `v.${assignedVer} [ASSIGNED]`
+            });
+        }
+
+        return options;
+    }, [allVersionsData, activeRateVersion, customerData]);
+
     const [checkAddressExists] = useLazyQuery(CHECK_ADDRESS_EXISTS);
     const [checkNmiExists] = useLazyQuery(CHECK_NMI_EXISTS);
     const [createCustomer] = useMutation(CREATE_CUSTOMER);
@@ -462,17 +499,20 @@ export const CustomerFormPage = () => {
     // Get customer's rate version for historic rates lookup
     const customerRateVersion = customerData?.customer?.rateVersion;
 
-    // Fetch historic rates by version (for edit mode when customer has rateVersion)
+    // Use selected version override or fall back to customer's saved version
+    const activeVersionForLookup = selectedVersion || customerRateVersion;
+
+    // Fetch historic rates by version (for edit mode or when selection overrides)
     const { data: historicRatesData } = useQuery(GET_RATES_HISTORY_BY_VERSION, {
-        variables: { version: customerRateVersion },
-        skip: !isEditMode || !customerRateVersion,
+        variables: { version: activeVersionForLookup },
+        skip: !activeVersionForLookup,
         fetchPolicy: 'cache-first',
     });
 
     // Derived Data - Parse rate plans from active or historic rates
     const ratePlans: RatePlan[] = useMemo(() => {
-        // In edit mode with historic rates available, use historic rates
-        if (isEditMode && customerRateVersion && historicRatesData?.ratesHistoryByVersion?.newRecord) {
+        // Use historic rates if version is selected/assigned
+        if (activeVersionForLookup && historicRatesData?.ratesHistoryByVersion?.newRecord) {
             try {
                 const parsed = typeof historicRatesData.ratesHistoryByVersion.newRecord === 'string'
                     ? JSON.parse(historicRatesData.ratesHistoryByVersion.newRecord)
@@ -493,12 +533,8 @@ export const CustomerFormPage = () => {
             console.error('Failed to parse newRecord:', e);
             return [];
         }
-    }, [isEditMode, customerRateVersion, historicRatesData, activeRatesData]);
+    }, [activeVersionForLookup, historicRatesData, activeRatesData]);
 
-    // Get active rate version for saving to customer
-    const activeRateVersion = useMemo(() => {
-        return activeRatesData?.globalActiveRatesHistory?.version || null;
-    }, [activeRatesData]);
 
     const tariffOptions = useMemo(() => {
         if (!formData.state) return [];
@@ -624,6 +660,10 @@ export const CustomerFormPage = () => {
             }
 
             console.log('[Edit Mode] Customer data loaded:', c);
+
+            if (c.rateVersion && !selectedVersion) {
+                setSelectedVersion(c.rateVersion);
+            }
         }
     }, [customerData, ratePlans]);
 
@@ -1053,6 +1093,55 @@ export const CustomerFormPage = () => {
                 }
             }
 
+            // Determine if an update email should be triggered based on significant field changes
+            const hasSignificantChanges = () => {
+                if (!isEditMode || !customerData?.customer) return false;
+                const c = customerData.customer;
+
+                // Significant fields that trigger an "Updated" email
+                const checks = [
+                    formData.firstName !== (c.firstName || ''),
+                    formData.lastName !== (c.lastName || ''),
+                    formData.businessName !== (c.businessName || ''),
+                    formData.abn !== (c.abn || ''),
+                    formData.phone !== (c.number || ''),
+                    formData.propertyType !== (c.propertyType || 0),
+                    formData.tariffCode !== (c.tariffCode || ''),
+                    formData.discount !== (c.discount || 0),
+                    (activeVersionForLookup || activeRateVersion) !== (c.rateVersion || ''),
+
+                    // Address fields
+                    formData.unitNumber !== (c.address?.unitNumber || ''),
+                    formData.streetNumber !== (c.address?.streetNumber || ''),
+                    formData.streetName !== (c.address?.streetName || ''),
+                    formData.streetType !== (c.address?.streetType || ''),
+                    formData.suburb !== (c.address?.suburb || ''),
+                    formData.state !== (c.address?.state || ''),
+                    formData.postcode !== (c.address?.postcode || ''),
+                    formData.nmi !== (c.address?.nmi || ''),
+
+                    // Solar/Battery details
+                    (formData.hasSolar ? 1 : 0) !== (c.solarDetails?.hassolar || 0),
+                    formData.solarCapacity !== (c.solarDetails?.solarcapacity?.toString() || ''),
+                    formData.inverterCapacity !== (c.solarDetails?.invertercapacity?.toString() || ''),
+
+                    // VPP details
+                    (formData.vpp ? 1 : 0) !== (c.vppDetails?.vpp || 0),
+                    (formData.vppConnected ? 1 : 0) !== (c.vppDetails?.vppConnected || 0),
+                    formData.vppSignupBonus !== (c.vppDetails?.vppSignupBonus?.toString() || ''),
+
+                    // Debit details
+                    (formData.directDebit ? 1 : 0) !== (c.debitDetails?.optIn || 0),
+                    formData.bankName !== (c.debitDetails?.bankName || ''),
+                    formData.bsb !== (c.debitDetails?.bsb || ''),
+                    formData.accountNumber !== (c.debitDetails?.accountNumber || ''),
+                ];
+
+                return checks.some(changed => changed);
+            };
+
+            const significantChanges = hasSignificantChanges();
+
             const input = {
                 email: formData.email,
                 firstName: formData.firstName,
@@ -1120,9 +1209,10 @@ export const CustomerFormPage = () => {
                 previousBill: formData.previousBill?.uid,
                 identityProof: formData.identityProof?.uid,
                 licenseDocument: formData.licenseDocument?.uid,
-                rateVersion: activeRateVersion,
+                rateVersion: activeVersionForLookup || activeRateVersion,
                 customerId: isEditMode ? undefined : generatedCustomerId,
-                triggerWelcomeEmail: isEditMode ? true : undefined,
+                triggerWelcomeEmail: isEditMode ? (finalStatus === 2) : undefined,
+                triggerUpdateEmail: isEditMode ? significantChanges : undefined,
             };
 
             let savedCustomer;
@@ -1145,7 +1235,7 @@ export const CustomerFormPage = () => {
             const customerUid = savedCustomer?.uid || uid;
             if (finalStatus === 2 && customerUid) {
                 // Redirect to details page if an offer was sent
-                navigate(`/customer/${customerUid}`);
+                navigate(`/customers/${customerUid}`);
             } else {
                 // Otherwise redirect back to the list (for drafts)
                 navigate('/customers');
@@ -1510,10 +1600,25 @@ export const CustomerFormPage = () => {
                                     <div className="flex items-center justify-between border-b border-border pb-2">
                                         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                                             <ShieldIcon size={20} className="text-neutral-700" /> Select tariff & discount
-                                            <div className="ml-2 px-2.5 py-1 rounded-md bg-neutral-100 border border-neutral-200 text-neutral-600 text-xs font-mono tracking-tight flex items-center gap-1">
-                                                <span className="opacity-60">v.</span>
-                                                {(isEditMode && customerRateVersion) ? customerRateVersion : activeRateVersion}
-                                            </div>
+                                            {isEditMode ? (
+                                                <div className="ml-4 flex items-center gap-2 min-w-[240px]">
+                                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest shrink-0">Rate Version</span>
+                                                    <Select
+                                                        containerClassName="w-full"
+                                                        placeholder="Select version"
+                                                        options={versionOptions}
+                                                        value={activeVersionForLookup || activeRateVersion || ''}
+                                                        onChange={(val) => {
+                                                            setSelectedVersion(val as string);
+                                                        }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="ml-2 px-2.5 py-1 rounded-md bg-neutral-100 border border-neutral-200 text-neutral-600 text-xs font-mono tracking-tight flex items-center gap-1">
+                                                    <span className="opacity-60">v.</span>
+                                                    {activeRateVersion}
+                                                </div>
+                                            )}
                                         </h2>
                                         <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Role limited</span>
                                     </div>
@@ -2279,7 +2384,7 @@ export const CustomerFormPage = () => {
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Discount:</span> <span className="font-medium badge bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded">{formData.discount > 0 ? `${formData.discount}%` : '—'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Distributor:</span> <span className="font-medium">{selectedRatePlan?.dnsp !== undefined ? (DNSP_MAP[selectedRatePlan.dnsp.toString()] || selectedRatePlan.dnsp) : '—'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Tariff Type:</span> <span className="font-medium">{selectedRatePlan?.tariff || '—'}</span></p>
-                                                    <p className="flex justify-between"><span className="text-muted-foreground">Pricing Version:</span> <span className="font-medium font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{(isEditMode && customerRateVersion) ? customerRateVersion : activeRateVersion}</span></p>
+                                                    <p className="flex justify-between"><span className="text-muted-foreground">Pricing Version:</span> <span className="font-medium font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{activeVersionForLookup || activeRateVersion}</span></p>
                                                 </div>
                                             </div>
 
@@ -2381,7 +2486,7 @@ export const CustomerFormPage = () => {
                             </Button>
                             <div className="flex gap-3">
 
-                                {(allStepsValid) && (
+                                {allStepsValid && !isEditMode && (
                                     <Button
                                         type="button"
                                         variant="secondary"
@@ -2419,7 +2524,7 @@ export const CustomerFormPage = () => {
                     title={<span className="text-red-600">Unsaved Changes</span>}
                     footer={
                         <div className="flex gap-2">
-                            {allStepsValid && (
+                            {allStepsValid && !isEditMode && (
                                 <Button
                                     variant="default"
                                     className="bg-green-600 hover:bg-green-700 text-white"
