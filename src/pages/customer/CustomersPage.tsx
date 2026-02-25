@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+// import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useLazyQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
 import {
     PlusIcon, PencilIcon,
-    CheckIcon, XIcon, MailIcon, RefreshCwIcon, AlertCircleIcon
+    CheckIcon, XIcon, MailIcon, RefreshCwIcon
 } from '@/components/icons';
 import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { Switch } from '@/components/ui/Switch';
+// import { Switch } from '@/components/ui/Switch';
 import { StatusField } from '@/components/common';
 import BulkEmailModal from './BulkEmailModal';
 
@@ -97,7 +97,6 @@ interface SearchFilters {
     utilmateStatus: string;
     msatConnected: string;
     riskStatus: string;
-    includeDeleted: boolean;
 }
 
 export function CustomersPage() {
@@ -120,7 +119,6 @@ export function CustomersPage() {
         utilmateStatus: '',
         msatConnected: '',
         riskStatus: '',
-        includeDeleted: false,
     });
 
     const [debouncedFilters, setDebouncedFilters] = useState(searchFilters);
@@ -179,13 +177,13 @@ export function CustomersPage() {
             searchTariff: debouncedFilters.tariff || undefined,
             searchDnsp: debouncedFilters.dnsp || undefined,
             searchDiscount: debouncedFilters.discount !== '' ? parseInt(debouncedFilters.discount) : undefined,
-            searchStatus: debouncedFilters.status !== '' ? parseInt(debouncedFilters.status) : undefined,
+            searchStatus: (debouncedFilters.status !== '' && debouncedFilters.status !== 'deleted') ? parseInt(debouncedFilters.status) : undefined,
             searchVpp: debouncedFilters.vpp !== '' ? parseInt(debouncedFilters.vpp) : undefined,
             searchVppConnected: debouncedFilters.vppConnected !== '' ? parseInt(debouncedFilters.vppConnected) : undefined,
             searchUtilmateStatus: debouncedFilters.utilmateStatus !== '' ? parseInt(debouncedFilters.utilmateStatus) : undefined,
             searchMsatConnected: debouncedFilters.msatConnected !== '' ? parseInt(debouncedFilters.msatConnected) : undefined,
             searchRiskStatus: debouncedFilters.riskStatus || undefined,
-            includeDeleted: debouncedFilters.includeDeleted,
+            includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : 'false',
         },
         fetchPolicy: 'network-only',
         notifyOnNetworkStatusChange: true,
@@ -306,13 +304,13 @@ export function CustomersPage() {
                     searchTariff: debouncedFilters.tariff || undefined,
                     searchDnsp: debouncedFilters.dnsp || undefined,
                     searchDiscount: debouncedFilters.discount ? parseInt(debouncedFilters.discount) : undefined,
-                    searchStatus: debouncedFilters.status ? parseInt(debouncedFilters.status) : undefined,
-                    searchVpp: debouncedFilters.vpp ? parseInt(debouncedFilters.vpp) : undefined,
-                    searchVppConnected: debouncedFilters.vppConnected ? parseInt(debouncedFilters.vppConnected) : undefined,
-                    searchUtilmateStatus: debouncedFilters.utilmateStatus ? parseInt(debouncedFilters.utilmateStatus) : undefined,
-                    searchMsatConnected: debouncedFilters.msatConnected ? parseInt(debouncedFilters.msatConnected) : undefined,
+                    searchStatus: (debouncedFilters.status !== '' && debouncedFilters.status !== 'deleted') ? parseInt(debouncedFilters.status) : undefined,
+                    searchVpp: debouncedFilters.vpp !== '' ? parseInt(debouncedFilters.vpp) : undefined,
+                    searchVppConnected: debouncedFilters.vppConnected !== '' ? parseInt(debouncedFilters.vppConnected) : undefined,
+                    searchUtilmateStatus: debouncedFilters.utilmateStatus !== '' ? parseInt(debouncedFilters.utilmateStatus) : undefined,
+                    searchMsatConnected: debouncedFilters.msatConnected !== '' ? parseInt(debouncedFilters.msatConnected) : undefined,
                     searchRiskStatus: debouncedFilters.riskStatus ? debouncedFilters.riskStatus : undefined,
-                    includeDeleted: debouncedFilters.includeDeleted,
+                    includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : 'false',
                 },
             });
 
@@ -424,7 +422,11 @@ export function CustomersPage() {
                         <span className="text-xs font-semibold uppercase text-muted-foreground">Status</span>
                     </div>
                     <Select
-                        options={[{ value: '', label: 'All' }, ...CUSTOMER_STATUS_OPTIONS]}
+                        options={[
+                            { value: '', label: 'All' },
+                            ...CUSTOMER_STATUS_OPTIONS,
+                            { value: 'deleted', label: 'Deleted' }
+                        ]}
                         value={searchFilters.status}
                         onChange={(val) => handleSearchChange('status', val as string)}
                         placeholder="All"
@@ -767,29 +769,7 @@ export function CustomersPage() {
                 <div className="flex items-center justify-between mb-4">
                     <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                         Total Customers: <span className="text-foreground font-bold">{pageInfo?.totalCount ?? 0}</span>
-                        {debouncedFilters.includeDeleted && (
-                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider animate-pulse">
-                                <AlertCircleIcon size={10} />
-                                Including Deleted
-                            </span>
-                        )}
                     </p>
-                    <div className="flex items-center gap-3 px-4 py-2 bg-accent/30 rounded-full border border-border/50 shadow-sm transition-all hover:shadow-md group">
-                        <span className={cn(
-                            "text-xs font-bold uppercase tracking-tight transition-colors",
-                            searchFilters.includeDeleted ? "text-red-600 dark:text-red-400 font-extrabold" : "text-muted-foreground"
-                        )}>
-                            Show Deleted
-                        </span>
-                        <Switch
-                            checked={searchFilters.includeDeleted}
-                            onChange={(checked) => handleSearchChange('includeDeleted', checked)}
-                            className={cn(
-                                "transition-transform group-hover:scale-110",
-                                searchFilters.includeDeleted ? "shadow-[0_0_10px_rgba(220,38,38,0.3)]" : ""
-                            )}
-                        />
-                    </div>
                 </div>
 
                 <DataTable

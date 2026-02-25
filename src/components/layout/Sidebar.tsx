@@ -130,9 +130,16 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
     const parentRefs = useRef<Record<string, HTMLButtonElement | null>>({});
     const popoverRef = useRef<HTMLDivElement>(null);
 
-    // Group menus
-    const rootMenus = accessibleMenus.filter(m => !m.parentUid && m.menuCode !== 'dashboard');
-    const getChildren = (parentUid: string) => accessibleMenus.filter(m => m.parentUid === parentUid);
+    // Group menus and sort by sortOrder then name
+    const sortedMenus = [...accessibleMenus].sort((a, b) => {
+        const sortA = a.sortOrder ?? 999;
+        const sortB = b.sortOrder ?? 999;
+        if (sortA !== sortB) return sortA - sortB;
+        return a.menuName.localeCompare(b.menuName);
+    });
+
+    const rootMenus = sortedMenus.filter(m => !m.parentUid && m.menuCode !== 'dashboard');
+    const getChildren = (parentUid: string) => sortedMenus.filter(m => m.parentUid === parentUid);
 
     // Auto-expand parent if child is active
     useEffect(() => {

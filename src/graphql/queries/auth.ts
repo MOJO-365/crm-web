@@ -27,6 +27,7 @@ export const GET_ME = gql`
                 canCreate
                 canEdit
                 canDelete
+                sortOrder
             }
             accessibleFeatures {
                 featureUid
