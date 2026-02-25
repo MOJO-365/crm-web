@@ -13,6 +13,7 @@ export interface AccessibleMenu {
     canCreate: boolean;
     canEdit: boolean;
     canDelete: boolean;
+    sortOrder?: number;
 }
 
 export interface AccessibleFeature {
