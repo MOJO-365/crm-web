@@ -90,6 +90,7 @@ export function EmailLogsPage() {
             emailType: emailTypeFilter || undefined,
         },
         fetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
     });
 
     const meta = data?.allEmailLogs?.meta;

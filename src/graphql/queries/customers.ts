@@ -759,6 +759,9 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 filename
                 path
             }
+            vppCertificateDetails {
+                isAllRequiredFilled
+            }
         }
     }
 `;
@@ -794,6 +797,50 @@ export const GET_CUSTOMER_SOLAR_VPP_DETAILS = gql`
                 isDeleted
                 createdAt
                 updatedAt
+            }
+        }
+    }
+`;
+
+export const GET_CUSTOMER_VPP_CERTIFICATE_DETAILS = gql`
+    query GetCustomerVppCertificateDetails($uid: String!) {
+        customer(uid: $uid) {
+            uid
+            vppCertificateDetails {
+                id
+                certificateNo
+                issueDate
+                batteryManufacturer
+                batteryModel
+                batterySerialNumber
+                batteryInstalledDate
+                batteryUsableCapacity
+                batteryPortConnected
+                inverterManufacturer
+                inverterModel
+                inverterSnNumbers
+                inverterCapacity
+                isLifeSupportEquipment
+                ifYesDetails
+                internetConnectionType
+                internetOtherText
+                modemRouterLocation
+                apiIntegration
+                remoteChargesCommandTest
+                remoteChargesCommandTestAt
+                remoteDischargesCommandTest
+                remoteDischargesCommandTestAt
+                stateOfChangeMonitoring
+                stateOfChangeMonitoringAt
+                gridExportVerification
+                gridExportVerificationAt
+                gridImportVerification
+                gridImportVerificationAt
+                communicationFailSafeTest
+                communicationFailSafeTestAt
+                testResult
+                isAllRequiredFilled
+
             }
         }
     }

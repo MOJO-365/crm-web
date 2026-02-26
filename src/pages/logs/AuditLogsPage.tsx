@@ -109,6 +109,7 @@ export const AuditLogsPage = () => {
             tableName: tableFilter || undefined
         },
         fetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
     });
 
     // Fetch record history when modal is open

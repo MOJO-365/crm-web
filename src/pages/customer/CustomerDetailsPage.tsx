@@ -47,6 +47,7 @@ import {
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
+import { VppCertificateTab } from './components/VppCertificateTab';
 
 interface CustomerAddress {
     id: string;
@@ -217,6 +218,9 @@ interface CustomerDetails {
         utilmateConnectedAt?: string;
     };
     utilmateStatus?: string | number;
+    vppCertificateDetails?: {
+        isAllRequiredFilled: number;
+    };
     rateVersion?: number;
     createdAt?: string;
     updatedAt?: string;
@@ -274,6 +278,7 @@ interface EmailLogsResponse {
 const DOCUMENT_TYPE_OPTIONS = [
     { label: 'Other', value: 'other' }
 ];
+
 const RateVersionTooltip = ({ version, children }: { version: string, children: React.ReactNode }) => {
     const { data, loading } = useQuery(GET_RATES_HISTORY_BY_VERSION, {
         variables: { version },
@@ -798,7 +803,7 @@ export function CustomerDetailsPage() {
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     // Detail Section State
-    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'solar_vpp' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log'>('general');
+    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'solar_vpp' | 'vpp_certificate' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log'>('general');
 
     // Email Logs Refresh State
     const [emailLogsKey, setEmailLogsKey] = useState(0);
@@ -2184,7 +2189,7 @@ export function CustomerDetailsPage() {
                                     { label: 'Offer sent', date: selectedCustomerDetails.offerEmailSentAt, completed: !!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.emailSent === 1, step: 1, isLoading: isSendingOffer },
                                     { label: 'Signed by customer', date: selectedCustomerDetails.signDate, completed: !!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2, showReminder: !!selectedCustomerDetails.offerEmailSentAt, step: 2 },
                                     ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
-                                        { label: 'VPP connect', date: null, completed: selectedCustomerDetails.vppDetails?.vppConnected === 1, showToggle: true, disabled: selectedCustomerDetails.status < 3, step: 3 },
+                                        { label: 'VPP connect', date: null, completed: selectedCustomerDetails.vppDetails?.vppConnected === 1, showToggle: true, disabled: selectedCustomerDetails.status < 3 || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0, step: 3 },
                                     ] : []),
                                     { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate || (selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1), step: 4 },
                                     { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: selectedCustomerDetails.msatDetails?.msatConnected !== 1, step: 5 },
@@ -2398,6 +2403,7 @@ export function CustomerDetailsPage() {
                                     { id: 'general', label: 'General', icon: Settings2Icon },
                                     { id: 'rates', label: 'Rates', icon: PercentIcon },
                                     { id: 'solar_vpp', label: 'Solar & VPP', icon: SunIcon },
+                                    { id: 'vpp_certificate', label: 'Vpp Certificate', icon: FileTextIcon },
                                     { id: 'debit', label: 'Debit', icon: CreditCardIcon },
                                     { id: 'utilmate', label: 'Utilmate', icon: PlugIcon },
                                     { id: 'documents', label: 'Documents', icon: UploadIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2')).length },
@@ -2412,6 +2418,9 @@ export function CustomerDetailsPage() {
 
                                         // Tab should strictly be shown ONLY if one of these is true
                                         return hasSolar || isVpp;
+                                    }
+                                    if (item.id === 'vpp_certificate') {
+                                        return selectedCustomerDetails.vppDetails?.vpp === 1;
                                     }
                                     if (item.id === 'debit') {
                                         return !!selectedCustomerDetails.debitDetails && selectedCustomerDetails.debitDetails.optIn === 1;
@@ -3087,6 +3096,13 @@ export function CustomerDetailsPage() {
                                             </div>
                                         )}
                                 </div>
+                            )}
+
+                            {selectedDetailSection === 'vpp_certificate' && (
+                                <VppCertificateTab
+                                    customerUid={selectedCustomerDetails.uid}
+                                    onUpdate={refetchCustomer}
+                                />
                             )}
 
                             {selectedDetailSection === 'debit' && selectedCustomerDetails.debitDetails && (

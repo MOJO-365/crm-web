@@ -202,7 +202,16 @@ export function DataTable<T>({
     const someSelected = data.length > 0 && selectedRowKeys.length > 0 && !allSelected;
 
     return (
-        <div className={cn('flex flex-col rounded-md', className)}>
+        <div className={cn('flex flex-col rounded-md relative', className)}>
+            {/* Refreshing Overlay */}
+            {loading && data.length > 0 && (
+                <div className="absolute inset-0 z-[40] flex items-center justify-center bg-background/40 backdrop-blur-[1px] animate-in fade-in duration-300">
+                    <div className="flex flex-col items-center gap-2 bg-background/80 px-4 py-3 rounded-xl border border-border shadow-xl">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                        <span className="text-xs font-medium text-muted-foreground">{loadingMessage}</span>
+                    </div>
+                </div>
+            )}
             <div
                 ref={scrollContainerRef}
                 className={cn(heightClass, 'overflow-auto scrollbar-thin rounded-t-md', pagination ? 'border-b border-border' : '')}

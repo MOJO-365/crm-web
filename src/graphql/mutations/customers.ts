@@ -226,6 +226,7 @@ export const SEND_OFFER_EMAIL = gql`
         }
     }
 `;
+
 export const SEND_CUSTOMER_CREDENTIALS_EMAIL = gql`
     mutation SendCustomerCredentialsEmail($customerUid: String!, $password: String) {
         sendCustomerCredentialsEmail(customerUid: $customerUid, password: $password) {
@@ -233,4 +234,45 @@ export const SEND_CUSTOMER_CREDENTIALS_EMAIL = gql`
             message
         }
     }
+`;
+
+export const GENERATE_VPP_CERTIFICATE = gql`
+    mutation GenerateVppCertificate($customerUid: String!, $input: CustomerVppCertificateDetailsInput) {
+    generateVppCertificate(customerUid: $customerUid, input: $input) {
+        id
+        certificateNo
+        issueDate
+        batteryManufacturer
+        batteryModel
+        batterySerialNumber
+        batteryInstalledDate
+        batteryUsableCapacity
+        batteryPortConnected
+        inverterManufacturer
+        inverterModel
+        inverterSnNumbers
+        inverterCapacity
+        isLifeSupportEquipment
+        ifYesDetails
+        internetConnectionType
+        internetOtherText
+        modemRouterLocation
+        apiIntegration
+        remoteChargesCommandTest
+        remoteChargesCommandTestAt
+        remoteDischargesCommandTest
+        remoteDischargesCommandTestAt
+        stateOfChangeMonitoring
+        stateOfChangeMonitoringAt
+        gridExportVerification
+        gridExportVerificationAt
+        gridImportVerification
+        gridImportVerificationAt
+        communicationFailSafeTest
+        communicationFailSafeTestAt
+        testResult
+        isAllRequiredFilled
+
+    }
+}
 `;

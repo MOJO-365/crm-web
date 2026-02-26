@@ -79,8 +79,14 @@ export function EmailSendPage() {
             type: 'CUSTOMER_CREDENTIALS',
             label: 'Customer Credentials',
             description: 'Sent to customers with their login credentials and app download links',
+        },
+        {
+            type: 'VPP_CERTIFICATE_SENT',
+            label: 'VPP Certificate Sent',
+            description: 'Sent to customers when their VPP Certificate is generated',
         }
     ];
+
 
     const getCurrentTemplateUid = (eventType: string) => {
         const setting = settingsData?.emailSettings?.find((s: any) => s.eventType === eventType);

@@ -775,14 +775,14 @@ export function CustomersPage() {
                 <DataTable
                     columns={columns}
                     data={filteredCustomers}
-                    loading={loading && allCustomers.length === 0}
+                    loading={loading}
                     error={error?.message}
                     rowKey={(row) => row.uid}
                     emptyMessage='No customers found. Click "Add Customer" to create one.'
                     loadingMessage="Loading customers..."
                     rowClassName={(row) => row.isDeleted ? 'bg-red-50 dark:bg-red-900/20' : ''}
                     /* Fixed height for pagination - adjusted to ensure footer is visible */
-                    containerHeightClass="h-[calc(100vh-295px)]"
+                    containerHeightClass="h-[calc(100vh-280px)]"
                     enableSelection={true}
                     selectedRowKeys={selectedCustomerIds}
                     onSelectionChange={setSelectedCustomerIds}
