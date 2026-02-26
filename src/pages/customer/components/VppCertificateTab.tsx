@@ -175,9 +175,7 @@ export function VppCertificateTab({
 
     const handlePreview = () => {
         setIsLoadingPreview(true);
-        // Ensure we handle trailing slashes robustly to guarantee correct paths in both live and local
-        const cleanBase = (apiAxios.defaults.baseURL || '').replace(/\/+$/, '');
-        const baseUrl = cleanBase.replace(/\/api$/, '');
+        const baseUrl = apiAxios.defaults.baseURL || '';
         setPreviewUrl(`${baseUrl}/api/vpp-certificate/preview/${customerUid}`);
         setPreviewModalOpen(true);
     };
@@ -255,9 +253,8 @@ export function VppCertificateTab({
 
             // Send VPP certificate email
             try {
-                const cleanBase = (apiAxios.defaults.baseURL || '').replace(/\/+$/, '');
-                const apiPrefix = cleanBase.endsWith('/api') ? '' : '/api';
-                await apiAxios.post(`${apiPrefix}/vpp-certificate/send/${customerUid}`);
+                const baseUrl = apiAxios.defaults.baseURL || '';
+                await apiAxios.post(`${baseUrl}/api/vpp-certificate/send/${customerUid}`);
                 toast.success('VPP Certificate generated and sent to customer!');
             } catch {
                 toast.success('VPP Certificate generated! (Email sending failed)');
