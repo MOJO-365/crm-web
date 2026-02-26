@@ -8,21 +8,60 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { Modal } from '@/components/common';
 import { apiAxios } from '@/lib/apollo';
 import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE } from '@/graphql';
-import { FileTextIcon, ZapIcon, PlugIcon, ShieldCheckIcon, CheckIcon, EyeIcon } from '@/components/icons';
+import { FileTextIcon, ZapIcon, PlugIcon, ShieldCheckIcon, CheckIcon, EyeIcon, PencilIcon, Settings2Icon } from '@/components/icons';
+import { Switch as ToggleSwitch } from '@/components/ui';
+import { BATTERY_BRAND_OPTIONS } from '@/lib/constants';
 
 interface VppCertificateTabProps {
     customerUid: string;
     onUpdate?: () => void;
+    vppDetails?: any;
+    solarDetails?: any;
+    ratePlan?: any;
+    isDeleted?: boolean;
+    vppForm?: any;
+    setVppForm?: (val: any) => void;
+    isEditingVpp?: boolean;
+    setIsEditingVpp?: (val: boolean) => void;
+    handleVppToggle?: (uid: string, checked: boolean) => void;
+    handleSaveVppDetails?: () => void;
 }
 
-const STEPS = [
-    { id: 0, label: 'Battery Details', icon: ZapIcon },
-    { id: 1, label: 'Inverter Details', icon: PlugIcon },
-    { id: 2, label: 'Network & API', icon: FileTextIcon },
-    { id: 3, label: 'Testing & Verification', icon: ShieldCheckIcon },
+
+const INVERTER_BRAND_OPTIONS = [
+    { value: 'Fronius', label: 'Fronius' },
+    { value: 'SMA', label: 'SMA' },
+    { value: 'SolarEdge', label: 'SolarEdge' },
+    { value: 'Sungrow', label: 'Sungrow' },
+    { value: 'Huawei', label: 'Huawei' },
+    { value: 'GoodWe', label: 'GoodWe' },
+    { value: 'Growatt', label: 'Growatt' },
+    { value: 'Enphase', label: 'Enphase' },
+    { value: 'Other', label: 'Other' },
 ];
 
-export function VppCertificateTab({ customerUid, onUpdate }: VppCertificateTabProps) {
+const STEPS = [
+    { id: 0, label: 'System Details', icon: Settings2Icon },
+    { id: 1, label: 'Battery Details', icon: ZapIcon },
+    { id: 2, label: 'Inverter Details', icon: PlugIcon },
+    { id: 3, label: 'Network & API', icon: FileTextIcon },
+    { id: 4, label: 'Testing & Verification', icon: ShieldCheckIcon },
+];
+
+export function VppCertificateTab({
+    customerUid,
+    onUpdate,
+    vppDetails,
+    solarDetails,
+    ratePlan,
+    isDeleted,
+    vppForm,
+    setVppForm,
+    isEditingVpp,
+    setIsEditingVpp,
+    handleVppToggle,
+    handleSaveVppDetails
+}: VppCertificateTabProps) {
     const { data, loading, refetch } = useQuery(GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, {
         variables: { uid: customerUid },
         fetchPolicy: 'network-only'
@@ -136,7 +175,9 @@ export function VppCertificateTab({ customerUid, onUpdate }: VppCertificateTabPr
 
     const handlePreview = () => {
         setIsLoadingPreview(true);
-        const baseUrl = apiAxios.defaults.baseURL || '';
+        // Ensure we handle trailing slashes robustly to guarantee correct paths in both live and local
+        const cleanBase = (apiAxios.defaults.baseURL || '').replace(/\/+$/, '');
+        const baseUrl = cleanBase.replace(/\/api$/, '');
         setPreviewUrl(`${baseUrl}/api/vpp-certificate/preview/${customerUid}`);
         setPreviewModalOpen(true);
     };
@@ -214,8 +255,9 @@ export function VppCertificateTab({ customerUid, onUpdate }: VppCertificateTabPr
 
             // Send VPP certificate email
             try {
-                const baseUrl = apiAxios.defaults.baseURL || '';
-                await apiAxios.post(`${baseUrl}/api/vpp-certificate/send/${customerUid}`);
+                const cleanBase = (apiAxios.defaults.baseURL || '').replace(/\/+$/, '');
+                const apiPrefix = cleanBase.endsWith('/api') ? '' : '/api';
+                await apiAxios.post(`${apiPrefix}/vpp-certificate/send/${customerUid}`);
                 toast.success('VPP Certificate generated and sent to customer!');
             } catch {
                 toast.success('VPP Certificate generated! (Email sending failed)');
@@ -249,6 +291,7 @@ export function VppCertificateTab({ customerUid, onUpdate }: VppCertificateTabPr
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
+
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-4">
                 <div className="flex items-center gap-3">
@@ -329,21 +372,158 @@ export function VppCertificateTab({ customerUid, onUpdate }: VppCertificateTabPr
             {/* Step Content */}
             <div>
                 <div className="bg-card border border-border rounded-xl p-6 animate-in fade-in slide-in-from-right-2 duration-300" key={currentStep}>
-                    {/* Step 0 — Battery Details */}
+                    {/* Step 0 — System Settings */}
                     {currentStep === 0 && (
+                        <div className="space-y-8">
+                            {/* Solar Section */}
+                            {solarDetails?.hassolar === 1 && (
+                                <div className="space-y-6">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Solar Configuration</h4>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Solar Capacity</label>
+                                            <p className="font-medium">{solarDetails.solarcapacity} kW</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Inverter Capacity</label>
+                                            <p className="font-medium">{solarDetails.invertercapacity} kW</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* VPP Section */}
+                            {(vppDetails?.vpp === 1 || ratePlan?.vpp === 1) && (
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between border-b pb-2">
+                                        <h3 className="text-lg font-semibold">VPP Configuration</h3>
+                                        <div className="flex items-center gap-2">
+                                            {!isDeleted && handleVppToggle && (
+                                                <>
+                                                    <span className="text-sm font-medium text-muted-foreground">VPP Connected</span>
+                                                    <ToggleSwitch
+                                                        checked={vppDetails?.vppConnected === 1}
+                                                        onChange={(checked: boolean) => handleVppToggle(customerUid, checked)}
+                                                        disabled={false}
+                                                    />
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {vppDetails?.vppConnected === 1 && vppForm && setVppForm && setIsEditingVpp && handleSaveVppDetails && (
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-foreground">Signup Bonus ($)</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={vppForm.vppSignupBonus}
+                                                        onChange={(e) => setVppForm({ ...vppForm, vppSignupBonus: e.target.value })}
+                                                        disabled={!isEditingVpp}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-foreground">Battery Brand</label>
+                                                    <Select
+                                                        value={vppForm.batteryBrand}
+                                                        onChange={(val: any) => setVppForm({ ...vppForm, batteryBrand: val })}
+                                                        disabled={!isEditingVpp}
+                                                        options={BATTERY_BRAND_OPTIONS}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-foreground">Serial Number</label>
+                                                    <Input
+                                                        value={vppForm.snNumber}
+                                                        onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
+                                                        disabled={!isEditingVpp}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-foreground">Battery Capacity (kWh)</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={vppForm.batteryCapacity}
+                                                        onChange={(e) => setVppForm({ ...vppForm, batteryCapacity: e.target.value })}
+                                                        disabled={!isEditingVpp}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-foreground">Export Limit (kW)</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={vppForm.exportLimit}
+                                                        onChange={(e) => setVppForm({ ...vppForm, exportLimit: e.target.value })}
+                                                        disabled={!isEditingVpp}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-foreground">Inverter Capacity (kW)</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={vppForm.inverterCapacity}
+                                                        onChange={(e) => setVppForm({ ...vppForm, inverterCapacity: e.target.value })}
+                                                        disabled={!isEditingVpp}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-foreground">Check Code</label>
+                                                    <Input
+                                                        value={vppForm.checkCode}
+                                                        onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
+                                                        disabled={!isEditingVpp}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-end gap-2 pt-4 border-t border-border/40 mt-6">
+                                                {isEditingVpp ? (
+                                                    <>
+                                                        <Button variant="outline" onClick={() => setIsEditingVpp(false)}>Cancel</Button>
+                                                        <Button onClick={handleSaveVppDetails}>Save VPP Details</Button>
+                                                    </>
+                                                ) : (
+                                                    <Button variant="outline" onClick={() => setIsEditingVpp(true)}>
+                                                        <PencilIcon className="w-4 h-4 mr-2" />
+                                                        Edit Details
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {solarDetails?.hassolar !== 1 && vppDetails?.vpp !== 1 && ratePlan?.vpp !== 1 && (
+                                <div className="text-center py-12 text-muted-foreground bg-white dark:bg-neutral-950 rounded-lg border border-dashed border-border">
+                                    <Settings2Icon className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                                    <p>No Solar or VPP configuration found for this customer.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Step 1 — Battery Details */}
+                    {currentStep === 1 && (
                         <div className="space-y-6">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Battery Details</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Manufacturer</label>
-                                    <Input name="batteryManufacturer" value={formState.batteryManufacturer} onChange={handleChange} placeholder="e.g. Tesla" />
+                                    <Select
+                                        value={formState.batteryManufacturer}
+                                        onChange={(v: any) => setFormState(prev => ({ ...prev, batteryManufacturer: v as string }))}
+                                        options={BATTERY_BRAND_OPTIONS}
+                                        placeholder="Select brand"
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Model</label>
                                     <Input name="batteryModel" value={formState.batteryModel} onChange={handleChange} placeholder="e.g. Powerwall 2" />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Serial Number(s)</label>
+                                    <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
                                     <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" />
                                 </div>
                                 <div className="space-y-2">
@@ -373,21 +553,26 @@ export function VppCertificateTab({ customerUid, onUpdate }: VppCertificateTabPr
                         </div>
                     )}
 
-                    {/* Step 1 — Inverter Details */}
-                    {currentStep === 1 && (
+                    {/* Step 2 — Inverter Details */}
+                    {currentStep === 2 && (
                         <div className="space-y-6">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Inverter Details</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Manufacturer</label>
-                                    <Input name="inverterManufacturer" value={formState.inverterManufacturer} onChange={handleChange} />
+                                    <Select
+                                        value={formState.inverterManufacturer}
+                                        onChange={(v: any) => setFormState(prev => ({ ...prev, inverterManufacturer: v as string }))}
+                                        options={INVERTER_BRAND_OPTIONS}
+                                        placeholder="Select brand"
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Model</label>
                                     <Input name="inverterModel" value={formState.inverterModel} onChange={handleChange} />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Serial Number(s)</label>
+                                    <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
                                     <Input name="inverterSnNumbers" value={formState.inverterSnNumbers} onChange={handleChange} />
                                 </div>
                                 <div className="space-y-2">
@@ -413,8 +598,8 @@ export function VppCertificateTab({ customerUid, onUpdate }: VppCertificateTabPr
                         </div>
                     )}
 
-                    {/* Step 2 — Network & API Integrations */}
-                    {currentStep === 2 && (
+                    {/* Step 3 — Network & API Integrations */}
+                    {currentStep === 3 && (
                         <div className="space-y-6">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Network & API Integrations</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -457,8 +642,8 @@ export function VppCertificateTab({ customerUid, onUpdate }: VppCertificateTabPr
                         </div>
                     )}
 
-                    {/* Step 3 — Testing & Verification */}
-                    {currentStep === 3 && (
+                    {/* Step 4 — Testing & Verification */}
+                    {currentStep === 4 && (
                         <div className="space-y-6">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Testing & Verification</h4>
 
