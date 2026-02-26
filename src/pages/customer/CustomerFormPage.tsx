@@ -474,9 +474,9 @@ export const CustomerFormPage = () => {
 
     const versionOptions = useMemo(() => {
         const versions = allVersionsData?.ratesHistory?.data || [];
-        const options: VersionOption[] = versions.map((v: any) => ({
+        const options: VersionOption[] = versions.map((v: any, key: number) => ({
             value: v.version,
-            label: `v.${v.version} (${new Date(v.createdAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: '2-digit' })}) ${v.version === activeRateVersion ? '[ACTIVE]' : ''}`
+            label: `v-${versions.length - key} (${new Date(v.createdAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: '2-digit', timeZone: 'Australia/Sydney' })}) ${v.version === activeRateVersion ? '[ACTIVE]' : ''}`
         }));
 
         // Add assigned version if not in list
@@ -484,7 +484,7 @@ export const CustomerFormPage = () => {
         if (assignedVer && !options.some(o => o.value === assignedVer)) {
             options.push({
                 value: assignedVer,
-                label: `v.${assignedVer} [ASSIGNED]`
+                label: `v-${assignedVer} [ASSIGNED]`
             });
         }
 
@@ -1615,7 +1615,7 @@ export const CustomerFormPage = () => {
                                                 </div>
                                             ) : (
                                                 <div className="ml-2 px-2.5 py-1 rounded-md bg-neutral-100 border border-neutral-200 text-neutral-600 text-xs font-mono tracking-tight flex items-center gap-1">
-                                                    <span className="opacity-60">v.</span>
+                                                    <span className="opacity-60 text-[10px] font-bold">v-</span>
                                                     {activeRateVersion}
                                                 </div>
                                             )}

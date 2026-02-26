@@ -129,6 +129,7 @@ export function UsersPage() {
             roleUid: roleFilter || undefined // Pass roleUid if selected
         },
         fetchPolicy: 'network-only',
+        notifyOnNetworkStatusChange: true,
     });
 
     // Fetch roles for dropdown

@@ -462,6 +462,7 @@ export function RatesPage() {
             type: typeFilter ? parseInt(typeFilter, 10) : undefined,
         },
         fetchPolicy: 'network-only',
+        notifyOnNetworkStatusChange: true,
     });
 
     const meta = data?.ratePlans?.meta;
