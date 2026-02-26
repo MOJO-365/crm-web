@@ -8,7 +8,7 @@ import {
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
     IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon, LockIcon,
-    RefreshCwIcon, SunIcon, CreditCardIcon, FileTextIcon, PercentIcon
+    RefreshCwIcon, CreditCardIcon, FileTextIcon, PercentIcon
 } from '@/components/icons';
 import {
     GET_CUSTOMER_GENERAL_DETAILS,
@@ -803,7 +803,7 @@ export function CustomerDetailsPage() {
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     // Detail Section State
-    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'solar_vpp' | 'vpp_certificate' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log'>('general');
+    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log'>('general');
 
     // Email Logs Refresh State
     const [emailLogsKey, setEmailLogsKey] = useState(0);
@@ -948,7 +948,7 @@ export function CustomerDetailsPage() {
 
     const { loading: loadingSolar } = useQuery(GET_CUSTOMER_SOLAR_VPP_DETAILS, {
         variables: { uid },
-        skip: !uid || (selectedDetailSection !== 'solar_vpp' && !vppConnectModalOpen && !freezeModalOpen),
+        skip: !uid || (selectedDetailSection !== 'vpp_certificate' && !vppConnectModalOpen && !freezeModalOpen),
         onCompleted: (data) => {
             if (data?.customer) {
                 setSelectedCustomerDetails(prev => prev ? ({ ...prev, ...data.customer }) : data.customer);
@@ -988,7 +988,7 @@ export function CustomerDetailsPage() {
 
     const isTabLoading =
         (selectedDetailSection === 'general' && loadingGeneral) ||
-        (selectedDetailSection === 'solar_vpp' && loadingSolar) ||
+        (selectedDetailSection === 'vpp_certificate' && loadingSolar) ||
         (selectedDetailSection === 'debit' && loadingDebit) ||
         (selectedDetailSection === 'utilmate' && loadingUtilmate) ||
         ((selectedDetailSection === 'documents' || selectedDetailSection === 'electricity_bills') && loadingDocuments);
@@ -2189,7 +2189,15 @@ export function CustomerDetailsPage() {
                                     { label: 'Offer sent', date: selectedCustomerDetails.offerEmailSentAt, completed: !!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.emailSent === 1, step: 1, isLoading: isSendingOffer },
                                     { label: 'Signed by customer', date: selectedCustomerDetails.signDate, completed: !!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2, showReminder: !!selectedCustomerDetails.offerEmailSentAt, step: 2 },
                                     ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
-                                        { label: 'VPP connect', date: null, completed: selectedCustomerDetails.vppDetails?.vppConnected === 1, showToggle: true, disabled: selectedCustomerDetails.status < 3 || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0, step: 3 },
+                                        {
+                                            label: 'VPP connect',
+                                            date: null,
+                                            completed: selectedCustomerDetails.vppDetails?.vppConnected === 1,
+                                            showToggle: true,
+                                            disabled: selectedCustomerDetails.status < 3 || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0,
+                                            disabledReason: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? "VPP certificate fields are required" : undefined,
+                                            step: 3
+                                        },
                                     ] : []),
                                     { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate || (selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1), step: 4 },
                                     { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: selectedCustomerDetails.msatDetails?.msatConnected !== 1, step: 5 },
@@ -2324,8 +2332,8 @@ export function CustomerDetailsPage() {
                                             )}
 
 
-                                            {item.showToggle && (
-                                                <div className="mt-1 relative z-30 flex items-center h-6">
+                                            {item.showToggle && (() => {
+                                                const toggleComponent = (
                                                     <ConfirmationPopover
                                                         title="Disconnect?"
                                                         description="Are you sure you want to disconnect this service?"
@@ -2350,8 +2358,24 @@ export function CustomerDetailsPage() {
                                                             />
                                                         </div>
                                                     </ConfirmationPopover>
-                                                </div>
-                                            )}
+                                                );
+
+                                                return (
+                                                    <div className="mt-1 relative z-30 flex items-center h-6">
+                                                        {item.disabledReason ? (
+                                                            <Tooltip content={item.disabledReason} position="bottom">
+                                                                <div className="cursor-not-allowed">
+                                                                    <div className="pointer-events-none">
+                                                                        {toggleComponent}
+                                                                    </div>
+                                                                </div>
+                                                            </Tooltip>
+                                                        ) : (
+                                                            toggleComponent
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                             {item.step === 5 && item.completed && (
                                                 <Button
                                                     variant="outline"
@@ -2402,8 +2426,13 @@ export function CustomerDetailsPage() {
                                 const allTabs = [
                                     { id: 'general', label: 'General', icon: Settings2Icon },
                                     { id: 'rates', label: 'Rates', icon: PercentIcon },
-                                    { id: 'solar_vpp', label: 'Solar & VPP', icon: SunIcon },
-                                    { id: 'vpp_certificate', label: 'Vpp Certificate', icon: FileTextIcon },
+                                    {
+                                        id: 'vpp_certificate',
+                                        label: 'Vpp Certificate',
+                                        icon: FileTextIcon,
+                                        highlight: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0,
+                                        tooltip: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? "VPP certificate fields are required" : undefined
+                                    },
                                     { id: 'debit', label: 'Debit', icon: CreditCardIcon },
                                     { id: 'utilmate', label: 'Utilmate', icon: PlugIcon },
                                     { id: 'documents', label: 'Documents', icon: UploadIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2')).length },
@@ -2412,15 +2441,10 @@ export function CustomerDetailsPage() {
                                     { id: 'email_logs', label: 'Email Logs', icon: MailIcon },
                                     { id: 'activity_log', label: 'Activity Log', icon: ActivityIcon }
                                 ].filter(item => {
-                                    if (item.id === 'solar_vpp') {
+                                    if (item.id === 'vpp_certificate') {
                                         const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
                                         const isVpp = selectedCustomerDetails.vppDetails?.vpp === 1;
-
-                                        // Tab should strictly be shown ONLY if one of these is true
                                         return hasSolar || isVpp;
-                                    }
-                                    if (item.id === 'vpp_certificate') {
-                                        return selectedCustomerDetails.vppDetails?.vpp === 1;
                                     }
                                     if (item.id === 'debit') {
                                         return !!selectedCustomerDetails.debitDetails && selectedCustomerDetails.debitDetails.optIn === 1;
@@ -2457,37 +2481,48 @@ export function CustomerDetailsPage() {
 
                                 return (
                                     <>
-                                        {primaryTabs.map((item) => (
-                                            <button
-                                                key={item.id}
-                                                onClick={() => {
-                                                    if (item.id === 'email_logs' && selectedDetailSection === 'email_logs') {
-                                                        setEmailLogsKey((prev) => prev + 1);
-                                                    }
-                                                    setSelectedDetailSection(item.id as any);
-                                                }}
-                                                className={cn(
-                                                    "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 border-b-2 whitespace-nowrap outline-none",
-                                                    selectedDetailSection === item.id
-                                                        ? "border-primary bg-background text-primary"
-                                                        : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                                                )}
-                                                title={item.label}
-                                            >
-                                                <item.icon className="w-4 h-4" />
-                                                <span className="hidden sm:inline">{item.label}</span>
-                                                {item.badge !== undefined && item.badge > 0 && (
-                                                    <span className={cn(
-                                                        "px-2 py-0.5 rounded-full text-xs font-bold",
+                                        {primaryTabs.map((item: any) => {
+                                            const tabButton = (
+                                                <button
+                                                    key={item.id}
+                                                    onClick={() => {
+                                                        if (item.id === 'email_logs' && selectedDetailSection === 'email_logs') {
+                                                            setEmailLogsKey((prev) => prev + 1);
+                                                        }
+                                                        setSelectedDetailSection(item.id as any);
+                                                    }}
+                                                    className={cn(
+                                                        "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 border-b-2 whitespace-nowrap outline-none",
                                                         selectedDetailSection === item.id
-                                                            ? "bg-primary/10 text-primary"
-                                                            : "bg-muted text-muted-foreground"
-                                                    )}>
-                                                        {item.badge}
-                                                    </span>
-                                                )}
-                                            </button>
-                                        ))}
+                                                            ? "border-primary bg-background text-primary"
+                                                            : item.highlight
+                                                                ? "border-transparent text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600"
+                                                                : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                                    )}
+                                                    title={!item.tooltip ? item.label : undefined}
+                                                >
+                                                    <item.icon className={cn("w-4 h-4", item.highlight && selectedDetailSection !== item.id ? "text-red-500" : "")} />
+                                                    <span className="hidden sm:inline">{item.label}</span>
+                                                    {item.badge !== undefined && item.badge > 0 && (
+                                                        <span className={cn(
+                                                            "px-2 py-0.5 rounded-full text-xs font-bold",
+                                                            selectedDetailSection === item.id
+                                                                ? "bg-primary/10 text-primary"
+                                                                : item.highlight ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" : "bg-muted text-muted-foreground"
+                                                        )}>
+                                                            {item.badge}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                            return item.tooltip ? (
+                                                <Tooltip key={item.id} content={item.tooltip} position="bottom">
+                                                    {tabButton}
+                                                </Tooltip>
+                                            ) : (
+                                                tabButton
+                                            );
+                                        })}
 
                                         {overflowTabs.length > 0 && (
                                             <Popover
@@ -2510,27 +2545,43 @@ export function CustomerDetailsPage() {
                                                 }
                                                 content={
                                                     <div className="py-1 min-w-[200px]">
-                                                        {overflowTabs.map(item => (
-                                                            <button
-                                                                key={item.id}
-                                                                onClick={() => {
-                                                                    setSelectedDetailSection(item.id as any);
-                                                                    setOverflowOpen(false);
-                                                                }}
-                                                                className={cn(
-                                                                    "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors text-left",
-                                                                    selectedDetailSection === item.id
-                                                                        ? "bg-primary/10 text-primary font-medium"
-                                                                        : "text-foreground hover:bg-muted/70"
-                                                                )}
-                                                            >
-                                                                <item.icon className="w-4 h-4 shrink-0" />
-                                                                <span>{item.label}</span>
-                                                                {item.badge !== undefined && item.badge > 0 && (
-                                                                    <span className="ml-auto bg-muted px-1.5 py-0.5 rounded-full text-[10px]">{item.badge}</span>
-                                                                )}
-                                                            </button>
-                                                        ))}
+                                                        {overflowTabs.map((item: any) => {
+                                                            const overflowBtn = (
+                                                                <button
+                                                                    key={item.id}
+                                                                    onClick={() => {
+                                                                        setSelectedDetailSection(item.id as any);
+                                                                        setOverflowOpen(false);
+                                                                    }}
+                                                                    className={cn(
+                                                                        "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors text-left",
+                                                                        selectedDetailSection === item.id
+                                                                            ? "bg-primary/10 text-primary font-medium"
+                                                                            : item.highlight
+                                                                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                                                                : "text-foreground hover:bg-muted/70"
+                                                                    )}
+                                                                >
+                                                                    <item.icon className={cn("w-4 h-4 shrink-0", item.highlight && selectedDetailSection !== item.id ? "text-red-500" : "")} />
+                                                                    <span>{item.label}</span>
+                                                                    {item.badge !== undefined && item.badge > 0 && (
+                                                                        <span className={cn(
+                                                                            "ml-auto px-1.5 py-0.5 rounded-full text-[10px]",
+                                                                            item.highlight && selectedDetailSection !== item.id ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" : "bg-muted"
+                                                                        )}>
+                                                                            {item.badge}
+                                                                        </span>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                            return item.tooltip ? (
+                                                                <Tooltip key={item.id} content={item.tooltip} position="right">
+                                                                    {overflowBtn}
+                                                                </Tooltip>
+                                                            ) : (
+                                                                overflowBtn
+                                                            );
+                                                        })}
                                                     </div>
                                                 }
                                                 isOpen={overflowOpen}
@@ -2952,156 +3003,22 @@ export function CustomerDetailsPage() {
                                 </div>
                             )}
 
-                            {selectedDetailSection === 'solar_vpp' && (
-                                <div className="space-y-8 animate-in fade-in duration-300">
-                                    {/* Solar Header */}
-                                    <div className="flex items-center justify-between border-b border-border pb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center text-green-600 dark:text-green-400">
-                                                <ZapIcon size={20} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Solar & VPP</h3>
-                                                <p className="text-xs text-muted-foreground">Solar & VPP configuration</p>
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    {/* Solar Section */}
-                                    {selectedCustomerDetails.solarDetails?.hassolar === 1 && (
-                                        <div className="space-y-6">
-                                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Solar Configuration</h4>
-                                            <div className="grid grid-cols-2 gap-6">
-                                                <div className="space-y-1">
-                                                    <label className="text-xs text-muted-foreground uppercase font-semibold">Solar Capacity</label>
-                                                    <p className="font-medium">{selectedCustomerDetails.solarDetails.solarcapacity} kW</p>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-xs text-muted-foreground uppercase font-semibold">Inverter Capacity</label>
-                                                    <p className="font-medium">{selectedCustomerDetails.solarDetails.invertercapacity} kW</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* VPP Section */}
-                                    {(selectedCustomerDetails.vppDetails?.vpp === 1 || selectedCustomerDetails.ratePlan?.vpp === 1) && (
-                                        <div className="space-y-6">
-                                            <div className="flex items-center justify-between border-b pb-2">
-                                                <h3 className="text-lg font-semibold">VPP Configuration</h3>
-                                                <div className="flex items-center gap-2">
-                                                    {!selectedCustomerDetails.isDeleted && (
-                                                        <>
-                                                            <span className="text-sm font-medium text-muted-foreground">VPP Connected</span>
-                                                            <ToggleSwitch
-                                                                checked={selectedCustomerDetails.vppDetails?.vppConnected === 1}
-                                                                onChange={(checked) => handleVppToggle(selectedCustomerDetails.uid, checked)}
-                                                                disabled={false}
-                                                            />
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {selectedCustomerDetails.vppDetails?.vppConnected === 1 && (
-                                                <div className="space-y-4">
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="space-y-2">
-                                                            <label className="text-sm font-medium">Signup Bonus ($)</label>
-                                                            <Input
-                                                                type="number"
-                                                                value={vppForm.vppSignupBonus}
-                                                                onChange={(e) => setVppForm({ ...vppForm, vppSignupBonus: e.target.value })}
-                                                                disabled={!isEditingVpp}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-sm font-medium">Battery Brand</label>
-                                                            <Select
-                                                                value={vppForm.batteryBrand}
-                                                                onChange={(val: any) => setVppForm({ ...vppForm, batteryBrand: val })}
-                                                                disabled={!isEditingVpp}
-                                                                options={BATTERY_BRAND_OPTIONS}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-sm font-medium">Serial Number</label>
-                                                            <Input
-                                                                value={vppForm.snNumber}
-                                                                onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
-                                                                disabled={!isEditingVpp}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-sm font-medium">Battery Capacity (kWh)</label>
-                                                            <Input
-                                                                type="number"
-                                                                value={vppForm.batteryCapacity}
-                                                                onChange={(e) => setVppForm({ ...vppForm, batteryCapacity: e.target.value })}
-                                                                disabled={!isEditingVpp}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-sm font-medium">Export Limit (kW)</label>
-                                                            <Input
-                                                                type="number"
-                                                                value={vppForm.exportLimit}
-                                                                onChange={(e) => setVppForm({ ...vppForm, exportLimit: e.target.value })}
-                                                                disabled={!isEditingVpp}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-sm font-medium">Inverter Capacity (kW)</label>
-                                                            <Input
-                                                                type="number"
-                                                                value={vppForm.inverterCapacity}
-                                                                onChange={(e) => setVppForm({ ...vppForm, inverterCapacity: e.target.value })}
-                                                                disabled={!isEditingVpp}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-sm font-medium">Check Code</label>
-                                                            <Input
-                                                                value={vppForm.checkCode}
-                                                                onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
-                                                                disabled={!isEditingVpp}
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex justify-end gap-2 pt-4">
-                                                        {isEditingVpp ? (
-                                                            <>
-                                                                <Button variant="outline" onClick={() => setIsEditingVpp(false)}>Cancel</Button>
-                                                                <Button onClick={handleSaveVppDetails}>Save VPP Details</Button>
-                                                            </>
-                                                        ) : (
-                                                            <Button variant="outline" onClick={() => setIsEditingVpp(true)}>
-                                                                <PencilIcon className="w-4 h-4 mr-2" />
-                                                                Edit Details
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {selectedCustomerDetails.solarDetails?.hassolar !== 1 &&
-                                        selectedCustomerDetails.vppDetails?.vpp !== 1 &&
-                                        selectedCustomerDetails.ratePlan?.vpp !== 1 && (
-                                            <div className="text-center py-12 text-muted-foreground bg-white dark:bg-neutral-950 rounded-lg border border-dashed border-border">
-                                                <ZapIcon className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                                                <p>No Solar or VPP configuration found for this customer.</p>
-                                            </div>
-                                        )}
-                                </div>
-                            )}
 
                             {selectedDetailSection === 'vpp_certificate' && (
                                 <VppCertificateTab
                                     customerUid={selectedCustomerDetails.uid}
                                     onUpdate={refetchCustomer}
+                                    vppDetails={selectedCustomerDetails.vppDetails}
+                                    solarDetails={selectedCustomerDetails.solarDetails}
+                                    ratePlan={selectedCustomerDetails.ratePlan}
+                                    isDeleted={selectedCustomerDetails.isDeleted}
+                                    vppForm={vppForm}
+                                    setVppForm={setVppForm}
+                                    isEditingVpp={isEditingVpp}
+                                    setIsEditingVpp={setIsEditingVpp}
+                                    handleVppToggle={handleVppToggle}
+                                    handleSaveVppDetails={handleSaveVppDetails}
                                 />
                             )}
 

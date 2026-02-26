@@ -107,10 +107,6 @@ export const StatusField: React.FC<StatusFieldProps> = ({
                         color: c
                     }}
                 >
-                    <span
-                        className="w-1.5 h-1.5 rounded-full mr-2 shrink-0"
-                        style={{ backgroundColor: c }}
-                    />
                     {l}
                 </span>
             );
