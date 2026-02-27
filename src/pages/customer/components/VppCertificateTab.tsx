@@ -27,19 +27,6 @@ interface VppCertificateTabProps {
     handleSaveVppDetails?: () => void;
 }
 
-
-const INVERTER_BRAND_OPTIONS = [
-    { value: 'Fronius', label: 'Fronius' },
-    { value: 'SMA', label: 'SMA' },
-    { value: 'SolarEdge', label: 'SolarEdge' },
-    { value: 'Sungrow', label: 'Sungrow' },
-    { value: 'Huawei', label: 'Huawei' },
-    { value: 'GoodWe', label: 'GoodWe' },
-    { value: 'Growatt', label: 'Growatt' },
-    { value: 'Enphase', label: 'Enphase' },
-    { value: 'Other', label: 'Other' },
-];
-
 const STEPS = [
     { id: 0, label: 'System Details', icon: Settings2Icon },
     { id: 1, label: 'Battery Details', icon: ZapIcon },
@@ -559,7 +546,7 @@ export function VppCertificateTab({
                                     <Select
                                         value={formState.inverterManufacturer}
                                         onChange={(v: any) => setFormState(prev => ({ ...prev, inverterManufacturer: v as string }))}
-                                        options={INVERTER_BRAND_OPTIONS}
+                                        options={BATTERY_BRAND_OPTIONS}
                                         placeholder="Select brand"
                                     />
                                 </div>
