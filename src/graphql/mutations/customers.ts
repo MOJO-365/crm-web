@@ -271,6 +271,7 @@ export const GENERATE_VPP_CERTIFICATE = gql`
         communicationFailSafeTest
         communicationFailSafeTestAt
         testResult
+        additionalNotes
         isAllRequiredFilled
 
     }

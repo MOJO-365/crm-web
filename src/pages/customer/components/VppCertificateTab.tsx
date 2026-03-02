@@ -8,8 +8,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { Modal } from '@/components/common';
 import { apiAxios } from '@/lib/apollo';
 import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE } from '@/graphql';
-import { FileTextIcon, ZapIcon, PlugIcon, ShieldCheckIcon, CheckIcon, EyeIcon, PencilIcon, Settings2Icon } from '@/components/icons';
-import { Switch as ToggleSwitch } from '@/components/ui';
+import { FileTextIcon, ZapIcon, PlugIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon } from '@/components/icons';
 import { BATTERY_BRAND_OPTIONS } from '@/lib/constants';
 
 interface VppCertificateTabProps {
@@ -27,32 +26,25 @@ interface VppCertificateTabProps {
     handleSaveVppDetails?: () => void;
 }
 
-const STEPS = [
-    { id: 0, label: 'System Details', icon: Settings2Icon },
-    { id: 1, label: 'Battery Details', icon: ZapIcon },
-    { id: 2, label: 'Inverter Details', icon: PlugIcon },
-    { id: 3, label: 'Network & API', icon: FileTextIcon },
-    { id: 4, label: 'Testing & Verification', icon: ShieldCheckIcon },
-];
 
 export function VppCertificateTab({
     customerUid,
     onUpdate,
-    vppDetails,
-    solarDetails,
-    ratePlan,
-    isDeleted,
-    vppForm,
-    setVppForm,
-    isEditingVpp,
-    setIsEditingVpp,
-    handleVppToggle,
-    handleSaveVppDetails
+    solarDetails
 }: VppCertificateTabProps) {
     const { data, loading, refetch } = useQuery(GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, {
         variables: { uid: customerUid },
         fetchPolicy: 'network-only'
     });
+
+
+    const STEPS = [
+        ...(solarDetails?.hassolar === 1 ? [{ id: 0, label: 'Solar Details', icon: SunIcon }] : []),
+        { id: 1, label: 'Inverter Details', icon: PlugIcon },
+        { id: 2, label: 'Battery Details', icon: ZapIcon },
+        { id: 3, label: 'Network & API', icon: FileTextIcon },
+        { id: 4, label: 'Testing & Verification', icon: ShieldCheckIcon },
+    ];
 
     const [generateVppCertificate] = useMutation(GENERATE_VPP_CERTIFICATE);
     const [isSaving, setIsSaving] = useState(false); // This 'isSaving' is for the final certificate generation
@@ -91,7 +83,8 @@ export function VppCertificateTab({
         gridImportVerificationAt: '',
         communicationFailSafeTest: 0,
         communicationFailSafeTestAt: '',
-        testResult: ''
+        testResult: '',
+        additionalNotes: ''
     });
 
     useEffect(() => {
@@ -127,7 +120,8 @@ export function VppCertificateTab({
                     gridImportVerificationAt: v.gridImportVerificationAt ? new Date(v.gridImportVerificationAt).toISOString().slice(0, 16) : '',
                     communicationFailSafeTest: v.communicationFailSafeTest ?? 0,
                     communicationFailSafeTestAt: v.communicationFailSafeTestAt ? new Date(v.communicationFailSafeTestAt).toISOString().slice(0, 16) : '',
-                    testResult: v.testResult || ''
+                    testResult: v.testResult || '',
+                    additionalNotes: v.additionalNotes || ''
                 });
             }, 0);
         }
@@ -237,15 +231,7 @@ export function VppCertificateTab({
             await generateVppCertificate({
                 variables: { customerUid, input: buildInputFormat() }
             });
-
-            // Send VPP certificate email
-            try {
-                await apiAxios.post(`/vpp-certificate/send/${customerUid}`);
-                toast.success('VPP Certificate generated and sent to customer!');
-            } catch {
-                toast.error('VPP Certificate generated! (Email sending failed)');
-            }
-
+            toast.success('VPP Certificate generated successfully!');
             refetch();
             onUpdate?.();
         } catch (error) {
@@ -287,11 +273,21 @@ export function VppCertificateTab({
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    {vppCertificateDetails?.id && (
-                        <Button type="button" variant="outline" size="sm" onClick={handlePreview}>
+                    {Number(vppCertificateDetails?.id) > 0 && (
+                        <Button type="button" variant="outline" size="sm" onClick={handlePreview} className="bg-white dark:bg-neutral-900 shadow-sm hover:shadow-md transition-shadow">
                             <EyeIcon size={14} className="mr-1.5" /> Preview
                         </Button>
                     )}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => refetch()}
+                        className="text-muted-foreground hover:text-foreground h-9 w-9 p-0"
+                        title="Refresh Data"
+                    >
+                        <Settings2Icon size={16} className={loading ? 'animate-spin' : ''} />
+                    </Button>
                     {vppCertificateDetails?.certificateNo && (
                         <div className="text-right">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Certificate No</p>
@@ -356,7 +352,7 @@ export function VppCertificateTab({
             <div>
                 <div className="bg-card border border-border rounded-xl p-6 animate-in fade-in slide-in-from-right-2 duration-300" key={currentStep}>
                     {/* Step 0 — System Settings */}
-                    {currentStep === 0 && (
+                    {STEPS[currentStep].id === 0 && (
                         <div className="space-y-8">
                             {/* Solar Section */}
                             {solarDetails?.hassolar === 1 && (
@@ -375,7 +371,7 @@ export function VppCertificateTab({
                                 </div>
                             )}
 
-                            {/* VPP Section */}
+                            {/* VPP Section
                             {(vppDetails?.vpp === 1 || ratePlan?.vpp === 1) && (
                                 <div className="space-y-6">
                                     <div className="flex items-center justify-between border-b pb-2">
@@ -450,14 +446,16 @@ export function VppCertificateTab({
                                                         disabled={!isEditingVpp}
                                                     />
                                                 </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-foreground">Check Code</label>
-                                                    <Input
-                                                        value={vppForm.checkCode}
-                                                        onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
-                                                        disabled={!isEditingVpp}
-                                                    />
-                                                </div>
+                                                {vppForm.batteryBrand === 'Fox ESS' && (
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-medium text-foreground">Check Code</label>
+                                                        <Input
+                                                            value={vppForm.checkCode}
+                                                            onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
+                                                            disabled={!isEditingVpp}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="flex justify-end gap-2 pt-4 border-t border-border/40 mt-6">
@@ -476,9 +474,9 @@ export function VppCertificateTab({
                                         </div>
                                     )}
                                 </div>
-                            )}
+                            )} */}
 
-                            {solarDetails?.hassolar !== 1 && vppDetails?.vpp !== 1 && ratePlan?.vpp !== 1 && (
+                            {solarDetails?.hassolar !== 1 && (
                                 <div className="text-center py-12 text-muted-foreground bg-white dark:bg-neutral-950 rounded-lg border border-dashed border-border">
                                     <Settings2Icon className="w-12 h-12 mx-auto mb-4 opacity-20" />
                                     <p>No Solar or VPP configuration found for this customer.</p>
@@ -487,8 +485,8 @@ export function VppCertificateTab({
                         </div>
                     )}
 
-                    {/* Step 1 — Battery Details */}
-                    {currentStep === 1 && (
+                    {/* Step 2 — Battery Details */}
+                    {STEPS[currentStep].id === 2 && (
                         <div className="space-y-6">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Battery Details</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -536,8 +534,8 @@ export function VppCertificateTab({
                         </div>
                     )}
 
-                    {/* Step 2 — Inverter Details */}
-                    {currentStep === 2 && (
+                    {/* Step 1 — Inverter Details */}
+                    {STEPS[currentStep].id === 1 && (
                         <div className="space-y-6">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Inverter Details</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -582,7 +580,7 @@ export function VppCertificateTab({
                     )}
 
                     {/* Step 3 — Network & API Integrations */}
-                    {currentStep === 3 && (
+                    {STEPS[currentStep].id === 3 && (
                         <div className="space-y-6">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Network & API Integrations</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -626,7 +624,7 @@ export function VppCertificateTab({
                     )}
 
                     {/* Step 4 — Testing & Verification */}
-                    {currentStep === 4 && (
+                    {STEPS[currentStep].id === 4 && (
                         <div className="space-y-6">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Testing & Verification</h4>
 
@@ -688,6 +686,17 @@ export function VppCertificateTab({
                                 <label className="text-sm font-medium text-foreground">Test Result / Notes</label>
                                 <Input name="testResult" value={formState.testResult} onChange={handleChange} placeholder="Any specific notes or observations..." />
                             </div>
+
+                            <div className="space-y-2 pt-2">
+                                <label className="text-sm font-medium text-foreground">Additional Notes</label>
+                                <textarea
+                                    name="additionalNotes"
+                                    value={formState.additionalNotes}
+                                    onChange={handleChange}
+                                    placeholder="Any additional notes..."
+                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </div>
                         </div>
                     )}
                 </div>
@@ -717,7 +726,7 @@ export function VppCertificateTab({
                                 disabled={isSaving || isSavingDraft || !isFormComplete}
                                 title={!isFormComplete ? "Please fill all required fields to generate certificate" : ""}
                             >
-                                {vppCertificateDetails?.id ? 'Update & Send' : 'Generate & Send'}
+                                {vppCertificateDetails?.id ? 'Update' : 'Generate'}
                             </Button>
                         ) : (
                             <Button
