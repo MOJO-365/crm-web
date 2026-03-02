@@ -761,6 +761,8 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             }
             vppCertificateDetails {
                 isAllRequiredFilled
+                isVppCertificateEmailSent
+                isVppCertificateEmailSentAt
             }
         }
     }
@@ -839,7 +841,10 @@ export const GET_CUSTOMER_VPP_CERTIFICATE_DETAILS = gql`
                 communicationFailSafeTest
                 communicationFailSafeTestAt
                 testResult
+                additionalNotes
                 isAllRequiredFilled
+                isVppCertificateEmailSent
+                isVppCertificateEmailSentAt
 
             }
         }

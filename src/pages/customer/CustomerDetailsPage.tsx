@@ -220,6 +220,8 @@ interface CustomerDetails {
     utilmateStatus?: string | number;
     vppCertificateDetails?: {
         isAllRequiredFilled: number;
+        isVppCertificateEmailSent?: number;
+        isVppCertificateEmailSentAt?: string;
     };
     rateVersion?: number;
     createdAt?: string;
@@ -801,6 +803,7 @@ export function CustomerDetailsPage() {
     const [previewModalOpen, setPreviewModalOpen] = useState(false);
     const [previewUrl, setPreviewUrl] = useState('');
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+    const [isEmailSending, setIsEmailSending] = useState(false);
 
     // Detail Section State
     const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log'>('general');
@@ -1983,6 +1986,37 @@ export function CustomerDetailsPage() {
         }
     };
 
+    const handleSendCertificateEmail = async () => {
+        if (!uid) {
+            toast.error('Customer ID not found.');
+            return;
+        }
+
+        try {
+            setIsEmailSending(true);
+            await apiAxios.post(`/vpp-certificate/send/${uid}`);
+            toast.success('VPP Certificate sent to customer!');
+            // Update local state to reflect email sent using functional update
+            setSelectedCustomerDetails(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    vppCertificateDetails: {
+                        ...prev.vppCertificateDetails,
+                        isAllRequiredFilled: prev.vppCertificateDetails?.isAllRequiredFilled ?? 0,
+                        isVppCertificateEmailSent: 1,
+                        isVppCertificateEmailSentAt: new Date().toISOString(),
+                    }
+                };
+            });
+        } catch (error) {
+            console.error('Email sending failed:', error);
+            toast.error('Email sending failed.');
+        } finally {
+            setIsEmailSending(false);
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
             <div className="bg-card text-card-foreground rounded-xl border border-border shadow-sm animate-in slide-in-from-top-4 duration-500 overflow-hidden">
@@ -2190,12 +2224,27 @@ export function CustomerDetailsPage() {
                                     { label: 'Signed by customer', date: selectedCustomerDetails.signDate, completed: !!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2, showReminder: !!selectedCustomerDetails.offerEmailSentAt, step: 2 },
                                     ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
                                         {
-                                            label: 'VPP connect',
+                                            label: 'Push to Gsync',
+                                            // label: 'VPP connect',
                                             date: null,
                                             completed: selectedCustomerDetails.vppDetails?.vppConnected === 1,
                                             showToggle: true,
-                                            disabled: selectedCustomerDetails.status < 3 || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0,
-                                            disabledReason: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? "VPP certificate fields are required" : undefined,
+                                            disabled: selectedCustomerDetails.status < 3
+                                            //  || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0
+                                            ,
+                                            // disabledReason: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? "VPP certificate fields are required" : undefined,
+                                            step: 3
+                                        },
+                                        {
+                                            label: 'Vpp Certificate',
+                                            date: null,
+                                            completed: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 1 && selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent === 1,
+                                            showToggle: false,
+                                            showSendCertificate: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 1 && selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent !== 1,
+                                            disabled: selectedCustomerDetails.vppDetails?.vppConnected === 0
+                                            //  || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0
+                                            ,
+                                            // disabledReason: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? "VPP certificate fields are required" : undefined,
                                             step: 3
                                         },
                                     ] : []),
@@ -2273,6 +2322,20 @@ export function CustomerDetailsPage() {
                                                         <><CheckIcon size={9} />Sent</>
                                                     ) : (
                                                         <><MailIcon size={9} />Send reminder</>
+                                                    )}
+                                                </button>
+                                            )}
+
+                                            {item.showSendCertificate && selectedCustomerDetails.vppDetails?.vppConnected === 1 && (
+                                                <button
+                                                    onClick={() => handleSendCertificateEmail()}
+                                                    disabled={isEmailSending || selectedCustomerDetails.isDeleted}
+                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 ${selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent === 1 ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground hover:bg-primary/90'} ${isEmailSending || selectedCustomerDetails.isDeleted ? 'opacity-70' : ''}`}
+                                                >
+                                                    {isEmailSending ? (
+                                                        <><div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
+                                                    ) : (
+                                                        <><MailIcon size={9} />Send certificate</>
                                                     )}
                                                 </button>
                                             )}
@@ -2426,13 +2489,13 @@ export function CustomerDetailsPage() {
                                 const allTabs = [
                                     { id: 'general', label: 'General', icon: Settings2Icon },
                                     { id: 'rates', label: 'Rates', icon: PercentIcon },
-                                    {
+                                    ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [{
                                         id: 'vpp_certificate',
                                         label: 'Vpp Certificate',
                                         icon: FileTextIcon,
                                         highlight: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0,
                                         tooltip: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? "VPP certificate fields are required" : undefined
-                                    },
+                                    }] : []),
                                     { id: 'debit', label: 'Debit', icon: CreditCardIcon },
                                     { id: 'utilmate', label: 'Utilmate', icon: PlugIcon },
                                     { id: 'documents', label: 'Documents', icon: UploadIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2')).length },
@@ -3964,14 +4027,16 @@ export function CustomerDetailsPage() {
                                 <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
                             </div>
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Check Code</label>
-                            <Input
-                                placeholder="Verification Code"
-                                value={vppForm.checkCode}
-                                onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
-                            />
-                        </div>
+                        {vppForm.batteryBrand === 'Fox ESS' && (
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">Check Code</label>
+                                <Input
+                                    placeholder="Verification Code"
+                                    value={vppForm.checkCode}
+                                    onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
             </Modal>
