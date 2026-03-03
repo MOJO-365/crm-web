@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DataTable, type Column, Modal } from '@/components/common';
 import { PlusIcon, RefreshCwIcon, TrashIcon, PencilIcon, SaveIcon, ClockIcon, AlertCircleIcon } from '@/components/icons';
-import { GET_RATE_PLANS, HAS_RATES_CHANGES } from '@/graphql/queries/rates';
+import { GET_RATE_PLANS, HAS_RATES_CHANGES, GET_MEASUREMENT_UNITS } from '@/graphql/queries/rates';
 import {
     CREATE_RATE_PLAN,
     // UPDATE_RATE_PLAN, 
     UPDATE_RATE_PLANS,
-    SOFT_DELETE_RATE_PLAN, RESTORE_RATE_PLAN, CREATE_RATES_SNAPSHOT
+    SOFT_DELETE_RATE_PLAN, RESTORE_RATE_PLAN, CREATE_RATES_SNAPSHOT,
+    CREATE_MEASUREMENT_UNIT, DELETE_MEASUREMENT_UNIT
 } from '@/graphql/mutations/rates';
 import { formatSydneyTime } from '@/lib/date';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -22,6 +23,14 @@ import { RatesHistoryModal } from './components/RatesHistoryModal';
 
 
 // Interfaces based on the query
+interface DynamicRate {
+    id: string;
+    name: string;
+    value: string;
+    unitId: string;
+    type: 'charges' | 'fit';
+}
+
 interface RateOffer {
     id: string;
     uid: string;
@@ -45,6 +54,8 @@ interface RateOffer {
     shoulder: number;
     supplyCharge: number;
     vppOrcharge: number;
+    priceUnits?: Record<string, string>;
+    dynamicRates?: DynamicRate[];
     isActive: boolean;
     isDeleted: boolean;
 }
@@ -65,6 +76,12 @@ interface RatePlan {
     isDeleted: number; // 0 = active, 1 = deleted
     offers: RateOffer[];
     updatedAt: string;
+}
+
+export interface MeasurementUnit {
+    id: string;
+    uid: string;
+    name: string;
 }
 
 interface RatePlansResponse {
@@ -130,6 +147,8 @@ export function RatesPage() {
         fitPeak: '',
         fitCritical: '',
         fitVpp: '',
+        priceUnits: {} as Record<string, string>,
+        dynamicRates: [] as DynamicRate[],
     };
 
     const [formData, setFormData] = useState(initialFormState);
@@ -138,6 +157,12 @@ export function RatesPage() {
     // Edit mode state
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingRatePlan, setEditingRatePlan] = useState<RatePlan | null>(null);
+
+    // Manage Units state
+    const [unitsModalOpen, setUnitsModalOpen] = useState(false);
+    const [newUnitName, setNewUnitName] = useState('');
+    const [isCreatingUnit, setIsCreatingUnit] = useState(false);
+    const [deletingUnitUid, setDeletingUnitUid] = useState<string | null>(null);
 
     // Local Edit State
     const [localOriginals, setLocalOriginals] = useState<Map<string, RatePlan>>(new Map());
@@ -163,6 +188,45 @@ export function RatesPage() {
     const [softDeleteRatePlan] = useMutation(SOFT_DELETE_RATE_PLAN);
     const [restoreRatePlanMutation] = useMutation(RESTORE_RATE_PLAN);
     const [createRatesSnapshot, { loading: isSnapshotting }] = useMutation(CREATE_RATES_SNAPSHOT);
+
+    const [createMeasurementUnitMutation] = useMutation(CREATE_MEASUREMENT_UNIT, {
+        refetchQueries: [{ query: GET_MEASUREMENT_UNITS }]
+    });
+
+    const [deleteMeasurementUnitMutation] = useMutation(DELETE_MEASUREMENT_UNIT, {
+        refetchQueries: [{ query: GET_MEASUREMENT_UNITS }]
+    });
+
+    const handleCreateUnit = async () => {
+        if (!newUnitName.trim()) {
+            toast.error("Unit name cannot be empty");
+            return;
+        }
+        setIsCreatingUnit(true);
+        try {
+            await createMeasurementUnitMutation({
+                variables: { name: newUnitName.trim() }
+            });
+            toast.success(`Unit "${newUnitName.trim()}" created successfully`);
+            setNewUnitName('');
+        } catch (e: any) {
+            toast.error(e.message || "Failed to create unit");
+        } finally {
+            setIsCreatingUnit(false);
+        }
+    };
+
+    const handleDeleteUnit = async (uid: string) => {
+        setDeletingUnitUid(uid);
+        try {
+            await deleteMeasurementUnitMutation({ variables: { uid } });
+            toast.success("Unit deleted successfully");
+        } catch (e: any) {
+            toast.error(e.message || "Failed to delete unit");
+        } finally {
+            setDeletingUnitUid(null);
+        }
+    };
 
     const handleResetLocalChanges = () => {
         if (!hasLocalChanges) return;
@@ -233,6 +297,8 @@ export function RatesPage() {
                         fitPeak: parseFloat(String(o.fitPeak || 0)),
                         fitCritical: parseFloat(String(o.fitCritical || 0)),
                         fitVpp: parseFloat(String(o.fitVpp || 0)),
+                        priceUnits: o.priceUnits,
+                        dynamicRates: o.dynamicRates,
                     }))
                 };
                 return createRatePlan({ variables: { input } });
@@ -277,6 +343,8 @@ export function RatesPage() {
                             fitPeak: parseFloat(String(o.fitPeak || 0)),
                             fitCritical: parseFloat(String(o.fitCritical || 0)),
                             fitVpp: parseFloat(String(o.fitVpp || 0)),
+                            priceUnits: o.priceUnits,
+                            dynamicRates: o.dynamicRates,
                         }))
                     };
 
@@ -381,6 +449,11 @@ export function RatesPage() {
                 const v2 = parseFloat(String(sOffer[field] || 0));
                 if (Math.abs(v1 - v2) > 0.0001) return true; // Float comparison
             }
+
+            // Compare dynamic rates
+            const cDyn = JSON.stringify(cOffer.dynamicRates || []);
+            const sDyn = JSON.stringify(sOffer.dynamicRates || []);
+            if (cDyn !== sDyn) return true;
         }
 
         return false;
@@ -468,6 +541,12 @@ export function RatesPage() {
     const meta = data?.ratePlans?.meta;
     const hasMore = meta ? page < meta.totalPages : false;
 
+    // Fetch measurement units
+    const { data: unitsData } = useQuery(GET_MEASUREMENT_UNITS, {
+        fetchPolicy: 'cache-first',
+    });
+    const measurementUnits: MeasurementUnit[] = unitsData?.measurementUnits || [];
+
     // Check if current rates have changes compared to active version (backend comparison)
     const { data: changesData, refetch: refetchChanges } = useQuery(HAS_RATES_CHANGES, {
         fetchPolicy: 'network-only',
@@ -496,6 +575,23 @@ export function RatesPage() {
 
 
     const changedRatePlanUids = useMemo(() => new Set(changesData?.hasRatesChanges?.changedRatePlanUids || []), [changesData]);
+
+    const unitMap = useMemo(() => {
+        const map = new Map<string, string>();
+        measurementUnits.forEach(u => map.set(u.uid, u.name));
+        return map;
+    }, [measurementUnits]);
+
+    const dynamicFieldNames = useMemo(() => {
+        const names = new Set<string>();
+        allRatePlans.forEach(plan => {
+            plan.offers?.[0]?.dynamicRates?.forEach(rate => {
+                if (rate.name) names.add(rate.name.toLowerCase());
+            });
+        });
+        return Array.from(names).sort();
+    }, [allRatePlans]);
+
     // Map of old records for comparison: uid -> oldRecord object
     const oldRecordsMap = useMemo(() => {
         const map = new Map<string, any>();
@@ -554,6 +650,13 @@ export function RatesPage() {
                     const oldOffer = oldRecord.offers?.[0]; // Assuming single offer structure
                     return getOfferValue(newOffer, offerKey) != getOfferValue(oldOffer, offerKey);
                 }
+
+                if (fieldKey.startsWith('dynamic_')) {
+                    const dynamicName = fieldKey.replace('dynamic_', '');
+                    const newRate = row.offers?.[0]?.dynamicRates?.find(r => r.name === dynamicName);
+                    const oldRate = oldRecord.offers?.[0]?.dynamicRates?.find((r: any) => r.name === dynamicName);
+                    return newRate?.value != oldRate?.value || newRate?.unitId != oldRate?.unitId;
+                }
                 return false;
         }
     }, [oldRecordsMap, localOriginals]);
@@ -571,6 +674,19 @@ export function RatesPage() {
             const offerKey = fieldKey.replace('offer_', '');
             return oldRecord.offers?.[0]?.[offerKey];
         }
+
+        if (fieldKey.startsWith('unit_')) {
+            const unitKey = fieldKey.replace('unit_', '');
+            return oldRecord.offers?.[0]?.priceUnits?.[unitKey];
+        }
+
+        if (fieldKey.startsWith('dynamic_')) {
+            const dynamicName = fieldKey.replace('dynamic_', '');
+            const oldRate = oldRecord.offers?.[0]?.dynamicRates?.find((r: any) => r.name === dynamicName);
+            if (!oldRate) return undefined;
+            return `${oldRate.value} ${unitMap.get(oldRate.unitId) || ''}`;
+        }
+
         return oldRecord[fieldKey];
     }, [oldRecordsMap, localOriginals]);
     useEffect(() => {
@@ -616,12 +732,63 @@ export function RatesPage() {
 
     // Open Add Rate Modal
     const handleAddRate = () => {
-        setFormData(initialFormState);
+        // Default to the first measurement unit if available
+        // Units are assigned on-the-fly when values are edited
+
+        setFormData({
+            ...initialFormState,
+            priceUnits: {}
+        });
         setFormErrors({});
         setAddModalOpen(true);
     };
 
     // Validate form
+
+    const handlePriceChange = (field: string, value: string) => {
+        setFormData(prev => {
+            const defaultUnitId = measurementUnits.length > 0 ? measurementUnits[0].uid : '';
+            const existingUnit = prev.priceUnits?.[field];
+
+            // If a value is entered and no unit is currently selected, set the default unit
+            const newPriceUnits = { ...prev.priceUnits };
+            if (value && !existingUnit && defaultUnitId) {
+                newPriceUnits[field] = defaultUnitId;
+            }
+
+            return {
+                ...prev,
+                [field]: value,
+                priceUnits: newPriceUnits
+            };
+        });
+    };
+
+    const handleDynamicRateChange = (index: number, field: keyof DynamicRate, value: string) => {
+        setFormData(prev => {
+            const newDynamicRates = [...prev.dynamicRates];
+            const processedValue = field === 'name' ? value.toLowerCase() : value;
+            newDynamicRates[index] = { ...newDynamicRates[index], [field]: processedValue };
+            return { ...prev, dynamicRates: newDynamicRates };
+        });
+    };
+
+    const addDynamicRate = () => {
+        setFormData(prev => ({
+            ...prev,
+            dynamicRates: [
+                ...prev.dynamicRates,
+                { id: crypto.randomUUID(), name: '', value: '', unitId: measurementUnits[0]?.uid || '', type: 'charges' }
+            ]
+        }));
+    };
+
+    const removeDynamicRate = (index: number) => {
+        setFormData(prev => ({
+            ...prev,
+            dynamicRates: prev.dynamicRates.filter((_, i) => i !== index)
+        }));
+    };
     const validateForm = () => {
         const errors: Record<string, string> = {};
         if (!formData.codes?.trim()) {
@@ -640,7 +807,7 @@ export function RatesPage() {
 
         setIsSubmitting(true);
         try {
-            const tempUid = `temp-create-${Date.now()}`;
+            const tempUid = crypto.randomUUID();
 
             const newPlan: RatePlan = {
                 id: tempUid,
@@ -658,8 +825,8 @@ export function RatesPage() {
                 isDeleted: 0,
                 updatedAt: new Date().toISOString(),
                 offers: [{
-                    id: `temp-offer-${Date.now()}`,
-                    uid: `temp-offer-${Date.now()}`,
+                    id: crypto.randomUUID(),
+                    uid: crypto.randomUUID(),
                     offerName: formData.offerName || 'Default Offer',
                     anytime: parseFloat(formData.anytime) || 0,
                     supplyCharge: parseFloat(formData.supplyCharge) || 0,
@@ -679,6 +846,8 @@ export function RatesPage() {
                     fitPeak: parseFloat(formData.fitPeak) || 0,
                     fitCritical: parseFloat(formData.fitCritical) || 0,
                     fitVpp: parseFloat(formData.fitVpp) || 0,
+                    priceUnits: formData.priceUnits,
+                    dynamicRates: formData.dynamicRates,
                     type: '', // placeholder
                     isActive: true,
                     isDeleted: false
@@ -704,6 +873,22 @@ export function RatesPage() {
     const handleEditRate = useCallback((ratePlan: RatePlan) => {
         setEditingRatePlan(ratePlan);
         const offer = ratePlan.offers?.[0];
+
+        // Ensure price units default to the first available unit if undefined in the offer
+        const defaultUnitId = measurementUnits.length > 0 ? measurementUnits[0].uid : '';
+        const existingUnits = typeof offer?.priceUnits === 'string' ? JSON.parse(offer.priceUnits) : (offer?.priceUnits || {});
+
+        const priceUnitsWithDefaults = { ...existingUnits };
+        const priceFields = ['anytime', 'supplyCharge', 'vppOrcharge', 'peak', 'shoulder', 'offPeak', 'cl1Supply', 'cl1Usage', 'cl2Supply', 'cl2Usage', 'demand', 'demandOp', 'demandP', 'demandS', 'fit', 'fitPeak', 'fitCritical', 'fitVpp'];
+
+        priceFields.forEach(field => {
+            // Apply default unit if the backend gave us a price value without a unit
+            let offerField = (offer as any)?.[field];
+            if (offerField && !priceUnitsWithDefaults[field] && defaultUnitId) {
+                priceUnitsWithDefaults[field] = defaultUnitId;
+            }
+        });
+
         setFormData({
             codes: Array.isArray(ratePlan.codes) ? ratePlan.codes.join(', ') : (ratePlan.codes || ''),
             planId: ratePlan.planId || '',
@@ -734,10 +919,12 @@ export function RatesPage() {
             fitPeak: offer?.fitPeak?.toString() || '',
             fitCritical: offer?.fitCritical?.toString() || '',
             fitVpp: offer?.fitVpp?.toString() || '',
+            priceUnits: priceUnitsWithDefaults,
+            dynamicRates: (typeof offer?.dynamicRates === 'string' ? JSON.parse(offer.dynamicRates) : (offer?.dynamicRates || [])) as DynamicRate[],
         });
         setFormErrors({});
         setEditModalOpen(true);
-    }, []);
+    }, [measurementUnits]);
 
     // Submit Update Rate (LOCALLY ONLY)
     const handleUpdateRate = async () => {
@@ -760,8 +947,8 @@ export function RatesPage() {
             const existingOffer = editingRatePlan.offers?.[0];
             const updatedOffer: RateOffer = {
                 ...(existingOffer || {}), // Keep existing IDs etc
-                id: existingOffer?.id || 'temp-id',
-                uid: existingOffer?.uid || 'temp-uid',
+                id: existingOffer?.id || crypto.randomUUID(),
+                uid: existingOffer?.uid || crypto.randomUUID(),
                 offerName: formData.offerName || existingOffer?.offerName || 'Default Offer',
                 anytime: parseFloat(formData.anytime) || 0,
                 supplyCharge: parseFloat(formData.supplyCharge) || 0,
@@ -781,6 +968,8 @@ export function RatesPage() {
                 fitPeak: parseFloat(formData.fitPeak) || 0,
                 fitCritical: parseFloat(formData.fitCritical) || 0,
                 fitVpp: parseFloat(formData.fitVpp) || 0,
+                priceUnits: formData.priceUnits,
+                dynamicRates: formData.dynamicRates,
                 // Required fields for type safety, though might not be edited
                 type: existingOffer?.type || '',
                 isActive: existingOffer?.isActive ?? true,
@@ -1212,6 +1401,25 @@ export function RatesPage() {
                 </Tooltip>
             ),
         },
+        ...dynamicFieldNames.map(fieldName => ({
+            key: `dynamic_${fieldName}`,
+            header: fieldName,
+            width: 'w-[150px]',
+            render: (row: RatePlan) => {
+                const rate = row.offers?.[0]?.dynamicRates?.find(r => r.name?.toLowerCase() === fieldName.toLowerCase());
+                if (!rate) return '-';
+                const isChanged = isFieldChanged(row, `dynamic_${fieldName}`);
+                const oldValue = getOldValue(row, `dynamic_${fieldName}`);
+
+                return (
+                    <Tooltip fullWidth content={isChanged ? `Old: ${oldValue}` : null}>
+                        <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isChanged ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-100 text-blue-950 dark:bg-blue-900/20 dark:text-blue-300'}`}>
+                            {rate.value}
+                        </div>
+                    </Tooltip>
+                );
+            }
+        })),
         {
             key: 'discount',
             header: 'Discount',
@@ -1294,7 +1502,7 @@ export function RatesPage() {
                 </div>
             )
         },
-    ], [handleEditRate, handleDeleteClick, handleRestoreClick, canEdit, canDelete, isFieldChanged, getOldValue]);
+    ], [handleEditRate, handleDeleteClick, handleRestoreClick, canEdit, canDelete, isFieldChanged, getOldValue, dynamicFieldNames, unitMap]);
 
     return (
         <div className="space-y-6">
@@ -1305,6 +1513,14 @@ export function RatesPage() {
                     <p className="text-muted-foreground">Manage utility rates and plans</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {canEdit && (
+                        <Button
+                            variant="outline"
+                            onClick={() => setUnitsModalOpen(true)}
+                        >
+                            Manage Units
+                        </Button>
+                    )}
                     {canCreate && (
                         <Button
                             leftIcon={<PlusIcon size={16} />}
@@ -1627,23 +1843,51 @@ export function RatesPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Anytime</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.anytime}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, anytime: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.anytime}
+                                        onChange={(e) => handlePriceChange('anytime', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.anytime || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, anytime: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Supply Charge</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.supplyCharge}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, supplyCharge: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.supplyCharge}
+                                        onChange={(e) => handlePriceChange('supplyCharge', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.supplyCharge || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, supplyCharge: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1651,13 +1895,28 @@ export function RatesPage() {
                     {/* VPP Orchestration */}
                     <div className="p-4 rounded-lg border border-border bg-muted/30 space-y-2">
                         <label className="text-sm font-medium text-gray-900 dark:text-gray-100">VPP Orchestration</label>
-                        <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={formData.vppOrcharge}
-                            onChange={(e) => setFormData(prev => ({ ...prev, vppOrcharge: e.target.value }))}
-                        />
+                        <div className="flex gap-2">
+                            <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={formData.vppOrcharge}
+                                onChange={(e) => handlePriceChange('vppOrcharge', e.target.value)}
+                            />
+                            <select
+                                className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                value={formData.priceUnits?.vppOrcharge || ''}
+                                onChange={(e) => setFormData(prev => ({
+                                    ...prev,
+                                    priceUnits: { ...prev.priceUnits, vppOrcharge: e.target.value }
+                                }))}
+                            >
+                                <option value="">Unit</option>
+                                {measurementUnits.map(u => (
+                                    <option key={u.uid} value={u.uid}>{u.name}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     {/* Peak, Shoulder, Off-Peak */}
@@ -1665,33 +1924,75 @@ export function RatesPage() {
                         <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Peak</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.peak}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, peak: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.peak}
+                                        onChange={(e) => handlePriceChange('peak', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.peak || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, peak: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Shoulder</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.shoulder}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, shoulder: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.shoulder}
+                                        onChange={(e) => handlePriceChange('shoulder', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.shoulder || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, shoulder: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Off-Peak</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.offPeak}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, offPeak: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.offPeak}
+                                        onChange={(e) => handlePriceChange('offPeak', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.offPeak || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, offPeak: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1701,43 +2002,99 @@ export function RatesPage() {
                         <div className="grid grid-cols-4 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">CL1 Supply</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.cl1Supply}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, cl1Supply: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.cl1Supply}
+                                        onChange={(e) => handlePriceChange('cl1Supply', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.cl1Supply || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, cl1Supply: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">CL1 Usage</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.cl1Usage}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, cl1Usage: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.cl1Usage}
+                                        onChange={(e) => handlePriceChange('cl1Usage', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.cl1Usage || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, cl1Usage: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">CL2 Supply</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.cl2Supply}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, cl2Supply: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.cl2Supply}
+                                        onChange={(e) => handlePriceChange('cl2Supply', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.cl2Supply || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, cl2Supply: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">CL2 Usage</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.cl2Usage}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, cl2Usage: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.cl2Usage}
+                                        onChange={(e) => handlePriceChange('cl2Usage', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.cl2Usage || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, cl2Usage: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1747,43 +2104,99 @@ export function RatesPage() {
                         <div className="grid grid-cols-4 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Demand</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.demand}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, demand: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.demand}
+                                        onChange={(e) => handlePriceChange('demand', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.demand || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, demand: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Demand (OP)</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.demandOp}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, demandOp: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.demandOp}
+                                        onChange={(e) => handlePriceChange('demandOp', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.demandOp || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, demandOp: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Demand (P)</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.demandP}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, demandP: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.demandP}
+                                        onChange={(e) => handlePriceChange('demandP', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.demandP || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, demandP: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Demand (S)</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.demandS}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, demandS: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.demandS}
+                                        onChange={(e) => handlePriceChange('demandS', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.demandS || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, demandS: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1793,45 +2206,183 @@ export function RatesPage() {
                         <div className="grid grid-cols-4 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">FIT</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.fit}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, fit: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.fit}
+                                        onChange={(e) => handlePriceChange('fit', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.fit || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, fit: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">BASE FIT</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.fitVpp}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, fitVpp: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.fitVpp}
+                                        onChange={(e) => handlePriceChange('fitVpp', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.fitVpp || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, fitVpp: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">PREMIUM FIT</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.fitPeak}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, fitPeak: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.fitPeak}
+                                        onChange={(e) => handlePriceChange('fitPeak', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.fitPeak || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, fitPeak: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">CRITICAL EVENT FIT</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={formData.fitCritical}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, fitCritical: e.target.value }))}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.fitCritical}
+                                        onChange={(e) => handlePriceChange('fitCritical', e.target.value)}
+                                    />
+                                    <select
+                                        className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={formData.priceUnits?.fitCritical || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            priceUnits: { ...prev.priceUnits, fitCritical: e.target.value }
+                                        }))}
+                                    >
+                                        {measurementUnits.map(u => (
+                                            <option key={u.uid} value={u.uid}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Dynamic Rates */}
+                    <div className="p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/50 dark:border-blue-800 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Dynamic Rates</h3>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={addDynamicRate}
+                                className="h-8"
+                            >
+                                <PlusIcon className="h-4 w-4 mr-2" />
+                                Add Dynamic Rate
+                            </Button>
+                        </div>
+
+                        {formData.dynamicRates && formData.dynamicRates.length > 0 ? (
+                            <div className="space-y-3">
+                                {formData.dynamicRates.map((rate, index) => (
+                                    <div key={rate.id} className="grid grid-cols-12 gap-3 items-end bg-background/50 p-3 rounded-md border border-blue-100 dark:border-blue-900">
+                                        <div className="col-span-3 space-y-1">
+                                            <label className="text-xs font-medium text-muted-foreground">Name</label>
+                                            <Input
+                                                placeholder="Rate name"
+                                                value={rate.name}
+                                                onChange={(e) => handleDynamicRateChange(index, 'name', e.target.value)}
+                                                className="h-9"
+                                            />
+                                        </div>
+                                        <div className="col-span-2 space-y-1">
+                                            <label className="text-xs font-medium text-muted-foreground">Value</label>
+                                            <Input
+                                                type="number"
+                                                step="0.0001"
+                                                placeholder="0.0000"
+                                                value={rate.value}
+                                                onChange={(e) => handleDynamicRateChange(index, 'value', e.target.value)}
+                                                className="h-9"
+                                            />
+                                        </div>
+                                        <div className="col-span-3 space-y-1">
+                                            <label className="text-xs font-medium text-muted-foreground">Unit</label>
+                                            <select
+                                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 h-9"
+                                                value={rate.unitId}
+                                                onChange={(e) => handleDynamicRateChange(index, 'unitId', e.target.value)}
+                                            >
+                                                {measurementUnits.map(u => (
+                                                    <option key={u.uid} value={u.uid}>{u.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="col-span-3 space-y-1">
+                                            <label className="text-xs font-medium text-muted-foreground">Type</label>
+                                            <select
+                                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 h-9"
+                                                value={rate.type}
+                                                onChange={(e) => handleDynamicRateChange(index, 'type', e.target.value as any)}
+                                            >
+                                                <option value="charges">Charges</option>
+                                                <option value="fit">FIT</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-span-1">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => removeDynamicRate(index)}
+                                                className="h-9 w-9 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                            >
+                                                <TrashIcon className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-muted-foreground text-center py-2">No dynamic rates added.</p>
+                        )}
                     </div>
                 </div>
             </Modal>
@@ -2021,215 +2572,550 @@ export function RatesPage() {
                         </div>
 
                         {/* Anytime and Supply Charge */}
-                        <div className="p-4 rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/30 space-y-4">
+                        <div className="p-4 rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-900/50 dark:border-orange-800 space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Anytime</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.anytime}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, anytime: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.anytime}
+                                            onChange={(e) => handlePriceChange('anytime', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.anytime || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, anytime: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Supply Charge</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.supplyCharge}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, supplyCharge: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.supplyCharge}
+                                            onChange={(e) => handlePriceChange('supplyCharge', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.supplyCharge || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, supplyCharge: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* VPP Orchestration */}
-                        <div className="p-4 rounded-lg border border-border bg-muted/50 space-y-2">
+                        <div className="p-4 rounded-lg border border-border bg-muted/30 space-y-2">
                             <label className="text-sm font-medium text-gray-900 dark:text-gray-100">VPP Orchestration</label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                value={formData.vppOrcharge}
-                                onChange={(e) => setFormData(prev => ({ ...prev, vppOrcharge: e.target.value }))}
-                            />
+                            <div className="flex gap-2">
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    value={formData.vppOrcharge}
+                                    onChange={(e) => handlePriceChange('vppOrcharge', e.target.value)}
+                                />
+                                <select
+                                    className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={formData.priceUnits?.vppOrcharge || ''}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        priceUnits: { ...prev.priceUnits, vppOrcharge: e.target.value }
+                                    }))}
+                                >
+                                    <option value="">Unit</option>
+                                    {measurementUnits.map(u => (
+                                        <option key={u.uid} value={u.uid}>{u.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
                         {/* Peak, Shoulder, Off-Peak */}
-                        <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 space-y-4">
+                        <div className="p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/50 dark:border-blue-800 space-y-4">
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Peak</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.peak}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, peak: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.peak}
+                                            onChange={(e) => handlePriceChange('peak', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.peak || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, peak: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Shoulder</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.shoulder}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, shoulder: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.shoulder}
+                                            onChange={(e) => handlePriceChange('shoulder', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.shoulder || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, shoulder: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Off-Peak</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.offPeak}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, offPeak: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.offPeak}
+                                            onChange={(e) => handlePriceChange('offPeak', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.offPeak || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, offPeak: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* CL1/CL2 Supply/Usage */}
-                        <div className="p-4 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 space-y-4">
+                        <div className="p-4 rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/50 dark:border-green-800 space-y-4">
                             <div className="grid grid-cols-4 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">CL1 Supply</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.cl1Supply}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, cl1Supply: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.cl1Supply}
+                                            onChange={(e) => handlePriceChange('cl1Supply', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.cl1Supply || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, cl1Supply: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">CL1 Usage</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.cl1Usage}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, cl1Usage: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.cl1Usage}
+                                            onChange={(e) => handlePriceChange('cl1Usage', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.cl1Usage || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, cl1Usage: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">CL2 Supply</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.cl2Supply}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, cl2Supply: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.cl2Supply}
+                                            onChange={(e) => handlePriceChange('cl2Supply', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.cl2Supply || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, cl2Supply: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">CL2 Usage</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.cl2Usage}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, cl2Usage: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.cl2Usage}
+                                            onChange={(e) => handlePriceChange('cl2Usage', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.cl2Usage || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, cl2Usage: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Demand fields */}
-                        <div className="p-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 space-y-4">
+                        <div className="p-4 rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/50 dark:border-red-800 space-y-4">
                             <div className="grid grid-cols-4 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Demand</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.demand}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, demand: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.demand}
+                                            onChange={(e) => handlePriceChange('demand', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.demand || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, demand: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Demand (OP)</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.demandOp}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, demandOp: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.demandOp}
+                                            onChange={(e) => handlePriceChange('demandOp', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.demandOp || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, demandOp: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Demand (P)</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.demandP}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, demandP: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.demandP}
+                                            onChange={(e) => handlePriceChange('demandP', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.demandP || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, demandP: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Demand (S)</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.demandS}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, demandS: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.demandS}
+                                            onChange={(e) => handlePriceChange('demandS', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.demandS || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, demandS: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* FIT fields */}
-                        <div className="p-4 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 space-y-4">
+                        <div className="p-4 rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/50 dark:border-green-800 space-y-4">
                             <div className="grid grid-cols-4 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">FIT</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.fit}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, fit: e.target.value }))}
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.fit}
+                                            onChange={(e) => handlePriceChange('fit', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.fit || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, fit: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">FIT-VPP</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.vppOrcharge}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, vppOrcharge: e.target.value }))}
-                                    />
+                                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">BASE FIT</label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.fitVpp}
+                                            onChange={(e) => handlePriceChange('fitVpp', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.fitVpp || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, fitVpp: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">FIT-Peak</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.fitPeak}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, fitPeak: e.target.value }))}
-                                    />
+                                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">PREMIUM FIT</label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.fitPeak}
+                                            onChange={(e) => handlePriceChange('fitPeak', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.fitPeak || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, fitPeak: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">FIT-Critical</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.fitCritical}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, fitCritical: e.target.value }))}
-                                    />
+                                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">CRITICAL EVENT FIT</label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.fitCritical}
+                                            onChange={(e) => handlePriceChange('fitCritical', e.target.value)}
+                                        />
+                                        <select
+                                            className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={formData.priceUnits?.fitCritical || ''}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                priceUnits: { ...prev.priceUnits, fitCritical: e.target.value }
+                                            }))}
+                                        >
+                                            {measurementUnits.map(u => (
+                                                <option key={u.uid} value={u.uid}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Dynamic Rates */}
+                        <div className="mt-6 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/50 dark:border-blue-800 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Dynamic Rates</h3>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={addDynamicRate}
+                                    className="h-8"
+                                >
+                                    <PlusIcon className="h-4 w-4 mr-2" />
+                                    Add Dynamic Rate
+                                </Button>
+                            </div>
+
+                            {formData.dynamicRates && formData.dynamicRates.length > 0 ? (
+                                <div className="space-y-3">
+                                    {formData.dynamicRates.map((rate, index) => (
+                                        <div key={rate.id} className="grid grid-cols-12 gap-3 items-end bg-background/50 p-3 rounded-md border border-blue-100 dark:border-blue-900">
+                                            <div className="col-span-3 space-y-1">
+                                                <label className="text-xs font-medium text-muted-foreground">Name</label>
+                                                <Input
+                                                    placeholder="Rate name"
+                                                    value={rate.name}
+                                                    onChange={(e) => handleDynamicRateChange(index, 'name', e.target.value)}
+                                                    className="h-9"
+                                                />
+                                            </div>
+                                            <div className="col-span-2 space-y-1">
+                                                <label className="text-xs font-medium text-muted-foreground">Value</label>
+                                                <Input
+                                                    type="number"
+                                                    step="0.0001"
+                                                    placeholder="0.0000"
+                                                    value={rate.value}
+                                                    onChange={(e) => handleDynamicRateChange(index, 'value', e.target.value)}
+                                                    className="h-9"
+                                                />
+                                            </div>
+                                            <div className="col-span-3 space-y-1">
+                                                <label className="text-xs font-medium text-muted-foreground">Unit</label>
+                                                <select
+                                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 h-9"
+                                                    value={rate.unitId}
+                                                    onChange={(e) => handleDynamicRateChange(index, 'unitId', e.target.value)}
+                                                >
+                                                    {measurementUnits.map(u => (
+                                                        <option key={u.uid} value={u.uid}>{u.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="col-span-3 space-y-1">
+                                                <label className="text-xs font-medium text-muted-foreground">Type</label>
+                                                <select
+                                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 h-9"
+                                                    value={rate.type}
+                                                    onChange={(e) => handleDynamicRateChange(index, 'type', e.target.value as any)}
+                                                >
+                                                    <option value="charges">Charges</option>
+                                                    <option value="fit">FIT</option>
+                                                </select>
+                                            </div>
+                                            <div className="col-span-1">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => removeDynamicRate(index)}
+                                                    className="h-9 w-9 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-muted-foreground text-center py-2">No dynamic rates added.</p>
+                            )}
                         </div>
                     </div>
                 )}
@@ -2326,6 +3212,74 @@ export function RatesPage() {
                 }}
                 onApplyLocalSnapshot={handleApplyLocalSnapshot}
             />
+
+            {/* Manage Units Modal */}
+            <Modal
+                isOpen={unitsModalOpen}
+                onClose={() => setUnitsModalOpen(false)}
+                title="Add Measurement Unit"
+                size="md"
+                footer={
+                    <>
+                        <Button variant="ghost" onClick={() => setUnitsModalOpen(false)} disabled={isCreatingUnit}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleCreateUnit} isLoading={isCreatingUnit}>
+                            Save Unit
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4 py-4">
+                    <p className="text-sm text-muted-foreground">Add a new dynamic unit format (e.g., month, year, kvAr) that can be applied to rate prices.</p>
+
+                    {/* Add Unit Field */}
+                    <div className="flex items-end gap-2">
+                        <div className="space-y-2 flex-grow">
+                            <label className="text-sm font-medium">Unit Name <span className="text-red-500">*</span></label>
+                            <Input
+                                placeholder="e.g. month"
+                                value={newUnitName}
+                                onChange={(e) => setNewUnitName(e.target.value)}
+                                disabled={isCreatingUnit}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleCreateUnit();
+                                }}
+                            />
+                        </div>
+                        <Button
+                            onClick={handleCreateUnit}
+                            isLoading={isCreatingUnit}
+                            disabled={!newUnitName.trim()}
+                        >
+                            <PlusIcon size={16} className="mr-2" /> Add
+                        </Button>
+                    </div>
+
+                    <div className="border-t border-border my-4 pt-4">
+                        <label className="text-sm font-medium mb-3 block">Existing Units</label>
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                            {measurementUnits.length === 0 ? (
+                                <p className="text-sm text-muted-foreground italic">No custom units found.</p>
+                            ) : (
+                                measurementUnits.map(unit => (
+                                    <div key={unit.uid} className="flex items-center justify-between p-2 rounded-md bg-accent/50 border border-border">
+                                        <span className="text-sm font-medium">{unit.name}</span>
+                                        <button
+                                            className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded transition-colors disabled:opacity-50"
+                                            onClick={() => handleDeleteUnit(unit.uid)}
+                                            disabled={deletingUnitUid === unit.uid}
+                                            title="Delete Unit"
+                                        >
+                                            <TrashIcon size={14} />
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </Modal>
             {/* Navigation Block Confirmation */}
             <Modal
                 isOpen={blocker.state === 'blocked'}
@@ -2348,6 +3302,6 @@ export function RatesPage() {
                     </p>
                 </div>
             </Modal>
-        </div >
+        </div>
     );
 }

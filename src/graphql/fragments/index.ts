@@ -87,11 +87,16 @@ export const RATE_OFFER_FIELDS = gql`
         demandP
         demandS
         fit
+        fitPeak
+        fitCritical
+        fitVpp
         offPeak
         peak
         shoulder
         supplyCharge
         vppOrcharge
+        dynamicRates
+        priceUnits
         isActive
         isDeleted
         createdAt

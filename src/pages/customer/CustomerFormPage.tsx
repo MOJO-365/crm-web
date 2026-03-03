@@ -17,6 +17,7 @@ import {
     CREATE_CUSTOMER,
     UPDATE_CUSTOMER,
     GET_RISK_STATUSES,
+    GET_MEASUREMENT_UNITS,
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
@@ -245,9 +246,17 @@ const SummaryItem = ({ icon: Icon, label, value, className }: { icon: any, label
 // RATE DETAILS COMPONENT
 // ============================================================================
 
-const RateDetailsView = ({ offer, discount, hasSolar, vpp }: { offer: any, discount: number, hasSolar: boolean, vpp: boolean }) => {
+const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {} }: { offer: any, discount: number, hasSolar: boolean, vpp: boolean, units?: Record<string, string> }) => {
     const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0;
     const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0;
+
+    const formatUnit = (key: string, fallback: string) => {
+        const unitUid = offer.priceUnits?.[key];
+        const isDemand = ['demand', 'demandOp', 'demandP', 'demandS'].includes(key);
+        const resolvedFallback = isDemand ? '' : fallback;
+        const unit = units[unitUid] || resolvedFallback;
+        return unit ? `/${unit}` : '';
+    };
 
     return (
         <div className="md:col-span-2 p-5 bg-card border border-border rounded-xl">
@@ -278,7 +287,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp }: { offer: any, disco
                                     <div className={cn(
                                         "font-bold text-sm",
                                         isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
-                                    )}>${price.toFixed(4)}/kWh</div>
+                                    )}>${price.toFixed(4)}{formatUnit(rate.type, 'kWh')}</div>
                                     <div className={cn(
                                         "text-[10px] font-bold uppercase tracking-wider opacity-80",
                                         isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
@@ -295,7 +304,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp }: { offer: any, disco
                         <span className="text-xs font-bold uppercase tracking-wide">Supply Charges</span>
                     </div>
                     <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                        <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${offer.supplyCharge.toFixed(4)}/day</div>
+                        <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${offer.supplyCharge.toFixed(4)}{formatUnit('supplyCharge', 'day')}</div>
                         <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
                     </div>
 
@@ -315,7 +324,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp }: { offer: any, disco
                                     .filter((d): d is { label: string, value: number } => (d.value ?? 0) > 0)
                                     .map((d, id) => (
                                         <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-sm">${d.value.toFixed(4)}/kVA/day</div>
+                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-sm">${d.value.toFixed(4)}{formatUnit(d.label === 'Demand' ? 'demand' : d.label === 'Demand (Op)' ? 'demandOp' : d.label === 'Demand (P)' ? 'demandP' : 'demandS', 'kVA/day')}</div>
                                             <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
                                         </div>
                                     ))}
@@ -330,7 +339,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp }: { offer: any, disco
                                 <span className="text-xs font-bold uppercase tracking-wide">VPP Orchestration Charges</span>
                             </div>
                             <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">${offer.vppOrcharge.toFixed(4)}/day</div>
+                                <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">${offer.vppOrcharge.toFixed(4)}{formatUnit('vppOrcharge', 'day')}</div>
                                 <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">Orchestration</div>
                             </div>
                         </>
@@ -358,7 +367,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp }: { offer: any, disco
                             .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
                             .map((rate, idx) => (
                                 <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${(rate.value ?? 0).toFixed(4)}/kWh</div>
+                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${(rate.value ?? 0).toFixed(4)}{formatUnit(rate.type, 'kWh')}</div>
                                     <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">{rate.label}</div>
                                 </div>
                             ))}
@@ -385,11 +394,30 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp }: { offer: any, disco
                                 const unit = isUsage ? 'kWh' : 'day';
                                 return (
                                     <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                        <div className="text-green-600 dark:text-green-400 font-bold text-sm">${price.toFixed(4)}/{unit}</div>
+                                        <div className="text-green-600 dark:text-green-400 font-bold text-sm">${price.toFixed(4)}{formatUnit(rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', unit)}</div>
                                         <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{rate.label}</div>
                                     </div>
                                 );
                             })}
+                    </div>
+                )}
+
+                {/* Column 5: Dynamic Rates */}
+                {offer.dynamicRates && offer.dynamicRates.length > 0 && (
+                    <div className="space-y-2 min-w-[180px] flex-1">
+                        <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400 mb-2">
+                            <ActivityIcon size={14} />
+                            <span className="text-xs font-bold uppercase tracking-wide">Dynamic Rates</span>
+                        </div>
+                        {offer.dynamicRates.map((rate: any, idx: number) => {
+                            const unitName = units[rate.unitId] || '';
+                            return (
+                                <div key={idx} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
+                                    <div className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">${Number(rate.value).toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
+                                    <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{rate.name}</div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -460,6 +488,18 @@ export const CustomerFormPage = () => {
         fetchPolicy: 'cache-and-network'
     });
     const riskStatuses = riskStatusesData?.riskStatuses || [];
+
+    // Fetch measurement units
+    const { data: unitsData } = useQuery(GET_MEASUREMENT_UNITS, {
+        fetchPolicy: 'cache-first'
+    });
+    const unitMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        unitsData?.measurementUnits?.forEach((u: any) => {
+            map[u.uid] = u.name;
+        });
+        return map;
+    }, [unitsData]);
 
     // Fetch all global rate versions for the dropdown
     const { data: allVersionsData } = useQuery(GET_RATES_HISTORY, {
@@ -1801,12 +1841,17 @@ export const CustomerFormPage = () => {
                                                                                 { label: 'Demand (S)', value: offer.demandS }
                                                                             ]
                                                                                 .filter((d): d is { label: string, value: number } => (d.value ?? 0) > 0)
-                                                                                .map((d, id) => (
-                                                                                    <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                                        <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${d.value.toFixed(4)}/kVA/day</div>
-                                                                                        <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
-                                                                                    </div>
-                                                                                ))}
+                                                                                .map((d, id) => {
+                                                                                    const unitKey = d.label === 'Demand' ? 'demand' : d.label === 'Demand (Op)' ? 'demandOp' : d.label === 'Demand (P)' ? 'demandP' : 'demandS';
+                                                                                    const unitUid = offer.priceUnits?.[unitKey as keyof typeof offer.priceUnits] as string | undefined;
+                                                                                    const unit = unitUid ? unitMap?.[unitUid] : '';
+                                                                                    return (
+                                                                                        <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${d.value.toFixed(4)}{unit ? `/${unit}` : ''}</div>
+                                                                                            <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
                                                                         </div>
                                                                     </>
                                                                 )}
@@ -1897,6 +1942,28 @@ export const CustomerFormPage = () => {
                                                                             <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Supply</div>
                                                                         </div>
                                                                     )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Column 5: Dynamic Rates */}
+                                                        {offer.dynamicRates && offer.dynamicRates.length > 0 && (
+                                                            <div className="space-y-4 min-w-[180px] flex-1">
+                                                                <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
+                                                                    <ActivityIcon size={16} />
+                                                                    <h4 className="text-sm font-bold uppercase tracking-wide">Dynamic Rates</h4>
+                                                                </div>
+                                                                <div className="space-y-3">
+                                                                    {offer.dynamicRates.map((dRate: any, id: number) => {
+                                                                        const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
+                                                                        const val = parseFloat(String(dRate.value || '0'));
+                                                                        return (
+                                                                            <div key={id} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                                <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">${val.toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
+                                                                                <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{dRate.name}</div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                         )}
@@ -2412,6 +2479,7 @@ export const CustomerFormPage = () => {
                                                 discount={formData.discount || 0}
                                                 hasSolar={formData.hasSolar}
                                                 vpp={formData.vpp}
+                                                units={unitMap}
                                             />
                                         )}
 

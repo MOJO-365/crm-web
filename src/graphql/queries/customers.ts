@@ -113,6 +113,8 @@ export const GET_CUSTOMERS = gql`
                         shoulder
                         supplyCharge
                         vppOrcharge
+                        dynamicRates
+                    priceUnits
                         isActive
                         isDeleted
                         createdAt
@@ -539,6 +541,8 @@ export const GET_CUSTOMER_BY_ID = gql`
                     shoulder
                     supplyCharge
                     vppOrcharge
+                    dynamicRates
+                    priceUnits
                 }
             }
             # Tab visibility and prefill data
@@ -695,6 +699,8 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                     shoulder
                     supplyCharge
                     vppOrcharge
+                    dynamicRates
+                    priceUnits
                 }
             }
             vppDetails {
@@ -1151,6 +1157,8 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
                     shoulder
                     supplyCharge
                     vppOrcharge
+                    dynamicRates
+                    priceUnits
                 }
             }
             enrollmentDetails {

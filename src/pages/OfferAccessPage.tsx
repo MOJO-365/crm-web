@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useLazyQuery, useMutation } from '@apollo/client';
+import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
 import { GET_CUSTOMER_BY_CUSTOMER_ID } from '@/graphql/queries/customers';
+import { GET_MEASUREMENT_UNITS } from '@/graphql/queries/rates';
 import {
     UPDATE_CUSTOMER,
     //  UPLOAD_FILE 
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { toast } from 'react-toastify';
 import {
     CheckIcon, UserIcon, MapPinIcon, MailIcon, PhoneIcon, HashIcon,
-    RatesIcon, CreditCardIcon, ZapIcon, PlugIcon, PencilIcon, TypeIcon
+    RatesIcon, CreditCardIcon, ZapIcon, PlugIcon, PencilIcon, TypeIcon, ActivityIcon
 } from '@/components/icons';
 import MainLogo from '@/assets/main-logo-dark-1.png';
 import BankAutocomplete from '@/components/BankAutocomplete';
@@ -98,6 +99,20 @@ export const OfferAccessPage = () => {
 
     // const [uploadFile] = useMutation(UPLOAD_FILE);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
+
+    // Fetch measurement units
+    const { data: unitsData } = useQuery(GET_MEASUREMENT_UNITS, {
+        fetchPolicy: 'cache-first'
+    });
+
+    // Memoize the mapping so we do not recalculate on every render
+    const unitMap = React.useMemo(() => {
+        const map: Record<string, string> = {};
+        unitsData?.measurementUnits?.forEach((u: any) => {
+            map[u.uid] = u.name;
+        });
+        return map;
+    }, [unitsData]);
 
     const [fetchCustomer, { loading: fetchingCustomer }] = useLazyQuery(GET_CUSTOMER_BY_CUSTOMER_ID, {
         variables: { customerId: customerId },
@@ -990,6 +1005,14 @@ export const OfferAccessPage = () => {
                             const hasFiT = (activeOffer.fit ?? 0) > 0 || (activeOffer.fitPeak ?? 0) > 0 || (activeOffer.fitCritical ?? 0) > 0 || (activeOffer.fitVpp ?? 0) > 0;
                             const hasCL = (activeOffer.cl1Usage ?? 0) > 0 || (activeOffer.cl2Usage ?? 0) > 0 || (activeOffer.cl1Supply ?? 0) > 0 || (activeOffer.cl2Supply ?? 0) > 0;
 
+                            const formatUnit = (key: string, fallback: string) => {
+                                const unitUid = activeOffer.priceUnits?.[key];
+                                const isDemand = ['demand', 'demandOp', 'demandP', 'demandS'].includes(key);
+                                const resolvedFallback = isDemand ? '' : fallback;
+                                const unit = unitMap[unitUid] || resolvedFallback;
+                                return unit ? `/${unit}` : '';
+                            };
+
                             return (
                                 <div className="flex flex-wrap gap-8">
                                     {/* Energy Rates Column */}
@@ -1016,7 +1039,7 @@ export const OfferAccessPage = () => {
                                                     return (
                                                         <div key={idx} className={`${bgColor} border ${borderColor} rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm`}>
                                                             <div className={`${textColor} font-bold text-base tracking-tight`}>
-                                                                ${calculateDiscountedRate(rate.value ?? 0, customerData.discount ?? 0).toFixed(4)}/kWh
+                                                                ${calculateDiscountedRate(rate.value ?? 0, customerData.discount ?? 0).toFixed(4)}{formatUnit(rate.type, 'kWh')}
                                                             </div>
                                                             <div className={`text-[10px] font-bold ${textColor} uppercase tracking-wider opacity-80`}>
                                                                 {rate.label}
@@ -1035,7 +1058,7 @@ export const OfferAccessPage = () => {
                                         </div>
                                         <div className="space-y-3">
                                             <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center space-y-0.5">
-                                                <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${(activeOffer.supplyCharge ?? 0).toFixed(4)}/day</div>
+                                                <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${(activeOffer.supplyCharge ?? 0).toFixed(4)}{formatUnit('supplyCharge', 'day')}</div>
                                                 <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
                                             </div>
 
@@ -1055,7 +1078,7 @@ export const OfferAccessPage = () => {
                                                             .filter(d => (d.value ?? 0) > 0)
                                                             .map((d, id) => (
                                                                 <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                    <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${d.value.toFixed(4)}/kVA/day</div>
+                                                                    <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${d.value.toFixed(4)}{formatUnit(d.label === 'Demand' ? 'demand' : d.label === 'Demand (Op)' ? 'demandOp' : d.label === 'Demand (P)' ? 'demandP' : 'demandS', 'kVA/day')}</div>
                                                                     <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
                                                                 </div>
                                                             ))}
@@ -1073,7 +1096,7 @@ export const OfferAccessPage = () => {
                                                 </div>
                                                 <div className="space-y-3">
                                                     <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center space-y-0.5">
-                                                        <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${(activeOffer.vppOrcharge ?? 0).toFixed(4)}/day</div>
+                                                        <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${(activeOffer.vppOrcharge ?? 0).toFixed(4)}{formatUnit('vppOrcharge', 'day')}</div>
                                                         <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">Orchestration</div>
                                                     </div>
                                                 </div>
@@ -1107,7 +1130,7 @@ export const OfferAccessPage = () => {
                                                     .map((rate, idx) => (
                                                         <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
                                                             <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">
-                                                                ${(rate.value ?? 0).toFixed(4)}/kWh
+                                                                ${(rate.value ?? 0).toFixed(4)}{formatUnit(rate.type, 'kWh')}
                                                             </div>
                                                             <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">
                                                                 {rate.label}
@@ -1140,7 +1163,7 @@ export const OfferAccessPage = () => {
                                                         return (
                                                             <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
                                                                 <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">
-                                                                    ${price.toFixed(4)}/{unit}
+                                                                    ${price.toFixed(4)}{formatUnit(rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', unit)}
                                                                 </div>
                                                                 <div className={`text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80`}>
                                                                     {rate.label}
@@ -1148,6 +1171,28 @@ export const OfferAccessPage = () => {
                                                             </div>
                                                         );
                                                     })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Dynamic Rates Column */}
+                                    {activeOffer.dynamicRates && activeOffer.dynamicRates.length > 0 && (
+                                        <div className="space-y-4 min-w-[180px] flex-1">
+                                            <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
+                                                <ActivityIcon size={16} />
+                                                <h4 className="text-sm font-bold uppercase tracking-wide">Dynamic Rates</h4>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {activeOffer.dynamicRates.map((dRate: any, id: number) => {
+                                                    const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
+                                                    const val = parseFloat(String(dRate.value || '0'));
+                                                    return (
+                                                        <div key={id} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                            <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">${val.toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
+                                                            <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{dRate.name}</div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}
