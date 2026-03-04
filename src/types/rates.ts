@@ -21,6 +21,16 @@ export interface RateOffer {
     shoulder: number;
     supplyCharge: number;
     vppOrcharge: number;
+    priceUnits?: Record<string, string>;
+    dynamicRates?: DynamicRate[];
+}
+
+export interface DynamicRate {
+    id: string;
+    name: string;
+    value: string;
+    unitId: string;
+    type: 'charges' | 'fit';
 }
 
 export interface RatePlan {

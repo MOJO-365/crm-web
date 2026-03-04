@@ -40,3 +40,6 @@ export * from './mutations/notificationEntities';
 // Risk Statuses
 export * from './mutations/riskStatuses';
 
+// PDF Terms
+export * from './queries/pdfTerms';
+export * from './mutations/pdfTerms';

@@ -49,6 +49,8 @@ export const GET_RATE_PLANS = gql`
                     shoulder
                     supplyCharge
                     vppOrcharge
+                    dynamicRates
+                    priceUnits
                     isActive
                     isDeleted
                     createdAt
@@ -138,6 +140,16 @@ export const GET_RATES_HISTORY_BY_VERSION = gql`
             newRecord
             activeVersion
             createdAt
+        }
+    }
+`;
+
+export const GET_MEASUREMENT_UNITS = gql`
+    query MeasurementUnits {
+        measurementUnits {
+            id
+            uid
+            name
         }
     }
 `;

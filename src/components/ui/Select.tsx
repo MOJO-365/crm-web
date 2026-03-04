@@ -112,17 +112,7 @@ export function Select({
         }
     }, [focusedIndex, isOpen]);
 
-    // Get display label for selected values
-    const displayLabel = React.useMemo(() => {
-        if (selectedValues.length === 0) return '';
-        if (multiple) {
-            return selectedValues
-                .map(v => options.find(o => o.value === v)?.label || '')
-                .filter(Boolean)
-                .join(', ');
-        }
-        return options.find(o => o.value === selectedValues[0])?.label || '';
-    }, [selectedValues, options, multiple]);
+
 
     // Handle click outside to close dropdown
     React.useEffect(() => {
@@ -246,20 +236,39 @@ export function Select({
                 </label>
             )}
             <div className="relative">
-                {/* Trigger Button */}
-                {/* Trigger Input */}
+                {/* Trigger */}
                 <div
                     className={cn(
-                        "flex items-center justify-between w-full h-10 px-3 py-2",
+                        "flex items-center gap-1 flex-wrap w-full min-h-[40px] px-2 py-1.5",
                         "border border-input rounded-md bg-background text-sm",
                         "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
-                        "min-w-0",
+                        "min-w-0 cursor-pointer",
                         disabled && "opacity-50 cursor-not-allowed",
                         error && "border-destructive focus-within:ring-destructive",
                         className
                     )}
                     onClick={() => !disabled && !isOpen && setIsOpen(true)}
                 >
+                    {/* Inline tags for multi-select */}
+                    {multiple && selectedValues.map((val) => {
+                        const opt = options.find(o => o.value === val);
+                        if (!opt) return null;
+                        return (
+                            <span
+                                key={val}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-primary/10 text-primary border border-primary/20"
+                            >
+                                {opt.label}
+                                <button
+                                    type="button"
+                                    onClick={(e) => handleRemoveTag(val, e)}
+                                    className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                                >
+                                    <CloseIcon size={10} />
+                                </button>
+                            </span>
+                        );
+                    })}
                     <input
                         type="text"
                         value={searchQuery}
@@ -268,20 +277,21 @@ export function Select({
                             if (!isOpen) setIsOpen(true);
                         }}
                         onFocus={() => !disabled && setIsOpen(true)}
-                        placeholder={multiple && selectedValues.length > 0 ? displayLabel : placeholder}
+                        placeholder={selectedValues.length > 0 ? (multiple ? '' : '') : placeholder}
                         disabled={disabled}
                         onBlur={onBlur}
                         className={cn(
-                            "flex-1 min-w-0 bg-transparent border-none outline-none placeholder:text-muted-foreground truncate",
-                            "disabled:cursor-not-allowed"
+                            "flex-1 min-w-[60px] bg-transparent border-none outline-none placeholder:text-muted-foreground text-sm h-6",
+                            "disabled:cursor-not-allowed",
+                            multiple && selectedValues.length > 0 && "placeholder:text-transparent"
                         )}
                     />
-                    <div className="flex items-center gap-1 ml-2 shrink-0">
+                    <div className="flex items-center gap-1 ml-auto shrink-0">
                         {((!multiple && searchQuery && searchQuery !== (options.find(o => o.value === value)?.label || '')) || (multiple && selectedValues.length > 0)) && (
                             <button
                                 type="button"
                                 onClick={handleClear}
-                                className="p-0.5 hover:bg-muted rounded"
+                                className="p-0.5 hover:bg-muted rounded transition-colors"
                             >
                                 <CloseIcon size={14} />
                             </button>
@@ -361,29 +371,7 @@ export function Select({
                 )}
             </div>
 
-            {/* Selected Tags for Multi-select */}
-            {multiple && selectedValues.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                    {selectedValues.map((val) => {
-                        const option = options.find(o => o.value === val);
-                        return (
-                            <span
-                                key={val}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-muted rounded-md"
-                            >
-                                {option?.label}
-                                <button
-                                    type="button"
-                                    onClick={(e) => handleRemoveTag(val, e)}
-                                    className="hover:text-destructive"
-                                >
-                                    <CloseIcon size={12} />
-                                </button>
-                            </span>
-                        );
-                    })}
-                </div>
-            )}
+
 
             {/* Error Message */}
             {error && (

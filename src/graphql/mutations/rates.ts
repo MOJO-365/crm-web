@@ -106,3 +106,18 @@ export const UPDATE_RATE_PLANS = gql`
         }
     }
 `;
+
+export const CREATE_MEASUREMENT_UNIT = gql`
+    mutation CreateMeasurementUnit($name: String!) {
+        createMeasurementUnit(name: $name) {
+            id
+            uid
+            name
+        }
+    }
+`;
+export const DELETE_MEASUREMENT_UNIT = gql`
+    mutation DeleteMeasurementUnit($uid: String!) {
+        deleteMeasurementUnit(uid: $uid)
+    }
+`;
