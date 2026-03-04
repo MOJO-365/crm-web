@@ -50,7 +50,7 @@ export const OfferAccessPage = () => {
     const versionParam = searchParams.get('v');
 
     // offerValues seems to be "CUSTOMER_ID" based on user snippet /?offer=GEE108
-    const customerId = offerValues;
+    const customerId = offerValues?.trim();
 
     const [accessCode, setAccessCode] = useState('');
     const [isAuthorized, setIsAuthorized] = useState(false);
