@@ -246,15 +246,20 @@ const SummaryItem = ({ icon: Icon, label, value, className }: { icon: any, label
 // RATE DETAILS COMPONENT
 // ============================================================================
 
-const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {} }: { offer: any, discount: number, hasSolar: boolean, vpp: boolean, units?: Record<string, string> }) => {
+const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan }: {
+    offer: any,
+    discount: number,
+    hasSolar: boolean,
+    vpp: boolean,
+    units?: Record<string, string>,
+    isVppPlan: boolean
+}) => {
     const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0;
     const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0;
 
     const formatUnit = (key: string, fallback: string) => {
         const unitUid = offer.priceUnits?.[key];
-        const isDemand = ['demand', 'demandOp', 'demandP', 'demandS'].includes(key);
-        const resolvedFallback = isDemand ? '' : fallback;
-        const unit = units[unitUid] || resolvedFallback;
+        const unit = units[unitUid] || fallback;
         return unit ? `/${unit}` : '';
     };
 
@@ -405,10 +410,16 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {} }: { offer
                 {/* Column 5: Dynamic Rates */}
                 {offer.dynamicRates && offer.dynamicRates.length > 0 && (
                     <div className="space-y-2 min-w-[180px] flex-1">
-                        <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400 mb-2">
-                            <ActivityIcon size={14} />
-                            <span className="text-xs font-bold uppercase tracking-wide">Dynamic Rates</span>
-                        </div>
+                        {(() => {
+                            const isVpp = vpp || isVppPlan;
+                            const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
+                            return (
+                                <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400 mb-2">
+                                    <ActivityIcon size={14} />
+                                    <span className="text-xs font-bold uppercase tracking-wide">{sectionLabel}</span>
+                                </div>
+                            );
+                        })()}
                         {offer.dynamicRates.map((rate: any, idx: number) => {
                             const unitName = units[rate.unitId] || '';
                             return (
@@ -1949,10 +1960,16 @@ export const CustomerFormPage = () => {
                                                         {/* Column 5: Dynamic Rates */}
                                                         {offer.dynamicRates && offer.dynamicRates.length > 0 && (
                                                             <div className="space-y-4 min-w-[180px] flex-1">
-                                                                <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
-                                                                    <ActivityIcon size={16} />
-                                                                    <h4 className="text-sm font-bold uppercase tracking-wide">Dynamic Rates</h4>
-                                                                </div>
+                                                                {(() => {
+                                                                    const isVpp = formData.vpp || selectedRatePlan?.vpp === 1;
+                                                                    const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
+                                                                    return (
+                                                                        <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
+                                                                            <ActivityIcon size={16} />
+                                                                            <h4 className="text-sm font-bold uppercase tracking-wide">{sectionLabel}</h4>
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                                 <div className="space-y-3">
                                                                     {offer.dynamicRates.map((dRate: any, id: number) => {
                                                                         const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
@@ -2475,11 +2492,12 @@ export const CustomerFormPage = () => {
                                         {/* Rate Details - Full Width Section */}
                                         {selectedRatePlan?.offers?.[0] && (
                                             <RateDetailsView
-                                                offer={selectedRatePlan.offers[0]}
+                                                offer={selectedRatePlan.offers![0]}
                                                 discount={formData.discount || 0}
                                                 hasSolar={formData.hasSolar}
                                                 vpp={formData.vpp}
                                                 units={unitMap}
+                                                isVppPlan={selectedRatePlan?.vpp === 1}
                                             />
                                         )}
 

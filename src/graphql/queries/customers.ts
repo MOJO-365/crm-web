@@ -1136,6 +1136,7 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
                 planId
                 dnsp
                 tariff
+                vpp
                 offers {
                     uid
                     offerName

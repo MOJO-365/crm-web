@@ -1007,9 +1007,7 @@ export const OfferAccessPage = () => {
 
                             const formatUnit = (key: string, fallback: string) => {
                                 const unitUid = activeOffer.priceUnits?.[key];
-                                const isDemand = ['demand', 'demandOp', 'demandP', 'demandS'].includes(key);
-                                const resolvedFallback = isDemand ? '' : fallback;
-                                const unit = unitMap[unitUid] || resolvedFallback;
+                                const unit = unitMap[unitUid] || fallback;
                                 return unit ? `/${unit}` : '';
                             };
 
@@ -1178,10 +1176,16 @@ export const OfferAccessPage = () => {
                                     {/* Dynamic Rates Column */}
                                     {activeOffer.dynamicRates && activeOffer.dynamicRates.length > 0 && (
                                         <div className="space-y-4 min-w-[180px] flex-1">
-                                            <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
-                                                <ActivityIcon size={16} />
-                                                <h4 className="text-sm font-bold uppercase tracking-wide">Dynamic Rates</h4>
-                                            </div>
+                                            {(() => {
+                                                const isVpp = customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1;
+                                                const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
+                                                return (
+                                                    <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
+                                                        <ActivityIcon size={16} />
+                                                        <h4 className="text-sm font-bold uppercase tracking-wide">{sectionLabel}</h4>
+                                                    </div>
+                                                );
+                                            })()}
                                             <div className="space-y-3">
                                                 {activeOffer.dynamicRates.map((dRate: any, id: number) => {
                                                     const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';

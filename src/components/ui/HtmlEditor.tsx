@@ -55,6 +55,7 @@ export interface HtmlEditorProps {
     label?: string;
     helperText?: string;
     error?: string;
+    showOfferPageButton?: boolean;
 }
 
 interface ToolbarButtonProps {
@@ -105,6 +106,7 @@ export const HtmlEditor: React.FC<HtmlEditorProps> = ({
     label,
     helperText,
     error,
+    showOfferPageButton = true,
 }) => {
     const editorRef = React.useRef<HTMLDivElement>(null);
     const savedSelectionRef = React.useRef<Range | null>(null);
@@ -742,31 +744,33 @@ ${content}
                     <ToolbarDivider />
 
                     {/* Offer Page Button - Static button for offer page redirection */}
-                    <Tooltip content="Insert Offer Page Button" position="bottom">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (editorRef.current) {
-                                    editorRef.current.focus();
-                                    // Create an email-compatible button for offer page with customer ID variable
-                                    const offerButtonHtml = `<p></p><table border="0" cellpadding="0" cellspacing="0" style="margin: 16px 0;"><tr><td align="center" bgcolor="#638C1C" style="border-radius: 6px; background-color: #638C1C;"><a href="${window.location.origin}/?offer=[[CUSTOMER_ID]]" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff !important; text-decoration: none !important; border-radius: 6px; background-color: #638C1C;" target="_blank">View Your Offer</a></td></tr></table><p></p>`;
-                                    document.execCommand('insertHTML', false, offerButtonHtml);
-                                    handleInput();
-                                }
-                            }}
-                            className={cn(
-                                "flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded border transition-colors",
-                                "bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20",
-                                "border-emerald-200 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300",
-                                "hover:from-emerald-100 hover:to-teal-100 dark:hover:from-emerald-900/30 dark:hover:to-teal-900/30"
-                            )}
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                            </svg>
-                            <span>Offer Page</span>
-                        </button>
-                    </Tooltip>
+                    {showOfferPageButton && (
+                        <Tooltip content="Insert Offer Page Button" position="bottom">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (editorRef.current) {
+                                        editorRef.current.focus();
+                                        // Create an email-compatible button for offer page with customer ID variable
+                                        const offerButtonHtml = `<p></p><table border="0" cellpadding="0" cellspacing="0" style="margin: 16px 0;"><tr><td align="center" bgcolor="#638C1C" style="border-radius: 6px; background-color: #638C1C;"><a href="${window.location.origin}/?offer=[[CUSTOMER_ID]]" style="display: inline-block; padding: 12px 24px; font-size: 14px; font-weight: 600; color: #ffffff !important; text-decoration: none !important; border-radius: 6px; background-color: #638C1C;" target="_blank">View Your Offer</a></td></tr></table><p></p>`;
+                                        document.execCommand('insertHTML', false, offerButtonHtml);
+                                        handleInput();
+                                    }
+                                }}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded border transition-colors",
+                                    "bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20",
+                                    "border-emerald-200 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300",
+                                    "hover:from-emerald-100 hover:to-teal-100 dark:hover:from-emerald-900/30 dark:hover:to-teal-900/30"
+                                )}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                </svg>
+                                <span>Offer Page</span>
+                            </button>
+                        </Tooltip>
+                    )}
                 </>
             )}
 

@@ -789,6 +789,7 @@ const CustomerEmailLogsTable = ({ customerUid }: { customerUid: string }) => {
     );
 };
 
+
 export function CustomerDetailsPage() {
     const { uid } = useParams();
     const navigate = useNavigate();
@@ -2900,9 +2901,7 @@ export function CustomerDetailsPage() {
 
                                                 const formatUnit = (key: string, fallback: string) => {
                                                     const unitUid = offer.priceUnits?.[key];
-                                                    const isDemand = ['demand', 'demandOp', 'demandP', 'demandS'].includes(key);
-                                                    const resolvedFallback = isDemand ? '' : fallback;
-                                                    const unit = unitMap[unitUid] || resolvedFallback;
+                                                    const unit = unitMap[unitUid] || fallback;
                                                     return unit ? `/${unit}` : '';
                                                 };
 
@@ -3080,10 +3079,16 @@ export function CustomerDetailsPage() {
                                                             {/* Column 5: Dynamic Rates */}
                                                             {offer.dynamicRates && offer.dynamicRates.length > 0 && (
                                                                 <div className="space-y-4 min-w-[180px] flex-1">
-                                                                    <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
-                                                                        <ActivityIcon size={16} />
-                                                                        <h4 className="text-sm font-bold uppercase tracking-wide">Dynamic Rates</h4>
-                                                                    </div>
+                                                                    {(() => {
+                                                                        const isVpp = selectedCustomerDetails.vppDetails?.vpp === 1 || offer.vpp === 1;
+                                                                        const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
+                                                                        return (
+                                                                            <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
+                                                                                <ActivityIcon size={16} />
+                                                                                <h4 className="text-sm font-bold uppercase tracking-wide">{sectionLabel}</h4>
+                                                                            </div>
+                                                                        );
+                                                                    })()}
                                                                     <div className="space-y-3">
                                                                         {offer.dynamicRates.map((dRate: any, id: number) => {
                                                                             const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';

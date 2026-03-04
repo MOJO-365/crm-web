@@ -43,7 +43,8 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     document_types: DocumentTypeIcon,
     note_types: NoteTypeIcon,
     notification_entity: NotificationIcon,
-    risk_statuses: ShieldIcon
+    risk_statuses: ShieldIcon,
+    pdf_terms: FileTextIcon
 };
 
 // Path mapping
@@ -60,7 +61,8 @@ const pathMap: Record<string, string> = {
     document_types: '/document-types',
     note_types: '/note-types',
     notification_entity: '/notification_entity',
-    risk_statuses: '/risk-statuses'
+    risk_statuses: '/risk-statuses',
+    pdf_terms: '/pdf-terms'
     // user_management and email have no path, they are groupers
 };
 

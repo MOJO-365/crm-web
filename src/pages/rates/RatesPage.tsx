@@ -1659,9 +1659,14 @@ export function RatesPage() {
                             </Tooltip>
                         </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                        {meta ? `Showing ${allRatePlans.length} out of ${meta.totalRecords} records` : 'Loading...'}
-                    </p>
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                            {meta ? `Showing ${allRatePlans.length} out of ${meta.totalRecords} records` : 'Loading...'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                            * All rates are exclusive of GST
+                        </p>
+                    </div>
                 </div>
 
                 <DataTable
