@@ -227,6 +227,8 @@ export function Select({
         setSearchQuery('');
     };
 
+    const isCompact = className?.includes('h-7') || className?.includes('h-6') || className?.includes('h-8');
+
     return (
         <div className={cn("space-y-1", containerClassName)} ref={containerRef}>
             {label && (
@@ -239,7 +241,8 @@ export function Select({
                 {/* Trigger */}
                 <div
                     className={cn(
-                        "flex items-center gap-1 flex-wrap w-full min-h-[40px] px-2 py-1.5",
+                        "flex items-center gap-1 flex-wrap w-full px-2",
+                        isCompact ? "min-h-0 py-0" : "min-h-[40px] py-1.5",
                         "border border-input rounded-md bg-background text-sm",
                         "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
                         "min-w-0 cursor-pointer",
@@ -281,7 +284,8 @@ export function Select({
                         disabled={disabled}
                         onBlur={onBlur}
                         className={cn(
-                            "flex-1 min-w-[60px] bg-transparent border-none outline-none placeholder:text-muted-foreground text-sm h-6",
+                            "flex-1 min-w-[60px] bg-transparent border-none outline-none placeholder:text-muted-foreground text-sm",
+                            isCompact ? "h-full" : "h-6",
                             "disabled:cursor-not-allowed",
                             multiple && selectedValues.length > 0 && "placeholder:text-transparent"
                         )}
@@ -293,11 +297,11 @@ export function Select({
                                 onClick={handleClear}
                                 className="p-0.5 hover:bg-muted rounded transition-colors"
                             >
-                                <CloseIcon size={14} />
+                                <CloseIcon size={isCompact ? 10 : 14} />
                             </button>
                         )}
                         <ChevronDownIcon
-                            size={16}
+                            size={isCompact ? 12 : 16}
                             className={cn(
                                 "transition-transform text-muted-foreground",
                                 isOpen && "rotate-180"
