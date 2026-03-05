@@ -26,6 +26,7 @@ interface RatePlan {
     id: string;
     uid: string;
     tariff: string;
+    codes: string;
     vpp: number;
     isActive: boolean;
     isDeleted: boolean;
@@ -721,7 +722,7 @@ export function PdfTermsPage() {
                                 placeholder="Select rate plans..."
                                 options={filteredRatePlans.map(rp => ({
                                     value: rp.uid,
-                                    label: rp.tariff || rp.planId || rp.uid,
+                                    label: `${rp.codes}${rp.tariff ? ` - ${rp.tariff}` : ''}${rp.state ? ` (${rp.state})` : ''}`,
                                 }))}
                                 value={formData.rateUids}
                                 onChange={(val) => setFormData(prev => ({ ...prev, rateUids: val as string[] }))}
