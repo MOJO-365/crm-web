@@ -26,6 +26,7 @@ const NoteTypesPage = lazy(() => import('@/pages/master/NoteTypesPage').then(m =
 const NotificationEntitiesPage = lazy(() => import('@/pages/master/NotificationEntitiesPage').then(m => ({ default: m.NotificationEntitiesPage })));
 const RiskStatusesPage = lazy(() => import('@/pages/master/RiskStatusesPage').then(m => ({ default: m.RiskStatusesPage })));
 const PdfTermsPage = lazy(() => import('@/pages/pdf/PdfTermsPage').then(m => ({ default: m.PdfTermsPage })));
+const CustomerBillingPage = lazy(() => import('@/pages/customer/CustomerBillingPage').then(m => ({ default: m.CustomerBillingPage })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -86,6 +87,7 @@ const router = createBrowserRouter(
                 <Route path="/notification_entity" element={<RequirePermission menuCode="notification_entity"><NotificationEntitiesPage /></RequirePermission>} />
                 <Route path="/risk-statuses" element={<RequirePermission menuCode="risk_statuses"><RiskStatusesPage /></RequirePermission>} />
                 <Route path="/pdf-terms" element={<RequirePermission menuCode="pdf_terms"><PdfTermsPage /></RequirePermission>} />
+                <Route path="/customer-billing" element={<RequirePermission menuCode="customer_billing"><CustomerBillingPage /></RequirePermission>} />
 
                 {/* General authenticated routes */}
                 <Route path="/change-password" element={<ChangePasswordPage />} />

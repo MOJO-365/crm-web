@@ -5,7 +5,7 @@ import { useQuery, useLazyQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
 import {
     PlusIcon, PencilIcon,
-    CheckIcon, XIcon, MailIcon, RefreshCwIcon
+    CheckIcon, XIcon, MailIcon, RefreshCwIcon, CreditCardIcon
 } from '@/components/icons';
 import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -408,7 +408,7 @@ export function CustomersPage() {
                         value={searchFilters.discount}
                         onChange={(val) => handleSearchChange('discount', val as string)}
                         placeholder="All"
-                        className="h-7 text-xs w-[70px]"
+                        className="h-7 text-xs w-[65px]"
                     />
                 </div>
             ),
@@ -430,7 +430,7 @@ export function CustomersPage() {
                         value={searchFilters.status}
                         onChange={(val) => handleSearchChange('status', val as string)}
                         placeholder="All"
-                        className="h-7 text-xs w-[90px]"
+                        className="h-7 text-xs w-[85px]"
                     />
                 </div>
             ),
@@ -477,7 +477,7 @@ export function CustomersPage() {
             key: 'vppConnected',
             header: (
                 <div className="flex flex-col gap-1 items-start">
-                    <div className='flex gap-1 items-center'>
+                    <div className="h-7 flex items-center gap-1">
                         <span className="text-xs font-semibold uppercase text-muted-foreground whitespace-nowrap">VPP</span>
                         <Select
                             options={[{ value: '', label: 'All' }, ...VPP_OPTIONS]}
@@ -648,7 +648,7 @@ export function CustomersPage() {
                         value={searchFilters.dnsp}
                         onChange={(val) => handleSearchChange('dnsp', val as string)}
                         placeholder="All"
-                        className="h-7 text-xs w-[90px]"
+                        className="h-7 text-xs w-[85px]"
                     />
                 </div>
             ),
@@ -713,6 +713,16 @@ export function CustomersPage() {
                                     </button>
                                 </Tooltip>
                             )}
+                        {canView && !row.isDeleted && row.status !== 4 && (
+                            <Tooltip content="Billing Cycle">
+                                <button
+                                    className="p-2 border border-amber-200 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 hover:text-amber-700 transition-colors dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/40"
+                                    onClick={() => navigate(`/customer-billing?customer=${row.uid}`)}
+                                >
+                                    <CreditCardIcon size={16} />
+                                </button>
+                            </Tooltip>
+                        )}
                         {row.isDeleted && (
                             <Tooltip content="Restore Customer">
                                 <button

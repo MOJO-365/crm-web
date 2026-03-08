@@ -23,6 +23,7 @@ interface StatusFieldProps {
     placeholder?: string;
     showAllOption?: boolean; // For filter Selects
     riskStatuses?: Array<{ id: string; uid: string; name: string; code: string; color?: string; sortOrder?: number; isActive?: boolean }>; // Optional dynamic risk statuses
+    icon?: React.ReactNode;
 }
 
 export const StatusField: React.FC<StatusFieldProps> = ({
@@ -34,6 +35,7 @@ export const StatusField: React.FC<StatusFieldProps> = ({
     placeholder,
     showAllOption = false,
     riskStatuses,
+    icon,
 }) => {
     // 1. Determine Label and Color for View Mode
     let label = '-';
@@ -100,19 +102,21 @@ export const StatusField: React.FC<StatusFieldProps> = ({
         if (isHex) {
             return (
                 <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${extraClass}`}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${extraClass}`}
                     style={{
                         backgroundColor: `${c}1A`, // 10% opacity
                         borderColor: `${c}33`,      // 20% opacity
                         color: c
                     }}
                 >
+                    {icon}
                     {l}
                 </span>
             );
         }
         return (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${c} ${extraClass}`}>
+            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${c} ${extraClass}`}>
+                {icon}
                 {l}
             </span>
         );
