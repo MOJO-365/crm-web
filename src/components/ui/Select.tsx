@@ -241,11 +241,11 @@ export function Select({
                 {/* Trigger */}
                 <div
                     className={cn(
-                        "flex items-center gap-1 flex-wrap w-full px-2",
+                        "flex items-center gap-1 w-full px-2",
                         isCompact ? "min-h-0 py-0" : "min-h-[40px] py-1.5",
                         "border border-input rounded-md bg-background text-sm",
                         "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
-                        "min-w-0 cursor-pointer",
+                        "min-w-0 cursor-pointer overflow-hidden whitespace-nowrap",
                         disabled && "opacity-50 cursor-not-allowed",
                         error && "border-destructive focus-within:ring-destructive",
                         className
@@ -284,7 +284,7 @@ export function Select({
                         disabled={disabled}
                         onBlur={onBlur}
                         className={cn(
-                            "flex-1 min-w-[60px] bg-transparent border-none outline-none placeholder:text-muted-foreground text-sm",
+                            "flex-1 min-w-[20px] bg-transparent border-none outline-none placeholder:text-muted-foreground text-sm",
                             isCompact ? "h-full" : "h-6",
                             "disabled:cursor-not-allowed",
                             multiple && selectedValues.length > 0 && "placeholder:text-transparent"

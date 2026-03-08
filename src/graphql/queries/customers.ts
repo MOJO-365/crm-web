@@ -1226,3 +1226,49 @@ export const GET_RISK_STATUSES = gql`
         }
     }
 `;
+
+// Lightweight query for customer search (name, id, address only)
+export const SEARCH_CUSTOMERS_BASIC = gql`
+    query SearchCustomersBasic($first: Int, $searchName: String) {
+        customersCursor(first: $first, searchName: $searchName) {
+            data {
+                uid
+                customerId
+                firstName
+                lastName
+                address {
+                    fullAddress
+                }
+            }
+        }
+    }
+`;
+
+// Lightweight query for billing page - only fields needed for the billing info card
+export const GET_CUSTOMER_BILLING_INFO = gql`
+    query GetCustomerBillingInfo($uid: String!) {
+        customer(uid: $uid) {
+            uid
+            customerId
+            firstName
+            lastName
+            email
+            number
+            creditScore
+            riskStatus
+            address {
+                fullAddress
+            }
+            enrollmentDetails {
+                billingpreference
+            }
+            debitDetails {
+                optIn
+            }
+            utilmateDetails {
+                accountNumber
+                siteIdentifier
+            }
+        }
+    }
+`;

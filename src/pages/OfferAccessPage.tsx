@@ -1005,9 +1005,13 @@ export const OfferAccessPage = () => {
                             const hasFiT = (activeOffer.fit ?? 0) > 0 || (activeOffer.fitPeak ?? 0) > 0 || (activeOffer.fitCritical ?? 0) > 0 || (activeOffer.fitVpp ?? 0) > 0;
                             const hasCL = (activeOffer.cl1Usage ?? 0) > 0 || (activeOffer.cl2Usage ?? 0) > 0 || (activeOffer.cl1Supply ?? 0) > 0 || (activeOffer.cl2Supply ?? 0) > 0;
 
+                            const parsedPriceUnits: Record<string, string> = typeof activeOffer.priceUnits === 'string'
+                                ? (() => { try { return JSON.parse(activeOffer.priceUnits); } catch { return {}; } })()
+                                : (activeOffer.priceUnits || {});
+
                             const formatUnit = (key: string, fallback: string) => {
-                                const unitUid = activeOffer.priceUnits?.[key];
-                                const unit = unitMap[unitUid] || fallback;
+                                const unitUid = parsedPriceUnits[key];
+                                const unit = unitUid ? (unitMap[unitUid] || fallback) : fallback;
                                 return unit ? `/${unit}` : '';
                             };
 
@@ -1174,32 +1178,40 @@ export const OfferAccessPage = () => {
                                     )}
 
                                     {/* Dynamic Rates Column */}
-                                    {activeOffer.dynamicRates && activeOffer.dynamicRates.length > 0 && (
-                                        <div className="space-y-4 min-w-[180px] flex-1">
-                                            {(() => {
-                                                const isVpp = customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1;
-                                                const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
-                                                return (
-                                                    <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
-                                                        <ActivityIcon size={16} />
-                                                        <h4 className="text-sm font-bold uppercase tracking-wide">{sectionLabel}</h4>
-                                                    </div>
-                                                );
-                                            })()}
-                                            <div className="space-y-3">
-                                                {activeOffer.dynamicRates.map((dRate: any, id: number) => {
-                                                    const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
-                                                    const val = parseFloat(String(dRate.value || '0'));
+                                    {(() => {
+                                        const parsedDynamicRates = typeof activeOffer.dynamicRates === 'string'
+                                            ? (() => { try { return JSON.parse(activeOffer.dynamicRates); } catch { return []; } })()
+                                            : (activeOffer.dynamicRates || []);
+
+                                        if (!parsedDynamicRates || parsedDynamicRates.length === 0) return null;
+
+                                        return (
+                                            <div className="space-y-4 min-w-[180px] flex-1">
+                                                {(() => {
+                                                    const isVpp = customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1;
+                                                    const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
                                                     return (
-                                                        <div key={id} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                            <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">${val.toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
-                                                            <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{dRate.name}</div>
+                                                        <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
+                                                            <ActivityIcon size={16} />
+                                                            <h4 className="text-sm font-bold uppercase tracking-wide">{sectionLabel}</h4>
                                                         </div>
                                                     );
-                                                })}
+                                                })()}
+                                                <div className="space-y-3">
+                                                    {parsedDynamicRates.map((dRate: any, id: number) => {
+                                                        const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
+                                                        const val = parseFloat(String(dRate.value || '0'));
+                                                        return (
+                                                            <div key={id} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">${val.toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
+                                                                <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{dRate.name}</div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                 </div>
                             );
                         })()}

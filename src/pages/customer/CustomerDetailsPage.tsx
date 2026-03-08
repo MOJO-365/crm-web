@@ -1653,10 +1653,10 @@ export function CustomerDetailsPage() {
     const handleUtilmateToggle = async (customerUid: string, newValue: boolean) => {
         if (!selectedCustomerDetails) return;
 
-        if (newValue && selectedCustomerDetails.msatDetails?.msatConnected !== 1) {
-            toast.error("Please connect to MSAT first before connecting to Utilmate.");
-            return;
-        }
+        // if (newValue && selectedCustomerDetails.msatDetails?.msatConnected !== 1) {
+        //     toast.error("Please connect to MSAT first before connecting to Utilmate.");
+        //     return;
+        // }
 
         if (newValue) {
             setUtilmateForm({
@@ -1812,8 +1812,6 @@ export function CustomerDetailsPage() {
             setIsGeneratingCredentials(false);
         }
     };
-
-
 
     const handleCheckCreditScore = async (customerUid: string) => {
         if (!selectedCustomerDetails) return;
@@ -2263,7 +2261,7 @@ export function CustomerDetailsPage() {
                                         },
                                     ] : []),
                                     { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate || (selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1), step: 4 },
-                                    { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: selectedCustomerDetails.msatDetails?.msatConnected !== 1, step: 5 },
+                                    { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: false, step: 5 },
                                 ].map((item: any, index) => (
                                     <div key={index} className="relative flex flex-row md:flex-col items-start md:items-center gap-3 md:gap-0 md:flex-1 w-full md:w-auto">
                                         {/* Horizontal connector line for desktop */}
@@ -2492,14 +2490,12 @@ export function CustomerDetailsPage() {
             ) : selectedCustomerDetails ? (
                 <div className="space-y-6">
 
-
-
-
                     {/* Horizontal Tabs Layout */}
                     <div className="flex flex-col bg-card rounded-lg border border-border overflow-hidden min-h-[600px]">
                         {/* Tab Navigation */}
                         <div className="border-b border-border bg-muted/30 flex items-center px-2 gap-1">
                             {(() => {
+
                                 const allTabs = [
                                     { id: 'general', label: 'General', icon: Settings2Icon },
                                     { id: 'rates', label: 'Rates', icon: PercentIcon },
@@ -2535,8 +2531,6 @@ export function CustomerDetailsPage() {
                                     }
                                     return true;
                                 });
-
-
 
                                 let primaryTabs = allTabs.slice(0, maxVisibleTabs);
                                 let overflowTabs = allTabs.slice(maxVisibleTabs);
@@ -2580,6 +2574,15 @@ export function CustomerDetailsPage() {
                                                 >
                                                     <item.icon className={cn("w-4 h-4", item.highlight && selectedDetailSection !== item.id ? "text-red-500" : "")} />
                                                     <span className="hidden sm:inline">{item.label}</span>
+                                                    {item.highlight && (
+                                                        <span className="ml-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-red-50 text-red-600 border border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50 shadow-sm animate-in fade-in zoom-in duration-300">
+                                                            <span className="relative flex h-1.5 w-1.5">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
+                                                            </span>
+                                                            Pending
+                                                        </span>
+                                                    )}
                                                     {item.badge !== undefined && item.badge > 0 && (
                                                         <span className={cn(
                                                             "px-2 py-0.5 rounded-full text-xs font-bold",
@@ -2641,6 +2644,15 @@ export function CustomerDetailsPage() {
                                                                 >
                                                                     <item.icon className={cn("w-4 h-4 shrink-0", item.highlight && selectedDetailSection !== item.id ? "text-red-500" : "")} />
                                                                     <span>{item.label}</span>
+                                                                    {item.highlight && (
+                                                                        <span className="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-red-50 text-red-600 border border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50 shadow-sm">
+                                                                            <span className="relative flex h-1.5 w-1.5">
+                                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
+                                                                            </span>
+                                                                            Pending
+                                                                        </span>
+                                                                    )}
                                                                     {item.badge !== undefined && item.badge > 0 && (
                                                                         <span className={cn(
                                                                             "ml-auto px-1.5 py-0.5 rounded-full text-[10px]",
@@ -2899,9 +2911,12 @@ export function CustomerDetailsPage() {
                                                 const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0;
                                                 const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0;
 
+                                                const parsedPriceUnits: Record<string, string> = typeof offer.priceUnits === 'string'
+                                                    ? (() => { try { return JSON.parse(offer.priceUnits); } catch { return {}; } })()
+                                                    : (offer.priceUnits || {});
                                                 const formatUnit = (key: string, fallback: string) => {
-                                                    const unitUid = offer.priceUnits?.[key];
-                                                    const unit = unitMap[unitUid] || fallback;
+                                                    const unitUid = parsedPriceUnits[key];
+                                                    const unit = unitUid ? (unitMap[unitUid] || fallback) : fallback;
                                                     return unit ? `/${unit}` : '';
                                                 };
 
@@ -3077,32 +3092,40 @@ export function CustomerDetailsPage() {
                                                             )}
 
                                                             {/* Column 5: Dynamic Rates */}
-                                                            {offer.dynamicRates && offer.dynamicRates.length > 0 && (
-                                                                <div className="space-y-4 min-w-[180px] flex-1">
-                                                                    {(() => {
-                                                                        const isVpp = selectedCustomerDetails.vppDetails?.vpp === 1 || offer.vpp === 1;
-                                                                        const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
-                                                                        return (
-                                                                            <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
-                                                                                <ActivityIcon size={16} />
-                                                                                <h4 className="text-sm font-bold uppercase tracking-wide">{sectionLabel}</h4>
-                                                                            </div>
-                                                                        );
-                                                                    })()}
-                                                                    <div className="space-y-3">
-                                                                        {offer.dynamicRates.map((dRate: any, id: number) => {
-                                                                            const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
-                                                                            const val = parseFloat(String(dRate.value || '0'));
+                                                            {(() => {
+                                                                const parsedDynamicRates = typeof offer.dynamicRates === 'string'
+                                                                    ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
+                                                                    : (offer.dynamicRates || []);
+
+                                                                if (!parsedDynamicRates || parsedDynamicRates.length === 0) return null;
+
+                                                                return (
+                                                                    <div className="space-y-4 min-w-[180px] flex-1">
+                                                                        {(() => {
+                                                                            const isVpp = selectedCustomerDetails.vppDetails?.vpp === 1 || offer.vpp === 1;
+                                                                            const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
                                                                             return (
-                                                                                <div key={id} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                                    <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">${val.toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
-                                                                                    <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{dRate.name}</div>
+                                                                                <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
+                                                                                    <ActivityIcon size={16} />
+                                                                                    <h4 className="text-sm font-bold uppercase tracking-wide">{sectionLabel}</h4>
                                                                                 </div>
                                                                             );
-                                                                        })}
+                                                                        })()}
+                                                                        <div className="space-y-3">
+                                                                            {parsedDynamicRates.map((dRate: any, id: number) => {
+                                                                                const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
+                                                                                const val = parseFloat(String(dRate.value || '0'));
+                                                                                return (
+                                                                                    <div key={id} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                                        <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">${val.toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
+                                                                                        <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{dRate.name}</div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 );
@@ -3945,10 +3968,6 @@ export function CustomerDetailsPage() {
                 </div>
             )
             }
-
-            {/* MODALS */}
-
-
 
             {/* Freeze Confirmation Modal */}
             <Modal
