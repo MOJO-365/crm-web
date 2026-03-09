@@ -259,7 +259,7 @@ export function VppCertificateTab({
     const isFormComplete = validateRequiredFields().length === 0;
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex flex-col h-[500px] animate-in fade-in duration-300">
 
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-4">
@@ -298,7 +298,7 @@ export function VppCertificateTab({
             </div>
 
             {/* Progress Stepper */}
-            <div className="relative">
+            <div className="relative mt-6 mb-6">
                 <div className="flex items-center justify-between">
                     {STEPS.map((step, index) => {
                         const StepIcon = step.icon;
@@ -349,7 +349,7 @@ export function VppCertificateTab({
             </div>
 
             {/* Step Content */}
-            <div>
+            <div className="flex-1 overflow-y-auto pr-2 pb-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
                 <div className="bg-card border border-border rounded-xl p-6 animate-in fade-in slide-in-from-right-2 duration-300" key={currentStep}>
                     {/* Step 0 — System Settings */}
                     {STEPS[currentStep].id === 0 && (
@@ -671,21 +671,28 @@ export function VppCertificateTab({
                                     && formState.gridImportVerification === 1
                                     && formState.communicationFailSafeTest === 1;
                                 return (
-                                    <div className={`p-3 rounded-lg border text-sm font-medium ${allPassed
-                                        ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400'
-                                        : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
-                                        }`}>
-                                        {allPassed
-                                            ? '✓ All tests passed — the battery system responded correctly to all dispatch commands.'
-                                            : '✗ Not all tests passed — the battery system has not met the operational requirements yet.'}
-                                    </div>
+                                    <>
+                                        <div className={`p-3 rounded-lg border text-sm font-medium ${allPassed
+                                            ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400'
+                                            : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
+                                            }`}>
+                                            {allPassed
+                                                ? '✓ All tests passed — the battery system responded correctly to all dispatch commands.'
+                                                : '✗ Not all tests passed — the battery system has not met the operational requirements yet.'}
+                                        </div>
+
+                                        <div className="space-y-2 pt-2">
+                                            <label className="text-sm font-medium text-foreground">Test Result / Notes</label>
+                                            <Input
+                                                name="testResult"
+                                                value={formState.testResult || (allPassed ? 'All Test passed successfully' : 'Failed')}
+                                                onChange={handleChange}
+                                                placeholder="Any specific notes or observations..."
+                                            />
+                                        </div>
+                                    </>
                                 );
                             })()}
-
-                            <div className="space-y-2 pt-2">
-                                <label className="text-sm font-medium text-foreground">Test Result / Notes</label>
-                                <Input name="testResult" value={formState.testResult} onChange={handleChange} placeholder="Any specific notes or observations..." />
-                            </div>
 
                             <div className="space-y-2 pt-2">
                                 <label className="text-sm font-medium text-foreground">Additional Notes</label>
@@ -700,43 +707,43 @@ export function VppCertificateTab({
                         </div>
                     )}
                 </div>
+            </div>
 
-                {/* Navigation Buttons */}
-                <div className="sticky bottom-0 flex items-center justify-between pt-4 pb-2 mt-6 border-t border-border bg-background z-10">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setCurrentStep(prev => prev - 1)}
-                        disabled={isFirstStep}
-                        className={isFirstStep ? 'opacity-0 pointer-events-none' : ''}
-                    >
-                        ← Previous
+            {/* Navigation Buttons */}
+            <div className="flex-none pt-4 mt-auto border-t border-border bg-background z-10 flex items-center justify-between">
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCurrentStep(prev => prev - 1)}
+                    disabled={isFirstStep}
+                    className={isFirstStep ? 'opacity-0 pointer-events-none' : ''}
+                >
+                    ← Previous
+                </Button>
+
+                <div className="flex items-center gap-3">
+                    <Button type="button" variant="outline" onClick={handleSaveDraft} isLoading={isSavingDraft} disabled={isSavingDraft || isSaving}>
+                        Save Draft
                     </Button>
 
-                    <div className="flex items-center gap-3">
-                        <Button type="button" variant="outline" onClick={handleSaveDraft} isLoading={isSavingDraft} disabled={isSavingDraft || isSaving}>
-                            Save Draft
+                    {isLastStep ? (
+                        <Button
+                            type="button"
+                            onClick={handleGenerateCertificate}
+                            isLoading={isSaving}
+                            disabled={isSaving || isSavingDraft || !isFormComplete}
+                            title={!isFormComplete ? "Please fill all required fields to generate certificate" : ""}
+                        >
+                            {vppCertificateDetails?.id ? 'Update' : 'Generate'}
                         </Button>
-
-                        {isLastStep ? (
-                            <Button
-                                type="button"
-                                onClick={handleGenerateCertificate}
-                                isLoading={isSaving}
-                                disabled={isSaving || isSavingDraft || !isFormComplete}
-                                title={!isFormComplete ? "Please fill all required fields to generate certificate" : ""}
-                            >
-                                {vppCertificateDetails?.id ? 'Update' : 'Generate'}
-                            </Button>
-                        ) : (
-                            <Button
-                                type="button"
-                                onClick={() => setCurrentStep(prev => prev + 1)}
-                            >
-                                Next →
-                            </Button>
-                        )}
-                    </div>
+                    ) : (
+                        <Button
+                            type="button"
+                            onClick={() => setCurrentStep(prev => prev + 1)}
+                        >
+                            Next →
+                        </Button>
+                    )}
                 </div>
             </div>
             {/* Preview Modal */}
@@ -777,6 +784,6 @@ export function VppCertificateTab({
                     </Button>
                 </div>
             </Modal>
-        </div>
+        </div >
     );
 }
