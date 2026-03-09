@@ -2252,7 +2252,7 @@ export function CustomerDetailsPage() {
                                             date: null,
                                             completed: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 1 && selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent === 1,
                                             showToggle: false,
-                                            showSendCertificate: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 1 && selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent !== 1,
+                                            showSendCertificate: selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent !== 1,
                                             disabled: selectedCustomerDetails.vppDetails?.vppConnected === 0
                                             //  || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0
                                             ,
@@ -2339,17 +2339,25 @@ export function CustomerDetailsPage() {
                                             )}
 
                                             {item.showSendCertificate && selectedCustomerDetails.vppDetails?.vppConnected === 1 && (
-                                                <button
-                                                    onClick={() => handleSendCertificateEmail()}
-                                                    disabled={isEmailSending || selectedCustomerDetails.isDeleted}
-                                                    className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 ${selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent === 1 ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground hover:bg-primary/90'} ${isEmailSending || selectedCustomerDetails.isDeleted ? 'opacity-70' : ''}`}
-                                                >
-                                                    {isEmailSending ? (
-                                                        <><div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
-                                                    ) : (
-                                                        <><MailIcon size={9} />Send certificate</>
+                                                <div className="inline-block relative group">
+                                                    <button
+                                                        onClick={selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? undefined : () => handleSendCertificateEmail()}
+                                                        disabled={isEmailSending || selectedCustomerDetails.isDeleted || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0}
+                                                        className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 ${selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent === 1 ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground'} ${(isEmailSending || selectedCustomerDetails.isDeleted || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/90'}`}
+                                                    >
+                                                        {isEmailSending ? (
+                                                            <><div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
+                                                        ) : (
+                                                            <><MailIcon size={9} />Send certificate</>
+                                                        )}
+                                                    </button>
+                                                    {selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 && (
+                                                        <div className="absolute top-[-30px] left-1/2 -translate-x-1/2 hidden group-hover:block z-50 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                                                            Required to fill VPP certificate pending data
+                                                            <span className="absolute bottom-[-4px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-t-[5px] border-t-gray-800 border-r-[5px] border-r-transparent"></span>
+                                                        </div>
                                                     )}
-                                                </button>
+                                                </div>
                                             )}
 
                                             {item.step === 0 && item.completed && selectedCustomerDetails.creditScore !== undefined && (
@@ -2508,7 +2516,21 @@ export function CustomerDetailsPage() {
                                     }] : []),
                                     { id: 'debit', label: 'Debit', icon: CreditCardIcon },
                                     { id: 'utilmate', label: 'Utilmate', icon: PlugIcon },
-                                    { id: 'documents', label: 'Documents', icon: UploadIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2')).length },
+                                    {
+                                        id: 'documents', label: 'Documents', icon: UploadIcon, badge: [
+                                            { doc: selectedCustomerDetails.previousBill, show: true },
+                                            { doc: selectedCustomerDetails.identityProof, show: selectedCustomerDetails.enrollmentDetails?.idtype !== 0 },
+                                            { doc: selectedCustomerDetails.licenseDocument, show: selectedCustomerDetails.enrollmentDetails?.idtype === 0 },
+                                            { doc: selectedCustomerDetails.additionalDocument, show: !!selectedCustomerDetails.additionalDocument },
+                                            ...(selectedCustomerDetails?.documents?.filter(d =>
+                                                d.uid !== selectedCustomerDetails?.previousBill?.uid &&
+                                                d.uid !== selectedCustomerDetails?.identityProof?.uid &&
+                                                d.uid !== selectedCustomerDetails?.licenseDocument?.uid &&
+                                                d.uid !== selectedCustomerDetails?.additionalDocument?.uid &&
+                                                (d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2'))
+                                            ).map(d => ({ doc: d, show: true })) || [])
+                                        ].filter(item => item.show).length
+                                    },
                                     { id: 'electricity_bills', label: 'Electricity Bills', icon: ZapIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2' || d.type === '2').length },
                                     { id: 'notes', label: 'Notes', icon: FileTextIcon, badge: notesData?.customerNotes?.length },
                                     { id: 'email_logs', label: 'Email Logs', icon: MailIcon },
