@@ -1,0 +1,23 @@
+name: Deploy CRM Web
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/crm-web
+            git pull
+            npm install
+            npm run build
+            sudo cp -r dist/* /usr/share/nginx/html/
+            sudo systemctl reload nginx
