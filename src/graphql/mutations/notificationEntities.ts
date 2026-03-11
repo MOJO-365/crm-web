@@ -7,7 +7,7 @@ export const CREATE_NOTIFICATION_ENTITY = gql`
             uid
             fromEmail
             isActive
-            userUid
+            userUids
         }
     }
 `;
@@ -19,7 +19,7 @@ export const UPDATE_NOTIFICATION_ENTITY = gql`
             uid
             fromEmail
             isActive
-            userUid
+            userUids
         }
     }
 `;

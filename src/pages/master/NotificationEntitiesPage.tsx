@@ -29,7 +29,7 @@ interface NotificationEntity {
     preference?: number;
     entityType: number;
     isActive: number; // 1 or 0
-    userUid?: string;
+    userUids?: string[];
     createdAt: string;
     updatedAt: string;
 }
@@ -60,7 +60,7 @@ export function NotificationEntitiesPage() {
         bccEmail: '',
         preference: 0,
         entityType: 1,
-        userUid: ''
+        userUids: [] as string[]
     };
 
     const [formData, setFormData] = useState(initialFormState);
@@ -122,7 +122,7 @@ export function NotificationEntitiesPage() {
             bccEmail: entity.bccEmail || '',
             preference: entity.preference || 0,
             entityType: entity.entityType,
-            userUid: entity.userUid || ''
+            userUids: entity.userUids || []
         });
         setErrors({});
         setModalOpen(true);
@@ -186,7 +186,7 @@ export function NotificationEntitiesPage() {
                 bccEmail: formData.bccEmail,
                 preference: Number(formData.preference),
                 entityType: Number(formData.entityType),
-                userUid: formData.userUid || null
+                userUids: formData.userUids.length > 0 ? formData.userUids : null
             };
 
             if (formData.password) {
@@ -318,13 +318,22 @@ export function NotificationEntitiesPage() {
             )
         },
         {
-            key: 'userUid',
-            header: 'User',
+            key: 'userUids',
+            header: 'Users',
             width: 'w-[150px]',
             render: (t) => {
-                if (!t.userUid) return <span className="text-muted-foreground">-</span>;
-                const user = usersOptions.find((u: any) => u.value === t.userUid);
-                return <span className="text-foreground">{user?.label || '-'}</span>;
+                if (!t.userUids || t.userUids.length === 0) return <span className="text-muted-foreground">-</span>;
+                const userNames = t.userUids.map(uid => {
+                    const user = usersOptions.find((u: any) => u.value === uid);
+                    return user?.label || 'Unknown';
+                });
+                return (
+                    <div className="flex flex-col gap-1 max-h-16 overflow-y-auto">
+                        {userNames.map((name, idx) => (
+                            <span key={idx} className="text-foreground text-xs bg-gray-100 px-2 py-0.5 rounded-md self-start">{name}</span>
+                        ))}
+                    </div>
+                );
             }
         },
 
@@ -484,12 +493,13 @@ export function NotificationEntitiesPage() {
                         </div>
 
                         <div className="space-y-2 col-span-2">
-                            <label className="text-sm font-medium">User</label>
+                            <label className="text-sm font-medium">Users</label>
                             <Select
+                                multiple
                                 options={usersOptions}
-                                value={formData.userUid}
-                                onChange={(val) => setFormData(prev => ({ ...prev, userUid: val as string }))}
-                                placeholder="Select User"
+                                value={formData.userUids}
+                                onChange={(val) => setFormData(prev => ({ ...prev, userUids: val as string[] }))}
+                                placeholder="Select Users"
                             />
                         </div>
                     </div>

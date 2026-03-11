@@ -24,7 +24,7 @@ interface AttachmentFile {
 interface NotificationEntity {
     uid: string;
     fromEmail: string;
-    userUid?: string;
+    userUids?: string[];
     preference?: number; // 1 = System, 0 = Entity
     isActive: number;
     bccEmail?: string;
@@ -94,7 +94,9 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
 
     const myEntity = useMemo(() => {
         if (!entityData?.notificationEntities || !user?.uid) return null;
-        return entityData.notificationEntities.find((e: NotificationEntity) => e.userUid === user.uid);
+        return entityData.notificationEntities.find((e: NotificationEntity) => 
+            e.userUids && e.userUids.includes(user.uid)
+        );
     }, [entityData, user?.uid]);
 
     const fromEmailDisplay = useMemo(() => {

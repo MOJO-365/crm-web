@@ -780,6 +780,24 @@ export function PdfTermsPage() {
                                 </div>
                             </div>
                         )}
+
+                        {formData.rateType === 'charges' && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-foreground">Insert Charges Terms</label>
+                                <div className="flex flex-wrap gap-2">
+                                    <Tooltip content="Insert description for standard solar FIT">
+                                        <button
+                                            type="button"
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-all duration-200 cursor-pointer"
+                                            onClick={() => handleInsertCustomHtml('<p><strong style="color: #68c645">Feed-in Tariff (FIT):</strong> A credit you receive for exporting excess solar energy from your system back to the electricity grid</p><p><br></p>')}
+                                        >
+                                            <PlusIcon size={12} />
+                                            Feed-in Tariff (FIT)
+                                        </button>
+                                    </Tooltip>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* HTML Editor + Preview side by side */}

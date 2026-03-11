@@ -11,7 +11,7 @@ export const GET_NOTIFICATION_ENTITIES = gql`
             preference
             entityType
             isActive
-            userUid
+            userUids
             createdAt
             updatedAt
         }
@@ -29,7 +29,7 @@ export const GET_NOTIFICATION_ENTITY = gql`
             preference
             entityType
             isActive
-            userUid
+            userUids
             createdAt
             updatedAt
         }
