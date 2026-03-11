@@ -415,9 +415,9 @@ export function DataTable<T>({
                                 <select
                                     value={pagination.pageSize}
                                     onChange={(e) => pagination.onPageSizeChange?.(Number(e.target.value))}
-                                    className="h-8 px-2 py-1 text-xs font-bold rounded-md border border-input bg-background hover:bg-accent hover:border-accent-foreground/30 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="h-8 px-2 py-1 text-xs font-bold text-foreground rounded-md border border-input bg-background hover:bg-accent hover:border-accent-foreground/30 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
                                 >
-                                    {[10, 25, 50, 100].map(size => (
+                                    {[10, 20, 25, 50, 100].map(size => (
                                         <option key={size} value={size}>{size}</option>
                                     ))}
                                 </select>
