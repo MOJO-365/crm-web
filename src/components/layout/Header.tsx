@@ -181,7 +181,7 @@ export function Header({ className, toggleSidebar }: HeaderProps) {
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent transition-colors"
                 >
                     {/* Avatar */}
-                    <div className="w-8 h-8  rounded-full border border-primary bg-primary/10 text-primary flex items-center justify-center text-sm font-medium">
+                    <div className="w-8 h-8 rounded-full border border-primary bg-primary/10 text-primary flex items-center justify-center text-sm font-medium">
                         {getInitials(user?.name)}
                     </div>
                     {/* Name - hidden on mobile */}
