@@ -1156,21 +1156,10 @@ export function CustomerDetailsPage() {
             apiPath = `/agreement/preview/${uid}?format=html`;
         }
 
-        // Construct URL robustly to avoid double /api prefixes in production
-        let url = '';
-        if (baseUrl.startsWith('http')) {
-            // Absolute URL from Axios configuration (usually dev)
-            url = `${baseUrl}${apiPath}`;
-        } else if (baseUrl === '/api' || baseUrl === 'api') {
-            // Relative path and already starts with /api (likely production)
-            url = apiPath;
-        } else {
-            // Other cases, join and clean up slashes
-            url = `${baseUrl}${apiPath}`.replace(/\/+/g, '/');
-            if (!url.startsWith('http') && !url.startsWith('/')) {
-                url = '/' + url;
-            }
-        }
+        // Construct URL
+        const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+        const cleanPath = apiPath.startsWith('/') ? apiPath : '/' + apiPath;
+        const url = `${cleanBase}${cleanPath}`;
 
         setPreviewUrl(url);
         setPreviewModalOpen(true);
