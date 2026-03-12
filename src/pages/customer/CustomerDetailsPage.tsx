@@ -1151,9 +1151,9 @@ export function CustomerDetailsPage() {
 
         let apiPath = '';
         if (selectedCustomerDetails?.signedPdfPath) {
-            apiPath = `/api/documents/${encodeURIComponent(selectedCustomerDetails.signedPdfPath).replace(/%2F/g, '/')}`;
+            apiPath = `/documents/${encodeURIComponent(selectedCustomerDetails.signedPdfPath).replace(/%2F/g, '/')}`;
         } else {
-            apiPath = `/api/agreement/preview/${uid}?format=html`;
+            apiPath = `/agreement/preview/${uid}?format=html`;
         }
 
         // Construct URL robustly to avoid double /api prefixes in production
@@ -1181,7 +1181,7 @@ export function CustomerDetailsPage() {
 
         setIsDeletingDocument(docPath);
         try {
-            await apiAxios.delete(`/api/documents/${encodeURIComponent(docPath).replace(/%2F/g, '/')}`);
+            await apiAxios.delete(`/documents/${encodeURIComponent(docPath).replace(/%2F/g, '/')}`);
 
             const result = await refetchCustomer();
             if (result.data?.customer) {
@@ -1236,7 +1236,7 @@ export function CustomerDetailsPage() {
             if (endDate) formData.append('endDate', endDate);
             formData.append('file', file);
 
-            await apiAxios.post('/api/documents/upload', formData, {
+            await apiAxios.post('/documents/upload', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
@@ -3668,7 +3668,7 @@ export function CustomerDetailsPage() {
                                                                             variant="outline"
                                                                             size="sm"
                                                                             className="h-8 px-3 text-xs font-medium border-border hover:bg-muted transition-colors"
-                                                                            onClick={() => item.doc?.path && window.open(`${apiAxios.defaults.baseURL}/api/documents/${encodeURIComponent(item.doc.path).replace(/%2F/g, '/')}`, '_blank')}
+                                                                            onClick={() => item.doc?.path && window.open(`${apiAxios.defaults.baseURL}/documents/${encodeURIComponent(item.doc.path).replace(/%2F/g, '/')}`, '_blank')}
                                                                         >
                                                                             <EyeIcon className="w-3.5 h-3.5" />
                                                                             {/* View */}
@@ -3850,7 +3850,7 @@ export function CustomerDetailsPage() {
                                                                             variant="outline"
                                                                             size="sm"
                                                                             className="h-8 px-3 text-xs font-medium border-border hover:bg-muted transition-colors"
-                                                                            onClick={() => doc.path && window.open(`${apiAxios.defaults.baseURL}/api/documents/${encodeURIComponent(doc.path).replace(/%2F/g, '/')}`, '_blank')}
+                                                                            onClick={() => doc.path && window.open(`${apiAxios.defaults.baseURL}/documents/${encodeURIComponent(doc.path).replace(/%2F/g, '/')}`, '_blank')}
                                                                         >
                                                                             <EyeIcon className="w-3.5 h-3.5" />
                                                                             {/* View */}
