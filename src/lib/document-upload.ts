@@ -86,7 +86,7 @@ export const uploadDocument = async (
  * @param filename Document filename
  */
 export const getDocumentUrl = (customerId: string, filename: string): string => {
-    const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:4000');
+    const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:4000');
     return `${baseUrl}/documents/${customerId}/${filename}`;
 };
 
@@ -96,7 +96,7 @@ export const getDocumentUrl = (customerId: string, filename: string): string => 
  * @returns Full URL for the document
  */
 export const getDocumentPreviewUrl = (documentPath: string): string => {
-    const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:4000');
+    const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:4000');
     return `${baseUrl}/documents/${documentPath}`;
 };
 
