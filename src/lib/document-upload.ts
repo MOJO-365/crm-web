@@ -58,7 +58,7 @@ export const uploadDocument = async (
     }
 
     const response = await apiAxios.post<UploadDocumentResponse>(
-        '/api/documents/upload',
+        '/documents/upload',
         formData,
         {
             headers: {
@@ -87,7 +87,7 @@ export const uploadDocument = async (
  */
 export const getDocumentUrl = (customerId: string, filename: string): string => {
     const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:4000');
-    return `${baseUrl}/api/documents/${customerId}/${filename}`;
+    return `${baseUrl}/documents/${customerId}/${filename}`;
 };
 
 /**
@@ -97,7 +97,7 @@ export const getDocumentUrl = (customerId: string, filename: string): string => 
  */
 export const getDocumentPreviewUrl = (documentPath: string): string => {
     const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:4000');
-    return `${baseUrl}/api/documents/${documentPath}`;
+    return `${baseUrl}/documents/${documentPath}`;
 };
 
 /**
@@ -124,7 +124,7 @@ export const isPdfFile = (filename: string): boolean => {
  */
 export const deleteDocument = async (customerId: string, filename: string): Promise<boolean> => {
     try {
-        const response = await apiAxios.delete(`/api/documents/${customerId}/${filename}`);
+        const response = await apiAxios.delete(`/documents/${customerId}/${filename}`);
         return response.data.success;
     } catch {
         return false;
@@ -172,7 +172,7 @@ export const moveDocumentsToCustomer = async (
     }
 
     try {
-        const response = await apiAxios.post<MoveDocumentsResponse>('/api/documents/move', {
+        const response = await apiAxios.post<MoveDocumentsResponse>('/documents/move', {
             tempId,
             customerId,
             customerUid,
