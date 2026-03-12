@@ -17,6 +17,7 @@ import {
     GET_CUSTOMER_UTILMATE_DETAILS,
     GET_CUSTOMER_DOCUMENTS,
     SOFT_DELETE_CUSTOMER,
+    HARD_DELETE_CUSTOMER,
     GET_RATES_HISTORY_BY_VERSION,
     GET_AUDIT_LOGS,
     GET_CUSTOMER_EMAIL_LOGS,
@@ -844,6 +845,7 @@ export function CustomerDetailsPage() {
     const [freezeModalOpen, setFreezeModalOpen] = useState(false);
     // const [customerToFreeze, setCustomerToFreeze] = useState<CustomerDetails | null>(null); // Not needed since we use selectedCustomerDetails
     const [markingNotInterested, setMarkingNotInterested] = useState(false);
+    const [isHardDelete, setIsHardDelete] = useState(false);
     const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [deleteConfirmName, setDeleteConfirmName] = useState('');
@@ -963,9 +965,10 @@ export function CustomerDetailsPage() {
 
     const loadingGeneral = false; // Replaced by primary query
 
-    const { loading: loadingSolar } = useQuery(GET_CUSTOMER_SOLAR_VPP_DETAILS, {
+    const { loading: loadingSolar, refetch: refetchSolarVpp } = useQuery(GET_CUSTOMER_SOLAR_VPP_DETAILS, {
         variables: { uid },
         skip: !uid || (selectedDetailSection !== 'vpp_certificate' && !vppConnectModalOpen && !freezeModalOpen),
+        fetchPolicy: 'network-only',
         onCompleted: (data) => {
             if (data?.customer) {
                 setSelectedCustomerDetails(prev => prev ? ({ ...prev, ...data.customer }) : data.customer);
@@ -1030,6 +1033,7 @@ export function CustomerDetailsPage() {
     const [deleteNote] = useMutation(DELETE_CUSTOMER_NOTE);
     const [sendOfferEmail] = useMutation(SEND_OFFER_EMAIL);
     const [softDeleteCustomer] = useMutation(SOFT_DELETE_CUSTOMER);
+    const [hardDeleteCustomer] = useMutation(HARD_DELETE_CUSTOMER);
     const [createNoteType] = useMutation(CREATE_NOTE_TYPE);
     const [createDocumentTypeMutation] = useMutation(CREATE_DOCUMENT_TYPE);
     const [sendReminderEmail] = useMutation(SEND_REMINDER_EMAIL);
@@ -1343,8 +1347,9 @@ export function CustomerDetailsPage() {
         setFreezeModalOpen(true);
     };
 
-    const handleDeleteCustomer = () => {
+    const handleDeleteCustomer = (hard: boolean = false) => {
         setDeleteConfirmName('');
+        setIsHardDelete(hard);
         setDeleteModalOpen(true);
     };
 
@@ -1357,12 +1362,21 @@ export function CustomerDetailsPage() {
 
         setIsDeletingCustomer(true);
         try {
-            await softDeleteCustomer({
-                variables: {
-                    uid: selectedCustomerDetails.uid
-                }
-            });
-            toast.success('Customer deleted successfully');
+            if (isHardDelete) {
+                await hardDeleteCustomer({
+                    variables: {
+                        uid: selectedCustomerDetails.uid
+                    }
+                });
+                toast.success('Customer permanently deleted');
+            } else {
+                await softDeleteCustomer({
+                    variables: {
+                        uid: selectedCustomerDetails.uid
+                    }
+                });
+                toast.success('Customer deleted successfully');
+            }
             setDeleteModalOpen(false);
             navigate('/customers');
         } catch (error: any) {
@@ -1492,15 +1506,33 @@ export function CustomerDetailsPage() {
         if (!selectedCustomerDetails) return;
 
         if (newValue) {
-            setVppForm({
-                vppSignupBonus: selectedCustomerDetails?.vppDetails?.vppSignupBonus?.toString() || '',
-                batteryBrand: selectedCustomerDetails?.batteryDetails?.batterybrand || '',
-                snNumber: selectedCustomerDetails?.batteryDetails?.snnumber || '',
-                batteryCapacity: selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || '',
-                exportLimit: selectedCustomerDetails?.batteryDetails?.exportlimit?.toString() || '',
-                inverterCapacity: selectedCustomerDetails?.batteryDetails?.inverterCapacity?.toString() || '',
-                checkCode: selectedCustomerDetails?.batteryDetails?.checkCode || ''
-            });
+            // Refresh details before opening modal to ensure battery details are up-to-date
+            try {
+                const { data } = await refetchSolarVpp();
+                const latestDetails = data?.customer;
+                
+                setVppForm({
+                    vppSignupBonus: latestDetails?.vppDetails?.vppSignupBonus?.toString() || selectedCustomerDetails?.vppDetails?.vppSignupBonus?.toString() || '',
+                    batteryBrand: latestDetails?.batteryDetails?.batterybrand || selectedCustomerDetails?.batteryDetails?.batterybrand || '',
+                    snNumber: latestDetails?.batteryDetails?.snnumber || selectedCustomerDetails?.batteryDetails?.snnumber || '',
+                    batteryCapacity: latestDetails?.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || '',
+                    exportLimit: latestDetails?.batteryDetails?.exportlimit?.toString() || selectedCustomerDetails?.batteryDetails?.exportlimit?.toString() || '',
+                    inverterCapacity: latestDetails?.batteryDetails?.inverterCapacity?.toString() || selectedCustomerDetails?.batteryDetails?.inverterCapacity?.toString() || '',
+                    checkCode: latestDetails?.batteryDetails?.checkCode || selectedCustomerDetails?.batteryDetails?.checkCode || ''
+                });
+            } catch (err) {
+                console.error("Error refetching solar details for VPP toggle:", err);
+                // Fallback to existing state if refetch fails
+                setVppForm({
+                    vppSignupBonus: selectedCustomerDetails?.vppDetails?.vppSignupBonus?.toString() || '',
+                    batteryBrand: selectedCustomerDetails?.batteryDetails?.batterybrand || '',
+                    snNumber: selectedCustomerDetails?.batteryDetails?.snnumber || '',
+                    batteryCapacity: selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || '',
+                    exportLimit: selectedCustomerDetails?.batteryDetails?.exportlimit?.toString() || '',
+                    inverterCapacity: selectedCustomerDetails?.batteryDetails?.inverterCapacity?.toString() || '',
+                    checkCode: selectedCustomerDetails?.batteryDetails?.checkCode || ''
+                });
+            }
             setVppConnectModalOpen(true);
             return;
         }
@@ -1529,6 +1561,7 @@ export function CustomerDetailsPage() {
                     }
                 }
             });
+            await refetchCustomer();
             toast.success(`VPP ${newValue ? 'connected' : 'disconnected'} successfully`);
         } catch (error: any) {
             console.error('Error updating VPP status:', error);
@@ -1587,6 +1620,7 @@ export function CustomerDetailsPage() {
                 }
             });
 
+            await refetchCustomer();
             toast.success('VPP Connected and details saved');
             setVppConnectModalOpen(false);
 
@@ -2202,6 +2236,16 @@ export function CustomerDetailsPage() {
                                                                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                                                             >
                                                                 <TrashIcon size={15} />
+                                                                {isDeletingCustomer ? 'Archiving...' : 'Archive'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    handleDeleteCustomer(true);
+                                                                }}
+                                                                disabled={isDeletingCustomer}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors disabled:opacity-50 font-semibold"
+                                                            >
+                                                                <TrashIcon size={15} className="text-red-600" />
                                                                 {isDeletingCustomer ? 'Deleting...' : 'Delete'}
                                                             </button>
                                                         </>
@@ -4342,7 +4386,7 @@ export function CustomerDetailsPage() {
             <Modal
                 isOpen={deleteModalOpen}
                 onClose={() => setDeleteModalOpen(false)}
-                title="Soft Delete / Archive Customer"
+                title={isHardDelete ? "Delete Customer Permanently" : "Archive Customer"}
                 size="sm"
                 footer={
                     <>
@@ -4353,13 +4397,13 @@ export function CustomerDetailsPage() {
                             Cancel
                         </Button>
                         <Button
-                            className="bg-red-600 hover:bg-red-700 text-white"
+                            className={cn("text-white", isHardDelete ? "bg-red-800 hover:bg-red-900 shadow-lg shadow-red-900/20" : "bg-red-600 hover:bg-red-700")}
                             onClick={handleConfirmDelete}
                             isLoading={isDeletingCustomer}
                             disabled={deleteConfirmName !== selectedCustomerDetails?.customerId}
-                            loadingText="Archiving..."
+                            loadingText={isHardDelete ? "Deleting..." : "Archiving..."}
                         >
-                            Archive Customer
+                            {isHardDelete ? "Delete" : "Archive"}
                         </Button>
                     </>
                 }
@@ -4367,17 +4411,36 @@ export function CustomerDetailsPage() {
                 <div className="space-y-4">
                     <div className="text-sm text-gray-600 dark:text-gray-300">
                         <p className="mb-3">
-                            Are you sure you want to soft-delete customer{' '}
+                            Are you sure you want to {isHardDelete ? 'DELETE' : 'archive'} customer{' '}
                             <span className="font-semibold text-gray-900 dark:text-white">
                                 {selectedCustomerDetails?.firstName} {selectedCustomerDetails?.lastName}
                             </span>?
                         </p>
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-3 rounded-lg flex items-start gap-3 mb-4">
+                        <div className={cn("border p-3 rounded-lg flex items-start gap-3 mb-4", isHardDelete ? "bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-900/50" : "bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900/30")}>
                             <InfoIcon size={18} className="text-red-500 shrink-0 mt-0.5" />
-                            <p className="text-xs text-red-700 dark:text-red-400">
-                                This action will archive the record. The customer will be hidden from the primary list but can still be restored later if needed.
+                            <p className={cn("text-xs", isHardDelete ? "text-red-900 dark:text-red-300 font-medium" : "text-red-700 dark:text-red-400")}>
+                                {isHardDelete 
+                                    ? "CRITICAL: This will permanently remove ALL customer data, history, documents, and notes. This action CANNOT be undone." 
+                                    : "This action will archive the record. The customer will be hidden from the primary list."}
                             </p>
                         </div>
+
+                        {isHardDelete && (
+                            <div className="flex items-center space-x-3 mb-4 p-3 rounded-md border border-red-200 bg-red-50/50 cursor-pointer hover:bg-red-100/50 transition-colors" onClick={() => setIsHardDelete(!isHardDelete)}>
+                                <input
+                                    type="checkbox"
+                                    id="hard-delete-toggle"
+                                    className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                                    checked={isHardDelete}
+                                    onChange={(e) => setIsHardDelete(e.target.checked)}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                                <label htmlFor="hard-delete-toggle" className="text-xs font-semibold text-red-900 cursor-pointer select-none leading-tight">
+                                    I understand that this action is permanent and all customer data will be removed forever.
+                                </label>
+                            </div>
+                        )}
+
                         <div className="space-y-2">
                             <label className="text-xs font-bold uppercase text-muted-foreground">
                                 To confirm, type <span className="text-foreground tracking-wider select-all">{selectedCustomerDetails?.customerId}</span> below:
