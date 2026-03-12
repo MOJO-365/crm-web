@@ -21,6 +21,7 @@ import {
 import { formatDateTime, getUserTimezone } from '@/lib/date';
 import { EMAIL_VARIABLES } from '@/lib/email-variables';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { isNameMatch } from '@/lib/utils';
 
 // Types
 interface EmailTemplate {
@@ -84,10 +85,7 @@ const DEFAULT_EMAIL_FOOTER = `
 `;
 
 // Helper function for name matching (case-insensitive, exact match - no trimming)
-const isNameMatch = (input: string, actual: string): boolean => {
-    if (!input || !actual) return false;
-    return input.toLowerCase() === actual.toLowerCase();
-};
+// Moved to src/lib/utils.ts
 
 export function EmailTemplatesPage() {
     // Permissions

@@ -34,6 +34,35 @@ const HEADING_OPTIONS: SelectOption[] = [
     { label: 'Heading 6', value: 'h6' },
 ];
 
+export const SHARED_EDITOR_STYLES = `
+    .html-editor-content h1 { font-size: 24px; font-weight: 700; margin: 0.67em 0; line-height: 1.2; color: #111827; }
+    .html-editor-content h2 { font-size: 20px; font-weight: 600; margin: 0.83em 0; line-height: 1.25; color: #1f2937; }
+    .html-editor-content h3 { font-size: 18px; font-weight: 600; margin: 1em 0; line-height: 1.3; color: #374151; }
+    .html-editor-content h4 { font-size: 16px; font-weight: 600; margin: 1em 0; line-height: 1.35; color: #4b5563; }
+    .html-editor-content h5 { font-size: 14px; font-weight: 600; margin: 1em 0; line-height: 1.4; color: #6b7280; }
+    .html-editor-content h6 { font-size: 13px; font-weight: 600; margin: 1em 0; line-height: 1.4; color: #6b7280; font-style: italic; }
+    .html-editor-content p { font-size: 13px; margin: 0.75em 0; line-height: 1.6; color: #374151; }
+    .html-editor-content ul { list-style-type: disc; padding-left: 1.5em; margin: 0.75em 0; color: #374151; font-size: 13px; }
+    .html-editor-content ol { list-style-type: decimal; padding-left: 1.5em; margin: 0.75em 0; color: #374151; font-size: 13px; }
+    .html-editor-content li { margin: 0.25em 0; line-height: 1.5; color: #374151; font-size: 13px; }
+    .html-editor-content a { color: #2563eb; text-decoration: underline; font-size: 13px; }
+    
+    /* Dark Mode Overrides */
+    .dark .html-editor-content h1,
+    .dark .html-editor-content h2,
+    .dark .html-editor-content h3,
+    .dark .html-editor-content h4,
+    .dark .html-editor-content h5,
+    .dark .html-editor-content h6 { color: #f3f4f6 !important; }
+    
+    .dark .html-editor-content p,
+    .dark .html-editor-content ul,
+    .dark .html-editor-content ol,
+    .dark .html-editor-content li { color: #e5e7eb !important; }
+    
+    .dark .html-editor-content a { color: #60a5fa !important; }
+`;
+
 const FONT_OPTIONS: SelectOption[] = [
     { label: 'Arial', value: 'Arial, sans-serif' },
     { label: 'Georgia', value: 'Georgia, serif' },
@@ -43,6 +72,19 @@ const FONT_OPTIONS: SelectOption[] = [
     { label: 'Trebuchet MS', value: 'Trebuchet MS, sans-serif' },
     { label: 'Tahoma', value: 'Tahoma, sans-serif' },
     { label: 'Helvetica', value: 'Helvetica, sans-serif' },
+];
+
+const FONT_SIZE_OPTIONS: SelectOption[] = [
+    { label: '10px', value: '10px' },
+    { label: '12px', value: '12px' },
+    { label: '13px', value: '13px' },
+    { label: '14px', value: '14px' },
+    { label: '16px', value: '16px' },
+    { label: '18px', value: '18px' },
+    { label: '20px', value: '20px' },
+    { label: '24px', value: '24px' },
+    { label: '30px', value: '30px' },
+    { label: '36px', value: '36px' },
 ];
 
 export interface HtmlEditorProps {
@@ -56,6 +98,11 @@ export interface HtmlEditorProps {
     helperText?: string;
     error?: string;
     showOfferPageButton?: boolean;
+    baseFontSize?: string;
+}
+
+export interface HtmlEditorHandle {
+    insertHTML: (html: string) => void;
 }
 
 interface ToolbarButtonProps {
@@ -93,7 +140,7 @@ const ToolbarDivider: React.FC = () => (
     <div className="w-px h-5 bg-gray-200 dark:bg-gray-600 mx-1" />
 );
 
-export const HtmlEditor: React.FC<HtmlEditorProps> = ({
+export const HtmlEditor = React.forwardRef<HtmlEditorHandle, HtmlEditorProps>(({
     value,
     onChange,
     placeholder = 'Start typing...',
@@ -107,7 +154,8 @@ export const HtmlEditor: React.FC<HtmlEditorProps> = ({
     helperText,
     error,
     showOfferPageButton = true,
-}) => {
+    baseFontSize = '13px',
+}, ref) => {
     const editorRef = React.useRef<HTMLDivElement>(null);
     const savedSelectionRef = React.useRef<Range | null>(null);
     const placeholderButtonRef = React.useRef<HTMLButtonElement>(null);
@@ -116,8 +164,29 @@ export const HtmlEditor: React.FC<HtmlEditorProps> = ({
     const [dropdownPosition, setDropdownPosition] = React.useState({ top: 0, left: 0 });
     const [placeholderSearch, setPlaceholderSearch] = React.useState('');
     const [activeFormats, setActiveFormats] = React.useState<Set<string>>(new Set());
+
+    React.useImperativeHandle(ref, () => ({
+        insertHTML: (html: string) => {
+            if (viewMode !== 'edit') {
+                setViewMode('edit');
+                // Give some time for the view to switch
+                setTimeout(() => {
+                    editorRef.current?.focus();
+                    restoreSelection();
+                    document.execCommand('insertHTML', false, html);
+                    handleInput();
+                }, 50);
+                return;
+            }
+            editorRef.current?.focus();
+            restoreSelection();
+            document.execCommand('insertHTML', false, html);
+            handleInput();
+        }
+    }));
     const [currentBlock, setCurrentBlock] = React.useState('p');
     const [currentFont, setCurrentFont] = React.useState('');
+    const [currentFontSize, setCurrentFontSize] = React.useState('13px');
 
     // Link popover state
     const [showLinkPopover, setShowLinkPopover] = React.useState(false);
@@ -197,18 +266,49 @@ ${content}
         return temp.innerHTML;
     };
 
+    // Strip inline styles that we added for storage, so we can compare "clean" HTML
+    const stripInternalStyles = (html: string): string => {
+        if (!html) return '';
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+
+        Object.keys(inlineStylesMap).forEach(tagName => {
+            const elements = temp.querySelectorAll(tagName.toLowerCase());
+            elements.forEach(el => {
+                const htmlEl = el as HTMLElement;
+                const style = htmlEl.getAttribute('style') || '';
+                // Simple regex to remove our standard styles if they exist
+                // This is safer than just removing the whole style attribute
+                let cleanedStyle = style;
+                const internalStyle = inlineStylesMap[tagName];
+                // Remove the internal style from the start if it matches
+                if (cleanedStyle.includes(internalStyle)) {
+                    cleanedStyle = cleanedStyle.replace(internalStyle, '').trim();
+                }
+
+                if (cleanedStyle) {
+                    htmlEl.setAttribute('style', cleanedStyle);
+                } else {
+                    htmlEl.removeAttribute('style');
+                }
+            });
+        });
+
+        return temp.innerHTML;
+    };
+
     // Inline styles map for each element type - applied when saving to database
     const inlineStylesMap: Record<string, string> = {
-        'H1': 'font-size: 2em; font-weight: 700; margin: 0.67em 0; line-height: 1.2; color: #111827;',
-        'H2': 'font-size: 1.5em; font-weight: 600; margin: 0.83em 0; line-height: 1.25; color: #1f2937;',
-        'H3': 'font-size: 1.25em; font-weight: 600; margin: 1em 0; line-height: 1.3; color: #374151;',
-        'H4': 'font-size: 1.1em; font-weight: 600; margin: 1em 0; line-height: 1.35; color: #4b5563;',
-        'H5': 'font-size: 1em; font-weight: 600; margin: 1em 0; line-height: 1.4; color: #6b7280;',
-        'H6': 'font-size: 0.95em; font-weight: 600; margin: 1em 0; line-height: 1.4; color: #6b7280; font-style: italic;',
-        'P': 'font-size: 1em; margin: 0.75em 0; line-height: 1.6; color: #374151;',
-        'UL': 'list-style-type: disc; padding-left: 1.5em; margin: 0.75em 0; color: #374151;',
-        'OL': 'list-style-type: decimal; padding-left: 1.5em; margin: 0.75em 0; color: #374151;',
-        'LI': 'margin: 0.25em 0; line-height: 1.5; color: #374151;',
+        'H1': 'font-size: 24px; font-weight: 700; margin: 0.67em 0; line-height: 1.2; color: #111827;',
+        'H2': 'font-size: 20px; font-weight: 600; margin: 0.83em 0; line-height: 1.25; color: #1f2937;',
+        'H3': 'font-size: 18px; font-weight: 600; margin: 1em 0; line-height: 1.3; color: #374151;',
+        'H4': 'font-size: 16px; font-weight: 600; margin: 1em 0; line-height: 1.35; color: #4b5563;',
+        'H5': 'font-size: 14px; font-weight: 600; margin: 1em 0; line-height: 1.4; color: #6b7280;',
+        'H6': 'font-size: 13px; font-weight: 600; margin: 1em 0; line-height: 1.4; color: #6b7280; font-style: italic;',
+        'P': 'font-size: 13px; margin: 0.75em 0; line-height: 1.6; color: #374151;',
+        'UL': 'list-style-type: disc; padding-left: 1.5em; margin: 0.75em 0; color: #374151; font-size: 13px;',
+        'OL': 'list-style-type: decimal; padding-left: 1.5em; margin: 0.75em 0; color: #374151; font-size: 13px;',
+        'LI': 'margin: 0.25em 0; line-height: 1.5; color: #374151; font-size: 13px;',
     };
 
     // Add inline styles to HTML elements for database storage
@@ -224,11 +324,22 @@ ${content}
             elements.forEach(el => {
                 const htmlEl = el as HTMLElement;
                 // Preserve existing styles and add our styles
+                // We prepend our styles so that existing styles (like explicit colors) take precedence
                 const existingStyle = htmlEl.getAttribute('style') || '';
-                const newStyle = existingStyle
-                    ? `${inlineStylesMap[tagName]} ${existingStyle}`
-                    : inlineStylesMap[tagName];
-                htmlEl.setAttribute('style', newStyle);
+                if (existingStyle) {
+                    // Check if existing style already defines things we want to set
+                    // This is a simple check; a more robust one would involve parsing styles
+                    const hasColor = existingStyle.includes('color:');
+                    const hasFontSize = existingStyle.includes('font-size:');
+
+                    let stylesToAdd = inlineStylesMap[tagName];
+                    if (hasColor) stylesToAdd = stylesToAdd.replace(/color:[^;]+;?/g, '');
+                    if (hasFontSize) stylesToAdd = stylesToAdd.replace(/font-size:[^;]+;?/g, '');
+
+                    htmlEl.setAttribute('style', `${stylesToAdd.trim()} ${existingStyle.trim()}`);
+                } else {
+                    htmlEl.setAttribute('style', inlineStylesMap[tagName]);
+                }
             });
         });
 
@@ -294,7 +405,11 @@ ${content}
                     bodyContent = styleVariablesForDisplay(bodyContent);
 
                     // Check if content actually changed to avoid cursor jumps/resets
-                    if (editorRef.current.innerHTML !== bodyContent) {
+                    // We compare against clean content to avoid false mismatches caused by inline styles or variables
+                    const currentClean = stripInternalStyles(cleanVariablesForStorage(editorRef.current.innerHTML));
+                    const incomingClean = stripInternalStyles(cleanVariablesForStorage(bodyContent));
+
+                    if (currentClean !== incomingClean) {
                         editorRef.current.innerHTML = bodyContent;
                         // Wrap any orphan text that might be in the loaded content
                         wrapOrphanTextNodes();
@@ -323,13 +438,55 @@ ${content}
 
         // Update block state
         const blockValue = document.queryCommandValue('formatBlock');
-        setCurrentBlock(blockValue || 'p');
+        setCurrentBlock(blockValue ? blockValue.toLowerCase() : 'p');
 
         // Update font state
         const fontValue = document.queryCommandValue('fontName');
         // Strip quotes if present (some browsers return "Arial" with quotes)
         const cleanFont = fontValue ? fontValue.replace(/['"]/g, '') : '';
         setCurrentFont(cleanFont);
+
+        // Update font size state
+        // We look for font-size in the style of the current selection
+        let size = baseFontSize || '13px';
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const container = range.collapsed ? range.startContainer : range.commonAncestorContainer;
+            const element = container.nodeType === Node.ELEMENT_NODE ? (container as HTMLElement) : container.parentElement;
+            
+            if (element) {
+                const computedStyle = window.getComputedStyle(element);
+                const computedSize = computedStyle.fontSize;
+                
+                if (computedSize) {
+                    // Normalize computed size (e.g., "13.333px" -> "13px")
+                    const match = computedSize.match(/^([\d.]+)(px|rem|em|pt)$/);
+                    if (match) {
+                        const value = parseFloat(match[1]);
+                        const unit = match[2];
+                        
+                        if (unit === 'px') {
+                            const roundedPx = Math.round(value) + 'px';
+                            // Check if the rounded value matches any of our dropdown options
+                            if (FONT_SIZE_OPTIONS.some(opt => opt.value === roundedPx)) {
+                                size = roundedPx;
+                            } else {
+                                // If no exact match (e.g. 13.33px -> 13px), try to find the closest option if needed
+                                // but for now, we'll just use the rounded value if it exists in options
+                                size = roundedPx;
+                            }
+                        } else {
+                            size = computedSize;
+                        }
+                    }
+                }
+            }
+        }
+        setCurrentFontSize(size);
+
+        // ALWAYS save selection on candidate change
+        saveSelection();
     }, []);
 
     React.useEffect(() => {
@@ -363,8 +520,9 @@ ${content}
 
     // Execute formatting commands
     const execCommand = (command: string, value?: string) => {
-        document.execCommand(command, false, value);
         editorRef.current?.focus();
+        restoreSelection();
+        document.execCommand(command, false, value);
         handleInput();
         updateActiveFormats();
     };
@@ -376,38 +534,83 @@ ${content}
     const handleOrderedList = () => execCommand('insertOrderedList');
     const handleUnorderedList = () => execCommand('insertUnorderedList');
 
+    const handleColor = (color: string) => {
+        execCommand('foreColor', color);
+    };
+
+    const handleFontSize = (size: string) => {
+        if (!size) return;
+
+        editorRef.current?.focus();
+        restoreSelection();
+
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+
+            if (range.collapsed) {
+                // If no selection, we can't easily apply font size via span
+                // Standard execCommand is limited, so we'll just return for now
+                // or we could insert a span with a zero-width space
+                return;
+            }
+
+            // Wrap selection in a span with font-size
+            // Use execCommand('fontSize', ...) as a fallback or just manual manipulation
+            // Pixels are better for our PDF preview consistency
+            const span = document.createElement('span');
+            span.style.fontSize = size;
+            
+            try {
+                // Extract contents and wrap
+                const contents = range.extractContents();
+                span.appendChild(contents);
+                range.insertNode(span);
+                
+                // Select the new node
+                selection.removeAllRanges();
+                const newRange = document.createRange();
+                newRange.selectNodeContents(span);
+                selection.addRange(newRange);
+                
+                saveSelection();
+                handleInput();
+                setCurrentFontSize(size);
+            } catch (e) {
+                console.error('Failed to apply font size:', e);
+            }
+        }
+    };
+
     const handleLink = () => {
         saveSelection();
         setShowLinkPopover(true);
     };
 
     const insertLink = () => {
-        if (linkUrl && linkUrl !== 'https://') {
+        if (linkUrl && linkUrl !== 'https://' && editorRef.current) {
+            editorRef.current.focus();
             restoreSelection();
-            editorRef.current?.focus();
-            execCommand('createLink', linkUrl);
+            document.execCommand('createLink', false, linkUrl);
+            handleInput();
         }
         setShowLinkPopover(false);
         setLinkUrl('https://');
     };
 
     const handleHeading = (level: string) => {
-        if (!level || !editorRef.current) return;
-        editorRef.current.focus();
-
-        // formatBlock applies to the entire block containing the cursor/selection
-        // This is the standard HTML behavior for block-level elements like headings
-        document.execCommand('formatBlock', false, `<${level}>`);
-
-        handleInput();
-        updateActiveFormats();
+        if (!level) return;
+        execCommand('formatBlock', `<${level}>`);
     };
 
     // Insert table
     const handleTable = () => {
-        if (editorRef.current) {
-            editorRef.current.focus();
-            const tableHtml = `
+        if (!editorRef.current) return;
+        
+        editorRef.current.focus();
+        restoreSelection();
+
+        const tableHtml = `
 <table style="border-collapse: collapse; width: 100%; margin: 10px 0;">
     <tr>
         <th style="border: 1px solid #ddd; padding: 8px; background-color: #f5f5f5;">Header 1</th>
@@ -425,9 +628,8 @@ ${content}
         <td style="border: 1px solid #ddd; padding: 8px;">Cell 6</td>
     </tr>
 </table><p></p>`;
-            document.execCommand('insertHTML', false, tableHtml);
-            handleInput();
-        }
+        document.execCommand('insertHTML', false, tableHtml);
+        handleInput();
     };
 
     // Save current selection/cursor position
@@ -559,7 +761,16 @@ ${content}
     );
 
     const renderToolbar = () => (
-        <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-t-lg">
+        <div 
+            className="flex flex-wrap items-center gap-0.5 p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-t-lg"
+            onMouseDown={(e) => {
+                // Prevent focus theft unless clicking an input
+                const target = e.target as HTMLElement;
+                if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.closest('input') && !target.closest('textarea')) {
+                    e.preventDefault();
+                }
+            }}
+        >
             {viewMode === 'edit' && (
                 <>
                     {/* Heading/Paragraph Selector */}
@@ -575,20 +786,29 @@ ${content}
                     </div>
 
                     {/* Font Family Selector */}
-                    {/* Font Family Selector */}
                     <div className="w-36">
                         <Select
                             options={FONT_OPTIONS}
                             value={currentFont}
                             onChange={(val) => {
                                 if (val) {
-                                    document.execCommand('fontName', false, val as string);
-                                    handleInput();
+                                    execCommand('fontName', val as string);
                                     // Update state immediately for better UX
                                     setCurrentFont(val as string);
                                 }
                             }}
                             placeholder="Font"
+                            className="h-7 text-xs py-1"
+                        />
+                    </div>
+
+                    {/* Font Size Selector */}
+                    <div className="w-24">
+                        <Select
+                            options={FONT_SIZE_OPTIONS}
+                            value={currentFontSize}
+                            onChange={(val) => handleFontSize(val as string)}
+                            placeholder="Size"
                             className="h-7 text-xs py-1"
                         />
                     </div>
@@ -614,6 +834,28 @@ ${content}
                         title="Underline (Ctrl+U)"
                         isActive={activeFormats.has('underline')}
                     />
+
+                    <ToolbarDivider />
+
+                    {/* Text Color */}
+                    <div className="flex items-center gap-1 px-1">
+                        <Tooltip content="Primary Color (#68c645)">
+                            <button
+                                type="button"
+                                onClick={() => handleColor('#68c645')}
+                                className="w-5 h-5 rounded-full border border-gray-200 dark:border-gray-600 hover:scale-110 transition-transform flex items-center justify-center overflow-hidden"
+                                style={{ backgroundColor: '#68c645' }}
+                            />
+                        </Tooltip>
+                        <Tooltip content="Black Color (#000000)">
+                            <button
+                                type="button"
+                                onClick={() => handleColor('#000000')}
+                                className="w-5 h-5 rounded-full border border-gray-200 dark:border-gray-600 hover:scale-110 transition-transform flex items-center justify-center overflow-hidden"
+                                style={{ backgroundColor: '#000000' }}
+                            />
+                        </Tooltip>
+                    </div>
 
                     <ToolbarDivider />
 
@@ -983,38 +1225,8 @@ ${content}
     };
 
     const renderEditor = () => (
-        <div className="html-editor-preview bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 h-full">
-            <style>{`
-                .html-editor-preview h1 { font-size: 2em; font-weight: 700; margin: 0.67em 0; line-height: 1.2; color: #111827; }
-                .html-editor-preview h2 { font-size: 1.5em; font-weight: 600; margin: 0.83em 0; line-height: 1.25; color: #1f2937; }
-                .html-editor-preview h3 { font-size: 1.25em; font-weight: 600; margin: 1em 0; line-height: 1.3; color: #374151; }
-                .html-editor-preview h4 { font-size: 1.1em; font-weight: 600; margin: 1em 0; line-height: 1.35; color: #4b5563; }
-                .html-editor-preview h5 { font-size: 1em; font-weight: 600; margin: 1em 0; line-height: 1.4; color: #6b7280; }
-                .html-editor-preview h6 { font-size: 0.95em; font-weight: 600; margin: 1em 0; line-height: 1.4; color: #6b7280; font-style: italic; }
-                .html-editor-preview p { font-size: 1em; margin: 0.75em 0; line-height: 1.6; color: #374151; }
-                .html-editor-preview ul { list-style-type: disc; padding-left: 1.5em; margin: 0.75em 0; color: #374151; }
-                .html-editor-preview ol { list-style-type: decimal; padding-left: 1.5em; margin: 0.75em 0; color: #374151; }
-                .html-editor-preview li { margin: 0.25em 0; line-height: 1.5; color: #374151; }
-                .html-editor-preview a { color: #2563eb; text-decoration: underline; }
-                .html-editor-preview a[style*="inline-block"] { all: revert; }
-                .html-editor-preview a[style*="background-color"] { all: revert; }
-                .html-editor-preview td a { all: revert; }
-
-                /* Dark Mode Overrides - Visual Only */
-                .dark .html-editor-preview h1,
-                .dark .html-editor-preview h2,
-                .dark .html-editor-preview h3,
-                .dark .html-editor-preview h4,
-                .dark .html-editor-preview h5,
-                .dark .html-editor-preview h6 { color: #f3f4f6 !important; }
-                
-                .dark .html-editor-preview p,
-                .dark .html-editor-preview ul,
-                .dark .html-editor-preview ol,
-                .dark .html-editor-preview li { color: #e5e7eb !important; }
-                
-                .dark .html-editor-preview a { color: #60a5fa !important; }
-            `}</style>
+        <div className="html-editor-content bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 h-full">
+            <style>{SHARED_EDITOR_STYLES}</style>
             <div
                 ref={editorRef}
                 contentEditable
@@ -1026,7 +1238,7 @@ ${content}
                     'min-h-[200px]',
                     '[&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-gray-400 [&:empty]:before:pointer-events-none'
                 )}
-                style={{ minHeight }}
+                style={{ minHeight, fontSize: baseFontSize, fontFamily: 'Arial, Helvetica, sans-serif' }}
                 data-placeholder={placeholder}
                 suppressContentEditableWarning
             />
@@ -1171,6 +1383,6 @@ ${content}
             )}
         </div>
     );
-};
+});
 
 export default HtmlEditor;

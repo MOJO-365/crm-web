@@ -53,3 +53,12 @@ export const formatRelativeTime = (dateStr: string | null | undefined) => {
     if (!dateStr) return '—';
     return fromNow(dateStr);
 };
+
+/**
+ * Helper function for name matching (case-insensitive, exact match)
+ * Used primarily for deletion confirmation.
+ */
+export const isNameMatch = (input: string, actual: string): boolean => {
+    if (!input || !actual) return false;
+    return input.trim().toLowerCase() === actual.trim().toLowerCase();
+};

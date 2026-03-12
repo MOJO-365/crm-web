@@ -30,6 +30,7 @@ interface VppCertificateTabProps {
 export function VppCertificateTab({
     customerUid,
     onUpdate,
+    vppDetails,
     solarDetails
 }: VppCertificateTabProps) {
     const { data, loading, refetch } = useQuery(GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, {
@@ -273,7 +274,7 @@ export function VppCertificateTab({
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    {Number(vppCertificateDetails?.id) > 0 && (
+                    {Number(vppCertificateDetails?.id) > 0 && vppDetails?.vppConnected === 1 && (
                         <Button type="button" variant="outline" size="sm" onClick={handlePreview} className="bg-white dark:bg-neutral-900 shadow-sm hover:shadow-md transition-shadow">
                             <EyeIcon size={14} className="mr-1.5" /> Preview
                         </Button>
@@ -497,6 +498,7 @@ export function VppCertificateTab({
                                         onChange={(v: any) => setFormState(prev => ({ ...prev, batteryManufacturer: v as string }))}
                                         options={BATTERY_BRAND_OPTIONS}
                                         placeholder="Select brand"
+                                        disabled={vppDetails?.vppConnected === 1}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -505,7 +507,7 @@ export function VppCertificateTab({
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
-                                    <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" />
+                                    <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" disabled={vppDetails?.vppConnected === 1} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Installed Date</label>
@@ -517,7 +519,7 @@ export function VppCertificateTab({
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Usable Capacity (kWh)</label>
-                                    <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} />
+                                    <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} disabled={vppDetails?.vppConnected === 1} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Backup Port Connected</label>

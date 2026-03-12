@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useLazyQuery } from '@apollo/client';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { HtmlEditor } from '@/components/ui/HtmlEditor';
+import { HtmlEditor, type HtmlEditorHandle } from '@/components/ui/HtmlEditor';
 import { DataTable, type Column, Modal, StatusField } from '@/components/common';
 import { PlusIcon, PencilIcon, TrashIcon, RefreshCwIcon } from '@/components/icons';
 import {
@@ -20,6 +20,7 @@ import {
 } from '@/graphql';
 import { formatDateTime, getUserTimezone } from '@/lib/date';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { isNameMatch } from '@/lib/utils';
 
 // Types
 interface RatePlan {
@@ -90,6 +91,18 @@ const CONTRACT_TERM_OPTION = {
 `
 };
 
+const SOLAR_FIT_OPTION = {
+    label: 'Feed-in Tariff (FIT)',
+    description: 'Insert conditional solar FIT block',
+    html: `
+<div data-condition="has-solar" style="border: 1px dashed #68c645; padding: 10px; margin-bottom: 10px; position: relative;">
+    <span style="background: #68c645; color: white; font-size: 10px; padding: 2px 5px; position: absolute; top: -10px; left: 10px; border-radius: 3px;">[IF HAS SOLAR]</span>
+    <p><strong style="color: #68c645">Feed-in Tariff (FIT):</strong> A credit you receive for exporting excess solar energy from your system back to the electricity grid</p>
+</div>
+<p><br></p>
+`
+};
+
 // Available variables that can be inserted into PDF terms content
 const PDF_VARIABLES = [
     { label: 'Solar Eligibility', value: '{{solarEligibility}}', description: 'Solar eligibility text (shown when customer has solar)' },
@@ -100,24 +113,6 @@ const PDF_VARIABLES = [
 ];
 
 // Helper function for name matching (case-insensitive, exact match)
-const isNameMatch = (input: string, actual: string): boolean => {
-    if (!input || !actual) return false;
-    return input.toLowerCase() === actual.toLowerCase();
-};
-
-/**
- * Strip the wrapping <!DOCTYPE html><html><body>...</body></html> to get raw inner content
- * for preview purposes.
- */
-function unwrapHtmlContent(html: string): string {
-    if (!html) return '';
-    if (html.match(/<body/i)) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        return doc.body.innerHTML;
-    }
-    return html;
-}
 
 export function PdfTermsPage() {
     // Permissions
@@ -149,7 +144,6 @@ export function PdfTermsPage() {
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingContent, setIsLoadingContent] = useState(false);
-    const [showPreview, setShowPreview] = useState(false);
 
     // Delete Modal State
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -161,6 +155,8 @@ export function PdfTermsPage() {
     const [restoreModalOpen, setRestoreModalOpen] = useState(false);
     const [termToRestore, setTermToRestore] = useState<PdfTerm | null>(null);
     const [isRestoring, setIsRestoring] = useState(false);
+
+    const editorRef = useRef<HtmlEditorHandle>(null);
 
     const limit = 20;
 
@@ -271,7 +267,6 @@ export function PdfTermsPage() {
         setEditingTerm(null);
         setFormData(initialFormState);
         setErrors({});
-        setShowPreview(false);
         setModalOpen(true);
     };
 
@@ -286,7 +281,6 @@ export function PdfTermsPage() {
             rateUids: term.rateUids || [],
         });
         setErrors({});
-        setShowPreview(false);
         setModalOpen(true);
         setIsLoadingContent(true);
 
@@ -359,28 +353,13 @@ export function PdfTermsPage() {
     };
 
     const handleInsertCustomHtml = (htmlToInsert: string) => {
-        // Append to existing content
-        setFormData(prev => {
-            let existing = prev.content;
-
-            // Unwrap if it has the full HTML wrapper
-            if (existing.match(/<body/i)) {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(existing, 'text/html');
-                existing = doc.body.innerHTML;
-            }
-
-            // Remove trailing empty paragraph / whitespace
-            existing = existing.replace(/(<p>\s*(<br\s*\/?>)?\s*<\/p>\s*)*$/i, '');
-
-            const newContent = existing + htmlToInsert;
-
-            // Wrap it back
-            const wrapped = `<!DOCTYPE html>\n<html>\n<body>\n${newContent}\n</body>\n</html>`;
-            return { ...prev, content: wrapped };
-        });
-
-        if (errors.content) setErrors(prev => ({ ...prev, content: '' }));
+        if (editorRef.current) {
+            editorRef.current.insertHTML(htmlToInsert);
+            if (errors.content) setErrors(prev => ({ ...prev, content: '' }));
+        } else {
+            // Fallback for unexpected cases
+            setFormData(prev => ({ ...prev, content: prev.content + htmlToInsert }));
+        }
     };
 
     /**
@@ -391,13 +370,6 @@ export function PdfTermsPage() {
         const titleHtml = `<h3 style="color: #68c645">${title}</h3><p><br></p>`;
         handleInsertCustomHtml(titleHtml);
     };
-
-    // Preview HTML — show the content as it would appear in the PDF
-    const previewHtml = useMemo(() => {
-        const raw = unwrapHtmlContent(formData.content);
-        if (!raw || raw === '<p><br></p>') return '';
-        return raw;
-    }, [formData.content]);
 
     // Status Toggle
     const handleStatusToggle = async (term: PdfTerm, isActive: boolean) => {
@@ -781,18 +753,18 @@ export function PdfTermsPage() {
                             </div>
                         )}
 
-                        {formData.rateType === 'charges' && (
+                                {formData.rateType === 'charges' && (
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-foreground">Insert Charges Terms</label>
                                 <div className="flex flex-wrap gap-2">
-                                    <Tooltip content="Insert description for standard solar FIT">
+                                    <Tooltip content={SOLAR_FIT_OPTION.description}>
                                         <button
                                             type="button"
                                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-all duration-200 cursor-pointer"
-                                            onClick={() => handleInsertCustomHtml('<p><strong style="color: #68c645">Feed-in Tariff (FIT):</strong> A credit you receive for exporting excess solar energy from your system back to the electricity grid</p><p><br></p>')}
+                                            onClick={() => handleInsertCustomHtml(SOLAR_FIT_OPTION.html)}
                                         >
                                             <PlusIcon size={12} />
-                                            Feed-in Tariff (FIT)
+                                            {SOLAR_FIT_OPTION.label}
                                         </button>
                                     </Tooltip>
                                 </div>
@@ -800,14 +772,12 @@ export function PdfTermsPage() {
                         )}
                     </div>
 
-                    {/* HTML Editor + Preview side by side */}
-                    <div className={`grid gap-4 ${showPreview ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    <div className="space-y-4">
                         {/* Editor */}
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <label className="text-sm font-medium">Content (HTML) <span className="text-red-500">*</span></label>
-                            </div>
+                            <label className="text-sm font-medium">Content (HTML) <span className="text-red-500">*</span></label>
                             <HtmlEditor
+                                ref={editorRef}
                                 value={formData.content}
                                 onChange={(newContent) => {
                                     setFormData(prev => ({ ...prev, content: newContent }));
@@ -819,36 +789,9 @@ export function PdfTermsPage() {
                                 minHeight="350px"
                                 error={errors.content}
                                 showOfferPageButton={false}
+                                baseFontSize="13px"
                             />
                         </div>
-
-                        {/* Preview Panel */}
-                        {showPreview && (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-foreground">PDF Preview</label>
-                                <div
-                                    className="rounded-lg border border-border bg-white dark:bg-gray-950 shadow-inner overflow-y-auto"
-                                    style={{ minHeight: '350px', maxHeight: '550px' }}
-                                >
-                                    {previewHtml ? (
-                                        <div
-                                            className="p-5"
-                                            style={{
-                                                fontFamily: 'Arial, Helvetica, sans-serif',
-                                                fontSize: '13px',
-                                                lineHeight: '1.6',
-                                                color: '#333',
-                                            }}
-                                            dangerouslySetInnerHTML={{ __html: previewHtml }}
-                                        />
-                                    ) : (
-                                        <div className="flex items-center justify-center h-full min-h-[350px] text-muted-foreground text-sm">
-                                            Start writing to see the preview
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     {modalMode === 'edit' && (

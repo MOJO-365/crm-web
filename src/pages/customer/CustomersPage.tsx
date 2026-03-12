@@ -98,6 +98,23 @@ interface SearchFilters {
     msatConnected: string;
     riskStatus: string;
 }
+const CUSTOMERS_FILTER_KEY = 'customers_search_filters';
+
+const INITIAL_FILTERS: SearchFilters = {
+    id: '',
+    name: '',
+    mobile: '',
+    address: '',
+    tariff: '',
+    dnsp: '',
+    discount: '',
+    status: '',
+    vpp: '',
+    vppConnected: '',
+    utilmateStatus: '',
+    msatConnected: '',
+    riskStatus: '',
+};
 
 export function CustomersPage() {
     const navigate = useNavigate();
@@ -105,21 +122,20 @@ export function CustomersPage() {
     const canCreate = useAuthStore((state) => state.canCreateInMenu('customers'));
     const canEdit = useAuthStore((state) => state.canEditInMenu('customers'));
     const canDelete = useAuthStore((state) => state.canDeleteInMenu('customers'));
-    const [searchFilters, setSearchFilters] = useState<SearchFilters>({
-        id: '',
-        name: '',
-        mobile: '',
-        address: '',
-        tariff: '',
-        dnsp: '',
-        discount: '',
-        status: '',
-        vpp: '',
-        vppConnected: '',
-        utilmateStatus: '',
-        msatConnected: '',
-        riskStatus: '',
+    const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => {
+        const saved = sessionStorage.getItem(CUSTOMERS_FILTER_KEY);
+        try {
+            return saved ? { ...INITIAL_FILTERS, ...JSON.parse(saved) } : INITIAL_FILTERS;
+        } catch (e) {
+            console.error('Failed to parse saved filters', e);
+            return INITIAL_FILTERS;
+        }
     });
+
+    // Save filters to sessionStorage when they change
+    useEffect(() => {
+        sessionStorage.setItem(CUSTOMERS_FILTER_KEY, JSON.stringify(searchFilters));
+    }, [searchFilters]);
 
     const [debouncedFilters, setDebouncedFilters] = useState(searchFilters);
     const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
@@ -226,6 +242,11 @@ export function CustomersPage() {
         // Existing logic `setSelectedCustomerIds` persists IDs, so we can keep them.
     };
 
+    const handleResetFilters = () => {
+        setSearchFilters(INITIAL_FILTERS);
+        sessionStorage.removeItem(CUSTOMERS_FILTER_KEY);
+    };
+
     const handleSearchChange = (key: keyof SearchFilters, value: string | boolean) => {
         setSearchFilters(prev => ({ ...prev, [key]: value }));
     };
@@ -280,6 +301,8 @@ export function CustomersPage() {
     const filteredCustomers = allCustomers;
 
     const showActionsColumn = canView || canEdit || canDelete;
+
+    const isFiltered = Object.values(searchFilters).some(value => value !== '' && value !== null && value !== undefined);
 
     // Selection Logic handled by DataTable
     const hasSelection = selectedCustomerIds.length > 0;
@@ -389,7 +412,7 @@ export function CustomersPage() {
                         </Tooltip>
                         {row.isDeleted && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                                Deleted
+                                Archived
                             </span>
                         )}
                     </div>
@@ -425,7 +448,7 @@ export function CustomersPage() {
                         options={[
                             { value: '', label: 'All' },
                             ...CUSTOMER_STATUS_OPTIONS,
-                            { value: 'deleted', label: 'Deleted' }
+                            { value: 'deleted', label: 'Archive' }
                         ]}
                         value={searchFilters.status}
                         onChange={(val) => handleSearchChange('status', val as string)}
@@ -776,10 +799,23 @@ export function CustomersPage() {
 
             {/* Customers Table */}
             <div className='p-5 bg-background rounded-lg border border-border shadow-sm'>
-                <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        Total Customers: <span className="text-foreground font-bold">{pageInfo?.totalCount ?? 0}</span>
-                    </p>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                            Total Customers: <span className="text-foreground font-bold">{pageInfo?.totalCount ?? 0}</span>
+                        </p>
+                        {isFiltered && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                leftIcon={<RefreshCwIcon size={14} />}
+                                onClick={handleResetFilters}
+                                className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
+                            >
+                                Reset Filter
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 <DataTable
