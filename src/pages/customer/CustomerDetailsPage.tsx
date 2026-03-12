@@ -1149,15 +1149,30 @@ export function CustomerDetailsPage() {
         setIsLoadingPreview(true);
         const baseUrl = apiAxios.defaults.baseURL || '';
 
+        let apiPath = '';
         if (selectedCustomerDetails?.signedPdfPath) {
-            const url = `${baseUrl}/api/documents/${encodeURIComponent(selectedCustomerDetails.signedPdfPath).replace(/%2F/g, '/')}`;
-            setPreviewUrl(url);
+            apiPath = `/api/documents/${encodeURIComponent(selectedCustomerDetails.signedPdfPath).replace(/%2F/g, '/')}`;
         } else {
-            // Use format=html for much faster preview
-            const url = `${baseUrl}/api/agreement/preview/${uid}?format=html`;
-            setPreviewUrl(url);
+            apiPath = `/api/agreement/preview/${uid}?format=html`;
         }
 
+        // Construct URL robustly to avoid double /api prefixes in production
+        let url = '';
+        if (baseUrl.startsWith('http')) {
+            // Absolute URL from Axios configuration (usually dev)
+            url = `${baseUrl}${apiPath}`;
+        } else if (baseUrl === '/api' || baseUrl === 'api') {
+            // Relative path and already starts with /api (likely production)
+            url = apiPath;
+        } else {
+            // Other cases, join and clean up slashes
+            url = `${baseUrl}${apiPath}`.replace(/\/+/g, '/');
+            if (!url.startsWith('http') && !url.startsWith('/')) {
+                url = '/' + url;
+            }
+        }
+
+        setPreviewUrl(url);
         setPreviewModalOpen(true);
     };
 
