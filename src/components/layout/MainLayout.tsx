@@ -27,7 +27,7 @@ export function MainLayout({ children }: { children?: React.ReactNode }) {
 
                 {/* Main Content */}
                 <main className={cn(
-                    "flex-1 overflow-auto p-6 bg-muted/30"
+                    "flex-1 overflow-auto p-4 bg-muted/30"
                 )}>
                     {children || <Outlet />}
                 </main>
