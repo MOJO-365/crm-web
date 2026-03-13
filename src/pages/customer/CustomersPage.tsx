@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-// import { cn } from '@/lib/utils';
-import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useLazyQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
 import {
@@ -118,6 +118,7 @@ const INITIAL_FILTERS: SearchFilters = {
 
 export function CustomersPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const canView = useAuthStore((state) => state.canViewMenu('customers'));
     const canCreate = useAuthStore((state) => state.canCreateInMenu('customers'));
     const canEdit = useAuthStore((state) => state.canEditInMenu('customers'));
@@ -131,6 +132,15 @@ export function CustomersPage() {
             return INITIAL_FILTERS;
         }
     });
+
+    // Handle reset filters from sidebar navigation
+    useEffect(() => {
+        if (location.state?.resetFilters) {
+            handleResetFilters();
+            // Clear the state to prevent resetting on every re-render/refresh
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location.state, location.pathname, navigate]);
 
     // Save filters to sessionStorage when they change
     useEffect(() => {
@@ -359,14 +369,33 @@ export function CustomersPage() {
             key: 'id',
             header: (
                 <div className="flex flex-col gap-1 max-w-[100px]">
-                    <div className="h-7 flex items-center">
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">Customer ID</span>
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.id ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Customer ID
+                        </span>
+                        {searchFilters.id && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Input
                         value={searchFilters.id}
                         onChange={(e) => handleSearchChange('id', e.target.value)}
                         placeholder="Search ID..."
-                        className="h-7 text-xs"
+                        className={cn(
+                            "h-7 text-xs transition-all duration-200",
+                            searchFilters.id && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                        rightIcon={searchFilters.id && (
+                            <button
+                                type="button"
+                                tabIndex={-1}
+                                onClick={() => handleSearchChange('id', '')}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                            >
+                                <XIcon size={12} />
+                            </button>
+                        )}
                     />
                 </div>
             ),
@@ -389,14 +418,33 @@ export function CustomersPage() {
             key: 'name',
             header: (
                 <div className="flex flex-col gap-1 min-w-[100px]">
-                    <div className="h-7 flex items-center">
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">Name</span>
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.name ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Name
+                        </span>
+                        {searchFilters.name && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Input
                         value={searchFilters.name}
                         onChange={(e) => handleSearchChange('name', e.target.value)}
                         placeholder="Search name..."
-                        className="h-7 text-xs"
+                        className={cn(
+                            "h-7 text-xs transition-all duration-200",
+                            searchFilters.name && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                        rightIcon={searchFilters.name && (
+                            <button
+                                type="button"
+                                tabIndex={-1}
+                                onClick={() => handleSearchChange('name', '')}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                            >
+                                <XIcon size={12} />
+                            </button>
+                        )}
                     />
                 </div>
             ),
@@ -423,15 +471,24 @@ export function CustomersPage() {
             key: 'discount',
             header: (
                 <div className="flex flex-col gap-1 items-start">
-                    <div className="h-7 flex items-center">
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">Discount</span>
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.discount ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Discount
+                        </span>
+                        {searchFilters.discount && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Select
                         options={[{ value: '', label: 'All' }, ...DISCOUNT_OPTIONS]}
                         value={searchFilters.discount}
                         onChange={(val) => handleSearchChange('discount', val as string)}
                         placeholder="All"
-                        className="h-7 text-xs w-[65px]"
+                        className={cn(
+                            "h-7 text-xs w-[65px] transition-all duration-200",
+                            searchFilters.discount && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
                     />
                 </div>
             ),
@@ -441,8 +498,14 @@ export function CustomersPage() {
             key: 'status',
             header: (
                 <div className="flex flex-col gap-1 items-start">
-                    <div className="h-7 flex items-center">
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">Status</span>
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.status ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Status
+                        </span>
+                        {searchFilters.status && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Select
                         options={[
@@ -453,7 +516,10 @@ export function CustomersPage() {
                         value={searchFilters.status}
                         onChange={(val) => handleSearchChange('status', val as string)}
                         placeholder="All"
-                        className="h-7 text-xs w-[85px]"
+                        className={cn(
+                            "h-7 text-xs w-[85px] transition-all duration-200",
+                            searchFilters.status && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
                     />
                 </div>
             ),
@@ -472,15 +538,24 @@ export function CustomersPage() {
             key: 'riskStatus',
             header: (
                 <div className="flex flex-col gap-1 items-start">
-                    <div className="h-7 flex items-center">
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">Risk Status</span>
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.riskStatus ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Risk Status
+                        </span>
+                        {searchFilters.riskStatus && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Select
                         options={[{ value: '', label: 'All' }, ...riskStatuses.map((rs: any) => ({ value: rs.uid, label: rs.name }))]}
                         value={searchFilters.riskStatus}
                         onChange={(val) => handleSearchChange('riskStatus', val as string)}
                         placeholder="All"
-                        className="h-7 text-xs w-[120px]"
+                        className={cn(
+                            "h-7 text-xs w-[120px] transition-all duration-200",
+                            searchFilters.riskStatus && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
                     />
                 </div>
             ),
@@ -501,13 +576,22 @@ export function CustomersPage() {
             header: (
                 <div className="flex flex-col gap-1 items-start">
                     <div className="h-7 flex items-center gap-1">
-                        <span className="text-xs font-semibold uppercase text-muted-foreground whitespace-nowrap">VPP</span>
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors whitespace-nowrap",
+                            searchFilters.vpp ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            VPP
+                        </span>
+                        {searchFilters.vpp && <div className="w-1 h-1 rounded-full bg-primary" />}
                         <Select
                             options={[{ value: '', label: 'All' }, ...VPP_OPTIONS]}
                             value={searchFilters.vpp}
                             onChange={(val) => handleSearchChange('vpp', val as string)}
                             placeholder="All"
-                            className="h-7 text-xs w-[70px]"
+                            className={cn(
+                                "h-7 text-xs w-[70px] transition-all duration-200 ml-1",
+                                searchFilters.vpp && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                            )}
                         />
                     </div>
                     <Select
@@ -515,7 +599,10 @@ export function CustomersPage() {
                         value={searchFilters.vppConnected}
                         onChange={(val) => handleSearchChange('vppConnected', val as string)}
                         placeholder="All"
-                        className="h-7 text-xs w-[98px]"
+                        className={cn(
+                            "h-7 text-xs w-[98px] transition-all duration-200",
+                            searchFilters.vppConnected && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
                     />
                 </div>
             ),
@@ -538,15 +625,24 @@ export function CustomersPage() {
                 key: 'utilmateStatus',
                 header: (
                     <div className="flex flex-col gap-1 items-start">
-                        <div className="h-7 flex items-center">
-                            <span className="text-xs font-semibold uppercase text-muted-foreground">Ultimate</span>
+                        <div className="h-7 flex items-center gap-1.5">
+                            <span className={cn(
+                                "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                                searchFilters.utilmateStatus ? "text-primary" : "text-muted-foreground"
+                            )}>
+                                Ultimate
+                            </span>
+                            {searchFilters.utilmateStatus && <div className="w-1 h-1 rounded-full bg-primary" />}
                         </div>
                         <Select
                             options={[{ value: '', label: 'All' }, ...ULTIMATE_STATUS_OPTIONS]}
                             value={searchFilters.utilmateStatus}
                             onChange={(val) => handleSearchChange('utilmateStatus', val as string)}
                             placeholder="All"
-                            className="h-7 text-xs w-[70px]"
+                            className={cn(
+                                "h-7 text-xs w-[70px] transition-all duration-200",
+                                searchFilters.utilmateStatus && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                            )}
                         />
                     </div>
                 ),
@@ -568,15 +664,24 @@ export function CustomersPage() {
                 key: 'msatConnected',
                 header: (
                     <div className="flex flex-col gap-1 items-start">
-                        <div className="h-7 flex items-center">
-                            <span className="text-xs font-semibold uppercase text-muted-foreground">MSAT</span>
+                        <div className="h-7 flex items-center gap-1.5">
+                            <span className={cn(
+                                "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                                searchFilters.msatConnected ? "text-primary" : "text-muted-foreground"
+                            )}>
+                                MSAT
+                            </span>
+                            {searchFilters.msatConnected && <div className="w-1 h-1 rounded-full bg-primary" />}
                         </div>
                         <Select
                             options={[{ value: '', label: 'All' }, ...MSAT_CONNECTED_OPTIONS]}
                             value={searchFilters.msatConnected}
                             onChange={(val) => handleSearchChange('msatConnected', val as string)}
                             placeholder="All"
-                            className="h-7 text-xs w-[70px]"
+                            className={cn(
+                                "h-7 text-xs w-[70px] transition-all duration-200",
+                                searchFilters.msatConnected && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                            )}
                         />
                     </div>
                 ),
@@ -599,14 +704,33 @@ export function CustomersPage() {
             key: 'mobile',
             header: (
                 <div className="flex flex-col gap-1 max-w-[110px]">
-                    <div className="h-7 flex items-center">
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">Mobile</span>
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.mobile ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Mobile
+                        </span>
+                        {searchFilters.mobile && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Input
                         value={searchFilters.mobile}
                         onChange={(e) => handleSearchChange('mobile', e.target.value)}
                         placeholder="Search mobile..."
-                        className="h-7 text-xs"
+                        className={cn(
+                            "h-7 text-xs transition-all duration-200",
+                            searchFilters.mobile && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                        rightIcon={searchFilters.mobile && (
+                            <button
+                                type="button"
+                                tabIndex={-1}
+                                onClick={() => handleSearchChange('mobile', '')}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                            >
+                                <XIcon size={12} />
+                            </button>
+                        )}
                     />
                 </div>
             ),
@@ -617,14 +741,33 @@ export function CustomersPage() {
             key: 'address',
             header: (
                 <div className="flex flex-col gap-1 min-w-[120px]">
-                    <div className="h-7 flex items-center">
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">Address</span>
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.address ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Address
+                        </span>
+                        {searchFilters.address && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Input
                         value={searchFilters.address}
                         onChange={(e) => handleSearchChange('address', e.target.value)}
                         placeholder="Search address..."
-                        className="h-7 text-xs"
+                        className={cn(
+                            "h-7 text-xs transition-all duration-200",
+                            searchFilters.address && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                        rightIcon={searchFilters.address && (
+                            <button
+                                type="button"
+                                tabIndex={-1}
+                                onClick={() => handleSearchChange('address', '')}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                            >
+                                <XIcon size={12} />
+                            </button>
+                        )}
                     />
                 </div>
             ),
@@ -645,14 +788,33 @@ export function CustomersPage() {
             key: 'tariff',
             header: (
                 <div className="flex flex-col gap-1 min-w-[100px]">
-                    <div className="h-7 flex items-center">
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">Tariff</span>
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.tariff ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Tariff
+                        </span>
+                        {searchFilters.tariff && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Input
                         value={searchFilters.tariff}
                         onChange={(e) => handleSearchChange('tariff', e.target.value)}
                         placeholder="Search tariff..."
-                        className="h-7 text-xs"
+                        className={cn(
+                            "h-7 text-xs transition-all duration-200",
+                            searchFilters.tariff && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                        rightIcon={searchFilters.tariff && (
+                            <button
+                                type="button"
+                                tabIndex={-1}
+                                onClick={() => handleSearchChange('tariff', '')}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                            >
+                                <XIcon size={12} />
+                            </button>
+                        )}
                     />
                 </div>
             ),
@@ -663,15 +825,24 @@ export function CustomersPage() {
             key: 'dnsp',
             header: (
                 <div className="flex flex-col gap-1 items-start">
-                    <div className="h-7 flex items-center">
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">DNSP</span>
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.dnsp ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            DNSP
+                        </span>
+                        {searchFilters.dnsp && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Select
                         options={[{ value: '', label: 'All' }, ...DNSP_OPTIONS]}
                         value={searchFilters.dnsp}
                         onChange={(val) => handleSearchChange('dnsp', val as string)}
                         placeholder="All"
-                        className="h-7 text-xs w-[85px]"
+                        className={cn(
+                            "h-7 text-xs w-[85px] transition-all duration-200",
+                            searchFilters.dnsp && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
                     />
                 </div>
             ),
@@ -806,13 +977,13 @@ export function CustomersPage() {
                         </p>
                         {isFiltered && (
                             <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                leftIcon={<RefreshCwIcon size={14} />}
+                                leftIcon={<XIcon size={14} />}
                                 onClick={handleResetFilters}
-                                className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
+                                className="text-xs font-semibold text-primary border-primary/20 bg-primary/5 hover:bg-primary/10 h-7 px-3 rounded-full transition-all shadow-sm"
                             >
-                                Reset Filter
+                                Clear All Filters
                             </Button>
                         )}
                     </div>
