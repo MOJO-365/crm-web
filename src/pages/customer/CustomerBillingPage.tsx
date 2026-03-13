@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useLazyQuery } from '@apollo/client';
 import { GET_CUSTOMER_BILLING_INFO, SEARCH_CUSTOMERS_BASIC, GET_RISK_STATUSES } from '@/graphql';
-import { SearchIcon, XIcon, SpinnerIcon, PhoneIcon, MailIcon, MapPinIcon, CreditCardIcon, UserIcon, HashIcon, BuildingIcon, EyeIcon, DownloadIcon } from '@/components/icons';
+import { SearchIcon, XIcon, SpinnerIcon, PhoneIcon, MailIcon, MapPinIcon, CreditCardIcon, UserIcon, HashIcon, BuildingIcon, EyeIcon, EyeOffIcon, DownloadIcon } from '@/components/icons';
 import { secondaryApiAxios } from '@/lib/apollo';
 import { Modal, StatusField, DataTable, type Column } from '@/components/common';
 import { Button } from '@/components/ui/Button';
@@ -430,6 +430,17 @@ export function CustomerBillingPage() {
         return filteredRecords.slice(start, start + pageSize);
     }, [filteredRecords, currentPage, pageSize]);
 
+    const latestBalance = useMemo(() => {
+        if (accountRecords.length === 0) return 0;
+        // Sort by transaction_date descending
+        const sorted = [...accountRecords].sort((a, b) => {
+            const dateA = new Date(a.transaction_date).getTime();
+            const dateB = new Date(b.transaction_date).getTime();
+            return dateB - dateA;
+        });
+        return sorted[0].running_balance;
+    }, [accountRecords]);
+
     const columns = useMemo<Column<AccountRecord>[]>(() => [
         {
             key: 'running_balance',
@@ -476,16 +487,17 @@ export function CustomerBillingPage() {
             render: (record) => (
                 <span className="font-mono text-xs whitespace-nowrap">
                     {record.transaction_type.startsWith('INV') ? (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handlePreviewInvoice(record)}
-                            disabled={downloadingInvoice === record.transaction_type}
+                            isLoading={downloadingInvoice === record.transaction_type}
                             title="Preview Invoice PDF"
-                            className="text-primary hover:underline flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                            className="h-8 px-3 font-mono text-[11px] text-primary bg-primary/5 hover:bg-primary/10 hover:text-primary rounded-full border border-primary/10 shadow-sm hover:shadow-md transition-all active:scale-95 gap-2"
+                            leftIcon={<EyeIcon size={14} />}
                         >
-                            <EyeIcon size={14} className="text-primary" />
                             {record.transaction_type}
-                            {downloadingInvoice === record.transaction_type && <SpinnerIcon size={12} className="animate-spin text-muted-foreground" />}
-                        </button>
+                        </Button>
                     ) : (
                         record.transaction_type
                     )}
@@ -538,20 +550,23 @@ export function CustomerBillingPage() {
                 const rowId = `${record.transaction_type}-${record.transaction_date}`;
                 const isVisible = visibleRows.has(rowId);
                 return (
-                    <button
+                    <Button
+                        size="sm"
+                        variant="ghost"
                         onClick={(e) => {
                             e.stopPropagation();
                             handleToggleVisibility(record, !isVisible);
                         }}
                         className={cn(
-                            "px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-tight rounded-md transition-all duration-200",
+                            "h-8 px-4 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all duration-300 shadow-sm hover:shadow-md active:scale-95 flex items-center gap-2",
                             isVisible
-                                ? "bg-rose-100 text-rose-700 hover:bg-rose-200"
-                                : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                                ? "bg-rose-50/80 backdrop-blur-sm text-rose-700 hover:bg-rose-100 border border-rose-200/50"
+                                : "bg-indigo-50/80 backdrop-blur-sm text-indigo-700 hover:bg-indigo-100 border border-indigo-200/50"
                         )}
+                        leftIcon={isVisible ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}
                     >
                         {isVisible ? 'Hide' : 'View'}
-                    </button>
+                    </Button>
                 );
             }
         }
@@ -568,7 +583,7 @@ export function CustomerBillingPage() {
                         variant="outline"
                         size="icon"
                         onClick={() => window.history.back()}
-                        className="h-10 w-10 shrink-0 rounded-full"
+                        className="h-10 w-10 shrink-0 rounded-full border-border/50 shadow-sm hover:shadow-md active:scale-95 bg-background/50 backdrop-blur-sm"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
                     </Button>
@@ -581,7 +596,7 @@ export function CustomerBillingPage() {
 
             {/* Customer Search */}
             {!isExternalNavigation && (
-                <div className="relative max-w-md" ref={dropdownRef}>
+                <div className="relative w-full" ref={dropdownRef}>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
                         Customer
                     </label>
@@ -614,7 +629,7 @@ export function CustomerBillingPage() {
                         {selectedCustomer && !customerLoading && (
                             <button
                                 onClick={handleClearSelection}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-muted/50 p-1 rounded-full transition-all active:scale-90"
                             >
                                 <XIcon size={16} />
                             </button>
@@ -707,19 +722,19 @@ export function CustomerBillingPage() {
                         {/* Column 2: Balance */}
                         <div className="space-y-4">
                             <InfoRow icon={MailIcon} label="Email" value={detail.email} />
-                            <InfoRow icon={CreditCardIcon} label="Total Balance" value="$0.00" />
+                            <InfoRow icon={CreditCardIcon} label="Total Balance" value={formatCurrency(latestBalance)} />
                         </div>
 
                         {/* Column 3: Billing */}
                         <div className="space-y-4">
                             <InfoRow icon={HashIcon} label="Account Number" value={detail.utilmateDetails?.accountNumber || '-'} />
-                            <InfoRow icon={CreditCardIcon} label="Overdue" value="$0.00" valueClassName="text-red-500" />
+                            {/* <InfoRow icon={CreditCardIcon} label="Overdue" value="$0.00" valueClassName="text-red-500" /> */}
                         </div>
 
                         {/* Column 4: Delivery */}
                         <div className="space-y-4">
                             <InfoRow icon={BuildingIcon} label="Site Identifier" value={detail.utilmateDetails?.siteIdentifier || '-'} />
-                            <InfoRow icon={CreditCardIcon} label="Current" value="$0.00" />
+                            {/* <InfoRow icon={CreditCardIcon} label="Current" value="$0.00" /> */}
                         </div>
                     </div>
                 </div>
@@ -738,7 +753,7 @@ export function CustomerBillingPage() {
             {/* Transaction List */}
             {
                 selectedCustomer && detail && (
-                    <div className="p-3 sm:p-5 bg-background rounded-lg border border-border shadow-sm">
+                    <div className="p-2 sm:p-4 bg-background rounded-lg border border-border shadow-sm">
                         {/* Header with Add Receipt Button */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                             <h2 className="text-lg font-semibold text-foreground">Transaction List</h2>
@@ -746,6 +761,7 @@ export function CustomerBillingPage() {
                                 size="sm"
                                 leftIcon={<PlusIcon size={16} />}
                                 onClick={() => setIsReceiptModalOpen(true)}
+                                className="rounded-full shadow-sm hover:shadow-md active:scale-95 px-5"
                             >
                                 Add Receipt
                             </Button>
@@ -754,7 +770,7 @@ export function CustomerBillingPage() {
                         {/* Search */}
                         <div className="mb-4">
 
-                            <div className="relative w-full sm:max-w-sm">
+                            <div className="relative w-full">
                                 <SearchIcon
                                     size={14}
                                     className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
@@ -799,8 +815,8 @@ export function CustomerBillingPage() {
                                             const rowId = `${record.transaction_type}-${record.transaction_date}`;
                                             const isVisible = visibleRows.has(rowId);
                                             return cn(
-                                                "transition-colors duration-200",
-                                                isVisible ? "bg-[#f5f7ff]" : "bg-white"
+                                                "transition-all duration-200",
+                                                isVisible ? "" : "bg-amber-50/70 dark:bg-amber-900/10"
                                             );
                                         }}
                                     />
@@ -813,38 +829,47 @@ export function CustomerBillingPage() {
                                         const isVisible = visibleRows.has(rowId);
                                         return (
                                             <div key={idx} className={cn(
-                                                "border border-border rounded-lg p-3 bg-background hover:bg-accent/20 transition-all",
-                                                !isVisible && "opacity-40 grayscale scale-[0.98]"
+                                                "border rounded-lg p-3 transition-all",
+                                                isVisible 
+                                                    ? "bg-background border-border" 
+                                                    : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30 shadow-sm"
                                             )}>
                                                 <div className="flex items-center justify-between mb-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-mono text-xs text-foreground font-medium">
                                                             {record.transaction_type.startsWith('INV') ? (
-                                                                <button
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
                                                                     onClick={() => handlePreviewInvoice(record)}
-                                                                    disabled={downloadingInvoice === record.transaction_type}
+                                                                    isLoading={downloadingInvoice === record.transaction_type}
                                                                     title="Preview Invoice PDF"
-                                                                    className="text-primary hover:underline flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                                                                    className="h-8 px-3 font-mono text-[11px] text-primary bg-primary/5 hover:bg-primary/10 hover:text-primary rounded-full border border-primary/10 shadow-sm active:scale-95 gap-2"
+                                                                    leftIcon={<EyeIcon size={14} />}
                                                                 >
-                                                                    <EyeIcon size={14} className="text-primary" />
                                                                     {record.transaction_type}
-                                                                    {downloadingInvoice === record.transaction_type && <SpinnerIcon size={12} className="animate-spin text-muted-foreground" />}
-                                                                </button>
+                                                                </Button>
                                                             ) : (
                                                                 record.transaction_type
                                                             )}
                                                         </span>
-                                                        <button
-                                                            onClick={() => handleToggleVisibility(record, !isVisible)}
+                                                        <Button
+                                                            size="sm"
+                                                            // variant="sm"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleToggleVisibility(record, !isVisible);
+                                                            }}
                                                             className={cn(
-                                                                "px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-tight rounded-md transition-all duration-200",
+                                                                "h-7 px-3 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all duration-300 shadow-sm active:scale-95 flex items-center gap-1.5",
                                                                 isVisible
-                                                                    ? "bg-rose-100 text-rose-700"
-                                                                    : "bg-indigo-100 text-indigo-700"
+                                                                    ? "bg-rose-50 text-rose-700 border border-rose-200/50"
+                                                                    : "bg-indigo-50 text-indigo-700 border border-indigo-200/50"
                                                             )}
+                                                            leftIcon={isVisible ? <EyeOffIcon size={12} /> : <EyeIcon size={12} />}
                                                         >
                                                             {isVisible ? 'Hide' : 'View'}
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                     <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${record.allocated === 'Y'
                                                         ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -912,7 +937,7 @@ export function CustomerBillingPage() {
                                             <button
                                                 onClick={() => setCurrentPage(1)}
                                                 disabled={currentPage <= 1}
-                                                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                                className="p-1.5 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-90"
                                                 title="First page"
                                             >
                                                 {'|<'}
@@ -920,7 +945,7 @@ export function CustomerBillingPage() {
                                             <button
                                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                                 disabled={currentPage <= 1}
-                                                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                                className="p-1.5 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-90"
                                                 title="Previous page"
                                             >
                                                 {'<'}
@@ -928,7 +953,7 @@ export function CustomerBillingPage() {
                                             <button
                                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                                 disabled={currentPage >= totalPages}
-                                                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                                className="p-1.5 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-90"
                                                 title="Next page"
                                             >
                                                 {'>'}
@@ -936,7 +961,7 @@ export function CustomerBillingPage() {
                                             <button
                                                 onClick={() => setCurrentPage(totalPages)}
                                                 disabled={currentPage >= totalPages}
-                                                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                                className="p-1.5 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-90"
                                                 title="Last page"
                                             >
                                                 {'>|'}
@@ -984,12 +1009,14 @@ export function CustomerBillingPage() {
                             type="button"
                             variant="outline"
                             onClick={() => setIsReceiptModalOpen(false)}
+                            className="rounded-full px-6"
                         >
                             Cancel
                         </Button>
                         <Button
                             type="submit"
                             isLoading={isSubmittingReceipt}
+                            className="rounded-full px-8 shadow-sm hover:shadow-md active:scale-95 transition-all"
                         >
                             Submit
                         </Button>
@@ -1030,13 +1057,14 @@ export function CustomerBillingPage() {
                             setPreviewModalOpen(false);
                             setIsLoadingPreview(false);
                         }}
+                        className="rounded-full px-6"
                     >
                         Close
                     </Button>
                     <Button
                         onClick={handleDownloadAction}
                         disabled={!previewUrl || isLoadingPreview}
-                        className="bg-neutral-900 text-white hover:bg-neutral-800"
+                        className="bg-neutral-900 text-white hover:bg-neutral-800 rounded-full px-8 shadow-sm hover:shadow-md active:scale-95 transition-all"
                     >
                         <DownloadIcon size={16} className="mr-2" />
                         Download PDF
