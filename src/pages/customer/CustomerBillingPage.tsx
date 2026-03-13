@@ -4,11 +4,12 @@ import { useQuery, useLazyQuery } from '@apollo/client';
 import { GET_CUSTOMER_BILLING_INFO, SEARCH_CUSTOMERS_BASIC, GET_RISK_STATUSES } from '@/graphql';
 import { SearchIcon, XIcon, SpinnerIcon, PhoneIcon, MailIcon, MapPinIcon, CreditCardIcon, UserIcon, HashIcon, BuildingIcon, EyeIcon, DownloadIcon } from '@/components/icons';
 import { secondaryApiAxios } from '@/lib/apollo';
-import { Modal, StatusField } from '@/components/common';
+import { Modal, StatusField, DataTable, type Column } from '@/components/common';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PlusIcon } from '@/components/icons';
 import { toast } from 'react-toastify';
+import { cn } from '@/lib/utils';
 
 interface CustomerResult {
     uid: string;
@@ -65,6 +66,7 @@ interface AccountRecord {
     description: string;
     transaction_date: string;
     invoice_due_date: string;
+    show_to_customer: string;
     notes: string;
 }
 
@@ -84,88 +86,6 @@ function InfoRow({ label, value, icon: Icon, valueClassName }: { label: string; 
         </div>
     );
 }
-
-// Static data matching actual API response format
-const STATIC_ACCOUNT_RECORDS: AccountRecord[] = [
-    {
-        account_number: '100107',
-        account_name: 'Jigarkumar Patel',
-        transaction_type: 'REC11888',
-        posted_date: '2026-03-05T10:30:00.000',
-        amount: -76.77,
-        running_balance: 0.00,
-        allocated: 'Y',
-        description: 'Receipt - CASH - Batch: 559',
-        transaction_date: '04/03/2026',
-        invoice_due_date: '',
-        notes: 'Reference: 179998',
-    },
-    {
-        account_number: '100107',
-        account_name: 'Jigarkumar Patel',
-        transaction_type: 'INV1002396',
-        posted_date: '2026-02-13T17:01:51.687',
-        amount: 76.77,
-        running_balance: 76.77,
-        allocated: 'Y',
-        description: 'Electricity Invoice - 202602/1002396 (0)',
-        transaction_date: '13/02/2026',
-        invoice_due_date: '27/02/2026',
-        notes: '',
-    },
-    {
-        account_number: '100107',
-        account_name: 'Jigarkumar Patel',
-        transaction_type: 'INV1002394',
-        posted_date: '2026-02-13T16:58:00.000',
-        amount: -274.48,
-        running_balance: 0.00,
-        allocated: 'Y',
-        description: 'Electricity Invoice - CR 1002394 (0)',
-        transaction_date: '13/02/2026',
-        invoice_due_date: '18/02/2026',
-        notes: '',
-    },
-    {
-        account_number: '100107',
-        account_name: 'Jigarkumar Patel',
-        transaction_type: 'INV1002279',
-        posted_date: '2026-02-04T14:22:10.000',
-        amount: 274.48,
-        running_balance: 274.48,
-        allocated: 'Y',
-        description: 'Electricity Invoice - 202602/1002279 (0)',
-        transaction_date: '04/02/2026',
-        invoice_due_date: '18/02/2026',
-        notes: 'INCORRECT READS',
-    },
-    {
-        account_number: '100107',
-        account_name: 'Jigarkumar Patel',
-        transaction_type: 'INV1002427',
-        posted_date: '2026-02-19T15:15:32.797',
-        amount: -29.15,
-        running_balance: 57.10,
-        allocated: 'Y',
-        description: 'Electricity Invoice - 202602/1002427 (0)',
-        transaction_date: '19/02/2026',
-        invoice_due_date: '05/03/2026',
-        notes: 'REC-1002427',
-    },
-    {
-        account_number: '100107',
-        account_name: 'Jigarkumar Patel',
-        transaction_type: 'INV1002401',
-        posted_date: '2026-02-13T17:01:51.687',
-        amount: 86.25,
-        running_balance: 86.25,
-        allocated: 'N',
-        description: 'Electricity Invoice - 202602/1002401 (0)',
-        transaction_date: '13/02/2026',
-        invoice_due_date: '27/02/2026',
-        notes: 'REC-1002401',
-    },
-];
 
 export function CustomerBillingPage() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -198,6 +118,7 @@ export function CustomerBillingPage() {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
     const [currentInvoiceRecord, setCurrentInvoiceRecord] = useState<AccountRecord | null>(null);
+    const [visibleRows, setVisibleRows] = useState<Set<string>>(new Set());
 
 
     // Fetch customer by UID if provided in query params
@@ -219,36 +140,47 @@ export function CustomerBillingPage() {
         try {
             // First, generate credentials / get token for this customer
             // const tokenResponse = await secondaryApiAxios.post(`/api/v1/utilmate/user/generate-credentials/${accountNumber}`);
-            const token = 'eyJhbGciOiJIUzUxMiJ9.eyJ1c2VybmFtZSI6IjEwMDExNCIsInN1YiI6IjEwMDExNCIsImlhdCI6MTc3Mjc2NjgwNiwiZXhwIjoxNzcyNzY3NzA2fQ.sHweQ-wkUvmk8Fyky875pmKCPXE9fwYePKzWuxi5YKB6yk2Cw19W4uwd_2vf8xKm12dYFIedz9guu69Wg1B4Vg';
             // const response = {
             //     data: STATIC_ACCOUNT_RECORDS
             // }
-            const response = await secondaryApiAxios.post('/api/v1/utilmate/user/account-records', {
-                companycode: 'GEE',
-                methodcode: 'GETACCREC',
-                parameters: [
-                    { account_number: accountNumber },
-                    { start_date: '2020-01-01' },
-                    { end_date: '2026-12-31' },
-                ],
-            }, {
+            const response = await secondaryApiAxios.get('/api/v1/utilmate/user/data/records', {
+                params: {
+                    account_number: accountNumber,
+                    from: '2026-01-18',
+                    to: '2026-03-06',
+                },
                 headers: {
-                    Authorization: `Bearer ${token}`,
+                    'x-api-key': import.meta.env.VITE_UTILMATE_API_KEY,
                 },
             });
-            if (response.data.data && Array.isArray(response.data.data)) {
-                setAccountRecords(response.data.data);
+
+            if (response?.data && Array.isArray(response?.data)) {
+                setAccountRecords(response?.data);
             } else {
-                setAccountRecords(STATIC_ACCOUNT_RECORDS);
+                setAccountRecords([]);
             }
         } catch (err: any) {
             console.error('Failed to fetch account records:', err);
-            setAccountRecords(STATIC_ACCOUNT_RECORDS);
+            setAccountRecords([]);
             setRecordsError(null);
         } finally {
             setRecordsLoading(false);
         }
     }, []);
+
+    // Initialize visibleRows from accountRecords
+    useEffect(() => {
+        if (accountRecords.length > 0) {
+            const initialVisible = new Set<string>();
+            accountRecords.forEach(record => {
+                const rowId = `${record.transaction_type}-${record.transaction_date}`;
+                if (record.show_to_customer === 'true') {
+                    initialVisible.add(rowId);
+                }
+            });
+            setVisibleRows(initialVisible);
+        }
+    }, [accountRecords]);
 
     // Set selected customer when fetched by UID (initial load from query param)
     useEffect(() => {
@@ -332,6 +264,53 @@ export function CustomerBillingPage() {
         });
         inputRef.current?.focus();
     }, [setSearchParams]);
+
+    const handleToggleVisibility = useCallback(async (record: AccountRecord, nextVisible: boolean) => {
+        const rowId = `${record.transaction_type}-${record.transaction_date}`;
+        const accountNumber = customerData?.customer?.utilmateDetails?.accountNumber;
+
+        if (!accountNumber) {
+            toast.error('Account number not found');
+            return;
+        }
+
+        // Optimistic update
+        setVisibleRows(prev => {
+            const next = new Set(prev);
+            if (nextVisible) next.add(rowId);
+            else next.delete(rowId);
+            return next;
+        });
+
+        try {
+            await secondaryApiAxios.post('/api/v1/utilmate/user/data/invoice', {
+                account_number: accountNumber,
+                invoice_display: [
+                    {
+                        invoice_no: record.transaction_type,
+                        show_to_customer: nextVisible
+                    }
+                ]
+            },
+                {
+                    headers: {
+                        'x-api-key': import.meta.env.VITE_UTILMATE_API_KEY,
+                    },
+                }
+            );
+            // toast.success(`Visibility updated for ${record.transaction_type}`);
+        } catch (err) {
+            console.error('Failed to update visibility:', err);
+            toast.error('Failed to update visibility');
+            // Revert on failure
+            setVisibleRows(prev => {
+                const next = new Set(prev);
+                if (nextVisible) next.delete(rowId);
+                else next.add(rowId);
+                return next;
+            });
+        }
+    }, [customerData?.customer?.utilmateDetails?.accountNumber]);
 
     const handleReceiptSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -450,6 +429,133 @@ export function CustomerBillingPage() {
         const start = (currentPage - 1) * pageSize;
         return filteredRecords.slice(start, start + pageSize);
     }, [filteredRecords, currentPage, pageSize]);
+
+    const columns = useMemo<Column<AccountRecord>[]>(() => [
+        {
+            key: 'running_balance',
+            header: 'Balance',
+            render: (record) => (
+                <span className={record.running_balance === 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground'}>
+                    {formatCurrency(record.running_balance)}
+                </span>
+            )
+        },
+        {
+            key: 'posted_date',
+            header: 'Posted Date',
+            render: (record) => record.transaction_date
+        },
+        {
+            key: 'amount',
+            header: 'Amount',
+            render: (record) => (
+                <div className="text-right">
+                    <span className={record.amount < 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                        {formatCurrency(record.amount)}
+                    </span>
+                </div>
+            )
+        },
+        {
+            key: 'allocated',
+            header: 'Allocated',
+            render: (record) => (
+                <div className="text-center">
+                    <span className={`text-xs font-medium ${record.allocated === 'Y'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                        }`}>
+                        {record.allocated}
+                    </span>
+                </div>
+            )
+        },
+        {
+            key: 'transaction_type',
+            header: 'ID',
+            render: (record) => (
+                <span className="font-mono text-xs whitespace-nowrap">
+                    {record.transaction_type.startsWith('INV') ? (
+                        <button
+                            onClick={() => handlePreviewInvoice(record)}
+                            disabled={downloadingInvoice === record.transaction_type}
+                            title="Preview Invoice PDF"
+                            className="text-primary hover:underline flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                        >
+                            <EyeIcon size={14} className="text-primary" />
+                            {record.transaction_type}
+                            {downloadingInvoice === record.transaction_type && <SpinnerIcon size={12} className="animate-spin text-muted-foreground" />}
+                        </button>
+                    ) : (
+                        record.transaction_type
+                    )}
+                </span>
+            )
+        },
+        {
+            key: 'description',
+            header: 'Description',
+            width: 'w-[300px]',
+            render: (record) => (
+                <span className="text-green-600 dark:text-green-400">
+                    {record.description}
+                </span>
+            )
+        },
+        {
+            key: 'transaction_date',
+            header: 'Transaction Date',
+            render: (record) => (
+                <span className="whitespace-nowrap">
+                    {record.transaction_date}
+                </span>
+            )
+        },
+        {
+            key: 'invoice_due_date',
+            header: 'Due Date',
+            render: (record) => (
+                <span className="whitespace-nowrap">
+                    {record.invoice_due_date || '—'}
+                </span>
+            )
+        },
+        {
+            key: 'notes',
+            header: 'Notes',
+            render: (record) => (
+                <span className="text-red-600 dark:text-red-400 whitespace-nowrap">
+                    {record.notes || ''}
+                </span>
+            )
+        },
+        {
+            key: 'actions',
+            header: '',
+            width: 'w-[100px]',
+            sticky: 'right',
+            render: (record) => {
+                const rowId = `${record.transaction_type}-${record.transaction_date}`;
+                const isVisible = visibleRows.has(rowId);
+                return (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleVisibility(record, !isVisible);
+                        }}
+                        className={cn(
+                            "px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-tight rounded-md transition-all duration-200",
+                            isVisible
+                                ? "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                                : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                        )}
+                    >
+                        {isVisible ? 'Hide' : 'View'}
+                    </button>
+                );
+            }
+        }
+    ], [downloadingInvoice, handlePreviewInvoice, visibleRows]);
 
     const startItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
     const endItem = Math.min(currentPage * pageSize, totalCount);
@@ -680,140 +786,104 @@ export function CustomerBillingPage() {
                         ) : (
                             <>
                                 {/* Desktop Table */}
-                                <div className="hidden md:block overflow-x-auto border border-border rounded-lg">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b border-border bg-muted/30">
-                                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Balance</th>
-                                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Posted Date</th>
-                                                <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Amount</th>
-                                                <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground">Allocated</th>
-                                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">ID</th>
-                                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Description</th>
-                                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Transaction Date</th>
-                                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Due Date</th>
-                                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {paginatedRecords.map((record, idx) => (
-                                                <tr
-                                                    key={idx}
-                                                    className="border-b border-border last:border-b-0 hover:bg-accent/30 transition-colors"
-                                                >
-                                                    <td className="px-4 py-2.5 whitespace-nowrap">
-                                                        <span className={record.running_balance === 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground'}>
-                                                            {formatCurrency(record.running_balance)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
-                                                        {record.transaction_date}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                                                        <span className={record.amount < 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                                                            {formatCurrency(record.amount)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-center">
-                                                        <span className={`text-xs font-medium ${record.allocated === 'Y'
-                                                            ? 'text-green-600 dark:text-green-400'
-                                                            : 'text-amber-600 dark:text-amber-400'
-                                                            }`}>
-                                                            {record.allocated}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-foreground font-mono text-xs whitespace-nowrap">
-                                                        {record.transaction_type.startsWith('INV') ? (
-                                                            <button
-                                                                onClick={() => handlePreviewInvoice(record)}
-                                                                disabled={downloadingInvoice === record.transaction_type}
-                                                                title="Preview Invoice PDF"
-                                                                className="text-primary hover:underline flex items-center gap-1.5 disabled:opacity-50 transition-colors"
-                                                            >
-                                                                <EyeIcon size={14} className="text-primary" />
-                                                                {record.transaction_type}
-                                                                {downloadingInvoice === record.transaction_type && <SpinnerIcon size={12} className="animate-spin text-muted-foreground" />}
-                                                            </button>
-                                                        ) : (
-                                                            record.transaction_type
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-green-600 dark:text-green-400 whitespace-nowrap">
-                                                        {record.description}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
-                                                        {record.transaction_date}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
-                                                        {record.invoice_due_date || '—'}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-red-600 dark:text-red-400 whitespace-nowrap">
-                                                        {record.notes || ''}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                <div className="hidden md:block">
+                                    <DataTable
+                                        columns={columns}
+                                        data={paginatedRecords}
+                                        rowKey={(record) => `${record.transaction_type}-${record.transaction_date}`}
+                                        loading={recordsLoading}
+                                        emptyMessage="No transactions found"
+                                        className="border border-border rounded-lg overflow-hidden"
+                                        maxHeightClass="max-h-none"
+                                        rowClassName={(record) => {
+                                            const rowId = `${record.transaction_type}-${record.transaction_date}`;
+                                            const isVisible = visibleRows.has(rowId);
+                                            return cn(
+                                                "transition-colors duration-200",
+                                                isVisible ? "bg-[#f5f7ff]" : "bg-white"
+                                            );
+                                        }}
+                                    />
                                 </div>
 
                                 {/* Mobile Card Layout */}
                                 <div className="md:hidden space-y-3">
-                                    {paginatedRecords.map((record, idx) => (
-                                        <div key={idx} className="border border-border rounded-lg p-3 bg-background hover:bg-accent/20 transition-colors">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="font-mono text-xs text-foreground font-medium">
-                                                    {record.transaction_type.startsWith('INV') ? (
+                                    {paginatedRecords.map((record, idx) => {
+                                        const rowId = `${record.transaction_type}-${record.transaction_date}`;
+                                        const isVisible = visibleRows.has(rowId);
+                                        return (
+                                            <div key={idx} className={cn(
+                                                "border border-border rounded-lg p-3 bg-background hover:bg-accent/20 transition-all",
+                                                !isVisible && "opacity-40 grayscale scale-[0.98]"
+                                            )}>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono text-xs text-foreground font-medium">
+                                                            {record.transaction_type.startsWith('INV') ? (
+                                                                <button
+                                                                    onClick={() => handlePreviewInvoice(record)}
+                                                                    disabled={downloadingInvoice === record.transaction_type}
+                                                                    title="Preview Invoice PDF"
+                                                                    className="text-primary hover:underline flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                                                                >
+                                                                    <EyeIcon size={14} className="text-primary" />
+                                                                    {record.transaction_type}
+                                                                    {downloadingInvoice === record.transaction_type && <SpinnerIcon size={12} className="animate-spin text-muted-foreground" />}
+                                                                </button>
+                                                            ) : (
+                                                                record.transaction_type
+                                                            )}
+                                                        </span>
                                                         <button
-                                                            onClick={() => handlePreviewInvoice(record)}
-                                                            disabled={downloadingInvoice === record.transaction_type}
-                                                            title="Preview Invoice PDF"
-                                                            className="text-primary hover:underline flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                                                            onClick={() => handleToggleVisibility(record, !isVisible)}
+                                                            className={cn(
+                                                                "px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-tight rounded-md transition-all duration-200",
+                                                                isVisible
+                                                                    ? "bg-rose-100 text-rose-700"
+                                                                    : "bg-indigo-100 text-indigo-700"
+                                                            )}
                                                         >
-                                                            <EyeIcon size={14} className="text-primary" />
-                                                            {record.transaction_type}
-                                                            {downloadingInvoice === record.transaction_type && <SpinnerIcon size={12} className="animate-spin text-muted-foreground" />}
+                                                            {isVisible ? 'Hide' : 'View'}
                                                         </button>
-                                                    ) : (
-                                                        record.transaction_type
-                                                    )}
-                                                </span>
-                                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${record.allocated === 'Y'
-                                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                                                    }`}>
-                                                    {record.allocated === 'Y' ? 'Allocated' : 'Unallocated'}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm text-green-600 dark:text-green-400 mb-2 break-words">
-                                                {record.description}
-                                            </p>
-                                            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                                                <div>
-                                                    <span className="text-muted-foreground">Amount: </span>
-                                                    <span className={record.amount < 0 ? 'text-green-600 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
-                                                        {formatCurrency(record.amount)}
+                                                    </div>
+                                                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${record.allocated === 'Y'
+                                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                                        }`}>
+                                                        {record.allocated === 'Y' ? 'Allocated' : 'Unallocated'}
                                                     </span>
                                                 </div>
-                                                <div>
-                                                    <span className="text-muted-foreground">Balance: </span>
-                                                    <span className={record.running_balance === 0 ? 'text-green-600 dark:text-green-400 font-medium' : 'text-foreground font-medium'}>
-                                                        {formatCurrency(record.running_balance)}
-                                                    </span>
+                                                <p className="text-sm text-green-600 dark:text-green-400 mb-2 break-words">
+                                                    {record.description}
+                                                </p>
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                                                    <div>
+                                                        <span className="text-muted-foreground">Amount: </span>
+                                                        <span className={record.amount < 0 ? 'text-green-600 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
+                                                            {formatCurrency(record.amount)}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-muted-foreground">Balance: </span>
+                                                        <span className={record.running_balance === 0 ? 'text-green-600 dark:text-green-400 font-medium' : 'text-foreground font-medium'}>
+                                                            {formatCurrency(record.running_balance)}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-muted-foreground">Date: </span>
+                                                        <span className="text-foreground">{record.transaction_date}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-muted-foreground">Due: </span>
+                                                        <span className="text-foreground">{record.invoice_due_date || '—'}</span>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <span className="text-muted-foreground">Date: </span>
-                                                    <span className="text-foreground">{record.transaction_date}</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-muted-foreground">Due: </span>
-                                                    <span className="text-foreground">{record.invoice_due_date || '—'}</span>
-                                                </div>
+                                                {record.notes && (
+                                                    <p className="text-xs text-red-600 dark:text-red-400 mt-2">{record.notes}</p>
+                                                )}
                                             </div>
-                                            {record.notes && (
-                                                <p className="text-xs text-red-600 dark:text-red-400 mt-2">{record.notes}</p>
-                                            )}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
 
                                 {/* Pagination */}

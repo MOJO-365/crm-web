@@ -1514,7 +1514,7 @@ export function CustomerDetailsPage() {
             try {
                 const { data } = await refetchSolarVpp();
                 const latestDetails = data?.customer;
-                
+
                 setVppForm({
                     vppSignupBonus: latestDetails?.vppDetails?.vppSignupBonus?.toString() || selectedCustomerDetails?.vppDetails?.vppSignupBonus?.toString() || '',
                     batteryBrand: latestDetails?.batteryDetails?.batterybrand || selectedCustomerDetails?.batteryDetails?.batterybrand || '',
@@ -4423,8 +4423,8 @@ export function CustomerDetailsPage() {
                         <div className={cn("border p-3 rounded-lg flex items-start gap-3 mb-4", isHardDelete ? "bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-900/50" : "bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900/30")}>
                             <InfoIcon size={18} className="text-red-500 shrink-0 mt-0.5" />
                             <p className={cn("text-xs", isHardDelete ? "text-red-900 dark:text-red-300 font-medium" : "text-red-700 dark:text-red-400")}>
-                                {isHardDelete 
-                                    ? "CRITICAL: This will permanently remove ALL customer data, history, documents, and notes. This action CANNOT be undone." 
+                                {isHardDelete
+                                    ? "CRITICAL: This will permanently remove ALL customer data, history, documents, and notes. This action CANNOT be undone."
                                     : "This action will archive the record. The customer will be hidden from the primary list."}
                             </p>
                         </div>

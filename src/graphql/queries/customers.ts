@@ -608,7 +608,11 @@ export const GET_CUSTOMER_BY_ID = gql`
                 filename
                 path
             }
-           
+            msatDetails {
+                msatConnected
+                msatConnectedAt
+                msatUpdatedAt
+            }
         }
     }
 `;
@@ -769,6 +773,11 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 isAllRequiredFilled
                 isVppCertificateEmailSent
                 isVppCertificateEmailSentAt
+            }
+            msatDetails {
+                msatConnected
+                msatConnectedAt
+                msatUpdatedAt
             }
         }
     }
