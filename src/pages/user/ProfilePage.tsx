@@ -66,11 +66,11 @@ export function ProfilePage() {
     return (
         <div className="max-w-2xl p-6">
             <div className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Profile</h1>
-                <p className="text-slate-500 dark:text-slate-400">Manage your account settings and preferences.</p>
+                <h1 className="text-2xl font-bold text-title dark:text-title">My Profile</h1>
+                <p className="text-subtitle dark:text-subtitle">Manage your account settings and preferences.</p>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+            <div className="bg-card dark:bg-card rounded-xl shadow-sm border border-border dark:border-border p-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Name Field */}
                     <Input
@@ -80,7 +80,7 @@ export function ProfilePage() {
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="Your full name"
                         required
-                        leftIcon={<UserIcon className="w-4 h-4 text-slate-400" />}
+                        leftIcon={<UserIcon className="w-4 h-4 text-muted-foreground" />}
                     />
 
                     {/* Phone Number Field */}
@@ -93,7 +93,7 @@ export function ProfilePage() {
                             setFormData({ ...formData, number: value });
                         }}
                         placeholder="+1234567890"
-                        leftIcon={<PhoneIcon className="w-4 h-4 text-slate-400" />}
+                        leftIcon={<PhoneIcon className="w-4 h-4 text-muted-foreground" />}
                         helperText="Used for notifications and account verification."
                     />
 

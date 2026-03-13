@@ -50,35 +50,54 @@
     }
 
     .dark {
-        --background: 222.2 84% 4.9%;
-        --foreground: 210 40% 98%;
-        --card: 222.2 84% 7%;
-        --card-foreground: 210 40% 98%;
+        --background: 0 0% 0%;
+        --foreground: 0 0% 98%;
+        --card: 0 0% 12%; /* Card base color */
+        --card-foreground: 0 0% 98%;
 
         --primary: 142 76% 45%;
         --primary-hover: 142 76% 55%;
-        --primary-foreground: 222.2 47.4% 11.2%;
+        --primary-foreground: 0 0% 0%;
 
-        --secondary: 217.2 32.6% 17.5%;
-        --secondary-hover: 217.2 32.6% 25%;
-        --secondary-foreground: 210 40% 98%;
+        --secondary: 0 0% 12%;
+        --secondary-hover: 0 0% 18%;
+        --secondary-foreground: 0 0% 98%;
 
-        --muted: 217.2 32.6% 17.5%;
-        --muted-foreground: 215 20.2% 65.1%;
+        --muted: 0 0% 12%;
+        --muted-foreground: 0 0% 65%;
 
-        --accent: 217.2 32.6% 17.5%;
-        --accent-foreground: 210 40% 98%;
+        --accent: 0 0% 15%;
+        --accent-foreground: 0 0% 100%;
 
-        --destructive: 0 62.8% 40%;
-        --destructive-hover: 0 62.8% 50%;
-        --destructive-foreground: 210 40% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-hover: 0 62.8% 40%;
+        --destructive-foreground: 0 0% 98%;
 
-        --border: 217.2 32.6% 17.5%;
-        --input: 217.2 32.6% 17.5%;
+        --border: 0 0% 100%; /* Border base for translucency */
+        --input: 0 0% 15%;
         --ring: 142 76% 45%;
 
-        --title: 210 40% 98%;
-        --subtitle: 215 20.2% 65.1%;
+        --title: 0 0% 100%;
+        --subtitle: 0 0% 65%;
+    }
+
+    /* Global Cyber Glass Effect */
+    .dark .bg-card,
+    .dark .bg-white,
+    .dark [class*="bg-slate-900"],
+    .dark [class*="bg-gray-900"] {
+        background-color: hsla(0, 0%, 12%, 0.45) !important;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+
+    .dark .border,
+    .dark [class*="border-border"],
+    .dark [class*="border-slate-800"],
+    .dark [class*="border-gray-800"],
+    .dark [class*="border-slate-200"],
+    .dark [class*="border-gray-100"] {
+        border-color: hsla(0, 0%, 100%, 0.1) !important;
     }
 
     * {
