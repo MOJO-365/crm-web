@@ -274,7 +274,7 @@ export function VppCertificateTab({
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    {Number(vppCertificateDetails?.id) > 0 && vppDetails?.vppConnected === 1 && (
+                    {Number(vppCertificateDetails?.id) > 0 && (
                         <Button type="button" variant="outline" size="sm" onClick={handlePreview} className="bg-white dark:bg-neutral-900 shadow-sm hover:shadow-md transition-shadow">
                             <EyeIcon size={14} className="mr-1.5" /> Preview
                         </Button>
