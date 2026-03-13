@@ -5,8 +5,8 @@ import { getAccessToken } from '@/lib/auth';
 
 const getApiUrl = () => {
     const rawUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:4000');
-    // Strip trailing slash and /graphql suffix to get a clean base URL for both GraphQL and REST
-    return rawUrl.replace(/\/+$/, '').replace(/\/graphql$/, '') || '/';
+    // Just strip trailing slashes, but KEEP the /graphql prefix if provided as it's needed for the proxy
+    return rawUrl.replace(/\/+$/, '');
 };
 
 export const BASE_API_URL = getApiUrl();
@@ -48,7 +48,7 @@ const axiosLink = new ApolloLink((operation) => {
         const { query, variables, operationName } = operation;
 
         axiosInstance
-            .post('/graphql', {
+            .post(BASE_API_URL.endsWith('/graphql') ? '' : '/graphql', {
                 query: print(query),
                 variables,
                 operationName,
