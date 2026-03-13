@@ -33,7 +33,7 @@ const getStatusBadge = (status: number | null) => {
         case 1: return { label: 'In Progress', bg: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' };
         case 2: return { label: 'Submitted', bg: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' };
         case 3: return { label: 'Signed', bg: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' };
-        default: return { label: 'Unknown', bg: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' };
+        default: return { label: 'Unknown', bg: 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground' };
     }
 };
 
@@ -52,7 +52,7 @@ const StatCard = ({ title, count, customers, accentColor, isExpanded, onToggle }
         <div className="flex flex-col">
             {/* Card */}
             <div
-                className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                className="bg-card dark:bg-card rounded-xl shadow-sm border border-border dark:border-border overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                 onClick={onToggle}
             >
                 {/* Accent bar */}
@@ -61,8 +61,8 @@ const StatCard = ({ title, count, customers, accentColor, isExpanded, onToggle }
                 <div className="p-5">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
-                            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{count}</p>
+                            <p className="text-sm font-medium text-subtitle dark:text-subtitle">{title}</p>
+                            <p className="text-3xl font-bold text-title dark:text-title mt-1">{count}</p>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-400 dark:text-gray-500">
@@ -83,28 +83,28 @@ const StatCard = ({ title, count, customers, accentColor, isExpanded, onToggle }
 
             {/* Expanded list */}
             {isExpanded && customers.length > 0 && (
-                <div className="mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+                <div className="mt-2 bg-card dark:bg-card rounded-xl shadow-sm border border-border dark:border-border overflow-hidden">
                     <div className="max-h-64 overflow-y-auto">
                         <table className="w-full">
-                            <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
-                                <tr className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            <thead className="bg-muted/50 dark:bg-muted/50 sticky top-0">
+                                <tr className="text-left text-xs font-medium text-subtitle dark:text-subtitle uppercase tracking-wider">
                                     <th className="px-4 py-3">ID</th>
                                     <th className="px-4 py-3">Name</th>
                                     <th className="px-4 py-3">Email</th>
                                     <th className="px-4 py-3">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tbody className="divide-y divide-border dark:divide-border/50">
                                 {customers.map((customer) => {
                                     const badge = getStatusBadge(customer.status);
                                     const name = [customer.firstName, customer.lastName].filter(Boolean).join(' ') || '-';
                                     return (
-                                        <tr key={customer.uid} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 text-sm">
-                                            <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">
+                                        <tr key={customer.uid} className="hover:bg-accent/50 dark:hover:bg-accent/50 text-sm">
+                                            <td className="px-4 py-3 font-mono text-xs text-muted-foreground dark:text-muted-foreground">
                                                 {customer.customerId || '-'}
                                             </td>
-                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-200">{name}</td>
-                                            <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{customer.email || '-'}</td>
+                                            <td className="px-4 py-3 font-medium text-title dark:text-title">{name}</td>
+                                            <td className="px-4 py-3 text-muted-foreground dark:text-muted-foreground">{customer.email || '-'}</td>
                                             <td className="px-4 py-3">
                                                 <span className={`inline-block px-2 py-1 text-xs font-medium rounded-md ${badge.bg}`}>
                                                     {badge.label}
@@ -120,8 +120,8 @@ const StatCard = ({ title, count, customers, accentColor, isExpanded, onToggle }
             )}
 
             {isExpanded && customers.length === 0 && (
-                <div className="mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 text-center">
-                    <p className="text-sm text-gray-400 dark:text-gray-500">No customers found</p>
+                <div className="mt-2 bg-card dark:bg-card rounded-xl shadow-sm border border-border dark:border-border p-6 text-center">
+                    <p className="text-sm text-subtitle dark:text-subtitle">No customers found</p>
                 </div>
             )}
         </div>
@@ -140,14 +140,14 @@ export function DashboardPage() {
         return (
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Customer summary overview</p>
+                    <h1 className="text-2xl font-semibold text-title dark:text-title">Dashboard</h1>
+                    <p className="text-sm text-subtitle dark:text-subtitle mt-1">Customer summary overview</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {[1, 2, 3].map((i) => (
-                        <div key={i} className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 animate-pulse">
-                            <div className="h-4 bg-muted dark:bg-gray-800 rounded w-1/2 mb-3" />
-                            <div className="h-8 bg-muted dark:bg-gray-800 rounded w-1/3" />
+                        <div key={i} className="bg-card dark:bg-card rounded-xl shadow-sm border border-border dark:border-border p-5 animate-pulse">
+                            <div className="h-4 bg-muted dark:bg-muted rounded w-1/2 mb-3" />
+                            <div className="h-8 bg-muted dark:bg-muted rounded w-1/3" />
                         </div>
                     ))}
                 </div>
@@ -159,8 +159,8 @@ export function DashboardPage() {
         return (
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Customer summary overview</p>
+                    <h1 className="text-2xl font-semibold text-title dark:text-title">Dashboard</h1>
+                    <p className="text-sm text-subtitle dark:text-subtitle mt-1">Customer summary overview</p>
                 </div>
                 <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-xl p-4 flex items-center gap-3">
                     <svg className="w-5 h-5 text-red-500 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -182,8 +182,8 @@ export function DashboardPage() {
         <div className="space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Customer summary overview</p>
+                <h1 className="text-2xl font-semibold text-title dark:text-title">Dashboard</h1>
+                <p className="text-sm text-subtitle dark:text-subtitle mt-1">Customer summary overview</p>
             </div>
 
             {/* Stats Grid */}

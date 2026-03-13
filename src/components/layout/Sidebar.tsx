@@ -82,8 +82,8 @@ interface SidebarNavItemProps {
 }
 
 function SidebarNavItem({ children, title, isActive, isOpen, isChild }: SidebarNavItemProps) {
-    const baseClasses = "flex items-center rounded-md font-medium transition-colors";
-    const activeClasses = "bg-[hsla(82,100%,87%,1)] text-[hsla(82,67%,33%,1)]";
+    const baseClasses = "flex items-center rounded-md font-medium transition-all duration-200";
+    const activeClasses = "bg-primary/20 text-primary shadow-sm dark:bg-primary/20 dark:text-primary dark:shadow-[0_0_25px_-5px_rgba(52,211,153,0.4)]";
     const inactiveClasses = "text-muted-foreground hover:bg-accent hover:text-accent-foreground";
 
     const commonActiveStateClasses = isActive ? activeClasses : inactiveClasses;
@@ -93,8 +93,8 @@ function SidebarNavItem({ children, title, isActive, isOpen, isChild }: SidebarN
             <div
                 className={cn(
                     baseClasses,
-                    "gap-3 text-sm",
-                    isChild ? "pl-9 pr-3 py-2" : "px-3 py-2", // Indent children
+                    "gap-3 text-sm relative overflow-hidden group",
+                    isChild ? "pl-9 pr-3 py-2.5" : "px-3 py-2.5", // Indent children
                     commonActiveStateClasses
                 )}
             >
