@@ -256,6 +256,7 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                             <NavLink
                                 key={menu.menuUid}
                                 to={path}
+                                state={menu.menuCode === 'customers' ? { resetFilters: true } : undefined}
                             >
                                 {({ isActive }) => (
                                     <SidebarNavItem title={menu.menuName} isActive={isActive} isOpen={isOpen || false}>
