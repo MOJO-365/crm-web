@@ -2432,7 +2432,7 @@ export function CustomersPage() {
                                                                                     variant="outline"
                                                                                     size="sm"
                                                                                     className="h-8 px-3 text-xs font-medium border-border hover:bg-muted transition-colors"
-                                                                                    onClick={() => window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/documents/${encodeURIComponent(doc.path!).replace(/%2F/g, '/')}`, '_blank')}
+                                                                                    onClick={() => window.open(`${(import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/+$/, '').replace(/\/graphql$/, '')}/api/documents/${encodeURIComponent(doc.path!).replace(/%2F/g, '/')}`, '_blank')}
                                                                                 >
                                                                                     <EyeIcon className="w-3.5 h-3.5 mr-1.5" />
                                                                                     View
@@ -2691,7 +2691,7 @@ export function CustomersPage() {
                                                                                     variant="outline"
                                                                                     size="sm"
                                                                                     className="h-8 px-3 text-xs font-medium border-border hover:bg-muted transition-colors"
-                                                                                    onClick={() => window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/documents/${encodeURIComponent(item.doc!.path!).replace(/%2F/g, '/')}`, '_blank')}
+                                                                                    onClick={() => window.open(`${(import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/+$/, '').replace(/\/graphql$/, '')}/api/documents/${encodeURIComponent(item.doc!.path!).replace(/%2F/g, '/')}`, '_blank')}
                                                                                 >
                                                                                     <EyeIcon className="w-3.5 h-3.5 mr-1.5" />
                                                                                     View

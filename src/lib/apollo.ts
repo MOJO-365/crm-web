@@ -3,11 +3,17 @@ import { print } from 'graphql';
 import axios, { AxiosError } from 'axios';
 import { getAccessToken } from '@/lib/auth';
 
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:4000');
+const getApiUrl = () => {
+    const rawUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:4000');
+    // Strip trailing slash and /graphql suffix to get a clean base URL for both GraphQL and REST
+    return rawUrl.replace(/\/+$/, '').replace(/\/graphql$/, '') || '/';
+};
+
+export const BASE_API_URL = getApiUrl();
 
 // Shared axios instance for all API requests
 const axiosInstance = axios.create({
-    baseURL: API_URL,
+    baseURL: BASE_API_URL,
     headers: {
         'Content-Type': 'application/json',
     },
