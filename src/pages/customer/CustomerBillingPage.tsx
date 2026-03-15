@@ -342,7 +342,6 @@ export function CustomerBillingPage() {
         setPreviewModalOpen(true);
         try {
             const invoiceNumber = record.transaction_type.replace('INV', '');
-            const token = 'eyJhbGciOiJIUzUxMiJ9.eyJ1c2VybmFtZSI6IjEwMDExNCIsInN1YiI6IjEwMDExNCIsImlhdCI6MTc3Mjc2NjgwNiwiZXhwIjoxNzcyNzY3NzA2fQ.sHweQ-wkUvmk8Fyky875pmKCPXE9fwYePKzWuxi5YKB6yk2Cw19W4uwd_2vf8xKm12dYFIedz9guu69Wg1B4Vg';
 
             const response = await secondaryApiAxios.post('/api/v1/utilmate/user/invoice', {
                 companycode: "GEE",
@@ -353,7 +352,7 @@ export function CustomerBillingPage() {
                 }
             }, {
                 headers: {
-                    Authorization: `Bearer ${token}`
+                    'x-api-key': import.meta.env.VITE_UTILMATE_API_KEY,
                 },
                 responseType: 'blob'
             });
@@ -830,8 +829,8 @@ export function CustomerBillingPage() {
                                         return (
                                             <div key={idx} className={cn(
                                                 "border rounded-lg p-3 transition-all",
-                                                isVisible 
-                                                    ? "bg-background border-border" 
+                                                isVisible
+                                                    ? "bg-background border-border"
                                                     : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30 shadow-sm"
                                             )}>
                                                 <div className="flex items-center justify-between mb-2">
