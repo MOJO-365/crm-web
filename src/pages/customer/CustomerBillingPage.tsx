@@ -867,7 +867,7 @@ export function CustomerBillingPage() {
                                                             )}
                                                             leftIcon={isVisible ? <EyeOffIcon size={12} /> : <EyeIcon size={12} />}
                                                         >
-                                                            {isVisible ? 'Hide' : 'View'}
+                                                            {isVisible ? 'Hide' : 'Show'}
                                                         </Button>
                                                     </div>
                                                     <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${record.allocated === 'Y'
