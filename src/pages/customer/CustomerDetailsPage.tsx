@@ -1767,18 +1767,18 @@ export function CustomerDetailsPage() {
 
         try {
             // Priority: Sync with secondary API first
-            try {
-                await secondaryApiAxios.post('/api/v1/utilmate/user/add-user', {
-                    account_number: utilmateForm.accountNumber,
-                    site_identifier: utilmateForm.siteIdentifier,
-                    gee_id: selectedCustomerDetails.customerId || selectedCustomerDetails.uid,
-                    dnsp: (selectedCustomerDetails.ratePlan?.dnsp !== undefined && selectedCustomerDetails.ratePlan?.dnsp !== null) ? (DNSP_LABELS[selectedCustomerDetails.ratePlan.dnsp as keyof typeof DNSP_LABELS] || '') : '',
-                    nmi_number: selectedCustomerDetails.address?.nmi || ''
-                });
-            } catch (secErr: any) {
-                console.error('Failed to sync with secondary API', secErr);
-                throw new Error(secErr.response?.data?.message || 'Failed to sync with secondary system. Utilmate not connected.');
-            }
+            // try {
+            //     await secondaryApiAxios.post('/api/v1/utilmate/user/add-user', {
+            //         account_number: utilmateForm.accountNumber,
+            //         site_identifier: utilmateForm.siteIdentifier,
+            //         gee_id: selectedCustomerDetails.customerId || selectedCustomerDetails.uid,
+            //         dnsp: (selectedCustomerDetails.ratePlan?.dnsp !== undefined && selectedCustomerDetails.ratePlan?.dnsp !== null) ? (DNSP_LABELS[selectedCustomerDetails.ratePlan.dnsp as keyof typeof DNSP_LABELS] || '') : '',
+            //         nmi_number: selectedCustomerDetails.address?.nmi || ''
+            //     });
+            // } catch (secErr: any) {
+            //     console.error('Failed to sync with secondary API', secErr);
+            //     throw new Error(secErr.response?.data?.message || 'Failed to sync with secondary system. Utilmate not connected.');
+            // }
 
             const now = new Date().toISOString();
             const input: any = {
