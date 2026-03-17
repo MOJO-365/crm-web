@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useBlocker } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
+import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -778,7 +779,7 @@ export function RatesPage() {
             ...prev,
             dynamicRates: [
                 ...prev.dynamicRates,
-                { id: crypto.randomUUID(), name: '', value: '', unitId: measurementUnits[0]?.uid || '', type: 'charges' }
+                { id: uuidv4(), name: '', value: '', unitId: measurementUnits[0]?.uid || '', type: 'charges' }
             ]
         }));
     };
@@ -807,7 +808,7 @@ export function RatesPage() {
 
         setIsSubmitting(true);
         try {
-            const tempUid = crypto.randomUUID();
+            const tempUid = uuidv4();
 
             const newPlan: RatePlan = {
                 id: tempUid,
@@ -825,8 +826,8 @@ export function RatesPage() {
                 isDeleted: 0,
                 updatedAt: new Date().toISOString(),
                 offers: [{
-                    id: crypto.randomUUID(),
-                    uid: crypto.randomUUID(),
+                    id: uuidv4(),
+                    uid: uuidv4(),
                     offerName: formData.offerName || 'Default Offer',
                     anytime: parseFloat(formData.anytime) || 0,
                     supplyCharge: parseFloat(formData.supplyCharge) || 0,
@@ -947,8 +948,8 @@ export function RatesPage() {
             const existingOffer = editingRatePlan.offers?.[0];
             const updatedOffer: RateOffer = {
                 ...(existingOffer || {}), // Keep existing IDs etc
-                id: existingOffer?.id || crypto.randomUUID(),
-                uid: existingOffer?.uid || crypto.randomUUID(),
+                id: existingOffer?.id || uuidv4(),
+                uid: existingOffer?.uid || uuidv4(),
                 offerName: formData.offerName || existingOffer?.offerName || 'Default Offer',
                 anytime: parseFloat(formData.anytime) || 0,
                 supplyCharge: parseFloat(formData.supplyCharge) || 0,
