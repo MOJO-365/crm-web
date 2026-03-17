@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useBlocker } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
-import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -21,6 +20,7 @@ import { StatusField } from '@/components/common';
 import { STATE_OPTIONS, DNSP_OPTIONS, DNSP_MAP, RATE_TYPE_MAP } from '@/lib/constants';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { RatesHistoryModal } from './components/RatesHistoryModal';
+import { v4 as uuidv4 } from 'uuid';
 
 
 // Interfaces based on the query
