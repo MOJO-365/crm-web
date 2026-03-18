@@ -3202,7 +3202,7 @@ export function CustomerDetailsPage() {
                                                                 </div>
                                                             )}
 
-                                                            {/* Column 5: Dynamic Rates */}
+                                                            {/* Dynamic Rates Columns */}
                                                             {(() => {
                                                                 const parsedDynamicRates = typeof offer.dynamicRates === 'string'
                                                                     ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
@@ -3210,31 +3210,50 @@ export function CustomerDetailsPage() {
 
                                                                 if (!parsedDynamicRates || parsedDynamicRates.length === 0) return null;
 
-                                                                return (
-                                                                    <div className="space-y-4 min-w-[180px] flex-1">
-                                                                        {(() => {
-                                                                            const isVpp = selectedCustomerDetails.vppDetails?.vpp === 1 || offer.vpp === 1;
-                                                                            const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
-                                                                            return (
-                                                                                <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
-                                                                                    <ActivityIcon size={16} />
-                                                                                    <h4 className="text-sm font-bold uppercase tracking-wide">{sectionLabel}</h4>
-                                                                                </div>
-                                                                            );
-                                                                        })()}
-                                                                        <div className="space-y-3">
-                                                                            {parsedDynamicRates.map((dRate: any, id: number) => {
-                                                                                const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
-                                                                                const val = parseFloat(String(dRate.value || '0'));
-                                                                                return (
-                                                                                    <div key={id} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                                        <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">${val.toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
-                                                                                        <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{dRate.name}</div>
-                                                                                    </div>
-                                                                                );
-                                                                            })}
+                                                                const fitRates = parsedDynamicRates.filter((r: any) => r.type === 'fit');
+                                                                const chargeRates = parsedDynamicRates.filter((r: any) => r.type === 'charges');
+                                                                const untypedRates = parsedDynamicRates.filter((r: any) => !r.type);
+
+                                                                const renderRatesColumn = (rates: any[], label: string, colorClass: string, icon: any = ActivityIcon) => {
+                                                                    if (rates.length === 0) return null;
+                                                                    const Icon = icon;
+                                                                    return (
+                                                                        <div className="space-y-4 min-w-[180px] flex-1">
+                                                                            <div className={cn("flex items-center gap-2 mb-2",
+                                                                                colorClass === 'indigo' ? "text-indigo-500 dark:text-indigo-400" : "text-teal-500 dark:text-teal-400"
+                                                                            )}>
+                                                                                <Icon size={16} />
+                                                                                <h4 className="text-sm font-bold uppercase tracking-wide">{label}</h4>
+                                                                            </div>
+                                                                            <div className="space-y-3">
+                                                                                {rates.map((dRate: any, id: number) => {
+                                                                                    const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
+                                                                                    const val = parseFloat(String(dRate.value || '0'));
+                                                                                    return (
+                                                                                        <div key={id} className={cn(
+                                                                                            colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
+                                                                                            "rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
+                                                                                        )}>
+                                                                                            <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-base tracking-tight")}>
+                                                                                                ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
+                                                                                            </div>
+                                                                                            <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "text-[10px] font-bold uppercase tracking-wider opacity-80")}>
+                                                                                                {dRate.name}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
+                                                                    );
+                                                                };
+
+                                                                return (
+                                                                    <>
+                                                                        {renderRatesColumn(chargeRates, "Extra Charges", "indigo")}
+                                                                        {renderRatesColumn(fitRates, "Extra FiT", "teal", ZapIcon)}
+                                                                        {untypedRates.length > 0 && renderRatesColumn(untypedRates, (selectedCustomerDetails.vppDetails?.vpp === 1 || offer.vpp === 1) ? "Extra FIT" : "Extra Charge", "indigo")}
+                                                                    </>
                                                                 );
                                                             })()}
                                                         </div>
