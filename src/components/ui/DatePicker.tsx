@@ -78,23 +78,43 @@ function formatDate(date: Date, format: string): string {
     }
 }
 
-function parseDate(value: Date | string | null | undefined): Date | null {
+function parseDate(value: Date | string | null | undefined, format?: string): Date | null {
     if (!value) return null;
     if (value instanceof Date) return value;
 
-    // Handle ISO date strings (yyyy-MM-dd or yyyy-MM-ddTHH:mm:ss) to avoid timezone issues
-    if (typeof value === 'string') {
-        // Check if it's an ISO date format (starts with yyyy-MM-dd)
-        const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (isoMatch) {
-            const [, year, month, day] = isoMatch;
-            // Create date using local timezone (not UTC)
-            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const val = String(value);
+    
+    // Handle ISO date strings (yyyy-MM-dd or yyyy-MM-ddTHH:mm:ss)
+    const isoMatch = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+        const year = parseInt(isoMatch[1], 10);
+        const month = parseInt(isoMatch[2], 10) - 1;
+        const day = parseInt(isoMatch[3], 10);
+        const d = new Date(year, month, day, 12, 0, 0); // Noon
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    // Handle common slash/dash formats if format is provided
+    const parts = val.split(/[\/\-]/);
+    if (parts.length === 3) {
+        let day: number, month: number, year: number;
+        if (format === 'MM/dd/yyyy') {
+            [month, day, year] = parts.map(Number);
+        } else if (format === 'yyyy-MM-dd') {
+            [year, month, day] = parts.map(Number);
+        } else {
+            [day, month, year] = parts.map(Number);
+        }
+        
+        if (day && month && year) {
+            const d = new Date(year, month - 1, day, 12, 0, 0);
+            return isNaN(d.getTime()) ? null : d;
         }
     }
 
-    const parsed = new Date(value);
-    return isNaN(parsed.getTime()) ? null : parsed;
+    const parsed = new Date(val);
+    if (isNaN(parsed.getTime())) return null;
+    return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0);
 }
 
 function isSameDay(date1: Date, date2: Date): boolean {
@@ -142,10 +162,12 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
         const selectedYearRef = React.useRef<HTMLButtonElement>(null);
 
         // Current view (month/year being displayed)
-        const selectedDate = parseDate(value);
-        const [viewDate, setViewDate] = React.useState<Date>(() =>
-            selectedDate || new Date()
-        );
+        const selectedDate = React.useMemo(() => parseDate(value, dateFormat), [value, dateFormat]);
+        const [viewDate, setViewDate] = React.useState<Date>(() => {
+            if (selectedDate) return selectedDate;
+            if (maxDate && maxDate < new Date()) return maxDate;
+            return new Date();
+        });
 
         // Update input value when selected date changes
         React.useEffect(() => {
@@ -163,6 +185,33 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                 selectedYearRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
             }
         }, [isYearSelection]);
+
+        const wasOpenRef = React.useRef(false);
+        const lastSelectedValueRef = React.useRef<Date | null>(null);
+
+        // Reset view when opening or when value truly changes
+        React.useEffect(() => {
+            const opened = isOpen && !wasOpenRef.current;
+            const valueChanged = (selectedDate && (!lastSelectedValueRef.current || !isSameDay(selectedDate, lastSelectedValueRef.current))) ||
+                                (!selectedDate && lastSelectedValueRef.current);
+
+            if (opened || (isOpen && valueChanged)) {
+                if (selectedDate) {
+                    setViewDate(selectedDate);
+                } else if (maxDate && maxDate < new Date()) {
+                    setViewDate(maxDate);
+                } else {
+                    setViewDate(new Date());
+                }
+            }
+
+            if (isOpen) {
+                wasOpenRef.current = true;
+                lastSelectedValueRef.current = selectedDate;
+            } else {
+                wasOpenRef.current = false;
+            }
+        }, [isOpen, selectedDate, maxDate]);
 
         // Calculate popup position when opening
         React.useEffect(() => {
@@ -365,6 +414,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
         const navigateYear = (delta: number) => {
             setViewDate(prev => new Date(prev.getFullYear() + delta, prev.getMonth(), 1));
         };
+
 
         const handleClear = (e: React.MouseEvent) => {
             e.stopPropagation();
