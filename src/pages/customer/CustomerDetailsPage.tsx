@@ -8,7 +8,7 @@ import {
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
     IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon, LockIcon,
-    RefreshCwIcon, CreditCardIcon, FileTextIcon, PercentIcon
+    RefreshCwIcon, CreditCardIcon, FileTextIcon, PercentIcon, DownloadIcon
 } from '@/components/icons';
 import {
     GET_CUSTOMER_GENERAL_DETAILS,
@@ -805,7 +805,10 @@ export function CustomerDetailsPage() {
     const [selectedCustomerDetails, setSelectedCustomerDetails] = useState<CustomerDetails | null>(null);
     const [previewModalOpen, setPreviewModalOpen] = useState(false);
     const [previewUrl, setPreviewUrl] = useState('');
+    const [previewApiPath, setPreviewApiPath] = useState('');
+    const [previewFileName, setPreviewFileName] = useState('');
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
     const [isEmailSending, setIsEmailSending] = useState(false);
 
     // Detail Section State
@@ -1150,8 +1153,12 @@ export function CustomerDetailsPage() {
         const baseUrl = apiAxios.defaults.baseURL || '';
 
         let apiPath = '';
+        let fileName = 'Offer_Preview.html';
+
         if (selectedCustomerDetails?.signedPdfPath) {
-            apiPath = `/documents/${encodeURIComponent(selectedCustomerDetails.signedPdfPath).replace(/%2F/g, '/')}`;
+            const path = selectedCustomerDetails.signedPdfPath;
+            apiPath = `/documents/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
+            fileName = path.split('/').pop() || 'document.pdf';
         } else {
             apiPath = `/agreement/preview/${uid}?format=html`;
         }
@@ -1161,8 +1168,42 @@ export function CustomerDetailsPage() {
         const cleanPath = apiPath.startsWith('/') ? apiPath : '/' + apiPath;
         const url = `${cleanBase}${cleanPath}`;
 
+        setPreviewFileName(fileName);
+        setPreviewApiPath(apiPath);
         setPreviewUrl(url);
         setPreviewModalOpen(true);
+    };
+
+    const handleDownloadPreview = async () => {
+        if (!previewApiPath) return;
+        setIsDownloading(true);
+        try {
+            let downloadPath = previewApiPath;
+            let downloadFileName = previewFileName;
+
+            // If it's an agreement preview currently in HTML format, switch to PDF for download
+            if (downloadPath.includes('/agreement/preview/') && downloadPath.includes('format=html')) {
+                downloadPath = downloadPath.replace('format=html', 'format=pdf');
+                downloadFileName = downloadFileName.replace('.html', '.pdf');
+            }
+
+            const response = await apiAxios.get(downloadPath, {
+                responseType: 'blob',
+            });
+            const url = window.URL.createObjectURL(response.data);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', downloadFileName);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode?.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Download error:', error);
+            toast.error('Failed to download the file.');
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     const handleDeleteDocument = async (docPath: string) => {
@@ -4264,6 +4305,15 @@ export function CustomerDetailsPage() {
                     )}
                 </div>
                 <div className="flex justify-end gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={handleDownloadPreview}
+                        leftIcon={<DownloadIcon size={16} />}
+                        isLoading={isDownloading}
+                        disabled={!previewUrl || isLoadingPreview || isDownloading}
+                    >
+                        Download
+                    </Button>
                     <Button
                         variant="outline"
                         onClick={() => {

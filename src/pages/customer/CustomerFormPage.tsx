@@ -22,7 +22,7 @@ import {
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
 import { secondaryApiAxios } from '@/lib/apollo';
-import { formatDateTime } from '@/lib/date';
+import { formatDateTime, dayjs } from '@/lib/date';
 import {
     ChevronRightIcon,
     HomeIcon,
@@ -488,6 +488,11 @@ export const CustomerFormPage = () => {
     const { hasFeatureAccess } = useAuthStore();
     const canAccessCustomDiscount = hasFeatureAccess('feature_custom_discount');
     const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
+    const eighteenYearsAgo = useMemo(() => {
+        const d = new Date();
+        d.setFullYear(d.getFullYear() - 18);
+        return d;
+    }, []);
 
     // Queries & Mutations
     const { data: customerData, loading: isLoadingCustomer } = useQuery(GET_CUSTOMER_BY_ID, {
@@ -572,6 +577,13 @@ export const CustomerFormPage = () => {
         fetchPolicy: 'cache-first',
     });
 
+    // Default DOB to 18 years ago for new customers if empty
+    useEffect(() => {
+        if (!isEditMode && !formData.dob) {
+            updateField('dob', dayjs(eighteenYearsAgo).format('YYYY-MM-DD'));
+        }
+    }, [isEditMode, eighteenYearsAgo]);
+
     // Derived Data - Parse rate plans from active or historic rates
     const ratePlans: RatePlan[] = useMemo(() => {
         // Use historic rates if version is selected/assigned
@@ -629,6 +641,11 @@ export const CustomerFormPage = () => {
     useEffect(() => {
         if (customerData?.customer) {
             const c = customerData.customer;
+            // Set default DOB if missing (for 18+ requirement)
+            if (!c.dob) {
+                c.dob = dayjs(eighteenYearsAgo).format('YYYY-MM-DD');
+            }
+
             setFormData({
                 firstName: c.firstName || '',
                 lastName: c.lastName || '',
@@ -955,15 +972,20 @@ export const CustomerFormPage = () => {
         setIsFormDirty(true);
 
         // Clear demographic errors if Check Credit Score is toggled off
-        if (field === 'checkCreditScore' && !finalValue) {
-            setErrors(prev => ({
-                ...prev,
-                gender: '',
-                relationshipStatus: '',
-                employerName: '',
-                enquiryAmount: '',
-                dob: ''
-            }));
+        if (field === 'checkCreditScore') {
+            if (!finalValue) {
+                setErrors(prev => ({
+                    ...prev,
+                    gender: '',
+                    relationshipStatus: '',
+                    employerName: '',
+                    enquiryAmount: '',
+                    dob: ''
+                }));
+            } else if (!formData.dob) {
+                // Pre-fill DOB with 18 years ago date when credit score is enabled
+                setFormData(prev => ({ ...prev, dob: dayjs(eighteenYearsAgo).format('YYYY-MM-DD') }));
+            }
         }
 
         // If already touched, validate immediately
@@ -1548,7 +1570,12 @@ export const CustomerFormPage = () => {
                                                 <span className={`text-sm font-medium ${formData.vpp ? 'text-primary' : 'text-muted-foreground'}`}>
                                                     {formData.vpp ? 'Active' : 'Inactive'}
                                                 </span>
-                                                <ToggleSwitch checked={formData.vpp} onChange={(checked) => updateField('vpp', checked)} />
+                                                <ToggleSwitch checked={formData.vpp} onChange={(checked) => {
+                                                    updateField('vpp', checked);
+                                                    if (checked) {
+                                                        updateField('hasSolar', true);
+                                                    }
+                                                }} />
                                             </div>
                                         </div>
 
@@ -2025,7 +2052,15 @@ export const CustomerFormPage = () => {
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                                 <Input label="First Name" required error={errors.firstName} placeholder="e.g. Alex" value={formData.firstName} onChange={(e) => updateField('firstName', e.target.value)} onBlur={() => handleBlur('firstName')} />
                                                 <Input label="Last Name" required error={errors.lastName} placeholder="e.g. Taylor" value={formData.lastName} onChange={(e) => updateField('lastName', e.target.value)} onBlur={() => handleBlur('lastName')} />
-                                                <DatePicker label="Date of Birth" required={formData.checkCreditScore} error={errors.dob} value={formData.dob} onChange={(date) => updateField('dob', date ? date.toISOString().split('T')[0] : '')} maxDate={new Date()} onBlur={() => handleBlur('dob')} />
+                                                <DatePicker
+                                                    label="Date of Birth"
+                                                    required={formData.checkCreditScore}
+                                                    error={errors.dob}
+                                                    value={formData.dob}
+                                                    onChange={(date) => updateField('dob', date ? date.toISOString().split('T')[0] : '')}
+                                                    maxDate={eighteenYearsAgo}
+                                                    onBlur={() => handleBlur('dob')}
+                                                />
                                                 <Input label="Email" required helperText="We'll send confirmations here" error={errors.email} type="email" placeholder="name@example.com" value={formData.email} onChange={(e) => updateField('email', e.target.value)} onBlur={() => handleBlur('email')} />
                                             </div>
                                         </div>
@@ -2297,7 +2332,7 @@ export const CustomerFormPage = () => {
                                                                 error={errors.dob}
                                                                 value={formData.dob}
                                                                 onChange={(date) => updateField('dob', date ? date.toISOString().split('T')[0] : '')}
-                                                                maxDate={new Date()}
+                                                                maxDate={eighteenYearsAgo}
                                                                 onBlur={() => handleBlur('dob')}
                                                             />
                                                         </div>
