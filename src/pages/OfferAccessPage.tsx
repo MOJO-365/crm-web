@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { toast } from 'react-toastify';
 import {
     CheckIcon, UserIcon, MapPinIcon, MailIcon, PhoneIcon, HashIcon,
-    RatesIcon, CreditCardIcon, ZapIcon, PlugIcon, PencilIcon, TypeIcon, ActivityIcon
+    CreditCardIcon, ZapIcon, PlugIcon, PencilIcon, TypeIcon, ActivityIcon, Settings2Icon
 } from '@/components/icons';
 import MainLogo from '@/assets/main-logo-dark-1.png';
 import BankAutocomplete from '@/components/BankAutocomplete';
@@ -43,6 +43,8 @@ function extractBase64(dataUrl?: string | null): string | null {
     const [, base64] = dataUrl.split(',')
     return base64 || null
 }
+
+const cn = (...classes: string[]) => classes.filter(Boolean).join(' ');
 
 export const OfferAccessPage = () => {
     const [searchParams] = useSearchParams();
@@ -521,7 +523,7 @@ export const OfferAccessPage = () => {
     // Calculate rates to display
     // Assuming the first offer in the list is the active one for this display or logic to find it.
     // The query fetches `offers` as an array.
-    const activeOffer = customerData.ratePlan?.offers?.[0] || {};
+    // const activeOffer = customerData.ratePlan?.offers?.[0] || {};
 
     // const ratesData = [
     //     { label: 'Tariff', value: customerData.tariffCode || customerData.ratePlan?.tariff, unit: '' },
@@ -1002,8 +1004,17 @@ export const OfferAccessPage = () => {
 
                     <div className="p-5">
                         {(() => {
-                            const hasFiT = (activeOffer.fit ?? 0) > 0 || (activeOffer.fitPeak ?? 0) > 0 || (activeOffer.fitCritical ?? 0) > 0 || (activeOffer.fitVpp ?? 0) > 0;
-                            const hasCL = (activeOffer.cl1Usage ?? 0) > 0 || (activeOffer.cl2Usage ?? 0) > 0 || (activeOffer.cl1Supply ?? 0) > 0 || (activeOffer.cl2Supply ?? 0) > 0;
+                            const activeOffer = customerData?.ratePlan?.offers?.[0];
+                            if (!activeOffer) return null;
+
+                            const parsedDynamicRates = typeof activeOffer.dynamicRates === 'string'
+                                ? (() => { try { return JSON.parse(activeOffer.dynamicRates); } catch { return []; } })()
+                                : (activeOffer.dynamicRates || []);
+
+                            const fitRates = parsedDynamicRates.filter((r: any) => r.type === 'fit');
+                            const chargeRates = parsedDynamicRates.filter((r: any) => r.type === 'charges');
+                            const untypedRates = parsedDynamicRates.filter((r: any) => !r.type);
+
 
                             const parsedPriceUnits: Record<string, string> = typeof activeOffer.priceUnits === 'string'
                                 ? (() => { try { return JSON.parse(activeOffer.priceUnits); } catch { return {}; } })()
@@ -1015,203 +1026,166 @@ export const OfferAccessPage = () => {
                                 return unit ? `/${unit}` : '';
                             };
 
+                            const renderRatesColumn = (rates: any[], label: string, columnColor: 'blue' | 'orange' | 'purple' | 'rose' | 'amber' | 'teal' | 'indigo' | 'green', icon: any) => {
+                                if (rates.length === 0) return null;
+                                const Icon = icon;
+
+                                const themeClasses: Record<string, any> = {
+                                    blue: { header: "text-blue-500", card: "bg-blue-50 border-blue-200 text-blue-600" },
+                                    orange: { header: "text-orange-500", card: "bg-orange-50 border-orange-200 text-orange-600" },
+                                    purple: { header: "text-purple-500", card: "bg-purple-50 border-purple-200 text-purple-600" },
+                                    rose: { header: "text-rose-500", card: "bg-rose-50 border-rose-200 text-rose-600" },
+                                    amber: { header: "text-amber-500", card: "bg-amber-50 border-amber-200 text-amber-600" },
+                                    teal: { header: "text-teal-500", card: "bg-teal-50 border-teal-200 text-teal-600" },
+                                    indigo: { header: "text-indigo-500", card: "bg-indigo-50 border-indigo-200 text-indigo-600" },
+                                    green: { header: "text-green-500", card: "bg-green-50 border-green-200 text-green-600" },
+                                };
+
+                                const classes = themeClasses[columnColor];
+
+                                return (
+                                    <div className="space-y-4 min-w-[200px] flex-1">
+                                        <div className={cn("flex items-center gap-2", classes.header)}>
+                                            <Icon size={16} />
+                                            <h4 className="text-sm font-bold uppercase tracking-wide">{label}</h4>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {rates.map((rate, idx) => {
+                                                const rateColor = rate.color || columnColor;
+                                                const itemClasses = themeClasses[rateColor];
+                                                return (
+                                                    <div key={idx} className={cn(
+                                                        itemClasses.card,
+                                                        "border rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm dark:bg-opacity-20"
+                                                    )}>
+                                                        <div className="font-bold text-base tracking-tight">
+                                                            {rate.displayValue}
+                                                        </div>
+                                                        <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">
+                                                            {rate.label}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            };
+
+                            const energyRates = [
+                                { label: 'Peak', value: activeOffer.peak, type: 'peak' },
+                                { label: 'Off-Peak', value: activeOffer.offPeak, type: 'offPeak' },
+                                { label: 'Shoulder', value: activeOffer.shoulder, type: 'shoulder' },
+                                { label: 'Anytime', value: activeOffer.anytime, type: 'anytime' }
+                            ]
+                                .filter(rate => (rate.value ?? 0) > 0)
+                                .sort((a, b) => calculateDiscountedRate(a.value ?? 0, customerData.discount ?? 0) - calculateDiscountedRate(b.value ?? 0, customerData.discount ?? 0))
+                                .map(rate => ({
+                                    label: rate.label,
+                                    displayValue: `$${calculateDiscountedRate(rate.value ?? 0, customerData.discount ?? 0).toFixed(4)}${formatUnit(rate.type, 'kWh')}`,
+                                    color: rate.type === 'anytime' ? 'orange' : 'blue'
+                                }));
+
+                            const supplyRates = [
+                                { label: 'Supply', displayValue: `$${(activeOffer.supplyCharge ?? 0).toFixed(4)}${formatUnit('supplyCharge', 'day')}` }
+                            ].filter(() => (activeOffer.supplyCharge ?? 0) > 0);
+
+                            const demandRates = [
+                                { label: 'Demand', value: activeOffer.demand, type: 'demand' },
+                                { label: 'Demand (Op)', value: activeOffer.demandOp, type: 'demandOp' },
+                                { label: 'Demand (P)', value: activeOffer.demandP, type: 'demandP' },
+                                { label: 'Demand (S)', value: activeOffer.demandS, type: 'demandS' }
+                            ]
+                                .filter(d => (d.value ?? 0) > 0)
+                                .map(d => ({
+                                    label: d.label,
+                                    displayValue: `$${d.value.toFixed(4)}${formatUnit(d.type, 'kVA/day')}`
+                                }));
+
+                            const vppCharges = [
+                                { label: 'Orchestration', displayValue: `$${(activeOffer.vppOrcharge ?? 0).toFixed(4)}${formatUnit('vppOrcharge', 'day')}` }
+                            ].filter(() => (activeOffer.vppOrcharge ?? 0) > 0);
+
+                            const solarFitRates = [
+                                { label: 'Feed-in', value: activeOffer.fit, type: 'fit' },
+                                { label: 'PREMIUM FIT', value: activeOffer.fitPeak, type: 'fitPeak' },
+                                { label: 'CRITICAL EVENT FIT', value: activeOffer.fitCritical, type: 'fitCritical' },
+                                { label: 'BASE FIT', value: activeOffer.fitVpp, type: 'fitVpp' }
+                            ]
+                                .filter(rate => {
+                                    if ((rate.value ?? 0) <= 0) return false;
+                                    const isVppActive = customerData.vppDetails?.vpp === 1;
+                                    const hasSolar = customerData.solarDetails?.hassolar === 1;
+                                    if (rate.type === 'fit') return !isVppActive;
+                                    return isVppActive || !hasSolar;
+                                })
+                                .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+                                .map(rate => ({
+                                    label: rate.label,
+                                    displayValue: `$${(rate.value ?? 0).toFixed(4)}${formatUnit(rate.type, 'kWh')}`
+                                }));
+
+                            const dynamicFitRates = fitRates.map((dRate: any) => ({
+                                label: dRate.name,
+                                displayValue: `$${parseFloat(String(dRate.value || '0')).toFixed(4)}${dRate.unitId ? `/${unitMap?.[dRate.unitId]}` : ''}`
+                            }));
+
+                            const extraChargeRates = [...chargeRates, ...untypedRates.filter(() => !(customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1))].map((dRate: any) => ({
+                                label: dRate.name,
+                                displayValue: `$${parseFloat(String(dRate.value || '0')).toFixed(4)}${dRate.unitId ? `/${unitMap?.[dRate.unitId]}` : ''}`
+                            }));
+
+                            const extraFitRates = untypedRates.filter(() => (customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1)).map((dRate: any) => ({
+                                label: dRate.name,
+                                displayValue: `$${parseFloat(String(dRate.value || '0')).toFixed(4)}${dRate.unitId ? `/${unitMap?.[dRate.unitId]}` : ''}`
+                            }));
+
+                            const clRates = [
+                                { label: 'CL1 Usage', value: activeOffer.cl1Usage, type: 'cl1_usage' },
+                                { label: 'CL2 Usage', value: activeOffer.cl2Usage, type: 'cl2_usage' },
+                                { label: 'CL1 Supply', value: activeOffer.cl1Supply, type: 'cl1_supply' },
+                                { label: 'CL2 Supply', value: activeOffer.cl2Supply, type: 'cl2_supply' }
+                            ]
+                                .filter(rate => (rate.value ?? 0) > 0)
+                                .map(rate => {
+                                    const isUsage = rate.type.endsWith('_usage');
+                                    const price = isUsage ? calculateDiscountedRate(rate.value ?? 0, customerData.discount ?? 0) : (rate.value ?? 0);
+                                    const unit = isUsage ? 'kWh' : 'day';
+                                    return {
+                                        label: rate.label,
+                                        displayValue: `$${price.toFixed(4)}${formatUnit(rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', unit)}`
+                                    };
+                                });
+
                             return (
-                                <div className="flex flex-wrap gap-8">
-                                    {/* Energy Rates Column */}
-                                    <div className="space-y-4 min-w-[180px] flex-1">
-                                        <div className="flex items-center gap-2 text-blue-500 dark:text-blue-400">
-                                            <RatesIcon size={16} />
-                                            <h4 className="text-sm font-bold uppercase tracking-wide">Energy Rates</h4>
-                                        </div>
-                                        <div className="space-y-3">
-                                            {[
-                                                { label: 'Peak', value: activeOffer.peak, type: 'peak' },
-                                                { label: 'Off-Peak', value: activeOffer.offPeak, type: 'offPeak' },
-                                                { label: 'Shoulder', value: activeOffer.shoulder, type: 'shoulder' },
-                                                { label: 'Anytime', value: activeOffer.anytime, type: 'anytime' }
-                                            ]
-                                                .filter(rate => (rate.value ?? 0) > 0)
-                                                .sort((a, b) => calculateDiscountedRate(a.value ?? 0, customerData.discount ?? 0) - calculateDiscountedRate(b.value ?? 0, customerData.discount ?? 0))
-                                                .map((rate, idx) => {
-                                                    const isAnytime = rate.type === 'anytime';
-                                                    const bgColor = isAnytime ? "bg-orange-50 dark:bg-orange-900/30" : "bg-blue-50 dark:bg-blue-900/30";
-                                                    const borderColor = isAnytime ? "border-orange-200 dark:border-orange-800" : "border-blue-200 dark:border-blue-800";
-                                                    const textColor = isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400";
+                                <div className="flex flex-wrap gap-x-12 gap-y-10">
+                                    {renderRatesColumn(energyRates, "Energy Rates", "blue", Settings2Icon)}
 
-                                                    return (
-                                                        <div key={idx} className={`${bgColor} border ${borderColor} rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm`}>
-                                                            <div className={`${textColor} font-bold text-base tracking-tight`}>
-                                                                ${calculateDiscountedRate(rate.value ?? 0, customerData.discount ?? 0).toFixed(4)}{formatUnit(rate.type, 'kWh')}
-                                                            </div>
-                                                            <div className={`text-[10px] font-bold ${textColor} uppercase tracking-wider opacity-80`}>
-                                                                {rate.label}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                        </div>
-                                    </div>
-
-                                    {/* Supply Charges Column */}
-                                    <div className="space-y-4 min-w-[180px] flex-1">
-                                        <div className="flex items-center gap-2 text-purple-500 dark:text-purple-400">
-                                            <PlugIcon size={16} />
-                                            <h4 className="text-sm font-bold uppercase tracking-wide">Supply Charges</h4>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center space-y-0.5">
-                                                <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${(activeOffer.supplyCharge ?? 0).toFixed(4)}{formatUnit('supplyCharge', 'day')}</div>
-                                                <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
-                                            </div>
-
-                                            {((activeOffer.demand ?? 0) > 0 || (activeOffer.demandOp ?? 0) > 0 || (activeOffer.demandP ?? 0) > 0 || (activeOffer.demandS ?? 0) > 0) && (
-                                                <>
-                                                    <div className="flex items-center gap-2 text-rose-500 dark:text-rose-400 mt-4">
-                                                        <RatesIcon size={16} />
-                                                        <h4 className="text-sm font-bold uppercase tracking-wide">Demand Charges</h4>
-                                                    </div>
-                                                    <div className="space-y-3">
-                                                        {[
-                                                            { label: 'Demand', value: activeOffer.demand },
-                                                            { label: 'Demand (Op)', value: activeOffer.demandOp },
-                                                            { label: 'Demand (P)', value: activeOffer.demandP },
-                                                            { label: 'Demand (S)', value: activeOffer.demandS }
-                                                        ]
-                                                            .filter(d => (d.value ?? 0) > 0)
-                                                            .map((d, id) => (
-                                                                <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                    <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${d.value.toFixed(4)}{formatUnit(d.label === 'Demand' ? 'demand' : d.label === 'Demand (Op)' ? 'demandOp' : d.label === 'Demand (P)' ? 'demandP' : 'demandS', 'kVA/day')}</div>
-                                                                    <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
-                                                                </div>
-                                                            ))}
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-
-                                        {/* VPP Orchestration Charges Sub-section */}
-                                        {(activeOffer.vppOrcharge ?? 0) > 0 && (
-                                            <>
-                                                <div className="flex items-center gap-2 text-amber-500 dark:text-amber-400 mt-4">
-                                                    <ZapIcon size={16} />
-                                                    <h4 className="text-sm font-bold uppercase tracking-wide">VPP Orchestration Charges</h4>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center space-y-0.5">
-                                                        <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${(activeOffer.vppOrcharge ?? 0).toFixed(4)}{formatUnit('vppOrcharge', 'day')}</div>
-                                                        <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">Orchestration</div>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-
-                                    {/* Solar FiT Column */}
-                                    {hasFiT && (
-                                        <div className="space-y-4 min-w-[180px] flex-1">
-                                            <div className="flex items-center gap-2 text-teal-500 dark:text-teal-400">
-                                                <ZapIcon size={16} />
-                                                <h4 className="text-sm font-bold uppercase tracking-wide">Solar FiT</h4>
-                                            </div>
-                                            <div className="space-y-3">
-                                                {[
-                                                    { label: 'Feed-in', value: activeOffer.fit, type: 'fit' },
-                                                    { label: 'PREMIUM FIT', value: activeOffer.fitPeak, type: 'fitPeak' },
-                                                    { label: 'CRITICAL EVENT FIT', value: activeOffer.fitCritical, type: 'fitCritical' },
-                                                    { label: 'BASE FIT', value: activeOffer.fitVpp, type: 'fitVpp' }
-                                                ]
-                                                    .filter(rate => {
-                                                        if ((rate.value ?? 0) <= 0) return false;
-                                                        const isVppActive = customerData.vppDetails?.vpp === 1;
-                                                        const hasSolar = customerData.solarDetails?.hassolar === 1;
-
-                                                        if (rate.type === 'fit') return !isVppActive;
-                                                        return isVppActive || !hasSolar;
-                                                    })
-                                                    .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
-                                                    .map((rate, idx) => (
-                                                        <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">
-                                                                ${(rate.value ?? 0).toFixed(4)}{formatUnit(rate.type, 'kWh')}
-                                                            </div>
-                                                            <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">
-                                                                {rate.label}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                            </div>
+                                    {(supplyRates.length > 0 || demandRates.length > 0 || vppCharges.length > 0) && (
+                                        <div className="space-y-10 flex-1 min-w-[200px]">
+                                            {renderRatesColumn(supplyRates, "Supply Charges", "purple", PlugIcon)}
+                                            {renderRatesColumn(demandRates, "Demand Charges", "rose", ActivityIcon)}
+                                            {renderRatesColumn(vppCharges, "VPP Charges", "orange", ActivityIcon)}
                                         </div>
                                     )}
 
-                                    {/* Controlled Load Column */}
-                                    {hasCL && (
-                                        <div className="space-y-4 min-w-[180px] flex-1">
-                                            <div className="flex items-center gap-2 text-green-500 dark:text-green-400">
-                                                <PlugIcon size={16} />
-                                                <h4 className="text-sm font-bold uppercase tracking-wide">Controlled Load</h4>
-                                            </div>
-                                            <div className="space-y-3">
-                                                {[
-                                                    { label: 'CL1 Usage', value: activeOffer.cl1Usage, type: 'cl1_usage' },
-                                                    { label: 'CL2 Usage', value: activeOffer.cl2Usage, type: 'cl2_usage' },
-                                                    { label: 'CL1 Supply', value: activeOffer.cl1Supply, type: 'cl1_supply' },
-                                                    { label: 'CL2 Supply', value: activeOffer.cl2Supply, type: 'cl2_supply' }
-                                                ]
-                                                    .filter(rate => (rate.value ?? 0) > 0)
-                                                    .map((rate, idx) => {
-                                                        const isUsage = rate.type.endsWith('_usage');
-                                                        const price = isUsage ? calculateDiscountedRate(rate.value ?? 0, customerData.discount ?? 0) : (rate.value ?? 0);
-                                                        const unit = isUsage ? 'kWh' : 'day';
-                                                        return (
-                                                            <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">
-                                                                    ${price.toFixed(4)}{formatUnit(rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', unit)}
-                                                                </div>
-                                                                <div className={`text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80`}>
-                                                                    {rate.label}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                            </div>
-                                        </div>
+                                    {renderRatesColumn(solarFitRates, "Solar FiT", "teal", ZapIcon)}
+
+                                    {extraChargeRates.length > 0 && renderRatesColumn(
+                                        extraChargeRates,
+                                        "Extra Charges",
+                                        "indigo",
+                                        ActivityIcon
                                     )}
 
-                                    {/* Dynamic Rates Column */}
-                                    {(() => {
-                                        const parsedDynamicRates = typeof activeOffer.dynamicRates === 'string'
-                                            ? (() => { try { return JSON.parse(activeOffer.dynamicRates); } catch { return []; } })()
-                                            : (activeOffer.dynamicRates || []);
+                                    {[...dynamicFitRates, ...extraFitRates].length > 0 && renderRatesColumn(
+                                        [...dynamicFitRates, ...extraFitRates],
+                                        "Extra FiT",
+                                        "teal",
+                                        ZapIcon
+                                    )}
 
-                                        if (!parsedDynamicRates || parsedDynamicRates.length === 0) return null;
-
-                                        return (
-                                            <div className="space-y-4 min-w-[180px] flex-1">
-                                                {(() => {
-                                                    const isVpp = customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1;
-                                                    const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
-                                                    return (
-                                                        <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
-                                                            <ActivityIcon size={16} />
-                                                            <h4 className="text-sm font-bold uppercase tracking-wide">{sectionLabel}</h4>
-                                                        </div>
-                                                    );
-                                                })()}
-                                                <div className="space-y-3">
-                                                    {parsedDynamicRates.map((dRate: any, id: number) => {
-                                                        const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
-                                                        const val = parseFloat(String(dRate.value || '0'));
-                                                        return (
-                                                            <div key={id} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">${val.toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
-                                                                <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{dRate.name}</div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
+                                    {renderRatesColumn(clRates, "Controlled Load", "green", PlugIcon)}
                                 </div>
                             );
                         })()}

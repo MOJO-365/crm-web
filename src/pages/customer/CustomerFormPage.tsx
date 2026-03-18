@@ -355,7 +355,6 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                     )}
                 </div>
 
-                {/* Column 3: Solar FiT */}
                 {hasFiT && (
                     <div className="space-y-2 min-w-[180px] flex-1">
                         <div className="flex items-center gap-2 text-teal-500 dark:text-teal-400 mb-2">
@@ -380,6 +379,28 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                                     <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">{rate.label}</div>
                                 </div>
                             ))}
+
+                        {/* Dynamic FiT Rates merged here */}
+                        {(() => {
+                            const parsedDynamicRates = typeof offer.dynamicRates === 'string'
+                                ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
+                                : (offer.dynamicRates || []);
+                            
+                            const fitRates = parsedDynamicRates.filter((r: any) => r.type === 'fit');
+                            return fitRates.map((rate: any, idx: number) => {
+                                const unitName = units[rate.unitId] || '';
+                                return (
+                                    <div key={`dyn-fit-${idx}`} className="bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
+                                        <div className="text-teal-600 dark:text-teal-400 font-bold text-sm">
+                                            ${Number(rate.value).toFixed(4)}{unitName ? `/${unitName}` : ''}
+                                        </div>
+                                        <div className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider opacity-80">
+                                            {rate.name}
+                                        </div>
+                                    </div>
+                                );
+                            });
+                        })()}
                     </div>
                 )}
 
@@ -411,32 +432,35 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                     </div>
                 )}
 
-                {/* Column 5: Dynamic Rates */}
+                {/* Combined Extra Charges Column */}
                 {(() => {
                     const parsedDynamicRates = typeof offer.dynamicRates === 'string'
                         ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
                         : (offer.dynamicRates || []);
 
-                    if (!parsedDynamicRates || parsedDynamicRates.length === 0) return null;
+                    const chargeRates = parsedDynamicRates.filter((r: any) => r.type === 'charges');
+                    const untypedRates = parsedDynamicRates.filter((r: any) => !r.type);
+
+                    if (chargeRates.length === 0 && untypedRates.length === 0) return null;
 
                     return (
                         <div className="space-y-2 min-w-[180px] flex-1">
-                            {(() => {
-                                const isVpp = vpp || isVppPlan;
-                                const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
-                                return (
-                                    <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400 mb-2">
-                                        <ActivityIcon size={14} />
-                                        <span className="text-xs font-bold uppercase tracking-wide">{sectionLabel}</span>
-                                    </div>
-                                );
-                            })()}
-                            {parsedDynamicRates.map((rate: any, idx: number) => {
+                            <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400 mb-2">
+                                <ActivityIcon size={14} />
+                                <span className="text-xs font-bold uppercase tracking-wide">
+                                    {(untypedRates.length > 0 && (vpp || isVppPlan)) ? "Extra FiT" : "Extra Charges"}
+                                </span>
+                            </div>
+                            {[...chargeRates, ...untypedRates].map((rate: any, idx: number) => {
                                 const unitName = units[rate.unitId] || '';
                                 return (
-                                    <div key={idx} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                        <div className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">${Number(rate.value).toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
-                                        <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{rate.name}</div>
+                                    <div key={`dyn-charge-${idx}`} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
+                                        <div className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+                                            ${Number(rate.value).toFixed(4)}{unitName ? `/${unitName}` : ''}
+                                        </div>
+                                        <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">
+                                            {rate.name}
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -1960,6 +1984,29 @@ export const CustomerFormPage = () => {
                                                                             )}
                                                                         </>
                                                                     )}
+
+                                                                    {/* Dynamic FiT Rates merged here */}
+                                                                    {(() => {
+                                                                        const parsedDynamicRates = typeof offer.dynamicRates === 'string'
+                                                                            ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
+                                                                            : (offer.dynamicRates || []);
+                                                                        
+                                                                        const fitRates = parsedDynamicRates.filter((r: any) => r.type === 'fit');
+                                                                        return fitRates.map((dRate: any, id: number) => {
+                                                                            const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
+                                                                            const val = parseFloat(String(dRate.value || '0'));
+                                                                            return (
+                                                                                <div key={`dyn-fit-${id}`} className="bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                                    <div className="text-teal-600 dark:text-teal-400 font-bold text-base tracking-tight">
+                                                                                        ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
+                                                                                    </div>
+                                                                                    <div className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider opacity-80">
+                                                                                        {dRate.name}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        });
+                                                                    })()}
                                                                 </div>
                                                             </div>
                                                         )}
@@ -2000,34 +2047,37 @@ export const CustomerFormPage = () => {
                                                             </div>
                                                         )}
 
-                                                        {/* Column 5: Dynamic Rates */}
+                                                        {/* Combined Extra Charges Column */}
                                                         {(() => {
                                                             const parsedDynamicRates = typeof offer.dynamicRates === 'string'
                                                                 ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
                                                                 : (offer.dynamicRates || []);
 
-                                                            if (!parsedDynamicRates || parsedDynamicRates.length === 0) return null;
+                                                            const chargeRates = parsedDynamicRates.filter((r: any) => r.type === 'charges');
+                                                            const untypedRates = parsedDynamicRates.filter((r: any) => !r.type);
+
+                                                            if (chargeRates.length === 0 && untypedRates.length === 0) return null;
 
                                                             return (
                                                                 <div className="space-y-4 min-w-[180px] flex-1">
-                                                                    {(() => {
-                                                                        const isVpp = formData.vpp || selectedRatePlan?.vpp === 1;
-                                                                        const sectionLabel = isVpp ? "Extra FIT" : "Extra Charge";
-                                                                        return (
-                                                                            <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
-                                                                                <ActivityIcon size={16} />
-                                                                                <h4 className="text-sm font-bold uppercase tracking-wide">{sectionLabel}</h4>
-                                                                            </div>
-                                                                        );
-                                                                    })()}
+                                                                    <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
+                                                                        <ActivityIcon size={16} />
+                                                                        <h4 className="text-sm font-bold uppercase tracking-wide">
+                                                                            {(untypedRates.length > 0 && (formData.vpp || selectedRatePlan?.vpp === 1)) ? "Extra FiT" : "Extra Charges"}
+                                                                        </h4>
+                                                                    </div>
                                                                     <div className="space-y-3">
-                                                                        {parsedDynamicRates.map((dRate: any, id: number) => {
+                                                                        {[...chargeRates, ...untypedRates].map((dRate: any, id: number) => {
                                                                             const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
                                                                             const val = parseFloat(String(dRate.value || '0'));
                                                                             return (
-                                                                                <div key={id} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                                    <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">${val.toFixed(4)}{unitName ? `/${unitName}` : ''}</div>
-                                                                                    <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">{dRate.name}</div>
+                                                                                <div key={`dyn-charge-${id}`} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                                    <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">
+                                                                                        ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
+                                                                                    </div>
+                                                                                    <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">
+                                                                                        {dRate.name}
+                                                                                    </div>
                                                                                 </div>
                                                                             );
                                                                         })}
