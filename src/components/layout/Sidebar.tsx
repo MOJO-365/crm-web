@@ -4,7 +4,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import logo from '@/assets/main-logo-dark-1.png';
 import { useAccessibleMenus } from '@/stores/useAuthStore';
-import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon } from '@/components/icons';
+import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon } from '@/components/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 // Dashboard icon component (locally defined in Header originally)
@@ -45,7 +45,8 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     notification_entity: NotificationIcon,
     risk_statuses: ShieldIcon,
     pdf_terms: FileTextIcon,
-    customer_billing: CalendarIcon
+    customer_billing: CalendarIcon,
+    bonus_master: ZapIcon
 };
 
 // Path mapping
@@ -64,7 +65,8 @@ const pathMap: Record<string, string> = {
     notification_entity: '/notification_entity',
     risk_statuses: '/risk-statuses',
     pdf_terms: '/pdf-terms',
-    customer_billing: '/customer-billing'
+    customer_billing: '/customer-billing',
+    bonus_master: '/bonus_master'
     // user_management and email have no path, they are groupers
 };
 

@@ -26,10 +26,15 @@ type Props = {
         lng?: number;
     }) => void;
     placeholder?: string;
-    /** Restrict to certain countries (default AU) */
+    /** Restrict to certain countries (default AU). Pass empty array for global search. */
     countries?: string[];
+    /** Google Places types (default ['geocode']) */
+    types?: string[];
     /** Optional: z-index for the dropdown */
     zIndexClass?: string; // e.g. "z-50"
+    label?: string;
+    error?: string;
+    required?: boolean;
 };
 
 export default function LocationAutocomplete({
@@ -38,7 +43,11 @@ export default function LocationAutocomplete({
     onSelect,
     placeholder = 'Start typing address',
     countries = ['au'],
+    types = ['geocode'],
     zIndexClass = 'z-50',
+    label,
+    error,
+    required,
 }: Props) {
     const [googleReady, setGoogleReady] = useState(false);
     const [options, setOptions] = useState<Prediction[]>([]);
@@ -111,13 +120,19 @@ export default function LocationAutocomplete({
     const fetchPredictions = (text: string) => {
         if (!acRef.current || !googleReady) return;
         setLoading(true);
+
+        const request: google.maps.places.AutocompletionRequest = {
+            input: text,
+            types: types,
+            sessionToken: tokenRef.current || undefined,
+        };
+
+        if (countries && countries.length > 0) {
+            request.componentRestrictions = { country: countries };
+        }
+
         acRef.current.getPlacePredictions(
-            {
-                input: text,
-                types: ['geocode'],
-                componentRestrictions: { country: countries },
-                sessionToken: tokenRef.current || undefined,
-            },
+            request,
             (preds) => {
                 setOptions((preds || []).map((p: any) => ({ description: p.description, place_id: p.place_id! })));
                 setLoading(false);
@@ -269,6 +284,9 @@ export default function LocationAutocomplete({
         <div className="relative" ref={containerRef}>
             <Input
                 ref={inputRef}
+                label={label}
+                error={error}
+                required={required}
                 placeholder={placeholder}
                 value={value}
                 onChange={handleInput}

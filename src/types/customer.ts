@@ -84,6 +84,7 @@ export interface CustomerFormData {
     identityProof?: CustomerDocument | null;
     licenseDocument?: CustomerDocument | null;
     additionalDocument?: CustomerDocument | null;
+    selectedBonuses: string[]; // Array of bonus UIDs
 }
 
 export interface CustomerDocument {

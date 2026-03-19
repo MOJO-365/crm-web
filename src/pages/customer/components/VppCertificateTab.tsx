@@ -7,9 +7,9 @@ import { Select } from '@/components/ui/Select';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Modal } from '@/components/common';
 import { apiAxios } from '@/lib/apollo';
-import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE } from '@/graphql';
+import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES, GET_BATTERY_MODELS } from '@/graphql';
+import { useLazyQuery } from '@apollo/client';
 import { FileTextIcon, ZapIcon, PlugIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon } from '@/components/icons';
-import { BATTERY_BRAND_OPTIONS } from '@/lib/constants';
 
 interface VppCertificateTabProps {
     customerUid: string;
@@ -37,23 +37,6 @@ export function VppCertificateTab({
         variables: { uid: customerUid },
         fetchPolicy: 'network-only'
     });
-
-
-    const STEPS = [
-        ...(solarDetails?.hassolar === 1 ? [{ id: 0, label: 'Solar Details', icon: SunIcon }] : []),
-        { id: 1, label: 'Inverter Details', icon: PlugIcon },
-        { id: 2, label: 'Battery Details', icon: ZapIcon },
-        { id: 3, label: 'Network & API', icon: FileTextIcon },
-        { id: 4, label: 'Testing & Verification', icon: ShieldCheckIcon },
-    ];
-
-    const [generateVppCertificate] = useMutation(GENERATE_VPP_CERTIFICATE);
-    const [isSaving, setIsSaving] = useState(false); // This 'isSaving' is for the final certificate generation
-    const [isSavingDraft, setIsSavingDraft] = useState(false); // This 'isSavingDraft' is for saving as draft
-    const [currentStep, setCurrentStep] = useState(0);
-    const [previewModalOpen, setPreviewModalOpen] = useState(false);
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     const [formState, setFormState] = useState({
         batteryManufacturer: '',
@@ -87,6 +70,60 @@ export function VppCertificateTab({
         testResult: '',
         additionalNotes: ''
     });
+
+    const { data: makesData } = useQuery(GET_BATTERY_MAKES);
+
+    const [getBatteryModels, { data: batteryModelsData, loading: loadingBatteryModels }] = useLazyQuery(GET_BATTERY_MODELS);
+    const [getInverterModels, { data: inverterModelsData, loading: loadingInverterModels }] = useLazyQuery(GET_BATTERY_MODELS);
+
+    const handleManufacturerChange = (field: 'batteryManufacturer' | 'inverterManufacturer', value: string) => {
+        const make = makesData?.batteryMakes?.find((m: any) => m.make === value);
+
+        setFormState(prev => ({
+            ...prev,
+            [field]: value,
+            [field === 'batteryManufacturer' ? 'batteryModel' : 'inverterModel']: ''
+        }));
+
+        if (make) {
+            if (field === 'batteryManufacturer') {
+                getBatteryModels({ variables: { makeUid: make.uid } });
+            } else {
+                getInverterModels({ variables: { makeUid: make.uid } });
+            }
+        }
+    };
+
+    const batteryMakeOptions = makesData?.batteryMakes?.map((m: any) => ({
+        value: m.make,
+        label: m.make
+    })) || [];
+
+    const batteryModelOptions = batteryModelsData?.batteryModels?.map((m: any) => ({
+        value: m.model,
+        label: m.model
+    })) || [];
+
+    const inverterModelOptions = inverterModelsData?.batteryModels?.map((m: any) => ({
+        value: m.model,
+        label: m.model
+    })) || [];
+
+    const STEPS = [
+        ...(solarDetails?.hassolar === 1 ? [{ id: 0, label: 'Solar Details', icon: SunIcon }] : []),
+        { id: 1, label: 'Inverter Details', icon: PlugIcon },
+        { id: 2, label: 'Battery Details', icon: ZapIcon },
+        { id: 3, label: 'Network & API', icon: FileTextIcon },
+        { id: 4, label: 'Testing & Verification', icon: ShieldCheckIcon },
+    ];
+
+    const [generateVppCertificate] = useMutation(GENERATE_VPP_CERTIFICATE);
+    const [isSaving, setIsSaving] = useState(false); // This 'isSaving' is for the final certificate generation
+    const [isSavingDraft, setIsSavingDraft] = useState(false); // This 'isSavingDraft' is for saving as draft
+    const [currentStep, setCurrentStep] = useState(0);
+    const [previewModalOpen, setPreviewModalOpen] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     useEffect(() => {
         if (data?.customer?.vppCertificateDetails) {
@@ -161,6 +198,7 @@ export function VppCertificateTab({
         setPreviewUrl(`${baseUrl}/vpp-certificate/preview/${customerUid}`);
         setPreviewModalOpen(true);
     };
+
 
     // Required fields for full certificate generation (excludes if_yes_details, internet_other_text, all test fields + timestamps)
     const REQUIRED_FIELDS: { key: string; label: string }[] = [
@@ -495,15 +533,21 @@ export function VppCertificateTab({
                                     <label className="text-sm font-medium text-foreground">Manufacturer</label>
                                     <Select
                                         value={formState.batteryManufacturer}
-                                        onChange={(v: any) => setFormState(prev => ({ ...prev, batteryManufacturer: v as string }))}
-                                        options={BATTERY_BRAND_OPTIONS}
+                                        onChange={(v: any) => handleManufacturerChange('batteryManufacturer', v as string)}
+                                        options={batteryMakeOptions}
                                         placeholder="Select brand"
                                         disabled={vppDetails?.vppConnected === 1}
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Model</label>
-                                    <Input name="batteryModel" value={formState.batteryModel} onChange={handleChange} placeholder="e.g. Powerwall 2" />
+                                    <Select
+                                        value={formState.batteryModel}
+                                        onChange={(v: any) => setFormState(prev => ({ ...prev, batteryModel: v as string }))}
+                                        options={batteryModelOptions}
+                                        placeholder={loadingBatteryModels ? "Loading models..." : "Select model"}
+                                        disabled={!formState.batteryManufacturer || loadingBatteryModels}
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
@@ -545,14 +589,20 @@ export function VppCertificateTab({
                                     <label className="text-sm font-medium text-foreground">Manufacturer</label>
                                     <Select
                                         value={formState.inverterManufacturer}
-                                        onChange={(v: any) => setFormState(prev => ({ ...prev, inverterManufacturer: v as string }))}
-                                        options={BATTERY_BRAND_OPTIONS}
+                                        onChange={(v: any) => handleManufacturerChange('inverterManufacturer', v as string)}
+                                        options={batteryMakeOptions}
                                         placeholder="Select brand"
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Model</label>
-                                    <Input name="inverterModel" value={formState.inverterModel} onChange={handleChange} />
+                                    <Select
+                                        value={formState.inverterModel}
+                                        onChange={(v: any) => setFormState(prev => ({ ...prev, inverterModel: v as string }))}
+                                        options={inverterModelOptions}
+                                        placeholder={loadingInverterModels ? "Loading models..." : "Select model"}
+                                        disabled={!formState.inverterManufacturer || loadingInverterModels}
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>

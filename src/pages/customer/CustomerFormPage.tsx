@@ -18,6 +18,7 @@ import {
     UPDATE_CUSTOMER,
     GET_RISK_STATUSES,
     GET_MEASUREMENT_UNITS,
+    GET_ACTIVE_BONUSES,
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
@@ -168,6 +169,7 @@ const initialFormData: CustomerFormData = {
     discount: 0,
     previousBill: null,
     identityProof: null,
+    selectedBonuses: [],
 };
 
 const generateGEECustomerId = () => {
@@ -385,7 +387,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                             const parsedDynamicRates = typeof offer.dynamicRates === 'string'
                                 ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
                                 : (offer.dynamicRates || []);
-                            
+
                             const fitRates = parsedDynamicRates.filter((r: any) => r.type === 'fit');
                             return fitRates.map((rate: any, idx: number) => {
                                 const unitName = units[rate.unitId] || '';
@@ -598,8 +600,14 @@ export const CustomerFormPage = () => {
     const { data: historicRatesData } = useQuery(GET_RATES_HISTORY_BY_VERSION, {
         variables: { version: activeVersionForLookup },
         skip: !activeVersionForLookup,
-        fetchPolicy: 'cache-first',
+        fetchPolicy: 'network-only',
     });
+
+    const { data: bonusesData } = useQuery(GET_ACTIVE_BONUSES, {
+        fetchPolicy: 'cache-and-network'
+    });
+    const activeBonuses = bonusesData?.activeBonuses || [];
+
 
     // Default DOB to 18 years ago for new customers if empty
     useEffect(() => {
@@ -658,6 +666,7 @@ export const CustomerFormPage = () => {
             label: country.name,
         }));
     }, []);
+
 
 
 
@@ -736,6 +745,7 @@ export const CustomerFormPage = () => {
                 identityProof: c.identityProof || null,
                 licenseDocument: c.licenseDocument || null,
                 additionalDocument: c.additionalDocument || null,
+                selectedBonuses: c.selectedBonuses || []
             });
 
             if (c.phoneVerifiedAt) {
@@ -1322,6 +1332,7 @@ export const CustomerFormPage = () => {
                 customerId: isEditMode ? undefined : generatedCustomerId,
                 triggerWelcomeEmail: isEditMode ? (finalStatus === 2) : undefined,
                 triggerUpdateEmail: isEditMode ? significantChanges : undefined,
+                selectedBonuses: formData.selectedBonuses
             };
 
             let savedCustomer;
@@ -1606,7 +1617,7 @@ export const CustomerFormPage = () => {
                                         {formData.vpp && (
                                             <div className="p-4 pt-0 space-y-5 animate-in slide-in-from-top-2 duration-300">
                                                 {/* Signup Bonus Card */}
-                                                <div className="p-4 rounded-xl border border-dashed border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                                {/* <div className="p-4 rounded-xl border border-dashed border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                                     <div>
                                                         <div className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wide">
                                                             <ZapIcon size={14} />
@@ -1634,9 +1645,52 @@ export const CustomerFormPage = () => {
                                                             'Add $600 Bonus'
                                                         )}
                                                     </Button>
-                                                </div>
+                                                </div> */}
 
                                                 {/* Battery details moved to Customer Modal on VPP Connect */}
+
+                                                {/* Dynamic Bonuses */}
+                                                {activeBonuses.filter((b: any) => b.uid !== 'vpp_signup_bonus_uid').map((bonus: any) => {
+                                                    const isApplied = formData.selectedBonuses.includes(bonus.uid);
+                                                    return (
+                                                        <div key={bonus.uid} className="p-4 rounded-xl border border-dashed border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                                                            <div>
+                                                                <div className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wide">
+                                                                    <ZapIcon size={14} />
+                                                                    {bonus.name}
+                                                                </div>
+                                                                {bonus.description && (
+                                                                    <div className="text-xs text-muted-foreground mt-1 max-w-md leading-relaxed">
+                                                                        {bonus.description}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    const newSelected = isApplied
+                                                                        ? formData.selectedBonuses.filter(uid => uid !== bonus.uid)
+                                                                        : [...formData.selectedBonuses, bonus.uid];
+                                                                    updateField('selectedBonuses', newSelected);
+                                                                }}
+                                                                className={cn(
+                                                                    "shrink-0 transition-all font-semibold shadow-sm",
+                                                                    isApplied
+                                                                        ? "bg-primary hover:bg-primary/90 text-primary-foreground border-transparent"
+                                                                        : "bg-transparent border-primary/20 text-primary hover:bg-primary/10"
+                                                                )}
+                                                                variant={isApplied ? 'default' : 'outline'}
+                                                            >
+                                                                {isApplied ? (
+                                                                    <><CheckIcon className="w-3 h-3 mr-1.5" /> Bonus Applied</>
+                                                                ) : (
+                                                                    `Add $${bonus.amount} Bonus`
+                                                                )}
+                                                            </Button>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
@@ -1990,7 +2044,7 @@ export const CustomerFormPage = () => {
                                                                         const parsedDynamicRates = typeof offer.dynamicRates === 'string'
                                                                             ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
                                                                             : (offer.dynamicRates || []);
-                                                                        
+
                                                                         const fitRates = parsedDynamicRates.filter((r: any) => r.type === 'fit');
                                                                         return fitRates.map((dRate: any, id: number) => {
                                                                             const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';

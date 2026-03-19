@@ -43,3 +43,9 @@ export * from './mutations/riskStatuses';
 // PDF Terms
 export * from './queries/pdfTerms';
 export * from './mutations/pdfTerms';
+
+// Battery
+export * from './queries/battery';
+
+// Bonus
+export * from './queries/bonus';
