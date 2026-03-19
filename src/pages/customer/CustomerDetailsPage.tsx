@@ -40,6 +40,7 @@ import {
 import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
 import { cn } from '@/lib/utils';
+import { getName } from 'country-list';
 
 import {
     SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS,
@@ -2936,7 +2937,9 @@ export function CustomerDetailsPage() {
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-muted-foreground uppercase font-semibold">ID Country</label>
                                                     <p className="font-medium">
-                                                        {selectedCustomerDetails.enrollmentDetails?.idcountry || '-'}
+                                                        {selectedCustomerDetails.enrollmentDetails?.idcountry
+                                                            ? getName(selectedCustomerDetails.enrollmentDetails.idcountry) || selectedCustomerDetails.enrollmentDetails.idcountry
+                                                            : '-'}
                                                     </p>
                                                 </div>
                                             ) : (

@@ -42,6 +42,7 @@ export const GET_CUSTOMERS = gql`
                 createdAt
                 offerEmailSentAt
                 updatedAt
+                selectedBonuses
                 previousBill {
                     id
                     filename
@@ -459,6 +460,7 @@ export const GET_CUSTOMER_BY_ID = gql`
     query GetCustomerById($uid: String!) {
         customer(uid: $uid) {
             uid
+            selectedBonuses
             customerId
             email
             firstName
