@@ -758,18 +758,94 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             }
             previousBill {
                 id
+                uid
+                customerUid
                 filename
                 path
+                size
+                mimeType
+                documentType {
+                    uid
+                    name
+                    color
+                    category
+                }
+                createdAt
+                updatedAt
+                createdBy
+                createdByUser {
+                    uid
+                    name
+                }
             }
             identityProof {
                 id
+                uid
+                customerUid
                 filename
                 path
+                size
+                mimeType
+                documentType {
+                    uid
+                    name
+                    color
+                    category
+                }
+                createdAt
+                updatedAt
+                createdBy
+                createdByUser {
+                    uid
+                    name
+                }
             }
             licenseDocument {
                 id
+                uid
+                customerUid
                 filename
                 path
+                size
+                mimeType
+                documentType {
+                    uid
+                    name
+                    color
+                    category
+                }
+                createdAt
+                updatedAt
+                createdBy
+                createdByUser {
+                    uid
+                    name
+                }
+            }
+            documents {
+                id
+                uid
+                customerUid
+                type
+                name
+                filename
+                path
+                size
+                mimeType
+                documentType {
+                    uid
+                    name
+                    color
+                    category
+                }
+                startDate
+                endDate
+                createdAt
+                createdBy
+                createdByUser {
+                    uid
+                    name
+                }
             }
             vppCertificateDetails {
                 isAllRequiredFilled

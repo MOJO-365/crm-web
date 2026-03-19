@@ -1156,7 +1156,7 @@ export function CustomerDetailsPage() {
         let apiPath = '';
         let fileName = 'Offer_Preview.html';
 
-        if (selectedCustomerDetails?.signedPdfPath) {
+        if (selectedCustomerDetails && selectedCustomerDetails.status > 2 && selectedCustomerDetails.signedPdfPath) {
             const path = selectedCustomerDetails.signedPdfPath;
             apiPath = `/documents/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
             fileName = path.split('/').pop() || 'document.pdf';
@@ -2242,7 +2242,7 @@ export function CustomerDetailsPage() {
                                                         className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
                                                     >
                                                         <EyeIcon size={15} className="text-muted-foreground" />
-                                                        {isLoadingPreview ? 'Loading...' : (selectedCustomerDetails.signedPdfPath ? 'View Signed Agreement' : 'Preview Offer')}
+                                                        {isLoadingPreview ? 'Loading...' : (selectedCustomerDetails.status > 2 ? 'View Signed Agreement' : 'Preview Offer')}
                                                     </button>
                                                     {hasNotInterested && (
                                                         <button
