@@ -103,6 +103,7 @@ const SOLAR_FIT_OPTION = {
 `
 };
 
+
 // Available variables that can be inserted into PDF terms content
 const PDF_VARIABLES = [
     { label: 'Solar Eligibility', value: '{{solarEligibility}}', description: 'Solar eligibility text (shown when customer has solar)' },
@@ -753,7 +754,7 @@ export function PdfTermsPage() {
                             </div>
                         )}
 
-                                {formData.rateType === 'charges' && (
+                        {formData.rateType === 'charges' && (
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-foreground">Insert Charges Terms</label>
                                 <div className="flex flex-wrap gap-2">

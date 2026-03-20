@@ -164,6 +164,7 @@ export const HtmlEditor = React.forwardRef<HtmlEditorHandle, HtmlEditorProps>(({
     const [dropdownPosition, setDropdownPosition] = React.useState({ top: 0, left: 0 });
     const [placeholderSearch, setPlaceholderSearch] = React.useState('');
     const [activeFormats, setActiveFormats] = React.useState<Set<string>>(new Set());
+    const [isInTable, setIsInTable] = React.useState(false);
 
     React.useImperativeHandle(ref, () => ({
         insertHTML: (html: string) => {
@@ -199,6 +200,11 @@ export const HtmlEditor = React.forwardRef<HtmlEditorHandle, HtmlEditorProps>(({
     // Fullscreen state
     const [isFullscreen, setIsFullscreen] = React.useState(false);
     const [buttonUrl, setButtonUrl] = React.useState('https://');
+
+    // Table popover state
+    const [showTablePopover, setShowTablePopover] = React.useState(false);
+    const [tableRows, setTableRows] = React.useState(2);
+    const [tableCols, setTableCols] = React.useState(4);
 
     // Helper functions for wrapping/unwrapping HTML
     const wrapHtml = (content: string) => {
@@ -252,12 +258,12 @@ ${content}
         const temp = document.createElement('div');
         temp.innerHTML = html;
 
-        // Find all variable spans (contenteditable="false" with [[...]] content)
+        // Find all variable spans (contenteditable="false" with [[...]] or {{...}} content)
         const variableSpans = temp.querySelectorAll('span[contenteditable="false"]');
         variableSpans.forEach(span => {
             const text = span.textContent || '';
-            // If it looks like a variable [[...]], replace span with just the text
-            if (text.match(/^\[\[.+\]\]$/)) {
+            // Match both [[VAR]] and {{VAR}}
+            if (text.match(/^\[\[.+\]\]$/) || text.match(/^\{\{.+\}\}$/)) {
                 const textNode = document.createTextNode(text);
                 span.parentNode?.replaceChild(textNode, span);
             }
@@ -485,6 +491,20 @@ ${content}
         }
         setCurrentFontSize(size);
 
+        // Check if cursor is inside a table
+        let isInTableContext = false;
+        if (selection && selection.rangeCount > 0) {
+            let node = selection.getRangeAt(0).startContainer;
+            while (node && node !== editorRef.current) {
+                if (node.nodeName === 'TABLE') {
+                    isInTableContext = true;
+                    break;
+                }
+                node = node.parentNode!;
+            }
+        }
+        setIsInTable(isInTableContext);
+
         // ALWAYS save selection on candidate change
         saveSelection();
     }, []);
@@ -605,31 +625,125 @@ ${content}
 
     // Insert table
     const handleTable = () => {
+        saveSelection();
+        setShowTablePopover(!showTablePopover);
+    };
+
+    const insertTable = () => {
         if (!editorRef.current) return;
-        
+
         editorRef.current.focus();
         restoreSelection();
 
+        const rows = Math.max(1, Math.min(20, tableRows));
+        const cols = Math.max(1, Math.min(10, tableCols));
+        const cellWidth = Math.floor(100 / cols);
+
+        let bodyRowsHtml = '';
+        for (let r = 0; r < rows; r++) {
+            let cellsHtml = '';
+            for (let c = 0; c < cols; c++) {
+                // If 4 columns, alternate Label-Value-Label-Value
+                const isLabel = cols === 4 ? (c % 2 === 0) : (c === 0);
+                const bg = isLabel ? 'background: #f0f0f0;' : '';
+                const weight = isLabel ? 'font-weight: bold;' : '';
+                const color = isLabel ? 'color: #000000;' : 'color: #1c1c1c;';
+                
+                cellsHtml += `<td style="padding: 3px 8px; border-width: 1px !important; border-style: solid !important; border-color: #6ab54a !important; ${weight} ${bg} ${color} width: ${cellWidth}%; vertical-align: top;"><br></td>`;
+            }
+            bodyRowsHtml += `<tr>${cellsHtml}</tr>`;
+        }
+
+        const tableStyle = 'width: 100%; border-collapse: collapse; font-size: 12px; font-family: "Helvetica Neue", Arial, sans-serif; border-width: 2px !important; border-style: solid !important; border-color: #6ab54a !important; border-radius: 12px;';
+        const wrapperStyle = 'width: 100%; border-radius: 12px; overflow: hidden; border-width: 2px !important; border-style: solid !important; border-color: #6ab54a !important; margin: 12px 0; display: block;';
+        const thStyle = 'background: #6ab54a !important; color: #ffffff !important; text-align: left; padding: 10px; font-weight: bold; font-size: 14px; border-width: 1px !important; border-style: solid !important; border-color: #6ab54a !important;';
+
         const tableHtml = `
-<table style="border-collapse: collapse; width: 100%; margin: 10px 0;">
-    <tr>
-        <th style="border: 1px solid #ddd; padding: 8px; background-color: #f5f5f5;">Header 1</th>
-        <th style="border: 1px solid #ddd; padding: 8px; background-color: #f5f5f5;">Header 2</th>
-        <th style="border: 1px solid #ddd; padding: 8px; background-color: #f5f5f5;">Header 3</th>
-    </tr>
-    <tr>
-        <td style="border: 1px solid #ddd; padding: 8px;">Cell 1</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">Cell 2</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">Cell 3</td>
-    </tr>
-    <tr>
-        <td style="border: 1px solid #ddd; padding: 8px;">Cell 4</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">Cell 5</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">Cell 6</td>
-    </tr>
-</table><p></p>`;
+<div class="details-table-wrapper" style="${wrapperStyle}">
+    <table class="details-table" style="${tableStyle}">
+        <thead>
+            <tr>
+                <th colspan="${cols}" style="${thStyle}">TABLE HEADING</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${bodyRowsHtml}
+        </tbody>
+    </table>
+</div><p><br></p>`;
         document.execCommand('insertHTML', false, tableHtml);
         handleInput();
+        setShowTablePopover(false);
+    };
+
+    const handleAddRow = () => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+
+        let node = selection.getRangeAt(0).startContainer;
+        while (node && node !== editorRef.current && node.nodeName !== 'TR') {
+            node = node.parentNode!;
+        }
+
+        if (node && node.nodeName === 'TR') {
+            const tr = node as HTMLTableRowElement;
+            const newRow = tr.cloneNode(true) as HTMLTableRowElement;
+            Array.from(newRow.cells).forEach(cell => {
+                cell.innerHTML = '<br>';
+                // Ensure border is consistent and explicit
+                cell.style.borderWidth = '1px';
+                cell.style.borderStyle = 'solid';
+                cell.style.borderColor = '#6ab54a';
+                cell.style.setProperty('border', '1px solid #6ab54a', 'important');
+            });
+            tr.parentNode?.insertBefore(newRow, tr.nextSibling);
+            handleInput();
+        }
+    };
+
+    const handleAddColumn = () => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+
+        let node = selection.getRangeAt(0).startContainer;
+        while (node && node !== editorRef.current && node.nodeName !== 'TABLE') {
+            node = node.parentNode!;
+        }
+
+        if (node && node.nodeName === 'TABLE') {
+            const table = node as HTMLTableElement;
+            
+            // Add cell to header
+            const thead = table.tHead;
+            if (thead) {
+                Array.from(thead.rows).forEach(row => {
+                    const lastCell = row.cells[row.cells.length - 1];
+                    if (lastCell.colSpan > 1) {
+                        lastCell.colSpan += 1;
+                    } else {
+                        const th = document.createElement('th');
+                        // Copy styles from last header cell if possible
+                        th.style.cssText = lastCell.style.cssText;
+                        th.textContent = 'Header';
+                        row.appendChild(th);
+                    }
+                });
+            }
+
+            // Add cell to all rows in body
+            Array.from(table.tBodies).forEach(tbody => {
+                Array.from(tbody.rows).forEach(row => {
+                    const td = document.createElement('td');
+                    const lastTd = row.cells[row.cells.length - 1];
+                    td.style.cssText = lastTd.style.cssText;
+                    td.style.setProperty('border', '1px solid #6ab54a', 'important');
+                    td.innerHTML = '<br>';
+                    row.appendChild(td);
+                });
+            });
+
+            handleInput();
+        }
     };
 
     // Save current selection/cursor position
@@ -740,6 +854,9 @@ ${content}
             }
             if (showButtonPopover && !target.closest('.button-popover-container')) {
                 setShowButtonPopover(false);
+            }
+            if (showTablePopover && !target.closest('.table-popover-container')) {
+                setShowTablePopover(false);
             }
         };
         document.addEventListener('click', handleClickOutside);
@@ -977,11 +1094,69 @@ ${content}
                     </div>
 
                     {/* Table */}
-                    <ToolbarButton
-                        icon={<TableIcon />}
-                        onClick={handleTable}
-                        title="Insert Table"
-                    />
+                    <div className="relative table-popover-container">
+                        <ToolbarButton
+                            icon={<TableIcon />}
+                            onClick={handleTable}
+                            title="Insert Table"
+                            isActive={showTablePopover}
+                        />
+                        {showTablePopover && (
+                            <div className="absolute left-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-[9999] p-3">
+                                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-3 text-center">Table Dimensions</div>
+                                <div className="flex flex-col gap-3">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <label className="text-[10px] text-gray-500 uppercase font-bold">Rows</label>
+                                        <input
+                                            type="number"
+                                            value={tableRows}
+                                            min="1"
+                                            max="20"
+                                            onChange={(e) => setTableRows(parseInt(e.target.value) || 1)}
+                                            className="w-16 px-2 py-1 text-sm border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4">
+                                        <label className="text-[10px] text-gray-500 uppercase font-bold">Cols</label>
+                                        <input
+                                            type="number"
+                                            value={tableCols}
+                                            min="1"
+                                            max="10"
+                                            onChange={(e) => setTableCols(parseInt(e.target.value) || 1)}
+                                            className="w-16 px-2 py-1 text-sm border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={insertTable}
+                                        className="w-full mt-1 px-3 py-1.5 text-xs font-medium text-white bg-primary rounded hover:bg-primary-hover shadow-sm transition-colors"
+                                    >
+                                        Insert Table
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {isInTable && (
+                        <div className="flex items-center bg-orange-50 dark:bg-orange-900/20 rounded ml-1 px-1 border border-orange-200 dark:border-orange-800">
+                             <ToolbarButton
+                                icon={<div className="font-bold">+</div>}
+                                onClick={handleAddRow}
+                                title="Add Row"
+                                label="Row"
+                                className="text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40"
+                            />
+                             <ToolbarButton
+                                icon={<div className="font-bold">+</div>}
+                                onClick={handleAddColumn}
+                                title="Add Column"
+                                label="Col"
+                                className="text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40"
+                            />
+                        </div>
+                    )}
 
                     <ToolbarDivider />
 
@@ -1170,23 +1345,28 @@ ${content}
             if (selection && selection.rangeCount > 0) {
                 const range = selection.getRangeAt(0);
                 const textNode = range.startContainer;
+                
+                // If we are in a text node, check for previous '['
                 if (textNode.nodeType === Node.TEXT_NODE) {
                     const text = textNode.textContent || '';
                     const offset = range.startOffset;
-                    // Check if previous character is also [
+                    
                     if (offset > 0 && text[offset - 1] === '[') {
+                        // We found '[['
                         e.preventDefault();
-                        // Remove the first [ from content
+                        
+                        // Delete the first '['
                         const newText = text.slice(0, offset - 1) + text.slice(offset);
                         textNode.textContent = newText;
-                        // Set cursor position
+                        
+                        // Position cursor for insertion
                         range.setStart(textNode, offset - 1);
                         range.setEnd(textNode, offset - 1);
                         selection.removeAllRanges();
                         selection.addRange(range);
+                        
                         saveSelection();
-                        openVariableMenuAtCursor(true); // Open at text cursor
-                        return;
+                        openVariableMenuAtCursor(true);
                     }
                 }
             }
