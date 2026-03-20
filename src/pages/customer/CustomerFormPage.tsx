@@ -23,7 +23,7 @@ import {
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
 import { secondaryApiAxios } from '@/lib/apollo';
-import { formatDateTime, dayjs } from '@/lib/date';
+import { formatDateTime } from '@/lib/date';
 import {
     ChevronRightIcon,
     HomeIcon,
@@ -434,39 +434,58 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                     </div>
                 )}
 
-                {/* Combined Extra Charges Column */}
+                {/* Dynamic Rates Columns */}
                 {(() => {
                     const parsedDynamicRates = typeof offer.dynamicRates === 'string'
                         ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
                         : (offer.dynamicRates || []);
 
+                    if (!parsedDynamicRates || parsedDynamicRates.length === 0) return null;
+
+                    const fitRates = parsedDynamicRates.filter((r: any) => r.type === 'fit');
                     const chargeRates = parsedDynamicRates.filter((r: any) => r.type === 'charges');
                     const untypedRates = parsedDynamicRates.filter((r: any) => !r.type);
 
-                    if (chargeRates.length === 0 && untypedRates.length === 0) return null;
+                    const renderRatesColumn = (rates: any[], label: string, colorClass: string, icon: any = ActivityIcon) => {
+                        if (rates.length === 0) return null;
+                        const Icon = icon;
+                        return (
+                            <div className="space-y-2 min-w-[180px] flex-1">
+                                <div className={cn("flex items-center gap-2 mb-2",
+                                    colorClass === 'indigo' ? "text-indigo-500 dark:text-indigo-400" : "text-teal-500 dark:text-teal-400"
+                                )}>
+                                    <Icon size={14} />
+                                    <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
+                                </div>
+                                <div className="space-y-2">
+                                    {rates.map((dRate: any, id: number) => {
+                                        const unitName = dRate.unitId ? units[dRate.unitId] : '';
+                                        const val = parseFloat(String(dRate.value || '0'));
+                                        return (
+                                            <div key={id} className={cn(
+                                                colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
+                                                "rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm"
+                                            )}>
+                                                <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-sm")}>
+                                                    ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
+                                                </div>
+                                                <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "text-[10px] font-bold uppercase tracking-wider opacity-80")}>
+                                                    {dRate.name}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    };
 
                     return (
-                        <div className="space-y-2 min-w-[180px] flex-1">
-                            <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400 mb-2">
-                                <ActivityIcon size={14} />
-                                <span className="text-xs font-bold uppercase tracking-wide">
-                                    {(untypedRates.length > 0 && (vpp || isVppPlan)) ? "Extra FiT" : "Extra Charges"}
-                                </span>
-                            </div>
-                            {[...chargeRates, ...untypedRates].map((rate: any, idx: number) => {
-                                const unitName = units[rate.unitId] || '';
-                                return (
-                                    <div key={`dyn-charge-${idx}`} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                        <div className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">
-                                            ${Number(rate.value).toFixed(4)}{unitName ? `/${unitName}` : ''}
-                                        </div>
-                                        <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">
-                                            {rate.name}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        <>
+                            {renderRatesColumn(chargeRates, "Extra Charges", "indigo")}
+                            {renderRatesColumn(fitRates, "Extra FiT", "teal", ZapIcon)}
+                            {untypedRates.length > 0 && renderRatesColumn(untypedRates, (vpp || isVppPlan) ? "Extra FIT" : "Extra Charge", "indigo")}
+                        </>
                     );
                 })()}
             </div>
@@ -609,12 +628,6 @@ export const CustomerFormPage = () => {
     const activeBonuses = bonusesData?.activeBonuses || [];
 
 
-    // Default DOB to 18 years ago for new customers if empty
-    useEffect(() => {
-        if (!isEditMode && !formData.dob) {
-            updateField('dob', dayjs(eighteenYearsAgo).format('YYYY-MM-DD'));
-        }
-    }, [isEditMode, eighteenYearsAgo]);
 
     // Derived Data - Parse rate plans from active or historic rates
     const ratePlans: RatePlan[] = useMemo(() => {
@@ -674,10 +687,6 @@ export const CustomerFormPage = () => {
     useEffect(() => {
         if (customerData?.customer) {
             const c = customerData.customer;
-            // Set default DOB if missing (for 18+ requirement)
-            if (!c.dob) {
-                c.dob = dayjs(eighteenYearsAgo).format('YYYY-MM-DD');
-            }
 
             setFormData({
                 firstName: c.firstName || '',
@@ -969,7 +978,7 @@ export const CustomerFormPage = () => {
                 break;
             case 'phone':
                 if (!/^\d+$/.test(value.replace(/\s/g, ''))) return 'Mobile number must contain digits only';
-                if (value.replace(/\s/g, '').length < 10) return 'Mobile number must be at least 10 digits';
+                if (value.replace(/\s/g, '').length < 9) return 'Mobile number must be at least 9 digits';
                 break;
             case 'nmi':
                 if (!/^\d+$/.test(value)) return 'NMI must contain digits only';
@@ -994,10 +1003,13 @@ export const CustomerFormPage = () => {
 
         if (field === 'phone' || field === 'nmi') {
             // Remove non-numeric characters for these fields if user is typing
-            // Allow spaces for phone for readability if desired, but request said "only number should be able to write"
-            // Let's implement strict number enforcement for simplicity as per request
             if (typeof value === 'string') {
                 finalValue = value.replace(/\D/g, '');
+
+                // For phone, prevent starting with 0
+                if (field === 'phone' && finalValue.startsWith('0')) {
+                    finalValue = finalValue.substring(1);
+                }
             }
         }
 
@@ -1016,9 +1028,6 @@ export const CustomerFormPage = () => {
                     enquiryAmount: '',
                     dob: ''
                 }));
-            } else if (!formData.dob) {
-                // Pre-fill DOB with 18 years ago date when credit score is enabled
-                setFormData(prev => ({ ...prev, dob: dayjs(eighteenYearsAgo).format('YYYY-MM-DD') }));
             }
         }
 
@@ -1438,7 +1447,12 @@ export const CustomerFormPage = () => {
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                             <Field label="Mobile" required error={errors.phone}>
                                                 <div className="flex flex-wrap gap-2 items-center">
-                                                    <Input containerClassName="w-full sm:w-64" placeholder="+61 400 000 000" value={formData.phone} onChange={(e) => updateField('phone', e.target.value)} onBlur={() => handleBlur('phone')} />
+                                                    <div className="flex items-center">
+                                                        <div className="flex items-center justify-center h-10 px-3 bg-muted border border-r-0 border-border rounded-l-xl text-sm font-medium text-muted-foreground whitespace-nowrap">
+                                                            +61
+                                                        </div>
+                                                        <Input containerClassName="w-full sm:w-56" className="rounded-l-none" placeholder="400 000 000" value={formData.phone} onChange={(e) => updateField('phone', e.target.value)} onBlur={() => handleBlur('phone')} />
+                                                    </div>
                                                     <Button
                                                         onClick={handleSendOTP}
                                                         type="button"
@@ -1573,9 +1587,9 @@ export const CustomerFormPage = () => {
                                                 <span>Solar at this property?</span>
                                             </div>
                                             <div className="flex items-center gap-3">
-                                                <ToggleSwitch checked={formData.hasSolar} onChange={(checked) => updateField('hasSolar', checked)} />
                                                 <span className="text-sm text-neutral-600 w-20 text-right">{formData.hasSolar ? 'Has Solar' : 'No Solar'}</span>
-                                                <div className="transform transition-transform group-open:rotate-180"><ChevronRightIcon size={16} className="rotate-90" /></div>
+                                                <ToggleSwitch checked={formData.hasSolar} onChange={(checked) => updateField('hasSolar', checked)} />
+                                                {/* <div className="transform transition-transform group-open:rotate-180"><ChevronRightIcon size={16} className="rotate-90" /></div> */}
                                             </div>
                                         </summary>
 
@@ -1617,7 +1631,7 @@ export const CustomerFormPage = () => {
                                         {formData.vpp && (
                                             <div className="p-4 pt-0 space-y-5 animate-in slide-in-from-top-2 duration-300">
                                                 {/* Signup Bonus Card */}
-                                                {/* <div className="p-4 rounded-xl border border-dashed border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                                <div className="p-4 rounded-xl border border-dashed border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                                     <div>
                                                         <div className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wide">
                                                             <ZapIcon size={14} />
@@ -1645,7 +1659,7 @@ export const CustomerFormPage = () => {
                                                             'Add $600 Bonus'
                                                         )}
                                                     </Button>
-                                                </div> */}
+                                                </div>
 
                                                 {/* Battery details moved to Customer Modal on VPP Connect */}
 
@@ -2039,28 +2053,7 @@ export const CustomerFormPage = () => {
                                                                         </>
                                                                     )}
 
-                                                                    {/* Dynamic FiT Rates merged here */}
-                                                                    {(() => {
-                                                                        const parsedDynamicRates = typeof offer.dynamicRates === 'string'
-                                                                            ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
-                                                                            : (offer.dynamicRates || []);
-
-                                                                        const fitRates = parsedDynamicRates.filter((r: any) => r.type === 'fit');
-                                                                        return fitRates.map((dRate: any, id: number) => {
-                                                                            const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
-                                                                            const val = parseFloat(String(dRate.value || '0'));
-                                                                            return (
-                                                                                <div key={`dyn-fit-${id}`} className="bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                                    <div className="text-teal-600 dark:text-teal-400 font-bold text-base tracking-tight">
-                                                                                        ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
-                                                                                    </div>
-                                                                                    <div className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider opacity-80">
-                                                                                        {dRate.name}
-                                                                                    </div>
-                                                                                </div>
-                                                                            );
-                                                                        });
-                                                                    })()}
+                                                                    {/* Dynamic FiT Rates handled in dynamic columns below */}
                                                                 </div>
                                                             </div>
                                                         )}
@@ -2101,42 +2094,58 @@ export const CustomerFormPage = () => {
                                                             </div>
                                                         )}
 
-                                                        {/* Combined Extra Charges Column */}
+                                                        {/* Dynamic Rates Columns */}
                                                         {(() => {
                                                             const parsedDynamicRates = typeof offer.dynamicRates === 'string'
                                                                 ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
                                                                 : (offer.dynamicRates || []);
 
+                                                            if (!parsedDynamicRates || parsedDynamicRates.length === 0) return null;
+
+                                                            const fitRates = parsedDynamicRates.filter((r: any) => r.type === 'fit');
                                                             const chargeRates = parsedDynamicRates.filter((r: any) => r.type === 'charges');
                                                             const untypedRates = parsedDynamicRates.filter((r: any) => !r.type);
 
-                                                            if (chargeRates.length === 0 && untypedRates.length === 0) return null;
+                                                            const renderRatesColumn = (rates: any[], label: string, colorClass: string, icon: any = ActivityIcon) => {
+                                                                if (rates.length === 0) return null;
+                                                                const Icon = icon;
+                                                                return (
+                                                                    <div className="space-y-4 min-w-[180px] flex-1">
+                                                                        <div className={cn("flex items-center gap-2 mb-2",
+                                                                            colorClass === 'indigo' ? "text-indigo-500 dark:text-indigo-400" : "text-teal-500 dark:text-teal-400"
+                                                                        )}>
+                                                                            <Icon size={16} />
+                                                                            <h4 className="text-sm font-bold uppercase tracking-wide">{label}</h4>
+                                                                        </div>
+                                                                        <div className="space-y-3">
+                                                                            {rates.map((dRate: any, id: number) => {
+                                                                                const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
+                                                                                const val = parseFloat(String(dRate.value || '0'));
+                                                                                return (
+                                                                                    <div key={id} className={cn(
+                                                                                        colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
+                                                                                        "rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
+                                                                                    )}>
+                                                                                        <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-base tracking-tight")}>
+                                                                                            ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
+                                                                                        </div>
+                                                                                        <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "text-[10px] font-bold uppercase tracking-wider opacity-80")}>
+                                                                                            {dRate.name}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            };
 
                                                             return (
-                                                                <div className="space-y-4 min-w-[180px] flex-1">
-                                                                    <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
-                                                                        <ActivityIcon size={16} />
-                                                                        <h4 className="text-sm font-bold uppercase tracking-wide">
-                                                                            {(untypedRates.length > 0 && (formData.vpp || selectedRatePlan?.vpp === 1)) ? "Extra FiT" : "Extra Charges"}
-                                                                        </h4>
-                                                                    </div>
-                                                                    <div className="space-y-3">
-                                                                        {[...chargeRates, ...untypedRates].map((dRate: any, id: number) => {
-                                                                            const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
-                                                                            const val = parseFloat(String(dRate.value || '0'));
-                                                                            return (
-                                                                                <div key={`dyn-charge-${id}`} className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                                    <div className="text-indigo-600 dark:text-indigo-400 font-bold text-base tracking-tight">
-                                                                                        ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
-                                                                                    </div>
-                                                                                    <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider opacity-80">
-                                                                                        {dRate.name}
-                                                                                    </div>
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                </div>
+                                                                <>
+                                                                    {renderRatesColumn(chargeRates, "Extra Charges", "indigo")}
+                                                                    {renderRatesColumn(fitRates, "Extra FiT", "teal", ZapIcon)}
+                                                                    {untypedRates.length > 0 && renderRatesColumn(untypedRates, (formData.vpp || selectedRatePlan?.vpp === 1) ? "Extra FIT" : "Extra Charge", "indigo")}
+                                                                </>
                                                             );
                                                         })()}
                                                     </div>
@@ -2590,7 +2599,7 @@ export const CustomerFormPage = () => {
                                             <div>
                                                 <h3 className="font-medium mb-3 flex items-center gap-2"><IdCardIcon size={16} className="text-blue-600" /> Identity & Credit Score</h3>
                                                 <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
-                                                    <p className="flex justify-between border-b pb-2 mb-2"><span className="text-muted-foreground">Driver's License:</span> <span className="font-medium">{formData.licenseNumber} ({formData.licenseState})</span></p>
+                                                    <p className="flex justify-between border-b pb-2 mb-2"><span className="text-muted-foreground">Driver's License:</span> <span className="font-medium">{formData.licenseNumber} {formData.licenseState ? `(${formData.licenseState})` : '—'}</span></p>
                                                     <p className="flex justify-between border-b pb-2 mb-2"><span className="text-muted-foreground">License Expiry:</span> <span className="font-medium">{formData.licenseExpiry || '—'}</span></p>
 
                                                     <p className="flex justify-between pt-1"><span className="text-muted-foreground">Check Credit Score:</span> <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded uppercase ${formData.checkCreditScore ? 'bg-green-500/10 text-green-600' : 'bg-muted text-muted-foreground'}`}>{formData.checkCreditScore ? 'Enabled' : 'Disabled'}</span></p>
@@ -2628,7 +2637,7 @@ export const CustomerFormPage = () => {
                                                 <h3 className="font-medium mb-3 flex items-center gap-2"><ShieldIcon size={16} className="text-blue-600" /> Plan & Pricing</h3>
                                                 <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Tariff Code:</span> <span className="font-medium">{formData.tariffCode}</span></p>
-                                                    <p className="flex justify-between"><span className="text-muted-foreground">Discount:</span> <span className="font-medium badge bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded">{formData.discount > 0 ? `${formData.discount}%` : '—'}</span></p>
+                                                    <p className="flex justify-between"><span className="text-muted-foreground">Discount:</span> <span className="font-medium badge bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded">{formData.discount > 0 ? `${formData.discount}%` : '0%'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Distributor:</span> <span className="font-medium">{selectedRatePlan?.dnsp !== undefined ? (DNSP_MAP[selectedRatePlan.dnsp.toString()] || selectedRatePlan.dnsp) : '—'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Tariff Type:</span> <span className="font-medium">{selectedRatePlan?.tariff || '—'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Pricing Version:</span> <span className="font-medium font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{activeVersionForLookup || activeRateVersion}</span></p>

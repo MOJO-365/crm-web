@@ -59,7 +59,6 @@ export const OfferAccessPage = () => {
     const [customerData, setCustomerData] = useState<any>(null);
     const [fetchError, setFetchError] = useState(false);
     const [offerExpired, setOfferExpired] = useState(false);
-
     const [directDebitOptIn, setDirectDebitOptIn] = useState(true);
     const [ddDetails, setDdDetails] = useState({
         accountType: 'business' as 'business' | 'personal',
@@ -862,10 +861,10 @@ export const OfferAccessPage = () => {
                                 <div className="text-xs text-muted-foreground mb-1">Discount</div>
                                 <div className="text-sm font-medium text-foreground">{`${customerData.discount}%`}</div>
                             </div>}
-                            <div>
+                            {/* <div>
                                 <div className="text-xs text-muted-foreground mb-1">Rate Version</div>
                                 <div className="text-sm font-medium text-foreground">{customerData.rateVersion || '—'}</div>
-                            </div>
+                            </div> */}
                             <div>
                                 <div className="text-xs text-muted-foreground mb-1">Sale Type</div>
                                 <div className="text-sm font-medium text-foreground">{SALE_TYPE_LABELS[customerData.enrollmentDetails?.saletype ?? 0] || 'Direct'}</div>
