@@ -649,17 +649,21 @@ ${content}
                 const weight = isLabel ? 'font-weight: bold;' : '';
                 const color = isLabel ? 'color: #000000;' : 'color: #1c1c1c;';
                 
-                cellsHtml += `<td style="padding: 3px 8px; border: 1px solid #6ab54a !important; ${weight} ${bg} ${color} width: ${cellWidth}%; vertical-align: top;"><br></td>`;
+                cellsHtml += `<td style="padding: 3px 8px; border-width: 1px !important; border-style: solid !important; border-color: #6ab54a !important; ${weight} ${bg} ${color} width: ${cellWidth}%; vertical-align: top;"><br></td>`;
             }
             bodyRowsHtml += `<tr>${cellsHtml}</tr>`;
         }
 
+        const tableStyle = 'width: 100%; border-collapse: collapse; font-size: 12px; font-family: "Helvetica Neue", Arial, sans-serif; border-width: 2px !important; border-style: solid !important; border-color: #6ab54a !important; border-radius: 12px;';
+        const wrapperStyle = 'width: 100%; border-radius: 12px; overflow: hidden; border-width: 2px !important; border-style: solid !important; border-color: #6ab54a !important; margin: 12px 0; display: block;';
+        const thStyle = 'background: #6ab54a !important; color: #ffffff !important; text-align: left; padding: 10px; font-weight: bold; font-size: 14px; border-width: 1px !important; border-style: solid !important; border-color: #6ab54a !important;';
+
         const tableHtml = `
-<div style="width: 100%; border-radius: 12px; overflow: hidden; border: 2px solid #6ab54a !important; margin: 12px 0;">
-    <table style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Helvetica Neue', Arial, sans-serif; border: 2px solid #6ab54a !important; border-radius: 12px;">
+<div class="details-table-wrapper" style="${wrapperStyle}">
+    <table class="details-table" style="${tableStyle}">
         <thead>
             <tr>
-                <th colspan="${cols}" style="background: #6ab54a !important; color: #ffffff !important; text-align: left; padding: 10px; font-weight: bold; font-size: 14px; border: 1px solid #6ab54a !important;">TABLE HEADING</th>
+                <th colspan="${cols}" style="${thStyle}">TABLE HEADING</th>
             </tr>
         </thead>
         <tbody>
@@ -686,6 +690,11 @@ ${content}
             const newRow = tr.cloneNode(true) as HTMLTableRowElement;
             Array.from(newRow.cells).forEach(cell => {
                 cell.innerHTML = '<br>';
+                // Ensure border is consistent and explicit
+                cell.style.borderWidth = '1px';
+                cell.style.borderStyle = 'solid';
+                cell.style.borderColor = '#6ab54a';
+                cell.style.setProperty('border', '1px solid #6ab54a', 'important');
             });
             tr.parentNode?.insertBefore(newRow, tr.nextSibling);
             handleInput();
@@ -727,6 +736,7 @@ ${content}
                     const td = document.createElement('td');
                     const lastTd = row.cells[row.cells.length - 1];
                     td.style.cssText = lastTd.style.cssText;
+                    td.style.setProperty('border', '1px solid #6ab54a', 'important');
                     td.innerHTML = '<br>';
                     row.appendChild(td);
                 });
