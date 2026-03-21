@@ -781,15 +781,15 @@ export const OfferAccessPage = () => {
         <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8 pb-24">
             <div className="max-w-4xl mx-auto space-y-6">
                 {/* Header */}
-                <div className="bg-card rounded-xl shadow-sm border border-border p-6">
-                    <div className="flex justify-between items-start border-b border-border pb-4 mb-4">
+                <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 border-b border-border pb-4 mb-4">
                         <div className="flex items-center gap-3">
-                            <img src={MainLogo} alt="GEE Energy" className="h-10 w-auto" />
-                            <h1 className="text-xl font-bold text-foreground">Offer Summary</h1>
+                            <img src={MainLogo} alt="GEE Energy" className="h-8 sm:h-10 w-auto shrink-0" />
+                            <h1 className="text-lg sm:text-xl font-bold text-foreground leading-tight">Offer Summary</h1>
                         </div>
-                        <div className="text-right">
-                            <div className="text-sm text-muted-foreground">Offer <span className="font-medium text-foreground">#{customerData.customerId}</span></div>
-                            <div className="text-sm text-muted-foreground">{formatDate(customerData.createdAt)}</div>
+                        <div className="text-left sm:text-right shrink-0">
+                            <div className="text-xs sm:text-sm text-muted-foreground">Offer <span className="font-medium text-foreground">#{customerData.customerId}</span></div>
+                            <div className="text-xs sm:text-sm text-muted-foreground">{formatDate(customerData.createdAt)}</div>
                         </div>
                     </div>
 
@@ -849,7 +849,7 @@ export const OfferAccessPage = () => {
                     {/* Additional Details */}
                     <div className="mt-6 pt-4 border-t border-border">
                         <h3 className="text-sm font-semibold text-foreground mb-3">Customer Details</h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-muted/50 rounded-lg p-4">
+                        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-4 gap-4 bg-muted/50 rounded-lg p-4">
                             <div>
                                 <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">Property Type</div>
                                 <div className="text-sm font-medium text-gray-900 dark:text-white">{RATE_TYPE_MAP[customerData.propertyType] || 'Residential'}</div>
@@ -906,7 +906,7 @@ export const OfferAccessPage = () => {
                         {customerData.vppDetails?.vpp === 1 && (
                             <div className="mt-4">
                                 <h4 className="text-xs text-muted-foreground mb-2 font-medium uppercase">VPP Participant</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
+                                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
                                     {[
                                         { label: 'VPP Enrolled', value: 'Yes' },
                                         { label: 'VPP Connected', value: customerData.vppDetails?.vppConnected === 1 ? 'Yes' : null },
@@ -963,7 +963,7 @@ export const OfferAccessPage = () => {
                         {customerData.solarDetails?.hassolar === 1 && (
                             <div className="mt-4">
                                 <h4 className="text-xs text-muted-foreground mb-2 font-medium uppercase">Solar System</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
+                                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
                                     {[
                                         { label: 'Has Solar', value: 'Yes' },
                                         { label: 'Solar Capacity', value: customerData.solarDetails?.solarcapacity ? `${customerData.solarDetails.solarcapacity} kW` : null },
@@ -983,7 +983,7 @@ export const OfferAccessPage = () => {
                         {/* Identification */}
                         <div className="mt-4">
                             <h4 className="text-xs text-muted-foreground mb-2 font-medium uppercase">Identification</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
+                            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
                                 <div>
                                     <div className="text-xs text-muted-foreground mb-1">ID Type & Number</div>
                                     <div className="text-sm font-medium text-foreground">
