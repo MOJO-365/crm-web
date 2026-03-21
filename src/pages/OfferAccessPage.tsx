@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
 import { GET_CUSTOMER_BY_CUSTOMER_ID } from '@/graphql/queries/customers';
 import { GET_MEASUREMENT_UNITS } from '@/graphql/queries/rates';
+import { GET_ALL_BONUSES } from '@/graphql/queries/bonus';
 import {
     UPDATE_CUSTOMER,
     //  UPLOAD_FILE 
@@ -97,6 +98,7 @@ export const OfferAccessPage = () => {
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sigPadRef = useRef<any>(null);
+    const hiddenInputRef = useRef<HTMLInputElement>(null);
 
     // const [uploadFile] = useMutation(UPLOAD_FILE);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
@@ -105,6 +107,12 @@ export const OfferAccessPage = () => {
     const { data: unitsData } = useQuery(GET_MEASUREMENT_UNITS, {
         fetchPolicy: 'cache-first'
     });
+
+    // Fetch all bonuses for dynamic bonus display
+    const { data: bonusesData } = useQuery(GET_ALL_BONUSES, {
+        fetchPolicy: 'cache-and-network'
+    });
+    const allBonuses = bonusesData?.bonuses || [];
 
     // Memoize the mapping so we do not recalculate on every render
     const unitMap = React.useMemo(() => {
@@ -283,6 +291,13 @@ export const OfferAccessPage = () => {
                     ctx.textBaseline = 'middle';
                     // Center in logical coordinates
                     ctx.fillText(typed, (canvas.width / ratio) / 2, (canvas.height / ratio) / 2);
+                } else {
+                    // Draw placeholder
+                    ctx.font = '24px sans-serif';
+                    ctx.fillStyle = '#94a3b8'; // text-slate-400
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('Tap here to type your name', (canvas.width / ratio) / 2, (canvas.height / ratio) / 2);
                 }
             }
         }
@@ -895,16 +910,27 @@ export const OfferAccessPage = () => {
                                     {[
                                         { label: 'VPP Enrolled', value: 'Yes' },
                                         { label: 'VPP Connected', value: customerData.vppDetails?.vppConnected === 1 ? 'Yes' : null },
-                                        { label: 'Signup Bonus', value: customerData.vppDetails?.vppSignupBonus ? '$50 monthly bill credit for 12 months (total $600)' : null },
+                                        {
+                                            label: 'Signup Bonus',
+                                            value: [
+                                                customerData.vppDetails?.vppSignupBonus ? '$50 monthly bill credit for 12 months (total $600)' : null,
+                                                ...(customerData.selectedBonuses && customerData.selectedBonuses.length > 0
+                                                    ? allBonuses
+                                                        .filter((b: any) => customerData.selectedBonuses.includes(b.uid))
+                                                        .map((b: any) => b.description || b.name)
+                                                    : [])
+                                            ].filter(Boolean).join(', ') || null,
+                                            fullWidth: true
+                                        },
                                         ...(customerData.batteryDetails ? [
                                             { label: 'Battery Brand', value: customerData.batteryDetails.batterybrand || null },
                                             { label: 'SN Number', value: customerData.batteryDetails.snnumber || null },
                                             { label: 'Battery Capacity', value: customerData.batteryDetails.batterycapacity ? `${customerData.batteryDetails.batterycapacity} kW` : null },
                                             { label: 'Export Limit', value: customerData.batteryDetails.exportlimit ? `${customerData.batteryDetails.exportlimit} kW` : null },
                                         ] : [])
-                                    ].map((item, i) => (
+                                    ].map((item: any, i) => (
                                         item.value ? (
-                                            <div key={i}>
+                                            <div key={i} className={item.fullWidth ? "sm:col-span-3" : ""}>
                                                 <div className="text-xs text-muted-foreground mb-1">{item.label}</div>
                                                 <div className="text-sm font-medium text-foreground">{item.value}</div>
                                             </div>
@@ -1585,7 +1611,14 @@ export const OfferAccessPage = () => {
                         </div>
 
                         {/* Signature area */}
-                        <div className="block bg-white dark:bg-transparent">
+                        <div
+                            className="relative block bg-white dark:bg-transparent"
+                            onClick={() => {
+                                if (mode === 'type') {
+                                    hiddenInputRef.current?.focus();
+                                }
+                            }}
+                        >
                             <canvas
                                 ref={canvasRef}
                                 width={480}
@@ -1593,17 +1626,16 @@ export const OfferAccessPage = () => {
                                 className="border border-gray-200 rounded w-full bg-white dark:bg-[#e1d6c4] dark:invert cursor-crosshair h-64"
                                 style={{ display: 'block', touchAction: 'none' }}
                             />
+                            {mode === 'type' && (
+                                <input
+                                    ref={hiddenInputRef}
+                                    className="absolute inset-0 opacity-0 pointer-events-none"
+                                    value={typed}
+                                    onChange={(e) => setTyped(e.target.value)}
+                                    autoFocus
+                                />
+                            )}
                         </div>
-
-                        {mode === 'type' && (
-                            <input
-                                className="border border-gray-200 dark:border-slate-700 rounded px-2 py-1 w-full font-cursive text-xl bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                value={typed}
-                                onChange={(e) => setTyped(e.target.value)}
-                                placeholder="Type your name"
-                                style={{ fontFamily: 'cursive' }}
-                            />
-                        )}
 
                         {/* Consents */}
                         <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">

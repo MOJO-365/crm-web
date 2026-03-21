@@ -67,12 +67,12 @@ export function EmailSendPage() {
             label: 'Agreement Signed',
             description: 'Confirmation email sent after customer signs their agreement',
             attachments: [
-                'GEE Welcome Pack.pdf',
-                'GEE Welcome Offer.pdf',
-                'GEE_Direct_Debit_Request.pdf',
-                'GEE Terms & Conditions.pdf',
-                'GEE Disclosure Statement.pdf',
-                'GEE Withdrawal Form.pdf'
+                'gee-welcome-pack.pdf',
+                'GEE Direct Debit Service Agreement.pdf',
+                'GEE-TERMS-AND-CONDITIONS.pdf',
+                'GEE-PDS.pdf',
+                'GEE Withdrawal Form.pdf',
+                'GEE-Privacy-Policy.pdf'
             ]
         },
         {
@@ -234,13 +234,16 @@ export function EmailSendPage() {
                                                 <span className="text-sm text-muted-foreground dark:text-gray-400 w-20">Attachments:</span>
                                                 <div className="flex flex-wrap gap-2">
                                                     {event.attachments.map((file, idx) => (
-                                                        <span
+                                                        <a
                                                             key={idx}
-                                                            className="inline-flex items-center px-2 py-1 rounded text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                                                            href={`/onboarding/${file}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center px-2 py-1 rounded text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                                                         >
                                                             <FileTextIcon size={12} className="mr-1 text-blue-500" />
                                                             {file}
-                                                        </span>
+                                                        </a>
                                                     ))}
                                                 </div>
                                             </div>
