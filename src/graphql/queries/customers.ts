@@ -1126,6 +1126,7 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
     query GetCustomerByCustomerId($customerId: String!) {
         customerByCustomerId(customerId: $customerId) {
             uid
+            selectedBonuses
             customerId
             email
             firstName

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
 import { GET_CUSTOMER_BY_CUSTOMER_ID } from '@/graphql/queries/customers';
 import { GET_MEASUREMENT_UNITS } from '@/graphql/queries/rates';
+import { GET_ALL_BONUSES } from '@/graphql/queries/bonus';
 import {
     UPDATE_CUSTOMER,
     //  UPLOAD_FILE 
@@ -97,6 +98,7 @@ export const OfferAccessPage = () => {
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sigPadRef = useRef<any>(null);
+    const hiddenInputRef = useRef<HTMLInputElement>(null);
 
     // const [uploadFile] = useMutation(UPLOAD_FILE);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
@@ -105,6 +107,12 @@ export const OfferAccessPage = () => {
     const { data: unitsData } = useQuery(GET_MEASUREMENT_UNITS, {
         fetchPolicy: 'cache-first'
     });
+
+    // Fetch all bonuses for dynamic bonus display
+    const { data: bonusesData } = useQuery(GET_ALL_BONUSES, {
+        fetchPolicy: 'cache-and-network'
+    });
+    const allBonuses = bonusesData?.bonuses || [];
 
     // Memoize the mapping so we do not recalculate on every render
     const unitMap = React.useMemo(() => {
@@ -283,6 +291,13 @@ export const OfferAccessPage = () => {
                     ctx.textBaseline = 'middle';
                     // Center in logical coordinates
                     ctx.fillText(typed, (canvas.width / ratio) / 2, (canvas.height / ratio) / 2);
+                } else {
+                    // Draw placeholder
+                    ctx.font = '24px sans-serif';
+                    ctx.fillStyle = '#94a3b8'; // text-slate-400
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('Tap here to type your name', (canvas.width / ratio) / 2, (canvas.height / ratio) / 2);
                 }
             }
         }
@@ -766,15 +781,15 @@ export const OfferAccessPage = () => {
         <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8 pb-24">
             <div className="max-w-4xl mx-auto space-y-6">
                 {/* Header */}
-                <div className="bg-card rounded-xl shadow-sm border border-border p-6">
-                    <div className="flex justify-between items-start border-b border-border pb-4 mb-4">
+                <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 border-b border-border pb-4 mb-4">
                         <div className="flex items-center gap-3">
-                            <img src={MainLogo} alt="GEE Energy" className="h-10 w-auto" />
-                            <h1 className="text-xl font-bold text-foreground">Offer Summary</h1>
+                            <img src={MainLogo} alt="GEE Energy" className="h-8 sm:h-10 w-auto shrink-0" />
+                            <h1 className="text-lg sm:text-xl font-bold text-foreground leading-tight">Offer Summary</h1>
                         </div>
-                        <div className="text-right">
-                            <div className="text-sm text-muted-foreground">Offer <span className="font-medium text-foreground">#{customerData.customerId}</span></div>
-                            <div className="text-sm text-muted-foreground">{formatDate(customerData.createdAt)}</div>
+                        <div className="text-left sm:text-right shrink-0">
+                            <div className="text-xs sm:text-sm text-muted-foreground">Offer <span className="font-medium text-foreground">#{customerData.customerId}</span></div>
+                            <div className="text-xs sm:text-sm text-muted-foreground">{formatDate(customerData.createdAt)}</div>
                         </div>
                     </div>
 
@@ -834,7 +849,7 @@ export const OfferAccessPage = () => {
                     {/* Additional Details */}
                     <div className="mt-6 pt-4 border-t border-border">
                         <h3 className="text-sm font-semibold text-foreground mb-3">Customer Details</h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-muted/50 rounded-lg p-4">
+                        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-4 gap-4 bg-muted/50 rounded-lg p-4">
                             <div>
                                 <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">Property Type</div>
                                 <div className="text-sm font-medium text-gray-900 dark:text-white">{RATE_TYPE_MAP[customerData.propertyType] || 'Residential'}</div>
@@ -891,20 +906,31 @@ export const OfferAccessPage = () => {
                         {customerData.vppDetails?.vpp === 1 && (
                             <div className="mt-4">
                                 <h4 className="text-xs text-muted-foreground mb-2 font-medium uppercase">VPP Participant</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
+                                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
                                     {[
                                         { label: 'VPP Enrolled', value: 'Yes' },
                                         { label: 'VPP Connected', value: customerData.vppDetails?.vppConnected === 1 ? 'Yes' : null },
-                                        { label: 'Signup Bonus', value: customerData.vppDetails?.vppSignupBonus ? '$50 monthly bill credit for 12 months (total $600)' : null },
+                                        {
+                                            label: 'Signup Bonus',
+                                            value: [
+                                                customerData.vppDetails?.vppSignupBonus ? '$50 monthly bill credit for 12 months (total $600)' : null,
+                                                ...(customerData.selectedBonuses && customerData.selectedBonuses.length > 0
+                                                    ? allBonuses
+                                                        .filter((b: any) => customerData.selectedBonuses.includes(b.uid))
+                                                        .map((b: any) => b.description || b.name)
+                                                    : [])
+                                            ].filter(Boolean).join(', ') || null,
+                                            fullWidth: true
+                                        },
                                         ...(customerData.batteryDetails ? [
                                             { label: 'Battery Brand', value: customerData.batteryDetails.batterybrand || null },
                                             { label: 'SN Number', value: customerData.batteryDetails.snnumber || null },
                                             { label: 'Battery Capacity', value: customerData.batteryDetails.batterycapacity ? `${customerData.batteryDetails.batterycapacity} kW` : null },
                                             { label: 'Export Limit', value: customerData.batteryDetails.exportlimit ? `${customerData.batteryDetails.exportlimit} kW` : null },
                                         ] : [])
-                                    ].map((item, i) => (
+                                    ].map((item: any, i) => (
                                         item.value ? (
-                                            <div key={i}>
+                                            <div key={i} className={item.fullWidth ? "sm:col-span-3" : ""}>
                                                 <div className="text-xs text-muted-foreground mb-1">{item.label}</div>
                                                 <div className="text-sm font-medium text-foreground">{item.value}</div>
                                             </div>
@@ -937,7 +963,7 @@ export const OfferAccessPage = () => {
                         {customerData.solarDetails?.hassolar === 1 && (
                             <div className="mt-4">
                                 <h4 className="text-xs text-muted-foreground mb-2 font-medium uppercase">Solar System</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
+                                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
                                     {[
                                         { label: 'Has Solar', value: 'Yes' },
                                         { label: 'Solar Capacity', value: customerData.solarDetails?.solarcapacity ? `${customerData.solarDetails.solarcapacity} kW` : null },
@@ -957,7 +983,7 @@ export const OfferAccessPage = () => {
                         {/* Identification */}
                         <div className="mt-4">
                             <h4 className="text-xs text-muted-foreground mb-2 font-medium uppercase">Identification</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
+                            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
                                 <div>
                                     <div className="text-xs text-muted-foreground mb-1">ID Type & Number</div>
                                     <div className="text-sm font-medium text-foreground">
@@ -1585,7 +1611,14 @@ export const OfferAccessPage = () => {
                         </div>
 
                         {/* Signature area */}
-                        <div className="block bg-white dark:bg-transparent">
+                        <div
+                            className="relative block bg-white dark:bg-transparent"
+                            onClick={() => {
+                                if (mode === 'type') {
+                                    hiddenInputRef.current?.focus();
+                                }
+                            }}
+                        >
                             <canvas
                                 ref={canvasRef}
                                 width={480}
@@ -1593,17 +1626,16 @@ export const OfferAccessPage = () => {
                                 className="border border-gray-200 rounded w-full bg-white dark:bg-[#e1d6c4] dark:invert cursor-crosshair h-64"
                                 style={{ display: 'block', touchAction: 'none' }}
                             />
+                            {mode === 'type' && (
+                                <input
+                                    ref={hiddenInputRef}
+                                    className="absolute inset-0 opacity-0 pointer-events-none"
+                                    value={typed}
+                                    onChange={(e) => setTyped(e.target.value)}
+                                    autoFocus
+                                />
+                            )}
                         </div>
-
-                        {mode === 'type' && (
-                            <input
-                                className="border border-gray-200 dark:border-slate-700 rounded px-2 py-1 w-full font-cursive text-xl bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                value={typed}
-                                onChange={(e) => setTyped(e.target.value)}
-                                placeholder="Type your name"
-                                style={{ fontFamily: 'cursive' }}
-                            />
-                        )}
 
                         {/* Consents */}
                         <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">

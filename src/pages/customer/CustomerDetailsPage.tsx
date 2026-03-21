@@ -3590,13 +3590,27 @@ export function CustomerDetailsPage() {
                                                                         </Button>
                                                                     </div>
                                                                 ) : (
-                                                                    <Select
-                                                                        options={docTypeOptions.filter(o => o.value !== '2')}
-                                                                        value={newDocumentType}
-                                                                        onChange={(val) => setNewDocumentType(val as string)}
-                                                                        placeholder="Select Type..."
-                                                                        className="w-full bg-background h-9"
-                                                                    />
+                                                                    <div className="flex gap-2">
+                                                                        <Select
+                                                                            options={docTypeOptions.filter(o => o.value !== '2')}
+                                                                            value={newDocumentType}
+                                                                            onChange={(val) => setNewDocumentType(val as string)}
+                                                                            placeholder="Select Type..."
+                                                                            className="flex-1 bg-background h-9"
+                                                                        />
+                                                                        {newDocumentType && (
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                onClick={() => {
+                                                                                    setNewDocumentType('');
+                                                                                }}
+                                                                                className="h-9 px-3 text-xs border-input hover:bg-accent hover:text-accent-foreground"
+                                                                            >
+                                                                                Clear
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         </td>
@@ -3605,16 +3619,6 @@ export function CustomerDetailsPage() {
                                                         <td className="px-4 py-4 text-right align-bottom">
                                                             <div className="flex flex-col gap-2 items-end">
                                                                 <div className="flex gap-2">
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() => {
-                                                                            setNewDocumentType('');
-                                                                        }}
-                                                                        className="h-8 px-3 text-xs border-input hover:bg-accent hover:text-accent-foreground"
-                                                                    >
-                                                                        Clear
-                                                                    </Button>
                                                                     <Button
                                                                         size="sm"
                                                                         className="bg-neutral-900 text-white hover:bg-neutral-800 h-8 px-3 text-xs"
