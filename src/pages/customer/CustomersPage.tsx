@@ -36,6 +36,7 @@ interface CustomerAddress {
 interface Customer {
     uid: string;
     customerId?: string;
+    title?: string;
     firstName: string;
     lastName: string;
     email: string;
@@ -450,7 +451,7 @@ export function CustomersPage() {
             ),
             width: 'w-[200px]',
             render: (row) => {
-                const fullName = `${row.firstName} ${row.lastName}`;
+                const fullName = `${row.title ? row.title + ' ' : ''}${row.firstName} ${row.lastName}`;
                 return (
                     <div className="flex flex-col items-start gap-1">
                         <Tooltip content={fullName} fullWidth>

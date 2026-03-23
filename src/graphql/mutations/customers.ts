@@ -9,6 +9,7 @@ const CUSTOMER_FULL_RESPONSE = `
     customerId
     tenant
     email
+    title
     firstName
     lastName
     businessName

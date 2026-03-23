@@ -95,6 +95,7 @@ interface DocumentItem {
 interface CustomerDetails {
     uid: string;
     customerId?: string;
+    title?: string;
     firstName: string;
     lastName: string;
     businessName?: string;
@@ -2131,7 +2132,7 @@ export function CustomerDetailsPage() {
                                 <div>
                                     <div className="flex flex-wrap items-center gap-3 mb-1">
                                         <h1 className="text-xl font-bold tracking-tight text-foreground">
-                                            {selectedCustomerDetails ? `${selectedCustomerDetails.firstName} ${selectedCustomerDetails.lastName}` : 'Customer Details'}
+                                            {selectedCustomerDetails ? `${selectedCustomerDetails.title ? selectedCustomerDetails.title + ' ' : ''}${selectedCustomerDetails.firstName} ${selectedCustomerDetails.lastName}` : 'Customer Details'}
                                         </h1>
                                         {selectedCustomerDetails && (
                                             <StatusField

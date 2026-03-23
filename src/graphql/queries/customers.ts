@@ -12,6 +12,7 @@ export const GET_CUSTOMERS = gql`
                 customerId
                 tenant
                 email
+                title
                 firstName
                 lastName
                 businessName
@@ -233,6 +234,7 @@ export const GET_CUSTOMERS_LIST = gql`
                 customerId
                 tenant
                 email
+                title
                 firstName
                 lastName
                 businessName
@@ -414,6 +416,7 @@ export const GET_CUSTOMERS_CURSOR = gql`
                 uid
                 customerId
                 tenant
+                title
                 firstName
                 lastName
                 number
@@ -463,6 +466,7 @@ export const GET_CUSTOMER_BY_ID = gql`
             selectedBonuses
             customerId
             email
+            title
             firstName
             lastName
             businessName
@@ -625,6 +629,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             uid
             customerId
             email
+            title
             firstName
             lastName
             businessName

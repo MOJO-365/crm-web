@@ -21,7 +21,7 @@ import {
     GET_ACTIVE_BONUSES,
     GET_NEXT_CUSTOMER_ID,
 } from '@/graphql';
-import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
+import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
 import { secondaryApiAxios } from '@/lib/apollo';
 import { formatDateTime } from '@/lib/date';
@@ -99,6 +99,7 @@ interface VersionOption {
 // ============================================================================
 
 const initialFormData: CustomerFormData = {
+    title: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -675,6 +676,7 @@ export const CustomerFormPage = () => {
             const c = customerData.customer;
 
             setFormData({
+                title: c.title || '',
                 firstName: c.firstName || '',
                 lastName: c.lastName || '',
                 email: c.email || '',
@@ -1006,10 +1008,10 @@ export const CustomerFormPage = () => {
             }
         }
 
-        // Standardize First Name and Last Name to UPPERCASE
-        if (field === 'firstName' || field === 'lastName') {
-            if (typeof value === 'string') {
-                finalValue = value.toUpperCase();
+        // Standardize Name fields: only first letter capital
+        if (['firstName', 'lastName', 'debitFirstName', 'debitLastName'].includes(field)) {
+            if (typeof value === 'string' && value.length > 0) {
+                finalValue = value.trim().charAt(0).toUpperCase() + value.trim().slice(1).toLowerCase();
             }
         }
 
@@ -1282,6 +1284,7 @@ export const CustomerFormPage = () => {
             const significantChanges = hasSignificantChanges();
 
             const input = {
+                title: formData.title,
                 email: formData.email,
                 firstName: formData.firstName,
                 lastName: formData.lastName,
@@ -2187,7 +2190,8 @@ export const CustomerFormPage = () => {
                                 <div className="space-y-8">
                                     <div className="p-4 rounded-lg border border-border bg-muted/30 space-y-4">
                                         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Personal</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                            <Select label="Title" options={TITLE_OPTIONS} value={formData.title} onChange={(val) => updateField('title', val as string)} onBlur={() => handleBlur('title')} />
                                             <Input label="First Name" required error={errors.firstName} placeholder="e.g. Alex" value={formData.firstName} onChange={(e) => updateField('firstName', e.target.value)} onBlur={() => handleBlur('firstName')} />
                                             <Input label="Last Name" required error={errors.lastName} placeholder="e.g. Taylor" value={formData.lastName} onChange={(e) => updateField('lastName', e.target.value)} onBlur={() => handleBlur('lastName')} />
                                             <DatePicker
@@ -2604,7 +2608,7 @@ export const CustomerFormPage = () => {
                                             <div>
                                                 <h3 className="font-medium mb-3 flex items-center gap-2"><UserIcon size={16} className="text-blue-600" /> Customer Information</h3>
                                                 <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
-                                                    <p className="flex justify-between"><span className="text-muted-foreground">Name:</span> <span className="font-medium">{formData.firstName} {formData.lastName}</span></p>
+                                                    <p className="flex justify-between"><span className="text-muted-foreground">Name:</span> <span className="font-medium">{formData.title ? `${formData.title} ` : ''}{formData.firstName} {formData.lastName}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Email:</span> <span className="font-medium">{formData.email}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Mobile:</span> <span className="font-medium">{formData.phone} {phoneVerified && '✓'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">DOB:</span> <span className="font-medium">{formatDate(formData.dob, { includeTime: false }) || '—'}</span></p>
@@ -2883,7 +2887,7 @@ export const CustomerFormPage = () => {
                                 <SummaryItem icon={PercentIcon} label="% Discount" value={`${formData.discount}%`} />
                                 <SummaryItem icon={ZapIcon} label="Sale type" value={SALE_TYPE_OPTIONS.find(o => o.value === formData.saleType.toString())?.label} />
                                 <SummaryItem icon={CalendarIcon} label="Connection date" value={formData.connectionDate} />
-                                <SummaryItem icon={UserIcon} label="Name" value={`${formData.firstName} ${formData.lastName}`} />
+                                <SummaryItem icon={UserIcon} label="Name" value={`${formData.title ? `${formData.title} ` : ''}${formData.firstName} ${formData.lastName}`} />
                                 <SummaryItem icon={MailIcon} label="Email" value={formData.email} />
                                 <SummaryItem icon={CalendarIcon} label="DOB" value={formData.dob} />
                                 <SummaryItem icon={IdCardIcon} label="License" value={formData.licenseNumber || '—'} />
