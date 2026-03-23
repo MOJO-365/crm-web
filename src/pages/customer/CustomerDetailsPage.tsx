@@ -849,6 +849,7 @@ export function CustomerDetailsPage() {
     const [freezeModalOpen, setFreezeModalOpen] = useState(false);
     // const [customerToFreeze, setCustomerToFreeze] = useState<CustomerDetails | null>(null); // Not needed since we use selectedCustomerDetails
     const [markingNotInterested, setMarkingNotInterested] = useState(false);
+    const [notInterestedModalOpen, setNotInterestedModalOpen] = useState(false);
     const [isHardDelete, setIsHardDelete] = useState(false);
     const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -1542,6 +1543,7 @@ export function CustomerDetailsPage() {
             toast.error(error.message || 'Failed to update customer status');
         } finally {
             setMarkingNotInterested(false);
+            setNotInterestedModalOpen(false);
         }
 
     };
@@ -2247,7 +2249,8 @@ export function CustomerDetailsPage() {
                                                     {hasNotInterested && (
                                                         <button
                                                             onClick={() => {
-                                                                handleMarkNotInterested();
+                                                                setNotInterestedModalOpen(true);
+                                                                setActionsMenuOpen(false);
                                                             }}
                                                             disabled={markingNotInterested}
                                                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
@@ -3736,6 +3739,7 @@ export function CustomerDetailsPage() {
                                                                                 confirmText="Delete"
                                                                                 onConfirm={() => item.doc?.path && handleDeleteDocument(item.doc.path)}
                                                                                 confirmVariant="destructive"
+                                                                                placement="left"
                                                                             >
                                                                                 <Button
                                                                                     variant="outline"
@@ -4141,6 +4145,45 @@ export function CustomerDetailsPage() {
                     </p>
                     <p className="text-gray-500 dark:text-gray-400">
                         This will create a new customer record and mark the current one as Frozen.
+                    </p>
+                </div>
+            </Modal>
+
+            {/* Not Interested Confirmation Modal */}
+            <Modal
+                isOpen={notInterestedModalOpen}
+                onClose={() => setNotInterestedModalOpen(false)}
+                title="Confirm Not Interested"
+                size="sm"
+                footer={
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => setNotInterestedModalOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            onClick={handleMarkNotInterested}
+                            isLoading={markingNotInterested}
+                            loadingText="Updating..."
+                        >
+                            Confirm Not Interested
+                        </Button>
+                    </>
+                }
+            >
+                <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <p className="mb-3">
+                        Are you sure you want to mark customer{' '}
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                            {selectedCustomerDetails?.firstName} {selectedCustomerDetails?.lastName}
+                        </span>{' '}
+                        as <span className="font-semibold text-red-600">Not Interested</span>?
+                    </p>
+                    <p className="text-gray-500 dark:text-gray-400">
+                        This will update the customer's status. You can change it back later if needed.
                     </p>
                 </div>
             </Modal>
