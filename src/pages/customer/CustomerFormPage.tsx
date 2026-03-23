@@ -19,6 +19,7 @@ import {
     GET_RISK_STATUSES,
     GET_MEASUREMENT_UNITS,
     GET_ACTIVE_BONUSES,
+    GET_NEXT_CUSTOMER_ID,
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
@@ -165,10 +166,6 @@ const initialFormData: CustomerFormData = {
     selectedBonuses: [],
 };
 
-const generateGEECustomerId = () => {
-    const randomNum = Math.floor(10000 + Math.random() * 90000);
-    return `GEE${randomNum}`;
-};
 
 const streetTypeOptions = [
     { value: 'St', label: 'Street' },
@@ -472,7 +469,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
 export const CustomerFormPage = () => {
     const { uid } = useParams();
     const navigate = useNavigate();
-    const isEditMode = uid && uid !== 'new';
+    const isEditMode = !!uid && uid !== 'new';
 
     // Form state
     const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
@@ -519,7 +516,24 @@ export const CustomerFormPage = () => {
     });
 
     // Document upload state
-    const [generatedCustomerId] = useState(() => isEditMode ? (customerData?.customer?.customerId || generateGEECustomerId()) : generateGEECustomerId());
+    const [generatedCustomerId, setGeneratedCustomerId] = useState<string>('');
+    const { data: nextIdData } = useQuery(GET_NEXT_CUSTOMER_ID, {
+        skip: isEditMode,
+        fetchPolicy: 'network-only',
+    });
+
+    useEffect(() => {
+        if (!isEditMode && nextIdData?.getNextCustomerId) {
+            setGeneratedCustomerId(nextIdData.getNextCustomerId);
+        }
+    }, [nextIdData, isEditMode]);
+
+    useEffect(() => {
+        if (isEditMode && customerData?.customer?.customerId) {
+            setGeneratedCustomerId(customerData.customer.customerId);
+        }
+    }, [customerData, isEditMode]);
+
     const [uploadingPreviousBill, setUploadingPreviousBill] = useState(false);
     const [uploadingLicense, setUploadingLicense] = useState(false);
     const [uploadingIdentityProof, setUploadingIdentityProof] = useState(false);
@@ -1442,6 +1456,21 @@ export const CustomerFormPage = () => {
 
 
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            {/* <Field label="Customer ID">
+                                                <div className="flex items-center">
+                                                    <div className="flex items-center justify-center h-10 px-3 bg-muted border border-r-0 border-border rounded-l-xl text-sm font-bold text-primary whitespace-nowrap">
+                                                        #
+                                                    </div>
+                                                    <Input
+                                                        containerClassName="w-full"
+                                                        className="rounded-l-none font-bold text-primary bg-primary/5 border-primary/20"
+                                                        value={generatedCustomerId || 'Generating...'}
+                                                        readOnly
+                                                        placeholder="GEE03000"
+                                                    />
+                                                </div>
+                                            </Field> */}
+
                                             <Field label="Mobile" required error={errors.phone}>
                                                 <div className="flex flex-wrap gap-2 items-center">
                                                     <div className="flex items-center">
