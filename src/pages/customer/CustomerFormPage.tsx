@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import { useQuery, useMutation, useLazyQuery, useApolloClient } from '@apollo/client';
 import { toast } from 'react-toastify';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -965,6 +965,13 @@ export const CustomerFormPage = () => {
 
     const handleBlur = (field: keyof CustomerFormData) => {
         setTouched(prev => ({ ...prev, [field]: true }));
+
+        // Trim values on blur for string fields
+        const value = formData[field];
+        if (typeof value === 'string') {
+            updateField(field, value.trim());
+        }
+
         const error = validateField(field, formData[field]);
         setErrors(prev => ({ ...prev, [field]: error }));
     };
@@ -985,6 +992,24 @@ export const CustomerFormPage = () => {
             }
         }
 
+        // Standardize First Name and Last Name to UPPERCASE
+        if (field === 'firstName' || field === 'lastName') {
+            if (typeof value === 'string') {
+                finalValue = value.toUpperCase();
+            }
+        }
+
+        // Standardize Email to lowercase and trimmed
+        if (field === 'email') {
+            if (typeof value === 'string') {
+                finalValue = value.toLowerCase().trim();
+            }
+        }
+
+        // Handle Date objects from DatePicker
+        if (value instanceof Date) {
+            finalValue = value.toISOString().split('T')[0];
+        }
 
         setFormData(prev => ({ ...prev, [field]: finalValue }));
         setIsFormDirty(true);
@@ -2141,7 +2166,7 @@ export const CustomerFormPage = () => {
                                                 required={formData.checkCreditScore}
                                                 error={errors.dob}
                                                 value={formData.dob}
-                                                onChange={(date) => updateField('dob', date ? date.toISOString().split('T')[0] : '')}
+                                                onChange={(date) => updateField('dob', date)}
                                                 maxDate={eighteenYearsAgo}
                                                 onBlur={() => handleBlur('dob')}
                                             />
@@ -2155,7 +2180,7 @@ export const CustomerFormPage = () => {
                                         <div className="p-4 rounded-lg border border-border bg-muted/30 space-y-4">
                                             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Enrollment</h3>
                                             <Select label="Sale Type" options={SALE_TYPE_OPTIONS} value={formData.saleType.toString()} onChange={(val) => updateField('saleType', parseInt(val as string))} />
-                                            <DatePicker label="Connection Date" required value={formData.connectionDate} onChange={(date) => updateField('connectionDate', date ? date.toISOString().split('T')[0] : '')} />
+                                            <DatePicker label="Connection Date" required value={formData.connectionDate} onChange={(date) => updateField('connectionDate', date)} />
                                             <Select label="Billing Preference" options={BILLING_PREF_OPTIONS} value={formData.billingPreference.toString()} onChange={(val) => updateField('billingPreference', parseInt(val as string))} />
 
                                             <Field label="Previous Bill">
@@ -2232,7 +2257,7 @@ export const CustomerFormPage = () => {
                                                     onChange={(val) => updateField('idState', val as string)}
                                                 />
                                             )}
-                                            <DatePicker label="ID Expiry" value={formData.idExpiry} onChange={(date) => updateField('idExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} />
+                                            <DatePicker label="ID Expiry" value={formData.idExpiry} onChange={(date) => updateField('idExpiry', date)} minDate={new Date()} />
 
                                             {formData.idType === 0 ? (
                                                 <Field label="Driver's License" required={formData.checkCreditScore} error={errors.licenseDocument}>
@@ -2414,7 +2439,7 @@ export const CustomerFormPage = () => {
                                                                 required={formData.checkCreditScore}
                                                                 error={errors.dob}
                                                                 value={formData.dob}
-                                                                onChange={(date) => updateField('dob', date ? date.toISOString().split('T')[0] : '')}
+                                                                onChange={(date) => updateField('dob', date)}
                                                                 maxDate={eighteenYearsAgo}
                                                                 onBlur={() => handleBlur('dob')}
                                                             />
@@ -2493,7 +2518,7 @@ export const CustomerFormPage = () => {
                                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                                             <Input label="Driver's License No." required={formData.checkCreditScore} placeholder="D123456" value={formData.licenseNumber} onChange={(e) => updateField('licenseNumber', e.target.value)} onBlur={() => handleBlur('licenseNumber')} error={errors.licenseNumber} />
                                                             <Select label="License State" required={formData.checkCreditScore} options={STATE_OPTIONS} value={formData.licenseState} onChange={(val) => updateField('licenseState', val as string)} onBlur={() => handleBlur('licenseState')} error={errors.licenseState} />
-                                                            <DatePicker label="License Expiry" required={formData.checkCreditScore} value={formData.licenseExpiry} onChange={(date) => updateField('licenseExpiry', date ? date.toISOString().split('T')[0] : '')} minDate={new Date()} onBlur={() => handleBlur('licenseExpiry')} error={errors.licenseExpiry} />
+                                                            <DatePicker label="License Expiry" required={formData.checkCreditScore} value={formData.licenseExpiry} onChange={(date) => updateField('licenseExpiry', date)} minDate={new Date()} onBlur={() => handleBlur('licenseExpiry')} error={errors.licenseExpiry} />
 
                                                             <Field label="Driver's License" required={formData.checkCreditScore} error={errors.licenseDocument}>
                                                                 <div className="space-y-2">
@@ -2553,7 +2578,7 @@ export const CustomerFormPage = () => {
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Name:</span> <span className="font-medium">{formData.firstName} {formData.lastName}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Email:</span> <span className="font-medium">{formData.email}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Mobile:</span> <span className="font-medium">{formData.phone} {phoneVerified && '✓'}</span></p>
-                                                    <p className="flex justify-between"><span className="text-muted-foreground">DOB:</span> <span className="font-medium">{formData.dob || '—'}</span></p>
+                                                    <p className="flex justify-between"><span className="text-muted-foreground">DOB:</span> <span className="font-medium">{formatDate(formData.dob, { includeTime: false }) || '—'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Type:</span> <span className="capitalize font-medium">{formData.propertyType === 1 ? 'Commercial' : 'Residential'}</span></p>
                                                     {formData.propertyType === 1 && (
                                                         <>
@@ -2570,7 +2595,7 @@ export const CustomerFormPage = () => {
                                                 <h3 className="font-medium mb-3 flex items-center gap-2"><IdCardIcon size={16} className="text-blue-600" /> Identity & Credit Score</h3>
                                                 <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
                                                     <p className="flex justify-between border-b pb-2 mb-2"><span className="text-muted-foreground">Driver's License:</span> <span className="font-medium">{formData.licenseNumber} {formData.licenseState ? `(${formData.licenseState})` : '—'}</span></p>
-                                                    <p className="flex justify-between border-b pb-2 mb-2"><span className="text-muted-foreground">License Expiry:</span> <span className="font-medium">{formData.licenseExpiry || '—'}</span></p>
+                                                    <p className="flex justify-between border-b pb-2 mb-2"><span className="text-muted-foreground">License Expiry:</span> <span className="font-medium">{formatDate(formData.licenseExpiry, { includeTime: false }) || '—'}</span></p>
 
                                                     <p className="flex justify-between pt-1"><span className="text-muted-foreground">Check Credit Score:</span> <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded uppercase ${formData.checkCreditScore ? 'bg-green-500/10 text-green-600' : 'bg-muted text-muted-foreground'}`}>{formData.checkCreditScore ? 'Enabled' : 'Disabled'}</span></p>
 
@@ -2618,14 +2643,14 @@ export const CustomerFormPage = () => {
                                                 <h3 className="font-medium mb-3 flex items-center gap-2"><IdCardIcon size={16} className="text-blue-600" /> Enrollment Details</h3>
                                                 <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Sale Type:</span> <span className="font-medium">{SALE_TYPE_OPTIONS.find(o => o.value === formData.saleType.toString())?.label}</span></p>
-                                                    <p className="flex justify-between"><span className="text-muted-foreground">Connection Date:</span> <span className="font-medium">{formData.connectionDate}</span></p>
+                                                    <p className="flex justify-between"><span className="text-muted-foreground">Connection Date:</span> <span className="font-medium">{formatDate(formData.connectionDate, { includeTime: false })}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Billing:</span> <span className="font-medium">{BILLING_PREF_OPTIONS.find(o => o.value === formData.billingPreference.toString())?.label}</span></p>
 
                                                     <div className="pt-2 border-t border-border mt-2">
                                                         <p className="flex text-xs font-semibold text-muted-foreground mb-1 uppercase">Other ID (Optional)</p>
                                                         <p className="flex justify-between"><span className="text-muted-foreground">Type:</span> <span className="font-medium">{ID_TYPE_OPTIONS.find(o => o.value === formData.idType.toString())?.label}</span></p>
                                                         <p className="flex justify-between"><span className="text-muted-foreground">ID Number:</span> <span className="font-medium">{formData.idNumber || '—'}</span></p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">Expiry:</span> <span className="font-medium">{formData.idExpiry || '—'}</span></p>
+                                                        <p className="flex justify-between"><span className="text-muted-foreground">Expiry:</span> <span className="font-medium">{formatDate(formData.idExpiry, { includeTime: false }) || '—'}</span></p>
                                                     </div>
                                                 </div>
                                             </div>

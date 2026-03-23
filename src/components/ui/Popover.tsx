@@ -169,23 +169,33 @@ export function Popover({
                             <div
                                 className={cn(
                                     "absolute w-0 h-0 border-[6px]",
-                                    placement.startsWith('top') ? "top-full border-t-zinc-900/10 dark:border-t-white/10 border-x-transparent border-b-transparent" :
-                                        placement.startsWith('bottom') ? "bottom-full border-b-zinc-900/10 dark:border-b-white/10 border-x-transparent border-t-transparent" :
-                                            ""
+                                    (placement === 'top' || placement === 'top-start' || placement === 'top-end') ? "top-full border-t-border/50 border-x-transparent border-b-transparent" :
+                                    (placement === 'bottom' || placement === 'bottom-start' || placement === 'bottom-end') ? "bottom-full border-b-border/50 border-x-transparent border-t-transparent" :
+                                    (placement === 'left') ? "left-full border-l-border/50 border-y-transparent border-r-transparent" :
+                                    (placement === 'right') ? "right-full border-r-border/50 border-y-transparent border-l-transparent" :
+                                    ""
                                 )}
                                 style={{
-                                    left: placement === 'top' || placement === 'bottom' ? '50%' :
-                                        placement.endsWith('start') ? '16px' : 'auto',
+                                    left: (placement === 'top' || placement === 'bottom') ? '50%' :
+                                          (placement === 'left') ? '100.5%' :
+                                          (placement === 'right') ? '-12px' :
+                                          placement.endsWith('start') ? '16px' : 
+                                          placement.endsWith('end') ? 'auto' : '50%',
                                     right: placement.endsWith('end') ? '16px' : 'auto',
-                                    transform: placement === 'top' || placement === 'bottom' ? 'translateX(-50%)' : 'none'
+                                    top: (placement === 'left' || placement === 'right') ? '50%' : 'auto',
+                                    bottom: 'auto',
+                                    transform: (placement === 'top' || placement === 'bottom') ? 'translateX(-50%)' : 
+                                               (placement === 'left' || placement === 'right') ? 'translateY(-50%)' : 'none'
                                 }}
                             >
-                                {/* Inner arrow for border effect / color match */}
+                                {/* Inner arrow for color match */}
                                 <div className={cn(
                                     "absolute w-0 h-0 border-[5px]",
-                                    placement.startsWith('top') ? "-top-[6px] -left-[5px] border-t-white dark:border-t-zinc-900 border-x-transparent border-b-transparent" :
-                                        placement.startsWith('bottom') ? "-bottom-[6px] -left-[5px] border-b-white dark:border-b-zinc-900 border-x-transparent border-t-transparent" :
-                                            ""
+                                    (placement === 'top' || placement === 'top-start' || placement === 'top-end') ? "-top-[6px] -left-[5px] border-t-white dark:border-t-zinc-900 border-x-transparent border-b-transparent" :
+                                    (placement === 'bottom' || placement === 'bottom-start' || placement === 'bottom-end') ? "-bottom-[6px] -left-[5px] border-b-white dark:border-b-zinc-900 border-x-transparent border-t-transparent" :
+                                    (placement === 'left') ? "-left-[6px] -top-[5px] border-l-white dark:border-l-zinc-900 border-y-transparent border-r-transparent" :
+                                    (placement === 'right') ? "-right-[6px] -top-[5px] border-r-white dark:border-r-zinc-900 border-y-transparent border-l-transparent" :
+                                    ""
                                 )} />
                             </div>
                         )}
