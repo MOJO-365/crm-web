@@ -2069,6 +2069,12 @@ export function CustomerDetailsPage() {
                 toast.success(data.sendReminderEmail.message || 'Reminder sent successfully');
                 setReminderSent(true);
                 setTimeout(() => setEmailLogsKey((prev) => prev + 1), 1500);
+                
+                // Refetch customer to get updated status (Signature Pending)
+                const { data: updatedData } = await refetchCustomer();
+                if (updatedData?.customer) {
+                    setSelectedCustomerDetails(updatedData.customer);
+                }
             } else {
                 toast.error(data?.sendReminderEmail?.message || 'Failed to send reminder');
             }
