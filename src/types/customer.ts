@@ -1,5 +1,6 @@
 export interface CustomerFormData {
     // Basic Info
+    title: string;
     firstName: string;
     lastName: string;
     email: string;

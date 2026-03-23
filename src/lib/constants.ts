@@ -166,6 +166,13 @@ export const ID_TYPE_OPTIONS = [
     { value: '2', label: 'Passport' },
 ];
 
+export const TITLE_OPTIONS = [
+    { value: 'Mr', label: 'Mr' },
+    { value: 'Mrs', label: 'Mrs' },
+    { value: 'Ms', label: 'Ms' },
+    { value: 'Miss', label: 'Miss' },
+];
+
 // Sale Types
 export const SALE_TYPE_LABELS: Record<number, string> = {
     0: 'Transfer',
