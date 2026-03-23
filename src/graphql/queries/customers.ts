@@ -1360,3 +1360,9 @@ export const GET_CUSTOMER_BILLING_INFO = gql`
         }
     }
 `;
+
+export const GET_NEXT_CUSTOMER_ID = gql`
+    query GetNextCustomerId {
+        getNextCustomerId
+    }
+`;
