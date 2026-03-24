@@ -5,10 +5,11 @@ import { cn } from '@/lib/utils';
 export type PopoverPlacement = 'top' | 'bottom' | 'left' | 'right' | 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end';
 
 export interface PopoverProps {
-    trigger: ReactNode;
+    trigger?: ReactNode;
+    children?: ReactNode; // Alternative trigger (as a wrapper)
     content: ReactNode;
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
+    isOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
     placement?: PopoverPlacement;
     className?: string;
     showArrow?: boolean;
@@ -16,13 +17,25 @@ export interface PopoverProps {
 
 export function Popover({
     trigger,
+    children,
     content,
-    isOpen,
-    onOpenChange,
+    isOpen: controlledIsOpen,
+    onOpenChange: controlledOnOpenChange,
     placement = 'top',
     className,
     showArrow = true,
 }: PopoverProps) {
+    const [internalIsOpen, setInternalIsOpen] = useState(false);
+    const isControlled = controlledIsOpen !== undefined;
+    const isOpen = isControlled ? controlledIsOpen : internalIsOpen;
+
+    const onOpenChange = (open: boolean) => {
+        if (!isControlled) {
+            setInternalIsOpen(open);
+        }
+        controlledOnOpenChange?.(open);
+    };
+
     const [coords, setCoords] = useState({ top: 0, left: 0 });
     const [transformOrigin, setTransformOrigin] = useState('center bottom'); // Default for 'top'
     const triggerRef = useRef<HTMLDivElement>(null);
@@ -144,7 +157,7 @@ export function Popover({
                     onOpenChange(!isOpen);
                 }}
             >
-                {trigger}
+                {trigger || children}
             </div>
             {isOpen && createPortal(
                 <div
