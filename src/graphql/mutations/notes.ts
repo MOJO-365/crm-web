@@ -2,11 +2,12 @@
 import { gql } from '@apollo/client';
 
 export const CREATE_CUSTOMER_NOTE = gql`
-    mutation CreateCustomerNote($customerUid: String!, $message: String!, $followUp: Date, $assignedTo: String, $type: String) {
-        createCustomerNote(customerUid: $customerUid, message: $message, followUp: $followUp, assignedTo: $assignedTo, type: $type) {
+    mutation CreateCustomerNote($customerUid: String!, $message: String!, $followUp: Date, $assignedTo: String, $type: String, $maintenanceUid: String) {
+        createCustomerNote(customerUid: $customerUid, message: $message, followUp: $followUp, assignedTo: $assignedTo, type: $type, maintenanceUid: $maintenanceUid) {
             id
             uid
             customerUid
+            maintenanceUid
             message
             followUp
             assignedTo

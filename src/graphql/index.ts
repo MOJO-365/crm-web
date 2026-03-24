@@ -49,3 +49,7 @@ export * from './queries/battery';
 
 // Bonus
 export * from './queries/bonus';
+
+// Maintenance
+export * from './queries/maintenance';
+export * from './mutations/maintenance';

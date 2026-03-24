@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { Button, Input, DatePicker, Select, Tooltip, Switch as ToggleSwitch, ConfirmationPopover, Popover } from '@/components/ui';
-import { DataTable, Modal, StatusField } from '@/components/common';
+import { DataTable, type Column, Modal, StatusField } from '@/components/common';
 import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
@@ -35,12 +35,17 @@ import {
     CREATE_CUSTOMER,
     UPDATE_CUSTOMER,
     SEND_CUSTOMER_CREDENTIALS_EMAIL,
-    GET_MEASUREMENT_UNITS
+    GET_MEASUREMENT_UNITS,
+    GET_CUSTOMER_MAINTENANCE,
+    CREATE_CUSTOMER_MAINTENANCE,
+    UPDATE_CUSTOMER_MAINTENANCE,
+    DELETE_CUSTOMER_MAINTENANCE
 } from '@/graphql';
 import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
 import { cn } from '@/lib/utils';
 import { getName } from 'country-list';
+import type { MaintenanceRecord, MaintenanceResponse } from '@/types';
 
 import {
     SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS,
@@ -642,7 +647,7 @@ const CustomerEmailLogsTable = ({ customerUid }: { customerUid: string }) => {
         toast.success('Email logs refreshed');
     };
 
-    const columns = [
+    const columns: Column<EmailLog>[] = [
         {
             key: 'subject',
             header: 'Subject',
@@ -716,8 +721,8 @@ const CustomerEmailLogsTable = ({ customerUid }: { customerUid: string }) => {
 
     return (
         <div className="space-y-4">
-            <DataTable
-                columns={columns as any}
+            <DataTable<EmailLog>
+                columns={columns}
                 data={allLogs}
                 rowKey={(log) => log.id}
                 loading={loading && page === 1}
@@ -788,6 +793,362 @@ const CustomerEmailLogsTable = ({ customerUid }: { customerUid: string }) => {
                     </div>
                 )}
             </Modal>
+        </div>
+    );
+};
+
+// ============================================================
+// Customer Maintenance Table Component
+// ============================================================
+
+const MAINTENANCE_METHOD_LABELS: Record<number, string> = {
+    1: 'Call',
+    2: 'Email'
+};
+
+const MAINTENANCE_STATUS_MAP: Record<number, { label: string, color: string }> = {
+    1: { label: 'Resolved', color: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50' },
+    2: { label: 'Cancelled', color: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800/50' },
+    3: { label: 'In-Progress', color: 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-400 dark:border-sky-800/50' }
+};
+
+const MAINTENANCE_PRIORITY_MAP: Record<number, { label: string, color: string }> = {
+    1: { label: 'Low', color: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-400' },
+    2: { label: 'Medium', color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400' },
+    3: { label: 'High', color: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
+    4: { label: 'Urgent', color: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' }
+};
+
+const MAINTENANCE_METHOD_OPTIONS = Object.entries(MAINTENANCE_METHOD_LABELS).map(([value, label]) => ({
+    label,
+    value: value
+}));
+
+const MAINTENANCE_STATUS_OPTIONS = Object.entries(MAINTENANCE_STATUS_MAP).map(([value, info]) => ({
+    label: info.label,
+    value: value
+}));
+
+const MAINTENANCE_PRIORITY_OPTIONS = Object.entries(MAINTENANCE_PRIORITY_MAP).map(([value, info]) => ({
+    label: info.label,
+    value: value
+}));
+
+const CustomerMaintenanceTable = ({
+    customerUid,
+    onEdit,
+    onViewNotes,
+    refreshKey
+}: {
+    customerUid: string,
+    onEdit: (record: MaintenanceRecord) => void,
+    onViewNotes: (record: MaintenanceRecord) => void,
+    refreshKey: number
+}) => {
+    const { data, loading, error, refetch } = useQuery<MaintenanceResponse>(GET_CUSTOMER_MAINTENANCE, {
+        variables: { customerUid },
+        fetchPolicy: 'cache-and-network',
+    });
+
+    const [deleteMaintenance] = useMutation(DELETE_CUSTOMER_MAINTENANCE);
+
+    useEffect(() => {
+        refetch();
+    }, [refreshKey, refetch]);
+
+    const handleDelete = async (uid: string) => {
+        try {
+            await deleteMaintenance({ variables: { uid } });
+            toast.success('Maintenance record deleted');
+            refetch();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to delete record');
+        }
+    };
+
+    const columns: Column<MaintenanceRecord>[] = [
+        {
+            key: 'callDate',
+            header: 'Date',
+            width: 'w-[150px]',
+            render: (row) => formatSydneyTime(row.callDate)
+        },
+        {
+            key: 'category',
+            header: 'Category',
+            render: (row) => row.category || 'N/A'
+        },
+        {
+            key: 'method',
+            header: 'Method',
+            width: 'w-[100px]',
+            render: (row) => MAINTENANCE_METHOD_LABELS[row.method || 0] || 'N/A'
+        },
+        {
+            key: 'status',
+            header: 'Status',
+            width: 'w-[120px]',
+            render: (row) => {
+                const info = MAINTENANCE_STATUS_MAP[row.status] || { label: 'Unknown', color: '' };
+                return (
+                    <span className={cn('px-2.5 py-0.5 text-xs font-semibold rounded-full border', info.color)}>
+                        {info.label}
+                    </span>
+                );
+            }
+        },
+        {
+            key: 'priority',
+            header: 'Priority',
+            width: 'w-[100px]',
+            render: (row) => {
+                const info = MAINTENANCE_PRIORITY_MAP[row.priority] || { label: 'Unknown', color: '' };
+                return (
+                    <span className={cn('px-2.5 py-0.5 text-xs font-semibold rounded-full border', info.color)}>
+                        {info.label}
+                    </span>
+                );
+            }
+        },
+        {
+            key: 'takenCareByUser',
+            header: 'Handled By',
+            render: (row) => row.takenCareByUser?.name || 'N/A'
+        },
+        {
+            key: 'notes',
+            header: 'Notes',
+            render: (row) => {
+                if (!row.notes) return <span className="text-muted-foreground/50">—</span>;
+
+                return (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onViewNotes(row)}
+                        className="h-7 px-2 text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary/10 hover:text-primary transition-all gap-1.5 border border-primary/20 bg-primary/5"
+                    >
+                        <FileTextIcon size={12} />
+                        View Note
+                    </Button>
+                );
+            }
+        },
+        {
+            key: 'actions',
+            header: '',
+            width: 'w-[100px]',
+            render: (row) => (
+                <div className="flex justify-end gap-2">
+                    <button
+                        onClick={() => onEdit(row)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                        title="Edit Record"
+                    >
+                        <PencilIcon size={14} />
+                    </button>
+                    <ConfirmationPopover
+                        title="Delete Record?"
+                        description="Are you sure you want to delete this maintenance record?"
+                        onConfirm={() => handleDelete(row.uid)}
+                    >
+                        <button
+                            className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                            title="Delete Record"
+                        >
+                            <TrashIcon size={14} />
+                        </button>
+                    </ConfirmationPopover>
+                </div>
+            )
+        }
+    ];
+
+    return (
+        <DataTable<MaintenanceRecord>
+            columns={columns}
+            data={data?.customerMaintenance || []}
+            rowKey={(row) => row.uid}
+            loading={loading}
+            error={error?.message}
+            emptyMessage="No maintenance records found."
+        />
+    );
+};
+
+
+// ============================================================
+// Maintenance Notes Modal Component
+// ============================================================
+
+const InlineMaintenanceNotes = ({
+    onClose,
+    maintenanceUid,
+    customerUid,
+    category,
+    noteText,
+    setNoteText,
+    onAddNote,
+    isAdding,
+    canDelete
+}: {
+    onClose: () => void,
+    maintenanceUid: string,
+    customerUid: string,
+    category: string,
+    noteText: string,
+    setNoteText: (val: string) => void,
+    onAddNote: () => Promise<void>,
+    isAdding: boolean,
+    canDelete: boolean
+}) => {
+    const { data, loading, refetch } = useQuery(GET_CUSTOMER_NOTES, {
+        variables: { customerUid, maintenanceUid },
+        skip: !maintenanceUid,
+        fetchPolicy: 'network-only',
+    });
+
+    const [deleteNote] = useMutation(DELETE_CUSTOMER_NOTE);
+
+    const handleDelete = async (uid: string) => {
+        try {
+            await deleteNote({ variables: { uid } });
+            refetch();
+            toast.success('Note deleted');
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to delete note');
+        }
+    };
+
+    return (
+        <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border pb-4">
+                <div className="flex items-center gap-3">
+                    <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <ArrowLeftIcon className="w-4 h-4" />
+                    </Button>
+                    <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                        <Settings2Icon size={20} />
+                    </div>
+                    <div>
+                        <h3 className="text-md font-semibold text-foreground tracking-tight">Maintenance Notes</h3>
+                        <p className="text-xs text-muted-foreground">{category} - Activity log & follow-ups</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Note Input */}
+            <div className="bg-muted/10 p-4 rounded-xl border border-border">
+                <div className="flex w-full gap-3">
+                    <div className="flex-1 relative">
+                        <textarea
+                            value={noteText}
+                            onChange={(e) => setNoteText(e.target.value)}
+                            placeholder="Type a new internal note for this maintenance..."
+                            className="w-full h-[38px] min-h-[38px] max-h-[120px] p-2 pr-10 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none transition-all"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey && noteText.trim()) {
+                                    e.preventDefault();
+                                    onAddNote().then(() => refetch());
+                                }
+                            }}
+                        />
+                        <Button
+                            size="sm"
+                            className="absolute right-1 top-1 h-[30px] w-[30px] p-0 bg-neutral-900 text-white hover:bg-neutral-800"
+                            onClick={() => onAddNote().then(() => refetch())}
+                            disabled={!noteText.trim() || isAdding}
+                            isLoading={isAdding}
+                        >
+                            <PlusIcon size={14} />
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Notes List */}
+            <div className="space-y-3">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-16">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                        <p className="mt-3 text-sm text-muted-foreground">Loading notes...</p>
+                    </div>
+                ) : (data?.customerNotes?.length || 0) > 0 ? (
+                    data.customerNotes.map((note: any) => (
+                        <div key={note.uid} className="group bg-white dark:bg-neutral-950 rounded-xl border border-border/50 hover:border-border p-4 transition-all hover:shadow-sm">
+                            <div className="flex gap-3">
+                                {/* Author Avatar */}
+                                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0 border border-primary/10">
+                                    {(note.createdByName || 'S').charAt(0).toUpperCase()}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                    {/* Author & Time */}
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-semibold text-foreground">{note.createdByName || 'System'}</span>
+                                            <span className="text-[11px] text-muted-foreground">{formatSydneyTime(note.createdAt)}</span>
+                                        </div>
+                                        {canDelete && (
+                                            <ConfirmationPopover
+                                                title="Delete this note?"
+                                                description="This action cannot be undone."
+                                                onConfirm={() => handleDelete(note.uid)}
+                                                confirmText="Delete"
+                                                cancelText="Cancel"
+                                                placement="left"
+                                            >
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <TrashIcon className="w-3.5 h-3.5" />
+                                                </Button>
+                                            </ConfirmationPopover>
+                                        )}
+                                    </div>
+
+                                    {/* Message */}
+                                    <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">{note.message}</p>
+
+                                    {/* Metadata Tags */}
+                                    {(note.followUp || note.assignedToUser || note.noteType) && (
+                                        <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-border/50">
+                                            {note.noteType && (
+                                                <span className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-muted text-muted-foreground border border-border/50">
+                                                    {note.noteType.name}
+                                                </span>
+                                            )}
+                                            {note.followUp && (
+                                                <span className="text-[11px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-2.5 py-1 rounded-lg flex items-center gap-1.5 border border-orange-200/50 dark:border-orange-800/50">
+                                                    <CalendarIcon className="w-3 h-3" />
+                                                    Follow up: {formatSydneyTime(note.followUp)}
+                                                </span>
+                                            )}
+                                            {note.assignedToUser && (
+                                                <span className="text-[11px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2.5 py-1 rounded-lg flex items-center gap-1.5 border border-blue-200/50 dark:border-blue-800/50">
+                                                    <UserIcon className="w-3 h-3" />
+                                                    Assigned to:  {note.assignedToUser.name}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="flex flex-col items-center justify-center py-16 text-center bg-white dark:bg-neutral-950 rounded-xl border border-dashed border-border">
+                        <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground mb-3">
+                            <Settings2Icon size={20} />
+                        </div>
+                        <p className="text-sm font-medium text-muted-foreground">No notes yet</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Add a note above to get started.</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -879,6 +1240,27 @@ export function CustomerDetailsPage() {
     const [utilmateConnectModalOpen, setUtilmateConnectModalOpen] = useState(false);
     const [isGeneratingCredentials, setIsGeneratingCredentials] = useState(false);
 
+    // Maintenance State
+    const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false);
+    const [isSavingMaintenance, setIsSavingMaintenance] = useState(false);
+    const [maintenanceRefreshKey, setMaintenanceRefreshKey] = useState(0);
+    const [editingMaintenance, setEditingMaintenance] = useState<any>(null);
+    const [maintenanceForm, setMaintenanceForm] = useState({
+        callDate: new Date(),
+        category: '',
+        takenCareByUid: '',
+        method: 1 as number,
+        status: 3 as number,
+        priority: 2 as number,
+        notes: ''
+    });
+
+    // Maintenance Notes Modal State
+    const [selectedMaintenanceUid, setSelectedMaintenanceUid] = useState<string | null>(null);
+    const [selectedMaintenanceCategory, setSelectedMaintenanceCategory] = useState<string | null>(null);
+    const [maintenanceNoteText, setMaintenanceNoteText] = useState('');
+    const [isAddingMaintenanceNote, setIsAddingMaintenanceNote] = useState(false);
+
     // Utilmate Form State
     const [isEditingUtilmate, setIsEditingUtilmate] = useState(false);
     const [utilmateForm, setUtilmateForm] = useState({
@@ -938,7 +1320,7 @@ export function CustomerDetailsPage() {
     // Fetch users for note assignment
     const { data: userData } = useQuery(GET_USERS, {
         variables: { limit: 100 },
-        skip: selectedDetailSection !== 'notes' && !noteModalOpen,
+        skip: selectedDetailSection !== 'notes' && !noteModalOpen && !maintenanceModalOpen,
     });
 
     const userOptions = userData?.users?.data?.map((u: any) => ({
@@ -1046,6 +1428,8 @@ export function CustomerDetailsPage() {
     const [createCustomer] = useMutation(CREATE_CUSTOMER);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
     const [sendCustomerCredentialsEmail] = useMutation(SEND_CUSTOMER_CREDENTIALS_EMAIL);
+    const [createMaintenance] = useMutation(CREATE_CUSTOMER_MAINTENANCE);
+    const [updateMaintenance] = useMutation(UPDATE_CUSTOMER_MAINTENANCE);
 
     // Effects
     useEffect(() => {
@@ -1117,6 +1501,26 @@ export function CustomerDetailsPage() {
             toast.error(error.message || 'Failed to add note');
         } finally {
             setIsAddingNote(false);
+        }
+    };
+
+    const handleAddMaintenanceNote = async () => {
+        if (!maintenanceNoteText.trim() || !selectedMaintenanceUid || !uid) return;
+        setIsAddingMaintenanceNote(true);
+        try {
+            await createNote({
+                variables: {
+                    customerUid: uid,
+                    maintenanceUid: selectedMaintenanceUid,
+                    message: maintenanceNoteText.trim(),
+                },
+            });
+            setMaintenanceNoteText('');
+            toast.success('Maintenance note added');
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to add maintenance note');
+        } finally {
+            setIsAddingMaintenanceNote(false);
         }
     };
 
@@ -1390,6 +1794,74 @@ export function CustomerDetailsPage() {
             toast.error(error.message || 'Failed to save Utilmate details');
         }
     };
+
+    const handleMaintenanceAction = (record: any = null) => {
+        if (record) {
+            setEditingMaintenance(record);
+            setMaintenanceForm({
+                callDate: new Date(record.callDate),
+                category: record.category || '',
+                takenCareByUid: record.takenCareByUser?.uid || record.takenCareByUid || '',
+                method: record.method || 1,
+                status: record.status || 3,
+                priority: record.priority || 2,
+                notes: record.notes || ''
+            });
+        } else {
+            setEditingMaintenance(null);
+            setMaintenanceForm({
+                callDate: new Date(),
+                category: '',
+                takenCareByUid: '',
+                method: 1,
+                status: 3,
+                priority: 2,
+                notes: ''
+            });
+        }
+        setMaintenanceModalOpen(true);
+    };
+
+    const handleSaveMaintenance = async () => {
+        if (!uid) return;
+        setIsSavingMaintenance(true);
+        try {
+            const input: any = {
+                customerUid: uid,
+                callDate: maintenanceForm.callDate.toISOString(),
+                category: maintenanceForm.category,
+                takenCareByUid: maintenanceForm.takenCareByUid || undefined,
+                method: maintenanceForm.method,
+                status: maintenanceForm.status,
+                priority: maintenanceForm.priority,
+                notes: maintenanceForm.notes
+            };
+
+            if (editingMaintenance) {
+                await updateMaintenance({
+                    variables: {
+                        uid: editingMaintenance.uid,
+                        input
+                    }
+                });
+                toast.success('Maintenance record updated');
+            } else {
+                await createMaintenance({
+                    variables: { input }
+                });
+                toast.success('Maintenance record added');
+            }
+
+            setMaintenanceModalOpen(false);
+            setMaintenanceRefreshKey(prev => prev + 1);
+        } catch (error: any) {
+            console.error('Error saving maintenance:', error);
+            toast.error(error.message || 'Failed to save maintenance record');
+        } finally {
+            setIsSavingMaintenance(false);
+        }
+    };
+
 
     const handleFreezeClick = () => {
         setFreezeModalOpen(true);
@@ -3999,27 +4471,56 @@ export function CustomerDetailsPage() {
                             )}
 
                             {selectedDetailSection === 'maintenance' && (
-                                <div className="space-y-6 animate-in fade-in duration-300">
-                                    <div className="flex items-center justify-between border-b border-border pb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900/40 flex items-center justify-center text-slate-600 dark:text-slate-400">
-                                                <RefreshCwIcon size={20} />
+                                <div className="space-y-6 animate-in fade-in duration-500">
+                                    {!selectedMaintenanceUid ? (
+                                        <>
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-foreground">Maintenance Details</h3>
+                                                    <p className="text-sm text-muted-foreground">Track system updates, service calls, and maintenance tasks.</p>
+                                                </div>
+                                                <Button
+                                                    onClick={() => handleMaintenanceAction()}
+                                                    className="flex items-center gap-2"
+                                                    size="sm"
+                                                >
+                                                    <PlusIcon size={16} />
+                                                    Add Maintenance
+                                                </Button>
                                             </div>
-                                            <div>
-                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Maintenance</h3>
-                                                <p className="text-xs text-muted-foreground">Customer maintenance & system updates</p>
+
+                                            <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
+                                                <CustomerMaintenanceTable
+                                                    customerUid={uid || ''}
+                                                    onEdit={handleMaintenanceAction}
+                                                    onViewNotes={(record) => {
+                                                        setSelectedMaintenanceUid(record.uid);
+                                                        setSelectedMaintenanceCategory(record.category ?? null);
+                                                    }}
+                                                    refreshKey={maintenanceRefreshKey}
+                                                />
                                             </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-neutral-950 rounded-xl border border-dashed border-border">
-                                        <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground mb-3">
-                                            <RefreshCwIcon size={20} />
-                                        </div>
-                                        <p className="text-sm font-medium text-muted-foreground">Maintenance mode</p>
-                                        <p className="text-xs text-muted-foreground/70 mt-1">This section is currently under development.</p>
-                                    </div>
+                                        </>
+                                    ) : (
+                                        <InlineMaintenanceNotes
+                                            onClose={() => {
+                                                setSelectedMaintenanceUid(null);
+                                                setSelectedMaintenanceCategory(null);
+                                                setMaintenanceNoteText('');
+                                            }}
+                                            maintenanceUid={selectedMaintenanceUid}
+                                            customerUid={uid || ''}
+                                            category={selectedMaintenanceCategory || 'Maintenance'}
+                                            noteText={maintenanceNoteText}
+                                            setNoteText={setMaintenanceNoteText}
+                                            onAddNote={handleAddMaintenanceNote}
+                                            isAdding={isAddingMaintenanceNote}
+                                            canDelete={canDelete}
+                                        />
+                                    )}
                                 </div>
                             )}
+
 
                             {selectedDetailSection === 'notes' && (
                                 <div className="space-y-6 animate-in fade-in duration-300">
@@ -4425,6 +4926,7 @@ export function CustomerDetailsPage() {
                     </Button>
                 </div>
             </Modal>
+
             {/* Add Note Modal */}
             <Modal
                 isOpen={noteModalOpen}
@@ -4455,8 +4957,6 @@ export function CustomerDetailsPage() {
                 }
             >
                 <div className="space-y-4">
-
-
                     <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -4515,8 +5015,8 @@ export function CustomerDetailsPage() {
                         </div>
 
                         <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Follow-up Date</label>
                             <DatePicker
-                                label="Follow-up Date"
                                 value={noteFollowUp ? new Date(noteFollowUp) : null}
                                 onChange={(date) => setNoteFollowUp(date)}
                                 placeholder="Select follow-up date..."
@@ -4535,6 +5035,107 @@ export function CustomerDetailsPage() {
                     </div>
                 </div>
             </Modal>
+
+            {/* Maintenance Modal */}
+            <Modal
+                isOpen={maintenanceModalOpen}
+                onClose={() => setMaintenanceModalOpen(false)}
+                title={editingMaintenance ? "Edit Maintenance" : "Add Maintenance"}
+                size="lg"
+                footer={
+                    <>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setMaintenanceModalOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="bg-neutral-900 text-white hover:bg-neutral-800"
+                            onClick={handleSaveMaintenance}
+                            disabled={!maintenanceForm.category.trim() || isSavingMaintenance}
+                            isLoading={isSavingMaintenance}
+                            loadingText="Saving..."
+                        >
+                            {editingMaintenance ? "Update Record" : "Save Maintenance"}
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Category</label>
+                            <Input
+                                placeholder="Maintenance category..."
+                                value={maintenanceForm.category}
+                                onChange={(e) => setMaintenanceForm({ ...maintenanceForm, category: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Handled By</label>
+                            <Select
+                                options={userOptions}
+                                value={maintenanceForm.takenCareByUid}
+                                onChange={(val: any) => setMaintenanceForm({ ...maintenanceForm, takenCareByUid: val as string })}
+                                placeholder="Select a user..."
+                                className="w-full"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Method</label>
+                            <Select
+                                options={MAINTENANCE_METHOD_OPTIONS}
+                                value={maintenanceForm.method?.toString()}
+                                onChange={(val: any) => setMaintenanceForm({ ...maintenanceForm, method: Number(val) })}
+                                className="w-full"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Status</label>
+                            <Select
+                                options={MAINTENANCE_STATUS_OPTIONS}
+                                value={maintenanceForm.status?.toString()}
+                                onChange={(val: any) => setMaintenanceForm({ ...maintenanceForm, status: Number(val) })}
+                                className="w-full"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Priority</label>
+                            <Select
+                                options={MAINTENANCE_PRIORITY_OPTIONS}
+                                value={maintenanceForm.priority?.toString()}
+                                onChange={(val: any) => setMaintenanceForm({ ...maintenanceForm, priority: Number(val) })}
+                                className="w-full"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Log Date</label>
+                            <DatePicker
+                                value={maintenanceForm.callDate}
+                                onChange={(date) => setMaintenanceForm({ ...maintenanceForm, callDate: date || new Date() })}
+                                placeholder="Select date..."
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase text-muted-foreground">Notes</label>
+                        <textarea
+                            value={maintenanceForm.notes}
+                            onChange={(e) => setMaintenanceForm({ ...maintenanceForm, notes: e.target.value })}
+                            placeholder="Detailed maintenance notes..."
+                            className="w-full min-h-[120px] p-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y"
+                        />
+                    </div>
+                </div>
+            </Modal>
+
 
             {/* Delete Confirmation Modal */}
             <Modal

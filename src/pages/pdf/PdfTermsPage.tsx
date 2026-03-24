@@ -84,7 +84,7 @@ const CONTRACT_TERM_OPTION = {
     <p>This plan has a 12-month contract starting from {{contractStart}}.</p>
 </div>
 <div data-condition="no-bonus" style="border: 1px dashed #999; padding: 10px; margin-bottom: 10px; position: relative;">
-    <span style="background: #999; color: white; font-size: 10px; padding: 2px 5px; position: absolute; top: -10px; left: 10px; border-radius: 3px;">[IF NO BONUS]</span>
+    <span style="background: #999; color: white; font-size: 10px; padding: 2px 5px; position: absolute; top: -10px; left: 10px; border-radius: 3px;">[IF NOT 12-MONTH BONUS]</span>
     <p>No lock-in contract.</p>
 </div>
 <p><br></p>
