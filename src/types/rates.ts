@@ -49,3 +49,12 @@ export interface RatePlan {
     isActive?: boolean;
     isDeleted?: boolean;
 }
+
+export interface Bonus {
+    uid: string;
+    name: string;
+    description: string;
+    amount?: number;
+    contractTerm?: string;
+    exitFee?: number;
+}

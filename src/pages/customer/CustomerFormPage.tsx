@@ -20,10 +20,11 @@ import {
     GET_MEASUREMENT_UNITS,
     GET_ACTIVE_BONUSES,
     GET_NEXT_CUSTOMER_ID,
+    PREVIEW_SYSTEM_TEMPLATE,
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
-import { secondaryApiAxios } from '@/lib/apollo';
+import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
 import { formatDateTime } from '@/lib/date';
 import {
     ChevronRightIcon,
@@ -40,6 +41,8 @@ import {
     IdCardIcon,
     ActivityIcon,
     ShieldCheckIcon,
+    DownloadIcon,
+    MailIcon
 } from '@/components/icons';
 import { sendVerification, checkVerification } from '@/lib/twilio';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
@@ -87,7 +90,7 @@ const ToggleSwitch = ({ checked, onChange }: { checked: boolean, onChange: (chec
 // TYPES
 // ============================================================================
 
-import type { CustomerFormData, RatePlan, CustomerDocument } from '@/types';
+import type { CustomerFormData, RatePlan, CustomerDocument, Bonus } from '@/types';
 
 interface VersionOption {
     value: string;
@@ -492,6 +495,16 @@ export const CustomerFormPage = () => {
     const [restrictedFeatureError, setRestrictedFeatureError] = useState(false);
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [submittingStatus, setSubmittingStatus] = useState<number | null>(null);
+    const [previewModalOpen, setPreviewModalOpen] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState('');
+    const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [previewData, setPreviewData] = useState<any>(null);
+    const [previewStep, setPreviewStep] = useState<'offer' | 'email'>('offer');
+    const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null);
+    const [isLoadingEmailPreview, setIsLoadingEmailPreview] = useState(false);
+
+    const [fetchSystemTemplate] = useLazyQuery(PREVIEW_SYSTEM_TEMPLATE);
 
     // Duplicate check state
     const [duplicateErrors, setDuplicateErrors] = useState<{ address?: string; nmi?: string }>({});
@@ -612,7 +625,7 @@ export const CustomerFormPage = () => {
     const { data: bonusesData } = useQuery(GET_ACTIVE_BONUSES, {
         fetchPolicy: 'cache-and-network'
     });
-    const activeBonuses = bonusesData?.activeBonuses || [];
+    const activeBonuses: Bonus[] = bonusesData?.activeBonuses || [];
 
 
 
@@ -1114,12 +1127,15 @@ export const CustomerFormPage = () => {
     const allStepsValid = useMemo(() => step0Valid && step1Valid && step2Valid && step3Valid, [step0Valid, step1Valid, step2Valid, step3Valid]);
 
     // Submit
-    const handleSubmit = async (targetStatus: number = 1) => {
-        setSubmittingStatus(targetStatus);
+    const handleSubmit = async (targetStatus: number = 1, isUpdateOnly: boolean = false) => {
+        const loadingStatus = isUpdateOnly ? 3 : targetStatus;
+        setSubmittingStatus(loadingStatus);
 
         // If phone is verified and we are submitting as active (1), set status to 2 (Signature Pending)
         let finalStatus = targetStatus;
-        if (targetStatus === 1 && phoneVerified) {
+        if (isUpdateOnly && customerData?.customer?.status !== undefined) {
+            finalStatus = customerData.customer.status;
+        } else if (targetStatus === 1 && phoneVerified) {
             finalStatus = 2;
         }
 
@@ -1353,8 +1369,8 @@ export const CustomerFormPage = () => {
                 licenseDocument: formData.licenseDocument?.uid,
                 rateVersion: activeVersionForLookup || activeRateVersion,
                 customerId: isEditMode ? undefined : generatedCustomerId,
-                triggerWelcomeEmail: isEditMode ? (finalStatus === 2) : undefined,
-                triggerUpdateEmail: isEditMode ? significantChanges : undefined,
+                triggerWelcomeEmail: (isEditMode && !isUpdateOnly) ? (finalStatus === 2) : undefined,
+                triggerUpdateEmail: (isEditMode && !isUpdateOnly) ? significantChanges : undefined,
                 selectedBonuses: formData.selectedBonuses
             };
 
@@ -1389,6 +1405,153 @@ export const CustomerFormPage = () => {
             // Re-enable dirty check if failed
             setIsFormDirty(true);
         } finally { setSubmittingStatus(null); }
+    };
+
+    const handlePreviewOffer = async (targetUid: string) => {
+        setIsLoadingPreview(true);
+        try {
+            const offer = selectedRatePlan?.offers?.[0];
+            const discount = formData.discount || 0;
+            const charges = offer ? {
+                supplyCharge: offer.supplyCharge,
+                anytime: calculateDiscountedRate(offer.anytime, discount),
+                peak: calculateDiscountedRate(offer.peak, discount),
+                shoulder: calculateDiscountedRate(offer.shoulder, discount),
+                offPeak: calculateDiscountedRate(offer.offPeak, discount),
+                cl1Usage: calculateDiscountedRate(offer.cl1Usage, discount),
+                cl2Usage: calculateDiscountedRate(offer.cl2Usage, discount),
+                cl1Supply: offer.cl1Supply,
+                cl2Supply: offer.cl2Supply,
+                demand: offer.demand,
+                demandOp: offer.demandOp,
+                demandP: offer.demandP,
+                demandS: offer.demandS,
+                fit: offer.fit,
+                fitPeak: offer.fitPeak,
+                fitCritical: offer.fitCritical,
+                fitVpp: offer.fitVpp,
+                vppOrchestration: offer.vppOrcharge,
+                vppSignupBonus: formData.vppSignupBonus ? parseFloat(formData.vppSignupBonus) : 0,
+                dynamicRates: offer.dynamicRates || [],
+                priceUnits: offer.priceUnits || {},
+            } : {};
+
+            const addressString = [
+                formData.unitNumber ? `Unit ${formData.unitNumber}` : '',
+                formData.streetNumber,
+                formData.streetName,
+                formData.streetType,
+                formData.suburb,
+                formData.state,
+                formData.postcode,
+            ].filter(Boolean).join(' ');
+
+            const today = new Date().toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' });
+
+            const data = {
+                customerNumber: generatedCustomerId || targetUid || 'NEW',
+                accountNumber: generatedCustomerId || targetUid || 'NEW',
+                nmi: formData.nmi || '',
+                siteAddress: addressString,
+                mailingAddress: addressString,
+                name: `${formData.title ? `${formData.title} ` : ''}${formData.firstName} ${formData.lastName}`.trim(),
+                businessName: (formData.showAsBusinessName && formData.businessName) ? formData.businessName : '',
+                email: formData.email || '',
+                mobile: formData.phone || '',
+                businessContact: formData.phone || '',
+                contractStart: today,
+                connectionDate: formData.connectionDate ? new Date(formData.connectionDate).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' }) : today,
+                offerAcceptance: today,
+                signatureTimestamp: today,
+                hasSolar: formData.hasSolar,
+                showName: formData.showName ?? true,
+                charges: charges,
+                hasVpp: formData.vpp,
+                vppSignupBonus: formData.vppSignupBonus ? parseFloat(formData.vppSignupBonus) : 0,
+                vppOrchestration: offer?.vppOrcharge || 0,
+                planName: formData.tariffCode || '',
+                discount: discount,
+                showAsBusinessName: formData.showAsBusinessName,
+                tenant: 'mojo',
+                ratePlanUid: selectedRatePlan?.uid,
+                selectedBonuses: activeBonuses.filter((b: Bonus) => formData.selectedBonuses.includes(b.uid)),
+                uid: targetUid === 'new' ? undefined : targetUid
+            };
+
+            setPreviewData(data);
+
+            const response = await apiAxios.post('/agreement/preview-html', data);
+            const blob = new Blob([response.data], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+
+            // Clean up old URL if it exists
+            if (previewUrl && previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(previewUrl);
+            }
+
+            setPreviewUrl(url);
+            setPreviewModalOpen(true);
+        } catch (err: any) {
+            console.error('Failed to generate preview:', err);
+            toast.error('Failed to generate offer preview');
+        } finally {
+            setIsLoadingPreview(false);
+        }
+    };
+
+    const handleNextToEmailPreview = async () => {
+        setIsLoadingEmailPreview(true);
+        try {
+            const eventType = isEditMode ? 'CUSTOMER_UPDATED' : 'CUSTOMER_CREATED';
+            const { data } = await fetchSystemTemplate({
+                variables: { eventType },
+                fetchPolicy: 'network-only'
+            });
+            if (data?.previewSystemTemplate) {
+                setEmailPreview(data.previewSystemTemplate);
+                setPreviewStep('email');
+            } else {
+                toast.error('Could not load email template');
+            }
+        } catch (error) {
+            console.error('Failed to fetch email preview:', error);
+            toast.error('Failed to load email preview');
+        } finally {
+            setIsLoadingEmailPreview(false);
+        }
+    };
+
+    const handleBackToOfferPreview = () => {
+        setPreviewStep('offer');
+    };
+
+    const handleDownloadPreview = async () => {
+        if (!previewData) return;
+        setIsDownloading(true);
+        try {
+            // Re-map to expected format if needed, and add a placeholder signature if none exists
+            const downloadBody = {
+                ...previewData,
+                signatureImage: previewData.signatureImage || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+            };
+
+            const response = await apiAxios.post('/agreement/html', downloadBody, {
+                responseType: 'blob',
+            });
+            const url = window.URL.createObjectURL(response.data);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'Offer_Summary.pdf');
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode?.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Download error:', error);
+            toast.error('Failed to download the file.');
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     // Navigation Blocking
@@ -1652,6 +1815,10 @@ export const CustomerFormPage = () => {
                                                     updateField('vpp', checked);
                                                     if (checked) {
                                                         updateField('hasSolar', true);
+                                                    } else {
+                                                        // Clear bonuses when VPP is unchecked
+                                                        updateField('vppSignupBonus', null);
+                                                        updateField('selectedBonuses', []);
                                                     }
                                                 }} />
                                             </div>
@@ -1693,7 +1860,7 @@ export const CustomerFormPage = () => {
                                                 {/* Battery details moved to Customer Modal on VPP Connect */}
 
                                                 {/* Dynamic Bonuses */}
-                                                {activeBonuses.filter((b: any) => b.uid !== 'vpp_signup_bonus_uid').map((bonus: any) => {
+                                                {activeBonuses.filter((b: Bonus) => b.uid !== 'vpp_signup_bonus_uid').map((bonus: Bonus) => {
                                                     const isApplied = formData.selectedBonuses.includes(bonus.uid);
                                                     return (
                                                         <div key={bonus.uid} className="p-4 rounded-xl border border-dashed border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
@@ -2800,14 +2967,26 @@ export const CustomerFormPage = () => {
 
                                 {currentStep === 4 && (
                                     <>
+                                        {isEditMode && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => handleSubmit(customerData?.customer?.status, true)}
+                                                isLoading={submittingStatus === 3}
+                                                disabled={submittingStatus !== null}
+                                                loadingText="Updating..."
+                                            >
+                                                Update Only
+                                            </Button>
+                                        )}
                                         <Button
                                             type="button"
-                                            onClick={() => handleSubmit(1)}
+                                            onClick={() => handlePreviewOffer(uid || 'new')}
                                             isLoading={submittingStatus === 1}
                                             disabled={submittingStatus !== null}
                                             loadingText="Saving..."
                                         >
-                                            {isEditMode ? 'Update Customer' : 'Create Customer'}
+                                            {isEditMode ? 'Update & Send Email' : 'Create Customer & Send Email'}
                                         </Button>
                                     </>
                                 )}
@@ -2861,6 +3040,140 @@ export const CustomerFormPage = () => {
                     <p className="text-sm text-muted-foreground">
                         There is an internal server error while processing the concession card option. My manager will be in touch with you as soon as possible as I am facing an error.
                     </p>
+                </Modal>
+
+                {/* Preview Offer Modal */}
+                <Modal
+                    isOpen={previewModalOpen}
+                    onClose={() => {
+                        setPreviewModalOpen(false);
+                        setIsLoadingPreview(false);
+                        setPreviewStep('offer');
+                    }}
+                    title={previewStep === 'offer' ? "Offer Preview" : "Email Preview"}
+                    size="full"
+                >
+                    {previewStep === 'offer' ? (
+                        <div className="flex-1 h-[70vh] w-full bg-muted/20 rounded-md border overflow-hidden mb-4 relative">
+                            {previewUrl ? (
+                                <>
+                                    {isLoadingPreview && (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 z-10">
+                                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+                                            <p className="mt-3 text-sm font-medium text-muted-foreground">Loading preview...</p>
+                                        </div>
+                                    )}
+                                    <iframe
+                                        src={previewUrl}
+                                        className="w-full h-full"
+                                        title="Offer Preview"
+                                        onLoad={() => setIsLoadingPreview(false)}
+                                    />
+                                </>
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-muted-foreground">
+                                    <div className="flex flex-col items-center">
+                                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-3" />
+                                        <p className="text-sm font-medium">Preparing preview...</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-4 mb-4">
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50 p-3 rounded-md flex items-start gap-2 mb-2">
+                                <MailIcon size={18} className="text-amber-600 dark:text-amber-400 mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Default Template Notice</p>
+                                    <p className="text-xs text-amber-700 dark:text-amber-400">This is the default system template that will be sent to the customer for this event.</p>
+                                </div>
+                            </div>
+
+                            <div className="rounded-lg border border-border bg-card overflow-hidden">
+                                <div className="px-4 py-3 border-b border-border bg-muted/30">
+                                    <p className="text-sm font-semibold text-foreground">Subject: {emailPreview?.subject}</p>
+                                </div>
+                                <div className="p-6 overflow-y-auto max-h-[55vh] bg-white dark:bg-slate-950">
+                                    {isLoadingEmailPreview ? (
+                                        <div className="flex items-center justify-center py-20">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                                        </div>
+                                    ) : emailPreview?.body ? (
+                                        <div
+                                            className="prose dark:prose-invert prose-sm max-w-none preview-email-body"
+                                            dangerouslySetInnerHTML={{ __html: emailPreview.body }}
+                                        />
+                                    ) : (
+                                        <p className="text-muted-foreground italic py-10 text-center">No email body content available.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2">
+                        {previewStep === 'offer' ? (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleDownloadPreview}
+                                    leftIcon={<DownloadIcon size={16} />}
+                                    isLoading={isDownloading}
+                                    disabled={!previewUrl || isLoadingPreview || isDownloading}
+                                >
+                                    Download PDF
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setPreviewModalOpen(false);
+                                        setIsLoadingPreview(false);
+                                        setPreviewStep('offer');
+                                    }}
+                                >
+                                    Close
+                                </Button>
+                                <Button
+                                    className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                    onClick={handleNextToEmailPreview}
+                                    isLoading={isLoadingEmailPreview}
+                                    disabled={!previewUrl || isLoadingPreview}
+                                    rightIcon={<ChevronRightIcon size={16} />}
+                                >
+                                    Next (Email Preview)
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleBackToOfferPreview}
+                                >
+                                    Back to Offer
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setPreviewModalOpen(false);
+                                        setIsLoadingPreview(false);
+                                        setPreviewStep('offer');
+                                    }}
+                                >
+                                    Close
+                                </Button>
+                                <Button
+                                    className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                    onClick={() => {
+                                        setPreviewModalOpen(false);
+                                        setPreviewStep('offer');
+                                        handleSubmit(1);
+                                    }}
+                                >
+                                    Confirm & Send
+                                </Button>
+                            </>
+                        )}
+                    </div>
                 </Modal>
 
                 {/* Sidebar: Live Summary */}
