@@ -16,7 +16,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/crm-web
-            git pull origin main
+            git pull origin develop
             npm install
             npm run build
 
