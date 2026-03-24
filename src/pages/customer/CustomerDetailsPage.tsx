@@ -814,7 +814,7 @@ export function CustomerDetailsPage() {
     const [isEmailSending, setIsEmailSending] = useState(false);
 
     // Detail Section State
-    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log'>('general');
+    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log' | 'maintenance'>('general');
 
     // Email Logs Refresh State
     const [emailLogsKey, setEmailLogsKey] = useState(0);
@@ -2634,7 +2634,8 @@ export function CustomerDetailsPage() {
                                     { id: 'electricity_bills', label: 'Electricity Bills', icon: ZapIcon, badge: selectedCustomerDetails.documents?.filter(d => d.documentType?.category === '2' || d.type === '2').length },
                                     { id: 'notes', label: 'Notes', icon: FileTextIcon, badge: notesData?.customerNotes?.length },
                                     { id: 'email_logs', label: 'Email Logs', icon: MailIcon },
-                                    { id: 'activity_log', label: 'Activity Log', icon: ActivityIcon }
+                                    { id: 'activity_log', label: 'Activity Log', icon: ActivityIcon },
+                                    { id: 'maintenance', label: 'Maintenance', icon: RefreshCwIcon }
                                 ].filter(item => {
                                     if (item.id === 'vpp_certificate') {
                                         const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
@@ -3994,6 +3995,29 @@ export function CustomerDetailsPage() {
                                         </div>
                                     </div>
                                     <CustomerActivityLogTable customerUid={selectedCustomerDetails.uid} />
+                                </div>
+                            )}
+
+                            {selectedDetailSection === 'maintenance' && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    <div className="flex items-center justify-between border-b border-border pb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900/40 flex items-center justify-center text-slate-600 dark:text-slate-400">
+                                                <RefreshCwIcon size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Maintenance</h3>
+                                                <p className="text-xs text-muted-foreground">Customer maintenance & system updates</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-neutral-950 rounded-xl border border-dashed border-border">
+                                        <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground mb-3">
+                                            <RefreshCwIcon size={20} />
+                                        </div>
+                                        <p className="text-sm font-medium text-muted-foreground">Maintenance mode</p>
+                                        <p className="text-xs text-muted-foreground/70 mt-1">This section is currently under development.</p>
+                                    </div>
                                 </div>
                             )}
 
