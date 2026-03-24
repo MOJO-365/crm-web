@@ -16,14 +16,19 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/crm-web
-            git pull origin develop
+
+            # 🔥 FIX GIT ERROR (IMPORTANT)
+            git reset --hard
+            git clean -fd
+
+            # 🔥 PULL LATEST CODE
+            git pull origin main
+
             npm install
             npm run build
 
-            # 🔥 CLEAN OLD FILES
+            # 🔥 DEPLOY BUILD
             sudo rm -rf /usr/share/nginx/html/*
-
-            # 🔥 COPY NEW BUILD
             sudo cp -r dist/* /usr/share/nginx/html/
 
             # 🔥 RESTART NGINX
