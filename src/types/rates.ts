@@ -30,7 +30,7 @@ export interface DynamicRate {
     name: string;
     value: string;
     unitId: string;
-    type: 'charges' | 'fit';
+    type: 'charges' | 'fit' | 'extra_charges' | 'extra_fit' | 'energy_rates' | 'vpp_charges' | 'supply_charges' | 'solar_fit' | 'controlled_load' | 'demand_charges';
 }
 
 export interface RatePlan {

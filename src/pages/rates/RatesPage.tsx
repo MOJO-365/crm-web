@@ -29,7 +29,7 @@ interface DynamicRate {
     name: string;
     value: string;
     unitId: string;
-    type: 'charges' | 'fit';
+    type: 'charges' | 'fit' | 'extra_charges' | 'extra_fit' | 'energy_rates' | 'vpp_charges' | 'supply_charges' | 'solar_fit' | 'controlled_load' | 'demand_charges';
 }
 
 interface RateOffer {
@@ -2368,8 +2368,14 @@ export function RatesPage() {
                                                 value={rate.type}
                                                 onChange={(e) => handleDynamicRateChange(index, 'type', e.target.value as any)}
                                             >
-                                                <option value="charges">Charges</option>
-                                                <option value="fit">FIT</option>
+                                                <option value="extra_charges">Extra Charges</option>
+                                                <option value="extra_fit">Extra FIT</option>
+                                                <option value="energy_rates">Energy Rates</option>
+                                                <option value="vpp_charges">VPP Charges</option>
+                                                <option value="supply_charges">Supply Charges</option>
+                                                <option value="solar_fit">Solar FiT</option>
+                                                <option value="controlled_load">Controlled Load</option>
+                                                <option value="demand_charges">Demand Charges</option>
                                             </select>
                                         </div>
                                         <div className="col-span-1">
@@ -3101,8 +3107,14 @@ export function RatesPage() {
                                                     value={rate.type}
                                                     onChange={(e) => handleDynamicRateChange(index, 'type', e.target.value as any)}
                                                 >
-                                                    <option value="charges">Charges</option>
-                                                    <option value="fit">FIT</option>
+                                                    <option value="extra_charges">Extra Charges</option>
+                                                    <option value="extra_fit">Extra FIT</option>
+                                                    <option value="energy_rates">Energy Rates</option>
+                                                    <option value="vpp_charges">VPP Charges</option>
+                                                    <option value="supply_charges">Supply Charges</option>
+                                                    <option value="solar_fit">Solar FiT</option>
+                                                    <option value="controlled_load">Controlled Load</option>
+                                                    <option value="demand_charges">Demand Charges</option>
                                                 </select>
                                             </div>
                                             <div className="col-span-1">

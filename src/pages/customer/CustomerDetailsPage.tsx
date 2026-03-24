@@ -3505,12 +3505,17 @@ export function CustomerDetailsPage() {
                                         <div className="space-y-6">
                                             {selectedCustomerDetails.ratePlan.offers.map((offer: any, idx) => {
                                                 const discount = selectedCustomerDetails.discount ?? 0;
-                                                const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0;
-                                                const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0;
-
                                                 const parsedPriceUnits: Record<string, string> = typeof offer.priceUnits === 'string'
                                                     ? (() => { try { return JSON.parse(offer.priceUnits); } catch { return {}; } })()
                                                     : (offer.priceUnits || {});
+
+                                                const parsedDynamicRates = typeof offer.dynamicRates === 'string'
+                                                    ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
+                                                    : (offer.dynamicRates || []);
+
+                                                const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'controlled_load');
+                                                const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit');
+
                                                 const formatUnit = (key: string, fallback: string) => {
                                                     const unitUid = parsedPriceUnits[key];
                                                     const unit = unitUid ? (unitMap[unitUid] || fallback) : fallback;
@@ -3531,13 +3536,15 @@ export function CustomerDetailsPage() {
                                                                         { label: 'Peak', value: offer.peak, type: 'peak' },
                                                                         { label: 'Off-Peak', value: offer.offPeak, type: 'offPeak' },
                                                                         { label: 'Shoulder', value: offer.shoulder, type: 'shoulder' },
-                                                                        { label: 'Anytime', value: offer.anytime, type: 'anytime' }
+                                                                        { label: 'Anytime', value: offer.anytime, type: 'anytime' },
+                                                                        ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
                                                                     ]
                                                                         .filter(rate => (rate.value ?? 0) > 0)
                                                                         .sort((a, b) => calculateDiscountedRate(a.value ?? 0, discount) - calculateDiscountedRate(b.value ?? 0, discount))
-                                                                        .map((rate, idx) => {
+                                                                        .map((rate: any, idx) => {
                                                                             const isAnytime = rate.type === 'anytime';
                                                                             const price = calculateDiscountedRate(rate.value ?? 0, discount);
+                                                                            const unit = rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : '/kWh') : formatUnit(rate.type, 'kWh');
 
                                                                             return (
                                                                                 <div
@@ -3553,7 +3560,7 @@ export function CustomerDetailsPage() {
                                                                                         "font-bold text-base tracking-tight",
                                                                                         isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
                                                                                     )}>
-                                                                                        ${price.toFixed(4)}{formatUnit(rate.type, 'kWh')}
+                                                                                        ${price.toFixed(4)}{unit}
                                                                                     </div>
                                                                                     <div className={cn(
                                                                                         "text-[10px] font-bold uppercase tracking-wider opacity-80",
@@ -3574,12 +3581,17 @@ export function CustomerDetailsPage() {
                                                                     <h4 className="text-sm font-bold uppercase tracking-wide">Supply Charges</h4>
                                                                 </div>
                                                                 <div className="space-y-3">
-                                                                    <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                        <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${(offer.supplyCharge ?? 0).toFixed(4)}{formatUnit('supplyCharge', 'day')}</div>
-                                                                        <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
-                                                                    </div>
+                                                                    {[
+                                                                        { label: 'Supply', value: offer.supplyCharge, type: 'supplyCharge' },
+                                                                        ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+                                                                    ].filter(r => (r.value ?? 0) > 0).map((r: any, id) => (
+                                                                        <div key={id} className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                            <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${parseFloat(String(r.value || '0')).toFixed(4)}{r.type === 'dynamic' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit(r.type, 'day')}</div>
+                                                                            <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">{r.label}</div>
+                                                                        </div>
+                                                                    ))}
 
-                                                                    {((offer.demand ?? 0) > 0 || (offer.demandOp ?? 0) > 0 || (offer.demandP ?? 0) > 0 || (offer.demandS ?? 0) > 0) && (
+                                                                    {((offer.demand ?? 0) > 0 || (offer.demandOp ?? 0) > 0 || (offer.demandP ?? 0) > 0 || (offer.demandS ?? 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'demand_charges')) && (
                                                                         <>
                                                                             <div className="flex items-center gap-2 text-rose-500 dark:text-rose-400 mt-4">
                                                                                 <ActivityIcon size={16} />
@@ -3587,15 +3599,16 @@ export function CustomerDetailsPage() {
                                                                             </div>
                                                                             <div className="space-y-3">
                                                                                 {[
-                                                                                    { label: 'Demand', value: offer.demand },
-                                                                                    { label: 'Demand (Op)', value: offer.demandOp },
-                                                                                    { label: 'Demand (P)', value: offer.demandP },
-                                                                                    { label: 'Demand (S)', value: offer.demandS }
+                                                                                    { label: 'Demand', value: offer.demand, type: 'demand' },
+                                                                                    { label: 'Demand (Op)', value: offer.demandOp, type: 'demandOp' },
+                                                                                    { label: 'Demand (P)', value: offer.demandP, type: 'demandP' },
+                                                                                    { label: 'Demand (S)', value: offer.demandS, type: 'demandS' },
+                                                                                    ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
                                                                                 ]
-                                                                                    .filter((d): d is { label: string, value: number } => (d.value ?? 0) > 0)
+                                                                                    .filter((d: any) => (d.value ?? 0) > 0)
                                                                                     .map((d, id) => (
                                                                                         <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${d.value.toFixed(4)}{formatUnit(d.label === 'Demand' ? 'demand' : d.label === 'Demand (Op)' ? 'demandOp' : d.label === 'Demand (P)' ? 'demandP' : 'demandS', 'kVA/day')}</div>
+                                                                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${parseFloat(String(d.value || '0')).toFixed(4)}{d.type === 'dynamic' ? (d.unitId ? `/${unitMap?.[d.unitId]}` : '/kVA/day') : formatUnit(d.type === 'demand' ? 'demand' : d.type === 'demandOp' ? 'demandOp' : d.type === 'demandP' ? 'demandP' : 'demandS', 'kVA/day')}</div>
                                                                                             <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
                                                                                         </div>
                                                                                     ))}
@@ -3603,15 +3616,22 @@ export function CustomerDetailsPage() {
                                                                         </>
                                                                     )}
 
-                                                                    {(offer.vppOrcharge ?? 0) > 0 && (
+                                                                    {((offer.vppOrcharge ?? 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'vpp_charges')) && (
                                                                         <>
                                                                             <div className="flex items-center gap-2 text-amber-500 dark:text-amber-400 mt-4">
                                                                                 <ActivityIcon size={16} />
                                                                                 <h4 className="text-sm font-bold uppercase tracking-wide">VPP Charges</h4>
                                                                             </div>
-                                                                            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${(offer.vppOrcharge ?? 0).toFixed(4)}{formatUnit('vppOrcharge', 'day')}</div>
-                                                                                <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">Orchestration</div>
+                                                                            <div className="space-y-3">
+                                                                                {[
+                                                                                    { label: 'Orchestration', value: offer.vppOrcharge, type: 'vppOrcharge' },
+                                                                                    ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+                                                                                ].filter(r => (r.value ?? 0) > 0).map((r, id) => (
+                                                                                    <div key={id} className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                                        <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${parseFloat(String(r.value || '0')).toFixed(4)}{r.type === 'dynamic' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit('vppOrcharge', 'day')}</div>
+                                                                                        <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">{r.label}</div>
+                                                                                    </div>
+                                                                                ))}
                                                                             </div>
                                                                         </>
                                                                     )}
@@ -3630,7 +3650,8 @@ export function CustomerDetailsPage() {
                                                                             { label: 'Feed-in', value: offer.fit, type: 'fit' },
                                                                             { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
                                                                             { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
-                                                                            { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' }
+                                                                            { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' },
+                                                                            ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
                                                                         ]
                                                                             .filter(rate => {
                                                                                 if ((rate.value ?? 0) <= 0) return false;
@@ -3641,19 +3662,22 @@ export function CustomerDetailsPage() {
                                                                                 return isVppActive || !hasSolar;
                                                                             })
                                                                             .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
-                                                                            .map((rate, idx) => (
-                                                                                <div
-                                                                                    key={idx}
-                                                                                    className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
-                                                                                >
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">
-                                                                                        ${(rate.value ?? 0).toFixed(4)}{formatUnit(rate.type, 'kWh')}
+                                                                            .map((rate: any, idx) => {
+                                                                                const unit = rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : '/kWh') : formatUnit(rate.type, 'kWh');
+                                                                                return (
+                                                                                    <div
+                                                                                        key={idx}
+                                                                                        className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
+                                                                                    >
+                                                                                        <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">
+                                                                                            ${parseFloat(String(rate.value || '0')).toFixed(4)}{unit}
+                                                                                        </div>
+                                                                                        <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">
+                                                                                            {rate.label}
+                                                                                        </div>
                                                                                     </div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">
-                                                                                        {rate.label}
-                                                                                    </div>
-                                                                                </div>
-                                                                            ))}
+                                                                                );
+                                                                            })}
                                                                     </div>
                                                                 </div>
                                                             )}
@@ -3670,16 +3694,17 @@ export function CustomerDetailsPage() {
                                                                             { label: 'CL1 Usage', value: offer.cl1Usage, type: 'cl1_usage' },
                                                                             { label: 'CL2 Usage', value: offer.cl2Usage, type: 'cl2_usage' },
                                                                             { label: 'CL1 Supply', value: offer.cl1Supply, type: 'cl1_supply' },
-                                                                            { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply' }
+                                                                            { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply' },
+                                                                            ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
                                                                         ]
                                                                             .filter(rate => (rate.value ?? 0) > 0)
-                                                                            .map((rate, idx) => {
-                                                                                const isUsage = rate.type.endsWith('_usage');
+                                                                            .map((rate: any, idx) => {
+                                                                                const isUsage = rate.type === 'cl1_usage' || rate.type === 'cl2_usage' || (rate.type === 'dynamic' && !(rate.unitId && unitMap?.[rate.unitId]?.toLowerCase().includes('day')));
                                                                                 const price = isUsage ? calculateDiscountedRate(rate.value ?? 0, discount) : (rate.value ?? 0);
-                                                                                const unit = isUsage ? 'kWh' : 'day';
+                                                                                const unit = rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : (isUsage ? '/kWh' : '/day')) : (isUsage ? '/kWh' : '/day');
                                                                                 return (
                                                                                     <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                                        <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${price.toFixed(4)}{formatUnit(rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', unit)}</div>
+                                                                                        <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${price.toFixed(4)}{unit}</div>
                                                                                         <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{rate.label}</div>
                                                                                     </div>
                                                                                 );
@@ -3689,16 +3714,16 @@ export function CustomerDetailsPage() {
                                                             )}
 
                                                             {/* Dynamic Rates Columns */}
+                                                            {/* We only show rates that haven't been displayed in the specific columns above */}
                                                             {(() => {
-                                                                const parsedDynamicRates = typeof offer.dynamicRates === 'string'
-                                                                    ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
-                                                                    : (offer.dynamicRates || []);
+                                                                const handledTypes = ['energy_rates', 'supply_charges', 'demand_charges', 'vpp_charges', 'solar_fit', 'controlled_load'];
+                                                                const remainingDynamicRates = parsedDynamicRates.filter((r: any) => !handledTypes.includes(r.type));
 
-                                                                if (!parsedDynamicRates || parsedDynamicRates.length === 0) return null;
+                                                                if (remainingDynamicRates.length === 0) return null;
 
-                                                                const fitRates = parsedDynamicRates.filter((r: any) => r.type === 'fit');
-                                                                const chargeRates = parsedDynamicRates.filter((r: any) => r.type === 'charges');
-                                                                const untypedRates = parsedDynamicRates.filter((r: any) => !r.type);
+                                                                const fitRates = remainingDynamicRates.filter((r: any) => r.type === 'fit' || r.type === 'extra_fit');
+                                                                const chargeRates = remainingDynamicRates.filter((r: any) => !r.type || r.type === 'charges' || r.type === 'extra_charges');
+                                                                const untypedRates = remainingDynamicRates.filter((r: any) => !r.type); // Filter untyped rates from the remaining
 
                                                                 const renderRatesColumn = (rates: any[], label: string, colorClass: string, icon: any = ActivityIcon) => {
                                                                     if (rates.length === 0) return null;
