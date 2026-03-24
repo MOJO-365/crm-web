@@ -182,7 +182,7 @@ export function DashboardPage() {
         <div className="space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-semibold text-title dark:text-title">Dashboard</h1>
+                <h1 className="text-2xl font-semibold text-title dark:text-title">Dashboard Crm</h1>
                 <p className="text-sm text-subtitle dark:text-subtitle mt-1">Customer summary overview</p>
             </div>
 
