@@ -1103,19 +1103,32 @@ export const OfferAccessPage = () => {
                                 );
                             };
 
+                            const clUsageRates = clDynamicRates.filter((r: any) => r.type === 'controlled_load' && (r.unitId ? unitMap?.[r.unitId]?.toLowerCase().includes('kwh') : true));
+                            const clSupplyRates = clDynamicRates.filter((r: any) => r.type === 'controlled_load' && (r.unitId ? unitMap?.[r.unitId]?.toLowerCase().includes('day') : true));
+
                             const energyRates = [
-                                { label: 'Peak', value: activeOffer.peak, type: 'peak' },
-                                { label: 'Off-Peak', value: activeOffer.offPeak, type: 'offPeak' },
-                                { label: 'Shoulder', value: activeOffer.shoulder, type: 'shoulder' },
-                                { label: 'Anytime', value: activeOffer.anytime, type: 'anytime' },
-                                ...energyDynamicRates.map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+                                { label: 'Peak', value: calculateDiscountedRate(activeOffer.peak, customerData.discount ?? 0), type: 'peak' },
+                                { label: 'Off-Peak', value: calculateDiscountedRate(activeOffer.offPeak, customerData.discount ?? 0), type: 'offPeak' },
+                                { label: 'Shoulder', value: calculateDiscountedRate(activeOffer.shoulder, customerData.discount ?? 0), type: 'shoulder' },
+                                { label: 'Anytime', value: calculateDiscountedRate(activeOffer.anytime, customerData.discount ?? 0), type: 'anytime' },
+                                ...clUsageRates.map((r: any) => ({
+                                    label: r.name,
+                                    value: calculateDiscountedRate(r.value, customerData.discount ?? 0),
+                                    type: 'clUsage',
+                                    unitId: r.unitId
+                                })),
+                                ...energyDynamicRates.map((r: any) => {
+                                    const numericValue = parseFloat(String(r.value || 0));
+                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
+                                })
                             ]
                                 .filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0)
-                                .sort((a, b) => calculateDiscountedRate(parseFloat(String(a.value || 0)), customerData.discount ?? 0) - calculateDiscountedRate(parseFloat(String(b.value || 0)), customerData.discount ?? 0))
+                                .sort((a, b) => parseFloat(String(a.value || 0)) - parseFloat(String(b.value || 0)))
                                 .map((rate: any) => {
                                     const isAnytime = rate.type === 'anytime';
-                                    const price = calculateDiscountedRate(parseFloat(String(rate.value || 0)), customerData.discount ?? 0);
-                                    const unit = rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : '/kWh') : formatUnit(rate.type, 'kWh');
+                                    const price = parseFloat(String(rate.value || 0));
+                                    const unit = rate.type === 'dynamic' || rate.type === 'clUsage' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : '/kWh') : formatUnit(rate.type, 'kWh');
                                     return {
                                         label: rate.label,
                                         displayValue: `$${price.toFixed(4)}${unit}`,
@@ -1124,11 +1137,21 @@ export const OfferAccessPage = () => {
                                 });
 
                             const supplyRates = [
-                                { label: 'Supply', value: activeOffer.supplyCharge, type: 'supplyCharge' },
-                                ...supplyDynamicRates.map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+                                { label: 'Supply', value: activeOffer.supplyCharge, type: 'supplyCharge' }, // Usually not discounted
+                                ...clSupplyRates.map((r: any) => ({
+                                    label: r.name,
+                                    value: r.value, // Usually not discounted
+                                    type: 'clSupply',
+                                    unitId: r.unitId
+                                })),
+                                ...supplyDynamicRates.map((r: any) => {
+                                    const numericValue = parseFloat(String(r.value || 0));
+                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
+                                })
                             ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r: any) => ({
                                 label: r.label,
-                                displayValue: `$${parseFloat(String(r.value || '0')).toFixed(4)}${r.type === 'dynamic' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit('supplyCharge', 'day')}`
+                                displayValue: `$${parseFloat(String(r.value || '0')).toFixed(4)}${r.type === 'dynamic' || r.type === 'clSupply' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit('supplyCharge', 'day')}`
                             }));
 
                             const demandRates = [
@@ -1136,28 +1159,46 @@ export const OfferAccessPage = () => {
                                 { label: 'Demand (Op)', value: activeOffer.demandOp, type: 'demandOp' },
                                 { label: 'Demand (P)', value: activeOffer.demandP, type: 'demandP' },
                                 { label: 'Demand (S)', value: activeOffer.demandS, type: 'demandS' },
-                                ...demandDynamicRates.map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+                                ...demandDynamicRates.map((r: any) => {
+                                    const numericValue = parseFloat(String(r.value || 0));
+                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
+                                })
                             ]
                                 .filter(d => (parseFloat(String(d.value || 0)) ?? 0) > 0)
-                                .map((d: any) => ({
-                                    label: d.label,
-                                    displayValue: `$${parseFloat(String(d.value || '0')).toFixed(4)}${d.type === 'dynamic' ? (d.unitId ? `/${unitMap?.[d.unitId]}` : '/kVA/day') : formatUnit(d.type, 'kVA/day')}`
-                                }));
+                                .map((d: any) => {
+                                    const price = parseFloat(String(d.value || '0'));
+                                    return {
+                                        label: d.label,
+                                        displayValue: `$${price.toFixed(4)}${d.type === 'dynamic' ? (d.unitId ? `/${unitMap?.[d.unitId]}` : '/kVA/day') : formatUnit(d.type, 'kVA/day')}`
+                                    };
+                                });
 
                             const vppCharges = [
                                 { label: 'Orchestration', value: activeOffer.vppOrcharge, type: 'vppOrcharge' },
-                                ...vppDynamicRates.map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-                            ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r: any) => ({
-                                label: r.label,
-                                displayValue: `$${parseFloat(String(r.value || '0')).toFixed(4)}${r.type === 'dynamic' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit('vppOrcharge', 'day')}`
-                            }));
+                                ...vppDynamicRates.map((r: any) => {
+                                    const numericValue = parseFloat(String(r.value || 0));
+                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
+                                })
+                            ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r: any) => {
+                                const price = parseFloat(String(r.value || '0'));
+                                return {
+                                    label: r.label,
+                                    displayValue: `$${price.toFixed(4)}${r.type === 'dynamic' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit('vppOrcharge', 'day')}`
+                                };
+                            });
 
                             const solarFitRates = [
                                 { label: 'Feed-in', value: activeOffer.fit, type: 'fit' },
                                 { label: 'PREMIUM FIT', value: activeOffer.fitPeak, type: 'fitPeak' },
                                 { label: 'CRITICAL EVENT FIT', value: activeOffer.fitCritical, type: 'fitCritical' },
                                 { label: 'BASE FIT', value: activeOffer.fitVpp, type: 'fitVpp' },
-                                ...solarFitDynamicRates.map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+                                ...solarFitDynamicRates.map((r: any) => {
+                                    const numericValue = parseFloat(String(r.value || 0));
+                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
+                                })
                             ]
                                 .filter(rate => {
                                     const numericValue = parseFloat(String(rate.value || 0));
@@ -1173,14 +1214,30 @@ export const OfferAccessPage = () => {
                                     displayValue: `$${parseFloat(String(rate.value || '0')).toFixed(4)}${rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : '/kWh') : formatUnit(rate.type, 'kWh')}`
                                 }));
 
-                            const extraFitRates = remainingDynamicRates.filter((r: any) => r.type === 'fit' || r.type === 'extra_fit' || (!r.type && (customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1))).map((dRate: any) => ({
-                                label: dRate.name,
-                                displayValue: `$${parseFloat(String(dRate.value || '0')).toFixed(4)}${dRate.unitId ? `/${unitMap?.[dRate.unitId]}` : ''}`
+                            const extraFitRates = remainingDynamicRates.filter((r: any) => r.type === 'fit' || r.type === 'extra_fit' || (!r.type && (customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1))).map((dRate: any) => {
+                                const val = parseFloat(String(dRate.value || '0'));
+                                const price = dRate.applyDiscount ? calculateDiscountedRate(val, customerData.discount ?? 0) : val;
+                                return {
+                                    label: dRate.name,
+                                    value: price,
+                                    unitId: dRate.unitId
+                                };
+                            }).map((rate: any) => ({
+                                label: rate.label,
+                                displayValue: `$${parseFloat(String(rate.value)).toFixed(4)}${rate.unitId ? `/${unitMap?.[rate.unitId]}` : ''}`
                             }));
 
-                            const extraChargeRates = remainingDynamicRates.filter((r: any) => r.type === 'charges' || r.type === 'extra_charges' || (!r.type && !(customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1))).map((dRate: any) => ({
-                                label: dRate.name,
-                                displayValue: `$${parseFloat(String(dRate.value || '0')).toFixed(4)}${dRate.unitId ? `/${unitMap?.[dRate.unitId]}` : ''}`
+                            const extraChargeRates = remainingDynamicRates.filter((r: any) => r.type === 'charges' || r.type === 'extra_charges' || (!r.type && !(customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1))).map((dRate: any) => {
+                                const val = parseFloat(String(dRate.value || '0'));
+                                const price = dRate.applyDiscount ? calculateDiscountedRate(val, customerData.discount ?? 0) : val;
+                                return {
+                                    label: dRate.name,
+                                    value: price,
+                                    unitId: dRate.unitId
+                                };
+                            }).map((rate: any) => ({
+                                label: rate.label,
+                                displayValue: `$${parseFloat(String(rate.value)).toFixed(4)}${rate.unitId ? `/${unitMap?.[rate.unitId]}` : ''}`
                             }));
 
                             const clRates = [
@@ -1188,13 +1245,17 @@ export const OfferAccessPage = () => {
                                 { label: 'CL2 Usage', value: activeOffer.cl2Usage, type: 'cl2_usage' },
                                 { label: 'CL1 Supply', value: activeOffer.cl1Supply, type: 'cl1_supply' },
                                 { label: 'CL2 Supply', value: activeOffer.cl2Supply, type: 'cl2_supply' },
-                                ...clDynamicRates.map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+                                ...clDynamicRates.map((r: any) => {
+                                    const numericValue = parseFloat(String(r.value || 0));
+                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
+                                })
                             ]
                                 .filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0)
                                 .map((rate: any) => {
                                     const numericValue = parseFloat(String(rate.value || 0));
                                     const isUsage = rate.type === 'cl1_usage' || rate.type === 'cl2_usage' || (rate.type === 'dynamic' && !(rate.unitId && unitMap?.[rate.unitId]?.toLowerCase().includes('day')));
-                                    const price = isUsage ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    const price = numericValue;
                                     const unit = rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : (isUsage ? '/kWh' : '/day')) : (isUsage ? '/kWh' : '/day');
                                     return {
                                         label: rate.label,

@@ -30,6 +30,7 @@ interface DynamicRate {
     value: string;
     unitId: string;
     type: 'charges' | 'fit' | 'extra_charges' | 'extra_fit' | 'energy_rates' | 'vpp_charges' | 'supply_charges' | 'solar_fit' | 'controlled_load' | 'demand_charges';
+    applyDiscount?: boolean;
 }
 
 interface RateOffer {
@@ -765,11 +766,11 @@ export function RatesPage() {
         });
     };
 
-    const handleDynamicRateChange = (index: number, field: keyof DynamicRate, value: string) => {
+    const handleDynamicRateChange = (index: number, field: keyof DynamicRate, value: any) => {
         setFormData(prev => {
             const newDynamicRates = [...prev.dynamicRates];
-            const processedValue = field === 'name' ? value.toLowerCase() : value;
-            newDynamicRates[index] = { ...newDynamicRates[index], [field]: processedValue };
+            const processedValue = (field === 'name' && typeof value === 'string') ? value.toLowerCase() : value;
+            newDynamicRates[index] = { ...newDynamicRates[index], [field]: processedValue } as any;
             return { ...prev, dynamicRates: newDynamicRates };
         });
     };
@@ -779,7 +780,7 @@ export function RatesPage() {
             ...prev,
             dynamicRates: [
                 ...prev.dynamicRates,
-                { id: uuidv4(), name: '', value: '', unitId: measurementUnits[0]?.uid || '', type: 'charges' }
+                { id: uuidv4(), name: '', value: '', unitId: measurementUnits[0]?.uid || '', type: 'charges', applyDiscount: false }
             ]
         }));
     };
@@ -921,7 +922,10 @@ export function RatesPage() {
             fitCritical: offer?.fitCritical?.toString() || '',
             fitVpp: offer?.fitVpp?.toString() || '',
             priceUnits: priceUnitsWithDefaults,
-            dynamicRates: (typeof offer?.dynamicRates === 'string' ? JSON.parse(offer.dynamicRates) : (offer?.dynamicRates || [])) as DynamicRate[],
+            dynamicRates: (typeof offer?.dynamicRates === 'string' ? JSON.parse(offer.dynamicRates) : (offer?.dynamicRates || [])).map((r: any) => ({
+                ...r,
+                applyDiscount: !!r.applyDiscount // Ensure it's a boolean
+            })) as DynamicRate[],
         });
         setFormErrors({});
         setEditModalOpen(true);
@@ -2329,7 +2333,7 @@ export function RatesPage() {
                             <div className="space-y-3">
                                 {formData.dynamicRates.map((rate, index) => (
                                     <div key={rate.id} className="grid grid-cols-12 gap-3 items-end bg-background/50 p-3 rounded-md border border-blue-100 dark:border-blue-900">
-                                        <div className="col-span-3 space-y-1">
+                                        <div className="col-span-2 space-y-1">
                                             <label className="text-xs font-medium text-muted-foreground">Name</label>
                                             <Input
                                                 placeholder="Rate name"
@@ -2349,7 +2353,7 @@ export function RatesPage() {
                                                 className="h-9"
                                             />
                                         </div>
-                                        <div className="col-span-3 space-y-1">
+                                        <div className="col-span-2 space-y-1">
                                             <label className="text-xs font-medium text-muted-foreground">Unit</label>
                                             <select
                                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 h-9"
@@ -2377,6 +2381,19 @@ export function RatesPage() {
                                                 <option value="controlled_load">Controlled Load</option>
                                                 <option value="demand_charges">Demand Charges</option>
                                             </select>
+                                        </div>
+                                        <div className="col-span-2 space-y-1.5 flex flex-col items-center justify-end pb-2">
+                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Discount</label>
+                                            <button
+                                                type="button"
+                                                className={`group relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${rate.applyDiscount ? 'bg-green-500' : 'bg-slate-200 dark:bg-slate-700'}`}
+                                                onClick={() => handleDynamicRateChange(index, 'applyDiscount', !rate.applyDiscount)}
+                                            >
+                                                <span className="sr-only">Apply discount</span>
+                                                <span
+                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${rate.applyDiscount ? 'translate-x-6' : 'translate-x-1'}`}
+                                                />
+                                            </button>
                                         </div>
                                         <div className="col-span-1">
                                             <Button
@@ -3068,7 +3085,7 @@ export function RatesPage() {
                                 <div className="space-y-3">
                                     {formData.dynamicRates.map((rate, index) => (
                                         <div key={rate.id} className="grid grid-cols-12 gap-3 items-end bg-background/50 p-3 rounded-md border border-blue-100 dark:border-blue-900">
-                                            <div className="col-span-3 space-y-1">
+                                            <div className="col-span-2 space-y-1">
                                                 <label className="text-xs font-medium text-muted-foreground">Name</label>
                                                 <Input
                                                     placeholder="Rate name"
@@ -3088,7 +3105,7 @@ export function RatesPage() {
                                                     className="h-9"
                                                 />
                                             </div>
-                                            <div className="col-span-3 space-y-1">
+                                            <div className="col-span-2 space-y-1">
                                                 <label className="text-xs font-medium text-muted-foreground">Unit</label>
                                                 <select
                                                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 h-9"
@@ -3116,6 +3133,19 @@ export function RatesPage() {
                                                     <option value="controlled_load">Controlled Load</option>
                                                     <option value="demand_charges">Demand Charges</option>
                                                 </select>
+                                            </div>
+                                            <div className="col-span-2 space-y-1.5 flex flex-col items-center justify-end pb-2">
+                                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Discount</label>
+                                                <button
+                                                    type="button"
+                                                    className={`group relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${rate.applyDiscount ? 'bg-green-500' : 'bg-slate-200 dark:bg-slate-700'}`}
+                                                    onClick={() => handleDynamicRateChange(index, 'applyDiscount', !rate.applyDiscount)}
+                                                >
+                                                    <span className="sr-only">Apply discount</span>
+                                                    <span
+                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${rate.applyDiscount ? 'translate-x-6' : 'translate-x-1'}`}
+                                                    />
+                                                </button>
                                             </div>
                                             <div className="col-span-1">
                                                 <Button
