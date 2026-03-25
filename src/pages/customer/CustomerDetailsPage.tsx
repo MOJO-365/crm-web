@@ -3583,13 +3583,17 @@ export function CustomerDetailsPage() {
                                                                 <div className="space-y-3">
                                                                     {[
                                                                         { label: 'Supply', value: offer.supplyCharge, type: 'supplyCharge' },
-                                                                        ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-                                                                    ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r: any, id) => (
-                                                                        <div key={id} className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${parseFloat(String(r.value || '0')).toFixed(4)}{r.type === 'dynamic' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit(r.type, 'day')}</div>
-                                                                            <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">{r.label}</div>
-                                                                        </div>
-                                                                    ))}
+                                                                        ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
+                                                                    ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r: any, id) => {
+                                                                        const numericValue = parseFloat(String(r.value || '0'));
+                                                                        const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
+                                                                        return (
+                                                                            <div key={id} className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                                <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${price.toFixed(4)}{r.type === 'dynamic' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit(r.type, 'day')}</div>
+                                                                                <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">{r.label}</div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
 
                                                                     {((offer.demand ?? 0) > 0 || (offer.demandOp ?? 0) > 0 || (offer.demandP ?? 0) > 0 || (offer.demandS ?? 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'demand_charges')) && (
                                                                         <>
@@ -3603,15 +3607,19 @@ export function CustomerDetailsPage() {
                                                                                     { label: 'Demand (Op)', value: offer.demandOp, type: 'demandOp' },
                                                                                     { label: 'Demand (P)', value: offer.demandP, type: 'demandP' },
                                                                                     { label: 'Demand (S)', value: offer.demandS, type: 'demandS' },
-                                                                                    ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+                                                                                    ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
                                                                                 ]
                                                                                     .filter((d: any) => (parseFloat(String(d.value || 0)) ?? 0) > 0)
-                                                                                    .map((d, id) => (
-                                                                                        <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${parseFloat(String(d.value || '0')).toFixed(4)}{d.type === 'dynamic' ? (d.unitId ? `/${unitMap?.[d.unitId]}` : '/kVA/day') : formatUnit(d.type === 'demand' ? 'demand' : d.type === 'demandOp' ? 'demandOp' : d.type === 'demandP' ? 'demandP' : 'demandS', 'kVA/day')}</div>
-                                                                                            <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
-                                                                                        </div>
-                                                                                    ))}
+                                                                                    .map((d, id) => {
+                                                                                        const numericValue = parseFloat(String(d.value || '0'));
+                                                                                        const price = d.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
+                                                                                        return (
+                                                                                            <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
+                                                                                                <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${price.toFixed(4)}{d.type === 'dynamic' ? (d.unitId ? `/${unitMap?.[d.unitId]}` : '/kVA/day') : formatUnit(d.type === 'demand' ? 'demand' : d.type === 'demandOp' ? 'demandOp' : d.type === 'demandP' ? 'demandP' : 'demandS', 'kVA/day')}</div>
+                                                                                                <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
                                                                             </div>
                                                                         </>
                                                                     )}
@@ -3625,13 +3633,17 @@ export function CustomerDetailsPage() {
                                                                             <div className="space-y-3">
                                                                                 {[
                                                                                     { label: 'Orchestration', value: offer.vppOrcharge, type: 'vppOrcharge' },
-                                                                                    ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-                                                                                ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r, id) => (
-                                                                                    <div key={id} className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                        <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${parseFloat(String(r.value || '0')).toFixed(4)}{r.type === 'dynamic' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit('vppOrcharge', 'day')}</div>
-                                                                                        <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">{r.label}</div>
-                                                                                    </div>
-                                                                                ))}
+                                                                                    ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
+                                                                                ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r, id) => {
+                                                                                    const numericValue = parseFloat(String(r.value || '0'));
+                                                                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
+                                                                                    return (
+                                                                                        <div key={id} className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center space-y-0.5">
+                                                                                            <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${price.toFixed(4)}{r.type === 'dynamic' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit('vppOrcharge', 'day')}</div>
+                                                                                            <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">{r.label}</div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
                                                                             </div>
                                                                         </>
                                                                     )}
@@ -3651,7 +3663,7 @@ export function CustomerDetailsPage() {
                                                                             { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
                                                                             { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
                                                                             { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' },
-                                                                            ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+                                                                            ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
                                                                         ]
                                                                             .filter(rate => {
                                                                                 const numericValue = parseFloat(String(rate.value || 0));
@@ -3665,13 +3677,15 @@ export function CustomerDetailsPage() {
                                                                             .sort((a, b) => (parseFloat(String(a.value || 0)) ?? 0) - (parseFloat(String(b.value || 0)) ?? 0))
                                                                             .map((rate: any, idx) => {
                                                                                 const unit = rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : '/kWh') : formatUnit(rate.type, 'kWh');
+                                                                                const numericValue = parseFloat(String(rate.value || '0'));
+                                                                                const price = rate.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
                                                                                 return (
                                                                                     <div
                                                                                         key={idx}
                                                                                         className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
                                                                                     >
                                                                                         <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">
-                                                                                            ${parseFloat(String(rate.value || '0')).toFixed(4)}{unit}
+                                                                                            ${price.toFixed(4)}{unit}
                                                                                         </div>
                                                                                         <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">
                                                                                             {rate.label}
@@ -3696,13 +3710,14 @@ export function CustomerDetailsPage() {
                                                                             { label: 'CL2 Usage', value: offer.cl2Usage, type: 'cl2_usage' },
                                                                             { label: 'CL1 Supply', value: offer.cl1Supply, type: 'cl1_supply' },
                                                                             { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply' },
-                                                                            ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+                                                                            ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
                                                                         ]
                                                                             .filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0)
                                                                             .map((rate: any, idx) => {
                                                                                 const numericValue = parseFloat(String(rate.value || 0));
                                                                                 const isUsage = rate.type === 'cl1_usage' || rate.type === 'cl2_usage' || (rate.type === 'dynamic' && !(rate.unitId && unitMap?.[rate.unitId]?.toLowerCase().includes('day')));
-                                                                                const price = isUsage ? calculateDiscountedRate(numericValue, discount) : numericValue;
+                                                                                const shouldApplyDiscount = rate.type === 'dynamic' ? !!rate.applyDiscount : isUsage;
+                                                                                const price = shouldApplyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
                                                                                 const unit = rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : (isUsage ? '/kWh' : '/day')) : (isUsage ? '/kWh' : '/day');
                                                                                 return (
                                                                                     <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
@@ -3740,16 +3755,17 @@ export function CustomerDetailsPage() {
                                                                             </div>
                                                                             <div className="space-y-3">
                                                                                 {rates.map((dRate: any, id: number) => {
-                                                                                    const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
-                                                                                    const val = parseFloat(String(dRate.value || '0'));
-                                                                                    return (
-                                                                                        <div key={id} className={cn(
-                                                                                            colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
-                                                                                            "rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
-                                                                                        )}>
-                                                                                            <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-base tracking-tight")}>
-                                                                                                ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
-                                                                                            </div>
+                                                                                     const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
+                                                                                     const val = parseFloat(String(dRate.value || '0'));
+                                                                                     const price = dRate.applyDiscount ? calculateDiscountedRate(val, discount) : val;
+                                                                                     return (
+                                                                                         <div key={id} className={cn(
+                                                                                             colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
+                                                                                             "rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
+                                                                                         )}>
+                                                                                             <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-base tracking-tight")}>
+                                                                                                 ${price.toFixed(4)}{unitName ? `/${unitName}` : ''}
+                                                                                             </div>
                                                                                             <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "text-[10px] font-bold uppercase tracking-wider opacity-80")}>
                                                                                                 {dRate.name}
                                                                                             </div>
