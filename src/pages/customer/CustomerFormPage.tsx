@@ -284,11 +284,11 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                         { label: 'Anytime', value: offer.anytime, type: 'anytime' },
                         ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
                     ]
-                        .filter(rate => (rate.value ?? 0) > 0)
-                        .sort((a, b) => calculateDiscountedRate(a.value ?? 0, discount) - calculateDiscountedRate(b.value ?? 0, discount))
+                        .filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0)
+                        .sort((a, b) => calculateDiscountedRate(parseFloat(String(a.value || 0)), discount) - calculateDiscountedRate(parseFloat(String(b.value || 0)), discount))
                         .map((rate, idx) => {
                             const isAnytime = rate.type === 'anytime';
-                            const price = calculateDiscountedRate(rate.value ?? 0, discount);
+                            const price = calculateDiscountedRate(parseFloat(String(rate.value || 0)), discount);
                             const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : 'kWh') : formatUnit(rate.type, 'kWh');
                             return (
                                 <div key={idx} className={cn(
@@ -316,7 +316,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                     </div>
                     <div className="space-y-2">
                         <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                            <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${offer.supplyCharge.toFixed(4)}{formatUnit('supplyCharge', 'day')}</div>
+                            <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${parseFloat(String(offer.supplyCharge || '0')).toFixed(4)}{formatUnit('supplyCharge', 'day')}</div>
                             <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
                         </div>
                         {parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any, id: number) => {
@@ -344,7 +344,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                                     { label: 'Demand (S)', value: offer.demandS, type: 'demandS' },
                                     ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
                                 ]
-                                    .filter((d): d is { label: string, value: number, type: string, unitId?: string } => (d.value ?? 0) > 0)
+                                    .filter((d): d is { label: string, value: number, type: string, unitId?: string } => (parseFloat(String(d.value || 0)) ?? 0) > 0)
                                     .map((d, id) => {
                                         const typeKey = d.type === 'demand' ? 'demand' : d.type === 'demandOp' ? 'demandOp' : d.type === 'demandP' ? 'demandP' : d.type === 'demandS' ? 'demandS' : '';
                                         const unit = d.type === 'dynamic' ? (d.unitId ? units[d.unitId] : 'kVA/day') : formatUnit(typeKey, 'kVA/day');
@@ -367,7 +367,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                             </div>
                             <div className="space-y-2">
                                 <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                    <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">${offer.vppOrcharge.toFixed(4)}{formatUnit('vppOrcharge', 'day')}</div>
+                                    <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">${parseFloat(String(offer.vppOrcharge || '0')).toFixed(4)}{formatUnit('vppOrcharge', 'day')}</div>
                                     <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">Orchestration</div>
                                 </div>
                                 {parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any, id: number) => {
@@ -398,12 +398,13 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                             ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
                         ]
                             .filter(rate => {
-                                if ((rate.value ?? 0) <= 0) return false;
+                                const numericValue = parseFloat(String(rate.value || 0));
+                                if (numericValue <= 0) return false;
                                 if (rate.type === 'fit') return !vpp;
                                 if (rate.type === 'dynamic') return true;
                                 return vpp || !hasSolar;
                             })
-                            .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+                            .sort((a, b) => (parseFloat(String(a.value || 0)) ?? 0) - (parseFloat(String(b.value || 0)) ?? 0))
                             .map((rate, idx) => {
                                 const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : 'kWh') : formatUnit(rate.type, 'kWh');
                                 return (
@@ -431,10 +432,11 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                             { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply' },
                             ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
                         ]
-                            .filter(rate => (rate.value ?? 0) > 0)
+                            .filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0)
                             .map((rate, idx) => {
+                                const numericValue = parseFloat(String(rate.value || 0));
                                 const isUsage = rate.type.endsWith('_usage') || (rate.type === 'dynamic' && !rate.label.toLowerCase().includes('supply'));
-                                const price = (isUsage && rate.type !== 'dynamic') ? calculateDiscountedRate(rate.value ?? 0, discount) : (rate.value ?? 0);
+                                const price = (isUsage && rate.type !== 'dynamic') ? calculateDiscountedRate(numericValue, discount) : numericValue;
                                 const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : (isUsage ? 'kWh' : 'day')) : (isUsage ? 'kWh' : 'day');
                                 const unitStr = rate.type === 'dynamic' ? unit : formatUnit(rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', unit);
                                 return (
@@ -1060,10 +1062,12 @@ export const CustomerFormPage = () => {
             }
         }
 
-        // Standardize Name fields: only first letter capital
+        // Standardize Name fields: first letter of each word capital
         if (['firstName', 'lastName', 'debitFirstName', 'debitLastName'].includes(field)) {
-            if (typeof value === 'string' && value.length > 0) {
-                finalValue = value.trim().charAt(0).toUpperCase() + value.trim().slice(1).toLowerCase();
+            if (typeof value === 'string') {
+                finalValue = value.split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                    .join(' ');
             }
         }
 
@@ -2185,27 +2189,27 @@ export const CustomerFormPage = () => {
                                                                 <h4 className="text-sm font-bold uppercase tracking-wide">Energy Rates</h4>
                                                             </div>
                                                             <div className="space-y-3">
-                                                                {(offer.peak ?? 0) > 0 && (
+                                                                {(parseFloat(String(offer.peak || 0)) ?? 0) > 0 && (
                                                                     <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                        <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.peak ?? 0, discount).toFixed(4)}/kWh</div>
+                                                                        <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.peak || 0)), discount).toFixed(4)}/kWh</div>
                                                                         <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Peak</div>
                                                                     </div>
                                                                 )}
-                                                                {(offer.offPeak ?? 0) > 0 && (
+                                                                {(parseFloat(String(offer.offPeak || 0)) ?? 0) > 0 && (
                                                                     <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                        <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.offPeak ?? 0, discount).toFixed(4)}/kWh</div>
+                                                                        <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.offPeak || 0)), discount).toFixed(4)}/kWh</div>
                                                                         <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Off-Peak</div>
                                                                     </div>
                                                                 )}
-                                                                {(offer.shoulder ?? 0) > 0 && (
+                                                                {(parseFloat(String(offer.shoulder || 0)) ?? 0) > 0 && (
                                                                     <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                        <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.shoulder ?? 0, discount).toFixed(4)}/kWh</div>
+                                                                        <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.shoulder || 0)), discount).toFixed(4)}/kWh</div>
                                                                         <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Shoulder</div>
                                                                     </div>
                                                                 )}
-                                                                {(offer.anytime ?? 0) > 0 && (
+                                                                {(parseFloat(String(offer.anytime || 0)) ?? 0) > 0 && (
                                                                     <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                        <div className="text-orange-600 dark:text-orange-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.anytime ?? 0, discount).toFixed(4)}/kWh</div>
+                                                                        <div className="text-orange-600 dark:text-orange-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.anytime || 0)), discount).toFixed(4)}/kWh</div>
                                                                         <div className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider opacity-80">Anytime</div>
                                                                     </div>
                                                                 )}
@@ -2213,7 +2217,7 @@ export const CustomerFormPage = () => {
                                                                     const unit = r.unitId ? unitMap?.[r.unitId] : 'kWh';
                                                                     return (
                                                                         <div key={id} className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(r.value || 0, discount).toFixed(4)}/{unit}</div>
+                                                                            <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(r.value || 0)), discount).toFixed(4)}/{unit}</div>
                                                                             <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">{r.name}</div>
                                                                         </div>
                                                                     );
@@ -2229,7 +2233,7 @@ export const CustomerFormPage = () => {
                                                             </div>
                                                             <div className="space-y-3">
                                                                 <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                    <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${(offer.supplyCharge ?? 0).toFixed(4)}/day</div>
+                                                                    <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${parseFloat(String(offer.supplyCharge || '0')).toFixed(4)}/day</div>
                                                                     <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
                                                                 </div>
                                                                 {parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any, id: number) => {
@@ -2256,7 +2260,7 @@ export const CustomerFormPage = () => {
                                                                                 { label: 'Demand (S)', value: offer.demandS, type: 'demandS' },
                                                                                 ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
                                                                             ]
-                                                                                .filter((d: any) => (d.value ?? 0) > 0)
+                                                                                .filter((d: any) => (parseFloat(String(d.value || 0)) ?? 0) > 0)
                                                                                 .map((d, id) => {
                                                                                     const unitKey = d.type === 'demand' ? 'demand' : d.type === 'demandOp' ? 'demandOp' : d.type === 'demandP' ? 'demandP' : d.type === 'demandS' ? 'demandS' : '';
                                                                                     const unitUid = unitKey ? parsedPriceUnits[unitKey] : '';
@@ -2279,7 +2283,7 @@ export const CustomerFormPage = () => {
                                                                         </div>
                                                                         <div className="space-y-3">
                                                                             <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${(offer.vppOrcharge ?? 0).toFixed(4)}/day</div>
+                                                                                <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${parseFloat(String(offer.vppOrcharge || '0')).toFixed(4)}/day</div>
                                                                                 <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">Orchestration</div>
                                                                             </div>
                                                                             {parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any, id: number) => {
@@ -2305,29 +2309,29 @@ export const CustomerFormPage = () => {
                                                                     <h4 className="text-sm font-bold uppercase tracking-wide">Solar FiT</h4>
                                                                 </div>
                                                                 <div className="space-y-3">
-                                                                    {(offer.fit ?? 0) > 0 && !formData.vpp && (
+                                                                    {(parseFloat(String(offer.fit || 0)) ?? 0) > 0 && !formData.vpp && (
                                                                         <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fit ?? 0).toFixed(4)}/kWh</div>
+                                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${parseFloat(String(offer.fit || 0)).toFixed(4)}/kWh</div>
                                                                             <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">Feed-in</div>
                                                                         </div>
                                                                     )}
                                                                     {(formData.vpp || !formData.hasSolar) && (
                                                                         <>
-                                                                            {(offer.fitPeak ?? 0) > 0 && (
+                                                                            {(parseFloat(String(offer.fitPeak || 0)) ?? 0) > 0 && (
                                                                                 <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitPeak ?? 0).toFixed(4)}/kWh</div>
+                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${parseFloat(String(offer.fitPeak || 0)).toFixed(4)}/kWh</div>
                                                                                     <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">PREMIUM FiT</div>
                                                                                 </div>
                                                                             )}
-                                                                            {(offer.fitCritical ?? 0) > 0 && (
+                                                                            {(parseFloat(String(offer.fitCritical || 0)) ?? 0) > 0 && (
                                                                                 <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitCritical ?? 0).toFixed(4)}/kWh</div>
+                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${parseFloat(String(offer.fitCritical || 0)).toFixed(4)}/kWh</div>
                                                                                     <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">CRITICAL EVENT FiT</div>
                                                                                 </div>
                                                                             )}
-                                                                            {(offer.fitVpp ?? 0) > 0 && (
+                                                                            {(parseFloat(String(offer.fitVpp || 0)) ?? 0) > 0 && (
                                                                                 <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${(offer.fitVpp ?? 0).toFixed(4)}/kWh</div>
+                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${parseFloat(String(offer.fitVpp || 0)).toFixed(4)}/kWh</div>
                                                                                     <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">BASE FIT</div>
                                                                                 </div>
                                                                             )}
@@ -2356,35 +2360,37 @@ export const CustomerFormPage = () => {
                                                                     <h4 className="text-sm font-bold uppercase tracking-wide">Controlled Load</h4>
                                                                 </div>
                                                                 <div className="space-y-3">
-                                                                    {(offer.cl1Usage ?? 0) > 0 && (
+                                                                    {(parseFloat(String(offer.cl1Usage || 0)) ?? 0) > 0 && (
                                                                         <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.cl1Usage ?? 0, discount).toFixed(4)}/kWh</div>
+                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.cl1Usage || 0)), discount).toFixed(4)}/kWh</div>
                                                                             <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Usage</div>
                                                                         </div>
                                                                     )}
-                                                                    {(offer.cl1Supply ?? 0) > 0 && (
+                                                                    {(parseFloat(String(offer.cl1Supply || 0)) ?? 0) > 0 && (
                                                                         <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${(offer.cl1Supply ?? 0).toFixed(4)}/day</div>
+                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${parseFloat(String(offer.cl1Supply || 0)).toFixed(4)}/day</div>
                                                                             <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Supply</div>
                                                                         </div>
                                                                     )}
-                                                                    {(offer.cl2Usage ?? 0) > 0 && (
+                                                                    {(parseFloat(String(offer.cl2Usage || 0)) ?? 0) > 0 && (
                                                                         <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(offer.cl2Usage ?? 0, discount).toFixed(4)}/kWh</div>
+                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.cl2Usage || 0)), discount).toFixed(4)}/kWh</div>
                                                                             <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Usage</div>
                                                                         </div>
                                                                     )}
-                                                                    {(offer.cl2Supply ?? 0) > 0 && (
+                                                                    {(parseFloat(String(offer.cl2Supply || 0)) ?? 0) > 0 && (
                                                                         <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${(offer.cl2Supply ?? 0).toFixed(4)}/day</div>
+                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${parseFloat(String(offer.cl2Supply || 0)).toFixed(4)}/day</div>
                                                                             <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Supply</div>
                                                                         </div>
                                                                     )}
                                                                     {parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any, id: number) => {
                                                                         const unit = r.unitId ? unitMap?.[r.unitId] : (r.name.toLowerCase().includes('supply') ? 'day' : 'kWh');
+                                                                        const numericValue = parseFloat(String(r.value || 0));
+                                                                        const isSupply = r.name.toLowerCase().includes('supply');
                                                                         return (
                                                                             <div key={id} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(r.value || 0, discount).toFixed(4)}/{unit}</div>
+                                                                                <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${isSupply ? numericValue.toFixed(4) : calculateDiscountedRate(numericValue, discount).toFixed(4)}/{unit}</div>
                                                                                 <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{r.name}</div>
                                                                             </div>
                                                                         );
@@ -2419,7 +2425,9 @@ export const CustomerFormPage = () => {
                                                                         <div className="space-y-3">
                                                                             {rates.map((dRate: any, id: number) => {
                                                                                 const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
-                                                                                const val = parseFloat(String(dRate.value || '0'));
+                                                                                const numericValue = parseFloat(String(dRate.value || '0'));
+                                                                                const isSupply = dRate.name.toLowerCase().includes('supply');
+                                                                                const val = isSupply ? numericValue : calculateDiscountedRate(numericValue, discount);
                                                                                 return (
                                                                                     <div key={id} className={cn(
                                                                                         colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
