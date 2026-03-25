@@ -1,33 +1,34 @@
 // Route definitions with lazy loading for code splitting
-import { lazy, Suspense } from 'react';
+import { useEffect, Suspense } from 'react';
 import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider, Outlet, useSearchParams } from 'react-router-dom';
 import { ProtectedRoute, RequirePermission } from '@/components/auth';
 import { MainLayout } from '@/components/layout';
+import { lazyWithRetry, clearLazyRetryFlag } from '@/lib/lazy-with-retry';
 
 // Lazy load pages for code splitting
-const LoginPage = lazy(() => import('@/pages/LoginPage').then(m => ({ default: m.LoginPage })));
-const DashboardPage = lazy(() => import('@/pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
-const UsersPage = lazy(() => import('@/pages/user/UsersPage').then(m => ({ default: m.UsersPage })));
-const ChangePasswordPage = lazy(() => import('@/pages/user/ChangePasswordPage').then(m => ({ default: m.ChangePasswordPage })));
-const CustomersPage = lazy(() => import('@/pages/customer/CustomersPage').then(m => ({ default: m.CustomersPage })));
-const CustomerFormPage = lazy(() => import('@/pages/customer/CustomerFormPage').then(m => ({ default: m.CustomerFormPage })));
-const CustomerDetailsPage = lazy(() => import('@/pages/customer/CustomerDetailsPage').then(m => ({ default: m.CustomerDetailsPage })));
-const RatesPage = lazy(() => import('@/pages/rates/RatesPage').then(m => ({ default: m.RatesPage })));
-const OfferAccessPage = lazy(() => import('@/pages/OfferAccessPage').then(m => ({ default: m.OfferAccessPage })));
-const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
-const RolePage = lazy(() => import('@/pages/role/RolePage').then(m => ({ default: m.RolePage })));
-const AuditLogsPage = lazy(() => import('@/pages/logs/AuditLogsPage').then(m => ({ default: m.AuditLogsPage })));
-const EmailTemplatesPage = lazy(() => import('@/pages/email/EmailTemplatesPage').then(m => ({ default: m.EmailTemplatesPage })));
-const EmailLogsPage = lazy(() => import('@/pages/email/EmailLogsPage').then(m => ({ default: m.EmailLogsPage })));
-const EmailSendPage = lazy(() => import('@/pages/email/EmailSendPage').then(m => ({ default: m.EmailSendPage })));
-const ProfilePage = lazy(() => import('@/pages/user/ProfilePage').then(m => ({ default: m.ProfilePage })));
-const DocumentTypesPage = lazy(() => import('@/pages/master/DocumentTypesPage').then(m => ({ default: m.DocumentTypesPage })));
-const NoteTypesPage = lazy(() => import('@/pages/master/NoteTypesPage').then(m => ({ default: m.NoteTypesPage })));
-const NotificationEntitiesPage = lazy(() => import('@/pages/master/NotificationEntitiesPage').then(m => ({ default: m.NotificationEntitiesPage })));
-const RiskStatusesPage = lazy(() => import('@/pages/master/RiskStatusesPage').then(m => ({ default: m.RiskStatusesPage })));
-const PdfTermsPage = lazy(() => import('@/pages/pdf/PdfTermsPage').then(m => ({ default: m.PdfTermsPage })));
-const CustomerBillingPage = lazy(() => import('@/pages/customer/CustomerBillingPage').then(m => ({ default: m.CustomerBillingPage })));
-const BonusMasterPage = lazy(() => import('@/pages/master/BonusMasterPage').then(m => ({ default: m.BonusMasterPage })));
+const LoginPage = lazyWithRetry(() => import('@/pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const DashboardPage = lazyWithRetry(() => import('@/pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const UsersPage = lazyWithRetry(() => import('@/pages/user/UsersPage').then(m => ({ default: m.UsersPage })));
+const ChangePasswordPage = lazyWithRetry(() => import('@/pages/user/ChangePasswordPage').then(m => ({ default: m.ChangePasswordPage })));
+const CustomersPage = lazyWithRetry(() => import('@/pages/customer/CustomersPage').then(m => ({ default: m.CustomersPage })));
+const CustomerFormPage = lazyWithRetry(() => import('@/pages/customer/CustomerFormPage').then(m => ({ default: m.CustomerFormPage })));
+const CustomerDetailsPage = lazyWithRetry(() => import('@/pages/customer/CustomerDetailsPage').then(m => ({ default: m.CustomerDetailsPage })));
+const RatesPage = lazyWithRetry(() => import('@/pages/rates/RatesPage').then(m => ({ default: m.RatesPage })));
+const OfferAccessPage = lazyWithRetry(() => import('@/pages/OfferAccessPage').then(m => ({ default: m.OfferAccessPage })));
+const NotFoundPage = lazyWithRetry(() => import('@/pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
+const RolePage = lazyWithRetry(() => import('@/pages/role/RolePage').then(m => ({ default: m.RolePage })));
+const AuditLogsPage = lazyWithRetry(() => import('@/pages/logs/AuditLogsPage').then(m => ({ default: m.AuditLogsPage })));
+const EmailTemplatesPage = lazyWithRetry(() => import('@/pages/email/EmailTemplatesPage').then(m => ({ default: m.EmailTemplatesPage })));
+const EmailLogsPage = lazyWithRetry(() => import('@/pages/email/EmailLogsPage').then(m => ({ default: m.EmailLogsPage })));
+const EmailSendPage = lazyWithRetry(() => import('@/pages/email/EmailSendPage').then(m => ({ default: m.EmailSendPage })));
+const ProfilePage = lazyWithRetry(() => import('@/pages/user/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const DocumentTypesPage = lazyWithRetry(() => import('@/pages/master/DocumentTypesPage').then(m => ({ default: m.DocumentTypesPage })));
+const NoteTypesPage = lazyWithRetry(() => import('@/pages/master/NoteTypesPage').then(m => ({ default: m.NoteTypesPage })));
+const NotificationEntitiesPage = lazyWithRetry(() => import('@/pages/master/NotificationEntitiesPage').then(m => ({ default: m.NotificationEntitiesPage })));
+const RiskStatusesPage = lazyWithRetry(() => import('@/pages/master/RiskStatusesPage').then(m => ({ default: m.RiskStatusesPage })));
+const PdfTermsPage = lazyWithRetry(() => import('@/pages/pdf/PdfTermsPage').then(m => ({ default: m.PdfTermsPage })));
+const CustomerBillingPage = lazyWithRetry(() => import('@/pages/customer/CustomerBillingPage').then(m => ({ default: m.CustomerBillingPage })));
+const BonusMasterPage = lazyWithRetry(() => import('@/pages/master/BonusMasterPage').then(m => ({ default: m.BonusMasterPage })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -102,6 +103,11 @@ const router = createBrowserRouter(
 );
 
 export function AppRoutes() {
+    useEffect(() => {
+        // Clear the retry flag when the app routes successfully mount
+        clearLazyRetryFlag();
+    }, []);
+
     return <RouterProvider router={router} />;
 }
 
