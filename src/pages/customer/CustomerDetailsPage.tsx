@@ -37,11 +37,11 @@ import {
     SEND_CUSTOMER_CREDENTIALS_EMAIL,
     GET_MEASUREMENT_UNITS,
     GET_CUSTOMER_MAINTENANCE,
-    GET_MAINTENANCE_CATEGORIES,
+    GET_ITEM_CATEGORIES,
     CREATE_CUSTOMER_MAINTENANCE,
     UPDATE_CUSTOMER_MAINTENANCE,
     DELETE_CUSTOMER_MAINTENANCE,
-    CREATE_MAINTENANCE_CATEGORY
+    CREATE_ITEM_CATEGORY
 } from '@/graphql';
 import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
@@ -1326,12 +1326,12 @@ export function CustomerDetailsPage() {
     });
 
     // Maintenance Categories Query
-    const { data: categoriesData, refetch: refetchCategories } = useQuery(GET_MAINTENANCE_CATEGORIES, {
+    const { data: categoriesData, refetch: refetchCategories } = useQuery(GET_ITEM_CATEGORIES, {
         fetchPolicy: 'network-only'
     });
 
     const categoryOptions = useMemo(() => {
-        return categoriesData?.maintenanceCategories?.map((c: any) => ({
+        return categoriesData?.itemCategories?.map((c: any) => ({
             label: c.name,
             value: c.name
         })) || [];
@@ -1450,7 +1450,7 @@ export function CustomerDetailsPage() {
     const [sendCustomerCredentialsEmail] = useMutation(SEND_CUSTOMER_CREDENTIALS_EMAIL);
     const [createMaintenance] = useMutation(CREATE_CUSTOMER_MAINTENANCE);
     const [updateMaintenance] = useMutation(UPDATE_CUSTOMER_MAINTENANCE);
-    const [createCategory] = useMutation(CREATE_MAINTENANCE_CATEGORY);
+    const [createCategory] = useMutation(CREATE_ITEM_CATEGORY);
 
     // Effects
     useEffect(() => {
