@@ -3712,7 +3712,7 @@ export function CustomerDetailsPage() {
                                                                                 if (numericValue <= 0) return false;
                                                                                 const isVppActive = selectedCustomerDetails.vppDetails?.vpp === 1;
                                                                                 const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
- 
+
                                                                                 if (rate.type === 'fit') return !isVppActive;
                                                                                 return isVppActive || !hasSolar;
                                                                             })
@@ -3797,17 +3797,17 @@ export function CustomerDetailsPage() {
                                                                             </div>
                                                                             <div className="space-y-3">
                                                                                 {rates.map((dRate: any, id: number) => {
-                                                                                     const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
-                                                                                     const val = parseFloat(String(dRate.value || '0'));
-                                                                                     const price = dRate.applyDiscount ? calculateDiscountedRate(val, discount) : val;
-                                                                                     return (
-                                                                                         <div key={id} className={cn(
-                                                                                             colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
-                                                                                             "rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
-                                                                                         )}>
-                                                                                             <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-base tracking-tight")}>
-                                                                                                 ${price.toFixed(4)}{unitName ? `/${unitName}` : ''}
-                                                                                             </div>
+                                                                                    const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
+                                                                                    const val = parseFloat(String(dRate.value || '0'));
+                                                                                    const price = dRate.applyDiscount ? calculateDiscountedRate(val, discount) : val;
+                                                                                    return (
+                                                                                        <div key={id} className={cn(
+                                                                                            colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
+                                                                                            "rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
+                                                                                        )}>
+                                                                                            <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-base tracking-tight")}>
+                                                                                                ${price.toFixed(4)}{unitName ? `/${unitName}` : ''}
+                                                                                            </div>
                                                                                             <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "text-[10px] font-bold uppercase tracking-wider opacity-80")}>
                                                                                                 {dRate.name}
                                                                                             </div>
@@ -5148,7 +5148,7 @@ export function CustomerDetailsPage() {
                 }
             >
                 <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <label className="text-xs font-semibold uppercase text-muted-foreground">Category</label>
@@ -5196,7 +5196,7 @@ export function CustomerDetailsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Handled By</label>
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Taken Care By</label>
                             <Select
                                 options={userOptions}
                                 value={maintenanceForm.takenCareByUid}
@@ -5207,7 +5207,7 @@ export function CustomerDetailsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Method</label>
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Call Method</label>
                             <Select
                                 options={MAINTENANCE_METHOD_OPTIONS}
                                 value={maintenanceForm.method?.toString()}
@@ -5217,7 +5217,7 @@ export function CustomerDetailsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Status</label>
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Call Status</label>
                             <Select
                                 options={MAINTENANCE_STATUS_OPTIONS}
                                 value={maintenanceForm.status?.toString()}
@@ -5237,7 +5237,7 @@ export function CustomerDetailsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Log Date</label>
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Call Date</label>
                             <DatePicker
                                 value={maintenanceForm.callDate}
                                 onChange={(date) => setMaintenanceForm({ ...maintenanceForm, callDate: date || new Date() })}
@@ -5247,7 +5247,7 @@ export function CustomerDetailsPage() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-semibold uppercase text-muted-foreground">Notes</label>
+                        <label className="text-xs font-semibold uppercase text-muted-foreground">Description</label>
                         <textarea
                             value={maintenanceForm.notes}
                             onChange={(e) => setMaintenanceForm({ ...maintenanceForm, notes: e.target.value })}
