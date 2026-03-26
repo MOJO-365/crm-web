@@ -5148,10 +5148,10 @@ export function CustomerDetailsPage() {
                 }
             >
                 <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs font-semibold uppercase text-muted-foreground">Category</label>
+                            <div className="flex items-center justify-between h-6">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">CATEGORY</label>
                                 {canManageMaintenanceCategories && (
                                     <button
                                         type="button"
@@ -5196,7 +5196,9 @@ export function CustomerDetailsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Taken Care By</label>
+                            <div className="flex items-center h-6">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">TAKEN CARE BY</label>
+                            </div>
                             <Select
                                 options={userOptions}
                                 value={maintenanceForm.takenCareByUid}
@@ -5207,7 +5209,9 @@ export function CustomerDetailsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Call Method</label>
+                            <div className="flex items-center h-6">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">CALL METHOD</label>
+                            </div>
                             <Select
                                 options={MAINTENANCE_METHOD_OPTIONS}
                                 value={maintenanceForm.method?.toString()}
@@ -5217,7 +5221,9 @@ export function CustomerDetailsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Call Status</label>
+                            <div className="flex items-center h-6">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">CALL STATUS</label>
+                            </div>
                             <Select
                                 options={MAINTENANCE_STATUS_OPTIONS}
                                 value={maintenanceForm.status?.toString()}
@@ -5227,7 +5233,9 @@ export function CustomerDetailsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Priority</label>
+                            <div className="flex items-center h-6">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">PRIORITY</label>
+                            </div>
                             <Select
                                 options={MAINTENANCE_PRIORITY_OPTIONS}
                                 value={maintenanceForm.priority?.toString()}
@@ -5237,7 +5245,9 @@ export function CustomerDetailsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Call Date</label>
+                            <div className="flex items-center h-6">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">CALL DATE</label>
+                            </div>
                             <DatePicker
                                 value={maintenanceForm.callDate}
                                 onChange={(date) => setMaintenanceForm({ ...maintenanceForm, callDate: date || new Date() })}
@@ -5247,7 +5257,9 @@ export function CustomerDetailsPage() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-semibold uppercase text-muted-foreground">Description</label>
+                        <div className="flex items-center h-6">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">DESCRIPTION</label>
+                        </div>
                         <textarea
                             value={maintenanceForm.notes}
                             onChange={(e) => setMaintenanceForm({ ...maintenanceForm, notes: e.target.value })}
