@@ -37,9 +37,11 @@ import {
     SEND_CUSTOMER_CREDENTIALS_EMAIL,
     GET_MEASUREMENT_UNITS,
     GET_CUSTOMER_MAINTENANCE,
+    GET_MAINTENANCE_CATEGORIES,
     CREATE_CUSTOMER_MAINTENANCE,
     UPDATE_CUSTOMER_MAINTENANCE,
-    DELETE_CUSTOMER_MAINTENANCE
+    DELETE_CUSTOMER_MAINTENANCE,
+    CREATE_MAINTENANCE_CATEGORY
 } from '@/graphql';
 import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
@@ -1163,6 +1165,7 @@ export function CustomerDetailsPage() {
     const canDelete = useAuthStore((state) => state.canDeleteInMenu('customers'));
     const canManageNoteTypes = useAuthStore((state) => state.hasFeatureAccess('feature_manage_note_types'));
     const canManageDocumentTypes = useAuthStore((state) => state.hasFeatureAccess('feature_manage_document_types'));
+    const canManageMaintenanceCategories = useAuthStore((state) => state.hasFeatureAccess('feature_manage_maintenance_categories'));
 
     // State
     const [selectedCustomerDetails, setSelectedCustomerDetails] = useState<CustomerDetails | null>(null);
@@ -1261,6 +1264,11 @@ export function CustomerDetailsPage() {
     const [maintenanceNoteText, setMaintenanceNoteText] = useState('');
     const [isAddingMaintenanceNote, setIsAddingMaintenanceNote] = useState(false);
 
+    // Maintenance Category State
+    const [isAddingNewCategoryInline, setIsAddingNewCategoryInline] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
+
     // Utilmate Form State
     const [isEditingUtilmate, setIsEditingUtilmate] = useState(false);
     const [utilmateForm, setUtilmateForm] = useState({
@@ -1316,6 +1324,18 @@ export function CustomerDetailsPage() {
         skip: selectedDetailSection !== 'notes' && !noteModalOpen,
         fetchPolicy: 'network-only'
     });
+
+    // Maintenance Categories Query
+    const { data: categoriesData, refetch: refetchCategories } = useQuery(GET_MAINTENANCE_CATEGORIES, {
+        fetchPolicy: 'network-only'
+    });
+
+    const categoryOptions = useMemo(() => {
+        return categoriesData?.maintenanceCategories?.map((c: any) => ({
+            label: c.name,
+            value: c.name
+        })) || [];
+    }, [categoriesData]);
 
     // Fetch users for note assignment
     const { data: userData } = useQuery(GET_USERS, {
@@ -1430,6 +1450,7 @@ export function CustomerDetailsPage() {
     const [sendCustomerCredentialsEmail] = useMutation(SEND_CUSTOMER_CREDENTIALS_EMAIL);
     const [createMaintenance] = useMutation(CREATE_CUSTOMER_MAINTENANCE);
     const [updateMaintenance] = useMutation(UPDATE_CUSTOMER_MAINTENANCE);
+    const [createCategory] = useMutation(CREATE_MAINTENANCE_CATEGORY);
 
     // Effects
     useEffect(() => {
@@ -1841,13 +1862,15 @@ export function CustomerDetailsPage() {
                 await updateMaintenance({
                     variables: {
                         uid: editingMaintenance.uid,
-                        input
+                        ...input
                     }
                 });
                 toast.success('Maintenance record updated');
             } else {
                 await createMaintenance({
-                    variables: { input }
+                    variables: {
+                        ...input
+                    }
                 });
                 toast.success('Maintenance record added');
             }
@@ -1859,6 +1882,25 @@ export function CustomerDetailsPage() {
             toast.error(error.message || 'Failed to save maintenance record');
         } finally {
             setIsSavingMaintenance(false);
+        }
+    };
+
+    const handleCreateMaintenanceCategory = async () => {
+        if (!newCategoryName.trim()) return;
+        setIsAddingCategory(true);
+        try {
+            await createCategory({
+                variables: { name: newCategoryName }
+            });
+            await refetchCategories();
+            setMaintenanceForm({ ...maintenanceForm, category: newCategoryName });
+            setIsAddingNewCategoryInline(false);
+            setNewCategoryName('');
+            toast.success('Category added');
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to add category');
+        } finally {
+            setIsAddingCategory(false);
         }
     };
 
@@ -5108,12 +5150,49 @@ export function CustomerDetailsPage() {
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Category</label>
-                            <Input
-                                placeholder="Maintenance category..."
-                                value={maintenanceForm.category}
-                                onChange={(e) => setMaintenanceForm({ ...maintenanceForm, category: e.target.value })}
-                            />
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-semibold uppercase text-muted-foreground">Category</label>
+                                {canManageMaintenanceCategories && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsAddingNewCategoryInline(!isAddingNewCategoryInline);
+                                            setNewCategoryName('');
+                                        }}
+                                        className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                    >
+                                        {isAddingNewCategoryInline ? 'Cancel' : '+ Add New Category'}
+                                    </button>
+                                )}
+                            </div>
+                            {isAddingNewCategoryInline ? (
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Category name..."
+                                        value={newCategoryName}
+                                        onChange={(e) => setNewCategoryName(e.target.value)}
+                                        className="h-9"
+                                        autoFocus
+                                    />
+                                    <Button
+                                        size="sm"
+                                        className="h-9 px-3 bg-neutral-900 text-white hover:bg-neutral-800"
+                                        onClick={handleCreateMaintenanceCategory}
+                                        disabled={!newCategoryName.trim() || isAddingCategory}
+                                        isLoading={isAddingCategory}
+                                    >
+                                        Add
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Select
+                                    options={categoryOptions}
+                                    value={maintenanceForm.category}
+                                    onChange={(val: any) => setMaintenanceForm({ ...maintenanceForm, category: val as string })}
+                                    placeholder="Select category..."
+                                    className="w-full"
+                                />
+                            )}
                         </div>
 
                         <div className="space-y-2">
