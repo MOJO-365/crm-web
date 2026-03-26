@@ -26,7 +26,6 @@ interface VppCertificateTabProps {
     handleSaveVppDetails?: () => void;
 }
 
-
 export function VppCertificateTab({
     customerUid,
     onUpdate,
