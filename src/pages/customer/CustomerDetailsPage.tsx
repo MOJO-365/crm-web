@@ -1288,8 +1288,8 @@ export function CustomerDetailsPage() {
             if (width < 640) setMaxVisibleTabs(4); // Mobile: Icons only (fits more)
             else if (width < 768) setMaxVisibleTabs(5); // Tablet Portrait
             else if (width < 1024) setMaxVisibleTabs(5); // Tablet Landscape
-            else if (width < 1280) setMaxVisibleTabs(6); // Laptop
-            else setMaxVisibleTabs(12); // Desktop (Show all tabs)
+            else if (width < 1280) setMaxVisibleTabs(5); // Laptop (Show fewer to avoid squeeze)
+            else setMaxVisibleTabs(9); // Desktop (Standard view)
         };
 
         handleResize();
@@ -2751,7 +2751,14 @@ export function CustomerDetailsPage() {
                                     return (
                                         <Popover
                                             trigger={
-                                                <Button variant="outline" className="h-9 w-9 p-0 flex items-center justify-center">
+                                                <Button
+                                                    variant="outline"
+                                                    className="h-9 w-9 p-0 flex items-center justify-center"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setActionsMenuOpen(!actionsMenuOpen);
+                                                    }}
+                                                >
                                                     <MoreHorizontalIcon size={16} />
                                                 </Button>
                                             }
@@ -3200,7 +3207,7 @@ export function CustomerDetailsPage() {
                                                         setSelectedDetailSection(item.id as any);
                                                     }}
                                                     className={cn(
-                                                        "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 border-b-2 whitespace-nowrap outline-none",
+                                                        "flex items-center gap-2 px-3 py-3 text-sm font-medium transition-colors duration-200 border-b-2 whitespace-nowrap outline-none",
                                                         selectedDetailSection === item.id
                                                             ? "border-primary bg-background text-primary"
                                                             : item.highlight
