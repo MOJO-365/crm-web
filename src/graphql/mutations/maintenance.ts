@@ -78,3 +78,32 @@ export const DELETE_CUSTOMER_MAINTENANCE = gql`
         deleteCustomerMaintenance(uid: $uid)
     }
 `;
+
+export const CREATE_MAINTENANCE_CATEGORY = gql`
+    mutation CreateMaintenanceCategory($name: String!, $color: String) {
+        createMaintenanceCategory(name: $name, color: $color) {
+            id
+            uid
+            name
+            color
+        }
+    }
+`;
+
+export const UPDATE_MAINTENANCE_CATEGORY = gql`
+    mutation UpdateMaintenanceCategory($uid: String!, $name: String, $color: String, $isActive: Int) {
+        updateMaintenanceCategory(uid: $uid, name: $name, color: $color, isActive: $isActive) {
+            id
+            uid
+            name
+            color
+            isActive
+        }
+    }
+`;
+
+export const DELETE_MAINTENANCE_CATEGORY = gql`
+    mutation DeleteMaintenanceCategory($uid: String!) {
+        deleteMaintenanceCategory(uid: $uid)
+    }
+`;

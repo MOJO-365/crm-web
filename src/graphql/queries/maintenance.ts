@@ -39,3 +39,14 @@ export const GET_MAINTENANCE_RECORD = gql`
         }
     }
 `;
+
+export const GET_MAINTENANCE_CATEGORIES = gql`
+    query GetMaintenanceCategories {
+        maintenanceCategories {
+            id
+            uid
+            name
+            color
+        }
+    }
+`;
