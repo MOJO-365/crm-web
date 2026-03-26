@@ -40,9 +40,9 @@ export const GET_MAINTENANCE_RECORD = gql`
     }
 `;
 
-export const GET_MAINTENANCE_CATEGORIES = gql`
-    query GetMaintenanceCategories {
-        maintenanceCategories {
+export const GET_ITEM_CATEGORIES = gql`
+    query GetItemCategories {
+        itemCategories {
             id
             uid
             name

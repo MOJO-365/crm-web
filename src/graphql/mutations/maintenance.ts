@@ -79,9 +79,9 @@ export const DELETE_CUSTOMER_MAINTENANCE = gql`
     }
 `;
 
-export const CREATE_MAINTENANCE_CATEGORY = gql`
-    mutation CreateMaintenanceCategory($name: String!, $color: String) {
-        createMaintenanceCategory(name: $name, color: $color) {
+export const CREATE_ITEM_CATEGORY = gql`
+    mutation CreateItemCategory($name: String!, $color: String) {
+        createItemCategory(name: $name, color: $color) {
             id
             uid
             name
@@ -90,9 +90,9 @@ export const CREATE_MAINTENANCE_CATEGORY = gql`
     }
 `;
 
-export const UPDATE_MAINTENANCE_CATEGORY = gql`
-    mutation UpdateMaintenanceCategory($uid: String!, $name: String, $color: String, $isActive: Int) {
-        updateMaintenanceCategory(uid: $uid, name: $name, color: $color, isActive: $isActive) {
+export const UPDATE_ITEM_CATEGORY = gql`
+    mutation UpdateItemCategory($uid: String!, $name: String, $color: String, $isActive: Int) {
+        updateItemCategory(uid: $uid, name: $name, color: $color, isActive: $isActive) {
             id
             uid
             name
@@ -102,8 +102,8 @@ export const UPDATE_MAINTENANCE_CATEGORY = gql`
     }
 `;
 
-export const DELETE_MAINTENANCE_CATEGORY = gql`
-    mutation DeleteMaintenanceCategory($uid: String!) {
-        deleteMaintenanceCategory(uid: $uid)
+export const DELETE_ITEM_CATEGORY = gql`
+    mutation DeleteItemCategory($uid: String!) {
+        deleteItemCategory(uid: $uid)
     }
 `;
