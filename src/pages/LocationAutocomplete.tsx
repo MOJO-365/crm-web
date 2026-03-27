@@ -252,7 +252,7 @@ export default function LocationAutocomplete({
             <ul
                 ref={node => { dropdownRef.current = node; }}
                 role="listbox"
-                className={`${zIndexClass} bg-white dark:bg-neutral-900 text-foreground border border-border rounded-xl shadow-xl max-h-72 overflow-auto`}
+                className={`${zIndexClass} bg-white dark:bg-neutral-900 text-foreground border border-border rounded-md shadow-xl max-h-72 overflow-auto`}
                 style={{ position: 'absolute', top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width }}
             >
                 {loading && (

@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { EmptyState } from './EmptyState';
 
 // ============================================================
 // DataTable Types
@@ -293,8 +294,8 @@ export function DataTable<T>({
                             </tr>
                         ) : data.length === 0 ? (
                             <tr>
-                                <td colSpan={colSpan} className="px-4 py-12 text-center text-muted-foreground">
-                                    {emptyMessage}
+                                <td colSpan={colSpan} className="px-4 py-1.5 text-center">
+                                    <EmptyState title={emptyMessage} size="sm" />
                                 </td>
                             </tr>
                         ) : (
