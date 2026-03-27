@@ -7,7 +7,7 @@ import { CloseIcon } from '@/components/icons';
 // Modal Types
 // ============================================================
 
-export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'full';
 
 export interface ModalProps {
     /** Whether the modal is open */
@@ -40,6 +40,10 @@ const sizeClasses: Record<ModalSize, string> = {
     md: 'max-w-md',
     lg: 'max-w-lg',
     xl: 'max-w-xl',
+    '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
+    '4xl': 'max-w-4xl',
+    '5xl': 'max-w-5xl',
     full: 'max-w-6xl', // Increased for 'full' to be wider generally, though UserPermissionsModal overrides it
 };
 

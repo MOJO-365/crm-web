@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useBlocker } from 'react-router-dom';
 import { useQuery, useMutation, useLazyQuery, useApolloClient } from '@apollo/client';
 import { toast } from 'react-toastify';
 import { cn, formatDate } from '@/lib/utils';
@@ -22,6 +22,7 @@ import {
     GET_ACTIVE_BONUSES,
     GET_NEXT_CUSTOMER_ID,
     PREVIEW_SYSTEM_TEMPLATE,
+    UPDATE_LEAD,
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
@@ -527,12 +528,13 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
 export const CustomerFormPage = () => {
     const { uid } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const isEditMode = !!uid && uid !== 'new';
 
     // Form state
     const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
     const [errors, setErrors] = useState<Record<string, string>>({});
-
+    const [prefillLeadUid, setPrefillLeadUid] = useState<string | null>(null);
 
     // Step state
     const [currentStep, setCurrentStep] = useState<0 | 1 | 2 | 3 | 4>(0);
@@ -602,6 +604,36 @@ export const CustomerFormPage = () => {
         }
     }, [customerData, isEditMode]);
 
+    // Handle lead prefill data
+    useEffect(() => {
+        const prefill = (location.state as any)?.prefillData;
+        if (!isEditMode && prefill) {
+            console.log('[Prefill] Loading lead data into customer form:', prefill);
+            if (prefill.uid) setPrefillLeadUid(prefill.uid);
+            setFormData(prev => ({
+                ...prev,
+                title: prefill.title || prev.title,
+                firstName: prefill.firstname || prev.firstName,
+                lastName: prefill.lastname || prev.lastName,
+                email: prefill.email || prev.email,
+                phone: prefill.number || prev.phone,
+                unitNumber: prefill.unitnumber || prev.unitNumber,
+                streetNumber: prefill.streetnumber || prev.streetNumber,
+                streetName: prefill.streetname || prev.streetName,
+                streetType: prefill.streettype || prev.streetType,
+                suburb: prefill.suburb || prev.suburb,
+                state: prefill.state || prev.state,
+                postcode: prefill.postcode || prev.postcode,
+                country: prefill.country || prev.country,
+                nmi: prefill.nmi || prev.nmi,
+            }));
+
+            if (prefill.fullAddress) {
+                setAddressSearch(prefill.fullAddress);
+            }
+        }
+    }, [location.state, isEditMode]);
+
     const [uploadingPreviousBill, setUploadingPreviousBill] = useState(false);
     const [uploadingLicense, setUploadingLicense] = useState(false);
     const [uploadingIdentityProof, setUploadingIdentityProof] = useState(false);
@@ -662,6 +694,7 @@ export const CustomerFormPage = () => {
     const [checkNmiExists] = useLazyQuery(CHECK_NMI_EXISTS);
     const [createCustomer] = useMutation(CREATE_CUSTOMER);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
+    const [updateLead] = useMutation(UPDATE_LEAD);
 
     // Get customer's rate version for historic rates lookup
     const customerRateVersion = customerData?.customer?.rateVersion;
@@ -1450,6 +1483,22 @@ export const CustomerFormPage = () => {
                 const { data } = await createCustomer({ variables: { input } });
                 savedCustomer = data?.createCustomer;
                 toast.success(savedCustomer?.message || 'Customer created successfully');
+
+                // If this customer was created from a lead, mark the lead as converted
+                if (prefillLeadUid) {
+                    try {
+                        await updateLead({
+                            variables: {
+                                uid: prefillLeadUid,
+                                input: { isCustomerNow: true }
+                            }
+                        });
+                        console.log('[Lead Conversion] Successfully updated lead status:', prefillLeadUid);
+                    } catch (leadUpdateErr) {
+                        console.error('[Lead Conversion] Failed to update lead status:', leadUpdateErr);
+                        // Don't show toast error here to not confuse the user, as the customer was created successfully
+                    }
+                }
             }
 
             // Clear customer cache to ensure fresh data on customers page

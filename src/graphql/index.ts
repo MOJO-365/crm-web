@@ -53,3 +53,7 @@ export * from './queries/bonus';
 // Maintenance
 export * from './queries/maintenance';
 export * from './mutations/maintenance';
+
+// Leads
+export * from './queries/leads';
+export * from './mutations/leads';

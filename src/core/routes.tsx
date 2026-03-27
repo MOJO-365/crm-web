@@ -29,6 +29,7 @@ const RiskStatusesPage = lazyWithRetry(() => import('@/pages/master/RiskStatuses
 const PdfTermsPage = lazyWithRetry(() => import('@/pages/pdf/PdfTermsPage').then(m => ({ default: m.PdfTermsPage })));
 const CustomerBillingPage = lazyWithRetry(() => import('@/pages/customer/CustomerBillingPage').then(m => ({ default: m.CustomerBillingPage })));
 const BonusMasterPage = lazyWithRetry(() => import('@/pages/master/BonusMasterPage').then(m => ({ default: m.BonusMasterPage })));
+const LeadsPage = lazyWithRetry(() => import('@/pages/leads/LeadsPage'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -71,6 +72,7 @@ const router = createBrowserRouter(
                 {/* Dashboard route is now handled by RootRouteHandler at '/' */}
 
                 {/* Routes with specific menu permissions */}
+                <Route path="/leads" element={<RequirePermission menuCode="leads"><LeadsPage /></RequirePermission>} />
                 <Route path="/customers" element={<RequirePermission menuCode="customers"><CustomersPage /></RequirePermission>} />
                 <Route path="/customers/new" element={<RequirePermission menuCode="customers"><CustomerFormPage /></RequirePermission>} />
                 <Route path="/customers/:uid" element={<RequirePermission menuCode="customers"><CustomerDetailsPage /></RequirePermission>} />

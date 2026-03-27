@@ -105,3 +105,30 @@ export const RATE_OFFER_FIELDS = gql`
         updatedBy
     }
 `;
+
+export const LEAD_FIELDS = gql`
+    fragment LeadFields on Lead {
+        uid
+        title
+        firstname
+        lastname
+        email
+        number
+        source
+        notes
+        unitnumber
+        streetnumber
+        streetname
+        streettype
+        suburb
+        postcode
+        state
+        country
+        nmi
+        fullAddress
+        isActive
+        isDeleted
+        createdAt
+        updatedAt
+    }
+`;
