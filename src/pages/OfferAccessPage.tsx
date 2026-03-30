@@ -1767,6 +1767,21 @@ export const OfferAccessPage = () => {
                                             >
                                                 Virtual Power Plant Program Terms and Conditions
                                             </a>
+                                            {(customerData.vppDetails?.vppConnected === 1 || customerData.vppDetails?.vpp === 1) && 
+                                             customerData.vppDetails?.vppSignupBonus === 600 && (
+                                                <>
+                                                    {', '}
+                                                    <a
+                                                        href="/onboarding/BESS2 and Nomination Form.pdf"
+                                                        className="underline hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
+                                                        style={{ color: '#4B8A10' }}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        BESS2 and Nomination Form
+                                                    </a>
+                                                </>
+                                            )}
                                             {', '}
                                             {/* <a
                                                 href="/onboarding/GEE-VPP-TC-Ver01.pdf"

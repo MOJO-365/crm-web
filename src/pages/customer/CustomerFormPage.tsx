@@ -44,7 +44,8 @@ import {
     ActivityIcon,
     ShieldCheckIcon,
     DownloadIcon,
-    MailIcon
+    MailIcon,
+    CheckCircleIcon
 } from '@/components/icons';
 import { sendVerification, checkVerification } from '@/lib/twilio';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
@@ -557,7 +558,7 @@ export const CustomerFormPage = () => {
     const [isDownloading, setIsDownloading] = useState(false);
     const [previewData, setPreviewData] = useState<any>(null);
     const [previewStep, setPreviewStep] = useState<'offer' | 'email'>('offer');
-    const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null);
+    const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string; isCustom: boolean } | null>(null);
     const [isLoadingEmailPreview, setIsLoadingEmailPreview] = useState(false);
 
     const [fetchSystemTemplate] = useLazyQuery(PREVIEW_SYSTEM_TEMPLATE);
@@ -3266,11 +3267,29 @@ export const CustomerFormPage = () => {
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4 mb-4">
-                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50 p-3 rounded-md flex items-start gap-2 mb-2">
-                                <MailIcon size={18} className="text-amber-600 dark:text-amber-400 mt-0.5" />
+                            <div className={`p-3 rounded-md flex items-start gap-2 mb-2 border ${
+                                emailPreview?.isCustom 
+                                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/50" 
+                                    : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-900/50"
+                            }`}>
+                                {emailPreview?.isCustom ? (
+                                    <CheckCircleIcon size={18} className="text-green-600 dark:text-green-400 mt-0.5" />
+                                ) : (
+                                    <MailIcon size={18} className="text-amber-600 dark:text-amber-400 mt-0.5" />
+                                )}
                                 <div>
-                                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Default Template Notice</p>
-                                    <p className="text-xs text-amber-700 dark:text-amber-400">This is the default system template that will be sent to the customer for this event.</p>
+                                    <p className={`text-sm font-medium ${
+                                        emailPreview?.isCustom ? "text-green-800 dark:text-green-300" : "text-amber-800 dark:text-amber-300"
+                                    }`}>
+                                        {emailPreview?.isCustom ? "Dynamic Template In Use" : "Default Template Notice"}
+                                    </p>
+                                    <p className={`text-xs ${
+                                        emailPreview?.isCustom ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400"
+                                    }`}>
+                                        {emailPreview?.isCustom 
+                                            ? "This is your custom dynamic template that is currently assigned to this event." 
+                                            : "This is the default system template that will be sent to the customer for this event."}
+                                    </p>
                                 </div>
                             </div>
 
