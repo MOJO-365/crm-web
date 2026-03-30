@@ -389,8 +389,3 @@ export const BATTERY_BRAND_OPTIONS = [
     { value: 'ZYC Energy', label: 'ZYC Energy' },
     { value: 'Other', label: 'Other' },
 ];
-
-export const LEAD_SOURCE_OPTIONS = [
-    { value: 'Referral', label: 'Referral' },
-    { value: 'Other', label: 'Other' },
-];

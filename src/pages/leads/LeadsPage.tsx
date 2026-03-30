@@ -5,9 +5,8 @@ import { DataTable, type Column } from '@/components/common';
 import {
     PlusIcon, PencilIcon, TrashIcon, XIcon, ArrowRightIcon
 } from '@/components/icons';
-import { GET_LEADS, DELETE_LEAD } from '@/graphql';
+import { GET_LEADS, DELETE_LEAD, GET_LEAD_SOURCES } from '@/graphql';
 import { Button, Input, Select, Tooltip } from '@/components/ui';
-import { LEAD_SOURCE_OPTIONS } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useMutation } from '@apollo/client';
@@ -101,6 +100,7 @@ export default function LeadsPage() {
         },
         fetchPolicy: 'network-only',
     });
+    const { data: sourcesData } = useQuery(GET_LEAD_SOURCES);
 
     const [deleteLeadMutation, { loading: deleting }] = useMutation(DELETE_LEAD);
 
@@ -274,7 +274,7 @@ export default function LeadsPage() {
                         {searchFilters.source && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Select
-                        options={[{ value: '', label: 'All' }, ...LEAD_SOURCE_OPTIONS]}
+                        options={[{ value: '', label: 'All' }, ...(sourcesData?.leadSources?.map((s: any) => ({ label: s.name, value: s.name })) || [])]}
                         value={searchFilters.source}
                         onChange={(val) => handleSearchChange('source', val as string)}
                         placeholder="All"
