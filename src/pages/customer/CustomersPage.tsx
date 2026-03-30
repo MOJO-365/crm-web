@@ -459,11 +459,11 @@ export function CustomersPage() {
                                 {fullName}
                             </span>
                         </Tooltip>
-                        {row.isDeleted && (
+                        {/* {row.isDeleted && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
                                 Archived
                             </span>
-                        )}
+                        )} */}
                     </div>
                 );
             },
@@ -527,11 +527,17 @@ export function CustomersPage() {
             width: 'w-[110px]',
             render: (row: Customer) => (
                 <div className="whitespace-nowrap">
-                    <StatusField
-                        type="customer_status"
-                        value={row.status}
-                        mode="badge"
-                    />
+                    {row.isDeleted ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                            Archive
+                        </span>
+                    ) : (
+                        <StatusField
+                            type="customer_status"
+                            value={row.status}
+                            mode="badge"
+                        />
+                    )}
                 </div>
             ),
         },

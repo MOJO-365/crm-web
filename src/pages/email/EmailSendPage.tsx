@@ -10,7 +10,7 @@ import {
 } from '@/graphql';
 
 import { Modal } from '@/components/common';
-import { EyeIcon, MailIcon, RefreshCwIcon, FileTextIcon } from '@/components/icons';
+import { EyeIcon, MailIcon, RefreshCwIcon, FileTextIcon, CheckCircleIcon } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
 import { Select, type SelectOption } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -72,7 +72,8 @@ export function EmailSendPage() {
                 'GEE-TERMS-AND-CONDITIONS.pdf',
                 'GEE-PDS.pdf',
                 'GEE Withdrawal Form.pdf',
-                'GEE-Privacy-Policy.pdf'
+                'GEE-Privacy-Policy.pdf',
+                'BESS2 and Nomination Form.pdf'
             ]
         },
         {
@@ -86,7 +87,6 @@ export function EmailSendPage() {
             description: 'Sent to customers when their VPP Certificate is generated',
         }
     ];
-
 
     const getCurrentTemplateUid = (eventType: string) => {
         const setting = settingsData?.emailSettings?.find((s: any) => s.eventType === eventType);
@@ -270,6 +270,31 @@ export function EmailSendPage() {
             >
                 {previewTemplate ? (
                     <div className="flex flex-col rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 min-h-[400px]">
+                        {/* Dynamic Template Status Notice */}
+                        <div className={`p-3 border-b flex items-start gap-2 ${
+                            previewTemplate?.isCustom 
+                                ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                                : "bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800"
+                        }`}>
+                            {previewTemplate?.isCustom ? (
+                                <CheckCircleIcon size={16} className="text-green-600 dark:text-green-400 mt-0.5" />
+                            ) : (
+                                <MailIcon size={16} className="text-amber-600 dark:text-amber-400 mt-0.5" />
+                            )}
+                            <div>
+                                <p className={`text-xs font-semibold ${
+                                    previewTemplate?.isCustom ? "text-green-800 dark:text-green-300" : "text-amber-800 dark:text-amber-300"
+                                }`}>
+                                    {previewTemplate?.isCustom ? "Dynamic Template Assigned" : "Using System Default"}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">
+                                    {previewTemplate?.isCustom 
+                                        ? "This is the custom template currently assigned to this event." 
+                                        : "No custom template is assigned; the system is using the static default."}
+                                </p>
+                            </div>
+                        </div>
+
                         {/* Email Header */}
                         <div className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
                             <div className="flex items-center px-4 py-3">

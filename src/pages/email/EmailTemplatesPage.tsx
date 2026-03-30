@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useLazyQuery } from '@apollo/client';
 import { toast } from 'react-toastify';
-import logo from '@/assets/main-logo-dark-1.png';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
@@ -55,33 +54,86 @@ const ENTITY_TYPES = [
     // Add more types as they become available
 ];
 
-// Default Email Footer
-const DEFAULT_EMAIL_FOOTER = `
-<br>
-<br>
-<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
-    <p style="color: #5c8a14; font-weight: bold; font-size: 16px; margin: 0 0 10px 0;">GEE Energy</p>
-    
-    <div style="margin-bottom: 10px;">
-        <img src="${logo}" alt="GEE Energy" style="height: 25px;" />
-    </div>
+// Modernized Email Template Constants
+const EMAIL_HEADER_TEMPLATE = `
+<div style="margin:0; padding:0; background-color:#f4f4f4; font-family:Arial, Helvetica, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4; padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; width:100%; background:#ffffff; border-radius:4px; overflow:hidden;">
+          <tr>
+            <td style="padding:24px 32px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+                <tr>
+                  <td>
+                    <img src="https://gee.com.au/images/GEE%20Energy%20Logo.svg" alt="GEE Energy" height="36" style="display:block; border:0;" />
+                  </td>
+                </tr>
+              </table>
+`;
 
-    <p style="margin: 0 0 2px 0;">
-        <a href="mailto:noreply@gee.com.au" style="color: #0000EE; text-decoration: underline;">noreply@gee.com.au</a>
-    </p>
-    
-    <p style="margin: 0 0 2px 0;">(P) 1300 707 042 / (M)</p>
-    
-    <p style="margin: 0 0 2px 0;">PO Box 567, South Melbourne, Victoria 3205</p>
-    
-    <p style="margin: 0 0 15px 0;">
-        <a href="https://www.gee.com.au" style="color: #0000EE; text-decoration: underline;">www.gee.com.au</a>
-    </p>
-    
-    <p style="color: #999; font-size: 10px; line-height: 1.3;">
-        The content of this email is confidential and intended for the recipient specified in message only. It is strictly forbidden to share any part of this message with any third party, without a written consent of the sender. If you received this message by mistake, please reply to this message and follow with its deletion, so that we can ensure such a mistake does not occur in the future.
-    </p>
+const EMAIL_FOOTER_TEMPLATE = `
+              <div style="height:1px; background:#e8e8e8; margin:24px 0;"></div>
+              <div style="text-align:center; padding-bottom:24px;">
+                <h2 style="margin:0 0 16px; font-size:17px; font-weight:700; color:#111;">Need any help?</h2>
+                <table cellpadding="0" cellspacing="0" border="0" align="center">
+                  <tr>
+                    <td style="padding-right:24px;">
+                      <a href="tel:1300 707 042" style="display:inline-flex; align-items:center; text-decoration:none; color:#333; font-size:14px; font-weight:600;">
+                        <span style="display:inline-block; width:32px; height:32px; background:#eaf3de; border-radius:50%; text-align:center; line-height:32px; margin-right:8px; font-size:16px;">&#128222;</span>
+                        1300 707 042
+                      </a>
+                    </td>
+                    <td>
+                      <a href="mailto:support@geeenergy.com.au" style="display:inline-flex; align-items:center; text-decoration:none; color:#333; font-size:14px; font-weight:600;">
+                        <span style="display:inline-block; width:32px; height:32px; background:#eaf3de; border-radius:50%; text-align:center; line-height:32px; margin-right:8px; font-size:16px;">&#9993;</span>
+                        support@geeenergy.com.au
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#f9f9f9; border-top:1px solid #e8e8e8; padding:20px 32px; text-align:center;">
+              <p style="margin:0; font-size:12px; color:#777;">Thank you for choosing GEE Energy.</p>
+              <p style="margin:6px 0 10px; font-size:11px; color:#ccc;">&#169; 2026 GEE POWER AND GAS PTY LTD. All Rights Reserved.</p>
+              <p style="margin:16px 0 0; font-size:10px; color:#bbb; line-height:1.4; text-align:justify;">
+                The content of this email is confidential and intended for the recipient specified in message only. It is strictly forbidden to share any part of this message with any third party, without a written consent of the sender. If you received this message by mistake, please reply to this message and follow with its deletion, so that we can ensure such a mistake does not occur in the future.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </div>
+`;
+
+// Helper to wrap content
+const wrapEmailContent = (content: string) => {
+    // Avoid double wrapping
+    if (content.includes('GEE POWER AND GAS PTY LTD')) return content;
+    return `${EMAIL_HEADER_TEMPLATE}${content}${EMAIL_FOOTER_TEMPLATE}`;
+};
+
+// Helper to unwrap content (extract middle part)
+const unwrapEmailContent = (html: string) => {
+    if (!html) return '';
+    const headerIndex = html.indexOf(EMAIL_HEADER_TEMPLATE);
+    const footerIndex = html.indexOf(EMAIL_FOOTER_TEMPLATE);
+
+    if (headerIndex !== -1 && footerIndex !== -1) {
+        return html.substring(headerIndex + EMAIL_HEADER_TEMPLATE.length, footerIndex);
+    }
+    return html; // Return as-is if it doesn't match the standardized template
+};
+
+// Default Email Body (Internal content only)
+const DEFAULT_EMAIL_BODY = `
+<p style="margin:0 0 10px; font-size:14px; color:#333;">Dear [[FIRST_NAME]],</p>
+<p style="margin:0 0 15px; font-size:14px; color:#444; line-height:1.6;">Enter your message content here...</p>
 `;
 
 // Helper function for name matching (case-insensitive, exact match - no trimming)
@@ -110,7 +162,7 @@ export function EmailTemplatesPage() {
         name: '',
         entityType: 1,
         subject: '',
-        body: DEFAULT_EMAIL_FOOTER,
+        body: DEFAULT_EMAIL_BODY,
         isActive: true
     };
 
@@ -235,7 +287,7 @@ export function EmailTemplatesPage() {
             if (data?.emailTemplate) {
                 setFormData(prev => ({
                     ...prev,
-                    body: data.emailTemplate.body || ''
+                    body: unwrapEmailContent(data.emailTemplate.body || '')
                 }));
             }
         } catch (error) {
@@ -268,7 +320,7 @@ export function EmailTemplatesPage() {
                 name: formData.name,
                 entityType: Number(formData.entityType),
                 subject: formData.subject,
-                body: formData.body,
+                body: wrapEmailContent(formData.body),
                 isActive: formData.isActive
             };
 
@@ -613,19 +665,20 @@ export function EmailTemplatesPage() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">Body Content (HTML) <span className="text-red-500">*</span></label>
+                        <label className="text-sm font-medium">Body Content <span className="text-red-500">*</span></label>
                         <HtmlEditor
                             value={formData.body}
                             onChange={(newBody) => {
                                 setFormData(prev => ({ ...prev, body: newBody }));
                                 if (errors.body) setErrors(prev => ({ ...prev, body: '' }));
                             }}
-                            placeholder="<html><body>...</body></html>"
+                            placeholder="Enter your message content here..."
                             placeholders={[...EMAIL_VARIABLES]}
                             helperText="Click 'Insert Variable' to add dynamic placeholders"
-                            minHeight="250px"
+                            minHeight="400px"
                             error={errors.body}
                         />
+
                     </div>
 
                     {modalMode === 'edit' && (

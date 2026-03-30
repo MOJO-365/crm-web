@@ -48,6 +48,7 @@ export const PREVIEW_SYSTEM_TEMPLATE = gql`
         previewSystemTemplate(eventType: $eventType) {
             subject
             body
+            isCustom
         }
     }
 `;
