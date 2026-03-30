@@ -5,17 +5,21 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/common';
-import { GET_LEAD, CREATE_LEAD, UPDATE_LEAD, GET_LEADS } from '@/graphql';
-import { TITLE_OPTIONS, LEAD_SOURCE_OPTIONS } from '@/lib/constants';
+import { GET_LEAD, CREATE_LEAD, UPDATE_LEAD, GET_LEADS, GET_LEAD_SOURCES, CREATE_LEAD_SOURCE } from '@/graphql';
+import { TITLE_OPTIONS } from '@/lib/constants';
 import LocationAutocomplete from '../LocationAutocomplete';
+import { PlusIcon } from '@/components/icons';
 
 // Reuse the Field component pattern from CustomerFormPage
-const Field = ({ label, required, hint, children, error }: { label: string, required?: boolean, hint?: string, children: React.ReactNode, error?: string }) => (
+const Field = ({ label, required, hint, children, error, action }: { label: string, required?: boolean, hint?: string, children: React.ReactNode, error?: string, action?: React.ReactNode }) => (
     <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground flex items-center gap-1">
-            {label}
-            {required && <span className="text-red-500">*</span>}
-        </label>
+        <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-foreground flex items-center gap-1">
+                {label}
+                {required && <span className="text-red-500">*</span>}
+            </label>
+            {action}
+        </div>
         {children}
         {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
         {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
@@ -52,6 +56,8 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
     });
 
     const [addressSearch, setAddressSearch] = useState('');
+    const [isAddingNewSourceInline, setIsAddingNewSourceInline] = useState(false);
+    const [newSourceName, setNewSourceName] = useState('');
 
     const { data, loading } = useQuery(GET_LEAD, {
         variables: { uid },
@@ -125,6 +131,35 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
     const [updateLead, { loading: updating }] = useMutation(UPDATE_LEAD, {
         refetchQueries: [{ query: GET_LEADS }]
     });
+
+    const { data: sourcesData, loading: sourcesLoading } = useQuery(GET_LEAD_SOURCES, {
+        skip: !isOpen,
+    });
+
+    const [createLeadSource, { loading: addingSource }] = useMutation(CREATE_LEAD_SOURCE, {
+        refetchQueries: [{ query: GET_LEAD_SOURCES }],
+        onCompleted: (data) => {
+            setFormData(prev => ({ ...prev, source: data.createLeadSource.name }));
+            setIsAddingNewSourceInline(false);
+            setNewSourceName('');
+            toast.success('Lead source added successfully');
+        },
+        onError: (err) => {
+            toast.error(err.message || 'Error adding lead source');
+        }
+    });
+
+    const handleCreateLeadSource = async () => {
+        if (!newSourceName.trim()) return;
+        await createLeadSource({
+            variables: { name: newSourceName.trim() }
+        });
+    };
+
+    const sourceOptions = sourcesData?.leadSources?.map((s: any) => ({
+        label: s.name,
+        value: s.name
+    })) || [];
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -217,13 +252,52 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                 </Field>
                             </div>
                             <div className="md:col-span-1">
-                                <Field label="Lead Source">
-                                    <Select
-                                        options={LEAD_SOURCE_OPTIONS}
-                                        value={formData.source}
-                                        onChange={(val) => handleSelectChange('source', val as string)}
-                                        placeholder="Select source"
-                                    />
+                                <Field
+                                    label="Lead Source"
+                                    action={
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsAddingNewSourceInline(!isAddingNewSourceInline);
+                                                setNewSourceName('');
+                                            }}
+                                            className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                        >
+                                            {isAddingNewSourceInline ? 'Cancel' : (
+                                                <><PlusIcon size={10} /> Add New Source</>
+                                            )}
+                                        </button>
+                                    }
+                                >
+                                    {isAddingNewSourceInline ? (
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="Source name..."
+                                                value={newSourceName}
+                                                onChange={(e) => setNewSourceName(e.target.value)}
+                                                className="h-9"
+                                                autoFocus
+                                            />
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                className="h-9 px-3 bg-neutral-900 text-white hover:bg-neutral-800"
+                                                onClick={handleCreateLeadSource}
+                                                disabled={!newSourceName.trim() || addingSource}
+                                                isLoading={addingSource}
+                                            >
+                                                Add
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Select
+                                            options={sourceOptions}
+                                            value={formData.source}
+                                            onChange={(val) => handleSelectChange('source', val as string)}
+                                            placeholder={sourcesLoading ? "Loading sources..." : "Select source"}
+                                            disabled={sourcesLoading}
+                                        />
+                                    )}
                                 </Field>
                             </div>
 

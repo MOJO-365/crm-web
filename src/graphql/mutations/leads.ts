@@ -24,3 +24,30 @@ export const DELETE_LEAD = gql`
         deleteLead(uid: $uid)
     }
 `;
+
+export const CREATE_LEAD_SOURCE = gql`
+    mutation CreateLeadSource($name: String!) {
+        createLeadSource(name: $name) {
+            id
+            uid
+            name
+        }
+    }
+`;
+
+export const UPDATE_LEAD_SOURCE = gql`
+    mutation UpdateLeadSource($uid: String!, $name: String, $isActive: Int) {
+        updateLeadSource(uid: $uid, name: $name, isActive: $isActive) {
+            id
+            uid
+            name
+            isActive
+        }
+    }
+`;
+
+export const DELETE_LEAD_SOURCE = gql`
+    mutation DeleteLeadSource($uid: String!) {
+        deleteLeadSource(uid: $uid)
+    }
+`;

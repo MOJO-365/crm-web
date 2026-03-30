@@ -26,3 +26,14 @@ export const GET_LEAD = gql`
     }
     ${LEAD_FIELDS}
 `;
+
+export const GET_LEAD_SOURCES = gql`
+    query GetLeadSources {
+        leadSources {
+            id
+            uid
+            name
+            isActive
+        }
+    }
+`;
