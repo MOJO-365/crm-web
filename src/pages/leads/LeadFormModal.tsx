@@ -9,6 +9,7 @@ import { GET_LEAD, CREATE_LEAD, UPDATE_LEAD, GET_LEADS, GET_LEAD_SOURCES, CREATE
 import { TITLE_OPTIONS } from '@/lib/constants';
 import LocationAutocomplete from '../LocationAutocomplete';
 import { PlusIcon } from '@/components/icons';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 // Reuse the Field component pattern from CustomerFormPage
 const Field = ({ label, required, hint, children, error, action }: { label: string, required?: boolean, hint?: string, children: React.ReactNode, error?: string, action?: React.ReactNode }) => (
@@ -34,6 +35,7 @@ interface LeadFormModalProps {
 
 export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalProps) {
     const isEditMode = !!uid;
+    const canManageLeadSources = useAuthStore((state) => state.hasFeatureAccess('feature_manage_lead_sources'));
 
     const [formData, setFormData] = useState({
         title: '',
@@ -255,21 +257,23 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                 <Field
                                     label="Lead Source"
                                     action={
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setIsAddingNewSourceInline(!isAddingNewSourceInline);
-                                                setNewSourceName('');
-                                            }}
-                                            className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
-                                        >
-                                            {isAddingNewSourceInline ? 'Cancel' : (
-                                                <><PlusIcon size={10} /> Add New Source</>
-                                            )}
-                                        </button>
+                                        canManageLeadSources && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setIsAddingNewSourceInline(!isAddingNewSourceInline);
+                                                    setNewSourceName('');
+                                                }}
+                                                className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                            >
+                                                {isAddingNewSourceInline ? 'Cancel' : (
+                                                    <><PlusIcon size={10} /> Add New Source</>
+                                                )}
+                                            </button>
+                                        )
                                     }
                                 >
-                                    {isAddingNewSourceInline ? (
+                                    {isAddingNewSourceInline && canManageLeadSources ? (
                                         <div className="flex gap-2">
                                             <Input
                                                 placeholder="Source name..."
