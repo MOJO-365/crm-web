@@ -7,7 +7,7 @@ import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, Settings2Icon, PlugIcon, ZapIcon,
     EyeIcon, TrashIcon, UploadIcon, CalendarIcon, UserIcon, InfoIcon, ActivityIcon,
-    IdCardIcon, ArrowLeftIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon, LockIcon,
+    IdCardIcon, ArrowLeftIcon, ArrowRightIcon, PhoneIcon, MoreHorizontalIcon, MapPinIcon, LockIcon,
     RefreshCwIcon, CreditCardIcon, FileTextIcon, PercentIcon, DownloadIcon
 } from '@/components/icons';
 import {
@@ -233,6 +233,12 @@ interface CustomerDetails {
         isAllRequiredFilled: number;
         isVppCertificateEmailSent?: number;
         isVppCertificateEmailSentAt?: string;
+        batteryManufacturer?: string;
+        batterySerialNumber?: string;
+        batteryUsableCapacity?: number;
+        inverterManufacturer?: string;
+        inverterSnNumbers?: string;
+        inverterCapacity?: number;
     };
     rateVersion?: number;
     createdAt?: string;
@@ -1233,6 +1239,20 @@ export function CustomerDetailsPage() {
         checkCode: ''
     });
 
+    useEffect(() => {
+        if (selectedCustomerDetails) {
+            setVppForm({
+                vppSignupBonus: selectedCustomerDetails.vppDetails?.vppSignupBonus?.toString() || '',
+                batteryBrand: selectedCustomerDetails.batteryDetails?.batterybrand || selectedCustomerDetails.vppCertificateDetails?.batteryManufacturer || '',
+                snNumber: selectedCustomerDetails.batteryDetails?.snnumber || selectedCustomerDetails.vppCertificateDetails?.batterySerialNumber || '',
+                batteryCapacity: selectedCustomerDetails.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.batteryUsableCapacity?.toString() || '',
+                exportLimit: selectedCustomerDetails.batteryDetails?.exportlimit?.toString() || '',
+                inverterCapacity: selectedCustomerDetails.batteryDetails?.inverterCapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.inverterCapacity?.toString() || '',
+                checkCode: selectedCustomerDetails.batteryDetails?.checkCode || ''
+            });
+        }
+    }, [selectedCustomerDetails]);
+
     // Date state for electricity bill upload
     const [billStartDate, setBillStartDate] = useState<string>('');
     const [billEndDate, setBillEndDate] = useState<string>('');
@@ -1240,6 +1260,7 @@ export function CustomerDetailsPage() {
     const [showManualOfferButton, setShowManualOfferButton] = useState(false);
     const [isSendingOffer, setIsSendingOffer] = useState(false);
     const [vppConnectModalOpen, setVppConnectModalOpen] = useState(false);
+    const [isSkippingVpp, setIsSkippingVpp] = useState(false);
     const [utilmateConnectModalOpen, setUtilmateConnectModalOpen] = useState(false);
     const [isGeneratingCredentials, setIsGeneratingCredentials] = useState(false);
 
@@ -2076,11 +2097,11 @@ export function CustomerDetailsPage() {
 
                 setVppForm({
                     vppSignupBonus: latestDetails?.vppDetails?.vppSignupBonus?.toString() || selectedCustomerDetails?.vppDetails?.vppSignupBonus?.toString() || '',
-                    batteryBrand: latestDetails?.batteryDetails?.batterybrand || selectedCustomerDetails?.batteryDetails?.batterybrand || '',
-                    snNumber: latestDetails?.batteryDetails?.snnumber || selectedCustomerDetails?.batteryDetails?.snnumber || '',
-                    batteryCapacity: latestDetails?.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || '',
+                    batteryBrand: latestDetails?.batteryDetails?.batterybrand || latestDetails?.vppCertificateDetails?.batteryManufacturer || selectedCustomerDetails?.batteryDetails?.batterybrand || selectedCustomerDetails.vppCertificateDetails?.batteryManufacturer || '',
+                    snNumber: latestDetails?.batteryDetails?.snnumber || latestDetails?.vppCertificateDetails?.batterySerialNumber || selectedCustomerDetails?.batteryDetails?.snnumber || selectedCustomerDetails.vppCertificateDetails?.batterySerialNumber || '',
+                    batteryCapacity: latestDetails?.batteryDetails?.batterycapacity?.toString() || latestDetails?.vppCertificateDetails?.batteryUsableCapacity?.toString() || selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.batteryUsableCapacity?.toString() || '',
                     exportLimit: latestDetails?.batteryDetails?.exportlimit?.toString() || selectedCustomerDetails?.batteryDetails?.exportlimit?.toString() || '',
-                    inverterCapacity: latestDetails?.batteryDetails?.inverterCapacity?.toString() || selectedCustomerDetails?.batteryDetails?.inverterCapacity?.toString() || '',
+                    inverterCapacity: latestDetails?.batteryDetails?.inverterCapacity?.toString() || latestDetails?.vppCertificateDetails?.inverterCapacity?.toString() || selectedCustomerDetails?.batteryDetails?.inverterCapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.inverterCapacity?.toString() || '',
                     checkCode: latestDetails?.batteryDetails?.checkCode || selectedCustomerDetails?.batteryDetails?.checkCode || ''
                 });
             } catch (err) {
@@ -2088,11 +2109,11 @@ export function CustomerDetailsPage() {
                 // Fallback to existing state if refetch fails
                 setVppForm({
                     vppSignupBonus: selectedCustomerDetails?.vppDetails?.vppSignupBonus?.toString() || '',
-                    batteryBrand: selectedCustomerDetails?.batteryDetails?.batterybrand || '',
-                    snNumber: selectedCustomerDetails?.batteryDetails?.snnumber || '',
-                    batteryCapacity: selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || '',
+                    batteryBrand: selectedCustomerDetails?.batteryDetails?.batterybrand || selectedCustomerDetails.vppCertificateDetails?.batteryManufacturer || '',
+                    snNumber: selectedCustomerDetails?.batteryDetails?.snnumber || selectedCustomerDetails.vppCertificateDetails?.batterySerialNumber || '',
+                    batteryCapacity: selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.batteryUsableCapacity?.toString() || '',
                     exportLimit: selectedCustomerDetails?.batteryDetails?.exportlimit?.toString() || '',
-                    inverterCapacity: selectedCustomerDetails?.batteryDetails?.inverterCapacity?.toString() || '',
+                    inverterCapacity: selectedCustomerDetails?.batteryDetails?.inverterCapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.inverterCapacity?.toString() || '',
                     checkCode: selectedCustomerDetails?.batteryDetails?.checkCode || ''
                 });
             }
@@ -2201,6 +2222,46 @@ export function CustomerDetailsPage() {
         } catch (error: any) {
             console.error('Error connecting VPP:', error);
             toast.error(error.message || 'Failed to connect VPP');
+        }
+    };
+
+    const handleSkipAndConnectVpp = async () => {
+        if (!selectedCustomerDetails) return;
+        setIsSkippingVpp(true);
+        try {
+            const input: any = {
+                vppDetails: {
+                    vpp: 1,
+                    vppConnected: 1,
+                },
+                skipStatusUpdate: true
+            };
+
+            await updateCustomer({
+                variables: {
+                    uid: selectedCustomerDetails.uid,
+                    input
+                }
+            });
+
+            await refetchCustomer();
+            toast.success('VPP Connected (Details Skipped)');
+            setVppConnectModalOpen(false);
+
+            setSelectedCustomerDetails({
+                ...selectedCustomerDetails,
+                vppDetails: {
+                    ...selectedCustomerDetails.vppDetails,
+                    vpp: 1,
+                    vppConnected: 1,
+                }
+            });
+
+        } catch (error: any) {
+            console.error('Error connecting VPP (Skip):', error);
+            toast.error(error.message || 'Failed to connect VPP');
+        } finally {
+            setIsSkippingVpp(false);
         }
     };
 
@@ -4817,7 +4878,7 @@ export function CustomerDetailsPage() {
                 isOpen={vppConnectModalOpen}
                 onClose={() => setVppConnectModalOpen(false)}
                 title="Connect VPP - Battery Details"
-                size="md"
+                size="lg"
                 footer={
                     <>
                         <Button
@@ -4827,8 +4888,18 @@ export function CustomerDetailsPage() {
                             Cancel
                         </Button>
                         <Button
-                            className="bg-neutral-900 text-white hover:bg-neutral-800"
+                            variant="outline"
+                            className="mr-2 text-primary border-primary/20 hover:bg-primary/5 shadow-sm hover:shadow transition-all duration-300 group"
+                            onClick={handleSkipAndConnectVpp}
+                            isLoading={isSkippingVpp}
+                            rightIcon={<ArrowRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
+                        >
+                            Skip & Connect
+                        </Button>
+                        <Button
+                            className="bg-neutral-900 text-white hover:bg-neutral-800 shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200"
                             onClick={handleConfirmVppConnect}
+                            leftIcon={<ZapIcon className="w-4 h-4 text-yellow-400 fill-yellow-400" />}
                         >
                             Connect & Save
                         </Button>
@@ -4898,7 +4969,7 @@ export function CustomerDetailsPage() {
                                 <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
                             </div>
                         </div>
-                        {vppForm.batteryBrand === 'Fox ESS' && (
+                        {(vppForm.batteryBrand === 'Fox ESS' || vppForm.batteryBrand === 'NeoVolt' || vppForm.batteryBrand === 'AlphaESS' || vppForm.batteryBrand === 'Alpha ESS' || vppForm.batteryBrand === 'Aerl') && (
                             <div className="space-y-2">
                                 <label className="text-xs font-semibold uppercase text-muted-foreground">Check Code</label>
                                 <Input

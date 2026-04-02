@@ -29,6 +29,7 @@ const RiskStatusesPage = lazyWithRetry(() => import('@/pages/master/RiskStatuses
 const PdfTermsPage = lazyWithRetry(() => import('@/pages/pdf/PdfTermsPage').then(m => ({ default: m.PdfTermsPage })));
 const CustomerBillingPage = lazyWithRetry(() => import('@/pages/customer/CustomerBillingPage').then(m => ({ default: m.CustomerBillingPage })));
 const BonusMasterPage = lazyWithRetry(() => import('@/pages/master/BonusMasterPage').then(m => ({ default: m.BonusMasterPage })));
+const MasterDataPage = lazyWithRetry(() => import('@/pages/master/MasterDataPage').then(m => ({ default: m.MasterDataPage })));
 const LeadsPage = lazyWithRetry(() => import('@/pages/leads/LeadsPage'));
 
 // Loading fallback component
@@ -93,6 +94,7 @@ const router = createBrowserRouter(
                 <Route path="/pdf-terms" element={<RequirePermission menuCode="pdf_terms"><PdfTermsPage /></RequirePermission>} />
                 <Route path="/customer-billing" element={<RequirePermission menuCode="customer_billing"><CustomerBillingPage /></RequirePermission>} />
                 <Route path="/bonus_master" element={<RequirePermission menuCode="bonus_master"><BonusMasterPage /></RequirePermission>} />
+                <Route path="/master-data" element={<RequirePermission menuCode="document_types"><MasterDataPage /></RequirePermission>} />
 
                 {/* General authenticated routes */}
                 <Route path="/change-password" element={<ChangePasswordPage />} />

@@ -484,7 +484,7 @@ export function VppCertificateTab({
                                                         disabled={!isEditingVpp}
                                                     />
                                                 </div>
-                                                {vppForm.batteryBrand === 'Fox ESS' && (
+                                                {(vppForm.batteryBrand === 'Fox ESS' || vppForm.batteryBrand === 'NeoVolt' || vppForm.batteryBrand === 'AlphaESS' || vppForm.batteryBrand === 'Alpha ESS' || vppForm.batteryBrand === 'Aerl') && (
                                                     <div className="space-y-2">
                                                         <label className="text-sm font-medium text-foreground">Check Code</label>
                                                         <Input
