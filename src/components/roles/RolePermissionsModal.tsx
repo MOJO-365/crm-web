@@ -190,22 +190,7 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
     }, [featurePermissionsMap, initialFeaturePermissionsMap]);
 
     const rawMenus = useMemo(() => menuData?.menus?.data || [], [menuData]);
-    const menus = useMemo(() => {
-        const transformed = rawMenus.map((m: Menu) => {
-            if (m.code === 'master_data') {
-                return { ...m, name: 'General' };
-            }
-            return { ...m };
-        });
-
-        const masterParent = transformed.find((m: Menu) => m.code === 'master');
-        const masterData = transformed.find((m: Menu) => m.code === 'master_data');
-
-        if (masterParent && masterData) {
-            masterData.parentUid = masterParent.uid;
-        }
-        return transformed;
-    }, [rawMenus]);
+    const menus = rawMenus;
 
     const topLevelMenus = useMemo(() =>
         menus.filter((m: Menu) => !m.parentUid),

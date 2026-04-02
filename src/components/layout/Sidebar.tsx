@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import logo from '@/assets/main-logo-dark-1.png';
 import { useAccessibleMenus } from '@/stores/useAuthStore';
-import type { AccessibleMenu } from '@/stores/useAuthStore';
 import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon } from '@/components/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
 
@@ -131,23 +130,7 @@ const Portal = ({ children }: { children: React.ReactNode }) => {
 };
 
 export function Sidebar({ className, isOpen = true }: SidebarProps) {
-    const rawAccessibleMenus = useAccessibleMenus();
-    const accessibleMenus = useMemo(() => {
-        const menus = rawAccessibleMenus.map((m: AccessibleMenu) => {
-            if (m.menuCode === 'master_data') {
-                return { ...m, menuName: 'General' };
-            }
-            return { ...m };
-        });
-
-        const masterParent = menus.find(m => m.menuCode === 'master');
-        const masterData = menus.find(m => m.menuCode === 'master_data');
-
-        if (masterParent && masterData) {
-            masterData.parentUid = masterParent.menuUid;
-        }
-        return menus;
-    }, [rawAccessibleMenus]);
+    const accessibleMenus = useAccessibleMenus();
     const location = useLocation();
 
     // Track expanded parent menus
