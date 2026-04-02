@@ -1772,7 +1772,7 @@ export function CustomerDetailsPage() {
                 skipStatusUpdate: true
             };
 
-            await updateCustomer({
+                await updateCustomer({
                 variables: {
                     uid: selectedCustomerDetails.uid,
                     input
@@ -1782,16 +1782,10 @@ export function CustomerDetailsPage() {
             toast.success('VPP details saved successfully');
             setIsEditingVpp(false);
 
-            setSelectedCustomerDetails({
-                ...selectedCustomerDetails,
-                vppDetails: {
-                    ...selectedCustomerDetails.vppDetails,
-                    vpp: 1,
-                    vppConnected: input.vppDetails.vppConnected,
-                    vppSignupBonus: input.vppDetails.vppSignupBonus
-                },
-                batteryDetails: input.batteryDetails
-            });
+            const result = await refetchCustomer();
+            if (result.data?.customer) {
+                setSelectedCustomerDetails(result.data.customer);
+            }
 
         } catch (error: any) {
             console.error('Error saving VPP details:', error);
@@ -2204,20 +2198,12 @@ export function CustomerDetailsPage() {
                 }
             });
 
-            await refetchCustomer();
+            const result = await refetchCustomer();
+            if (result.data?.customer) {
+                setSelectedCustomerDetails(result.data.customer);
+            }
             toast.success('VPP Connected and details saved');
             setVppConnectModalOpen(false);
-
-            setSelectedCustomerDetails({
-                ...selectedCustomerDetails,
-                vppDetails: {
-                    ...selectedCustomerDetails.vppDetails,
-                    vpp: 1,
-                    vppConnected: 1,
-                    vppSignupBonus: input.vppDetails.vppSignupBonus
-                },
-                batteryDetails: input.batteryDetails
-            });
 
         } catch (error: any) {
             console.error('Error connecting VPP:', error);
@@ -2244,18 +2230,12 @@ export function CustomerDetailsPage() {
                 }
             });
 
-            await refetchCustomer();
+            const result = await refetchCustomer();
+            if (result.data?.customer) {
+                setSelectedCustomerDetails(result.data.customer);
+            }
             toast.success('VPP Connected (Details Skipped)');
             setVppConnectModalOpen(false);
-
-            setSelectedCustomerDetails({
-                ...selectedCustomerDetails,
-                vppDetails: {
-                    ...selectedCustomerDetails.vppDetails,
-                    vpp: 1,
-                    vppConnected: 1,
-                }
-            });
 
         } catch (error: any) {
             console.error('Error connecting VPP (Skip):', error);
@@ -2265,6 +2245,13 @@ export function CustomerDetailsPage() {
         }
     };
 
+    const handleVppUpdate = async () => {
+        const result = await refetchCustomer();
+        if (result.data?.customer) {
+            setSelectedCustomerDetails(result.data.customer);
+        }
+    };
+ 
     const handleMsatToggle = async (customerUid: string, newValue: boolean) => {
         if (!selectedCustomerDetails) return;
 
@@ -3023,9 +3010,9 @@ export function CustomerDetailsPage() {
                                             {item.showSendCertificate && selectedCustomerDetails.vppDetails?.vppConnected === 1 && (
                                                 <div className="inline-block relative group">
                                                     <button
-                                                        onClick={selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? undefined : () => handleSendCertificateEmail()}
-                                                        disabled={isEmailSending || selectedCustomerDetails.isDeleted || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0}
-                                                        className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 ${selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent === 1 ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground'} ${(isEmailSending || selectedCustomerDetails.isDeleted || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/90'}`}
+                                                        onClick={selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled !== 1 ? undefined : () => handleSendCertificateEmail()}
+                                                        disabled={isEmailSending || selectedCustomerDetails.isDeleted || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled !== 1}
+                                                        className={`flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-md mt-1 relative z-30 ${selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent === 1 ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground'} ${(isEmailSending || selectedCustomerDetails.isDeleted || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled !== 1) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/90'}`}
                                                     >
                                                         {isEmailSending ? (
                                                             <><div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</>
@@ -3033,7 +3020,7 @@ export function CustomerDetailsPage() {
                                                             <><MailIcon size={9} />Send certificate</>
                                                         )}
                                                     </button>
-                                                    {selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 && (
+                                                    {selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled !== 1 && (
                                                         <div className="absolute top-[-30px] left-1/2 -translate-x-1/2 hidden group-hover:block z-50 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
                                                             Required to fill VPP certificate pending data
                                                             <span className="absolute bottom-[-4px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-t-[5px] border-t-gray-800 border-r-[5px] border-r-transparent"></span>
@@ -3193,8 +3180,8 @@ export function CustomerDetailsPage() {
                                         id: 'vpp_certificate',
                                         label: 'Vpp Certificate',
                                         icon: FileTextIcon,
-                                        highlight: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0,
-                                        tooltip: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? "VPP certificate fields are required" : undefined
+                                        highlight: !selectedCustomerDetails.vppCertificateDetails || selectedCustomerDetails.vppCertificateDetails.isAllRequiredFilled === 0,
+                                        tooltip: (!selectedCustomerDetails.vppCertificateDetails || selectedCustomerDetails.vppCertificateDetails.isAllRequiredFilled === 0) ? "VPP certificate fields are required" : undefined
                                     }] : []),
                                     { id: 'debit', label: 'Debit', icon: CreditCardIcon },
                                     { id: 'utilmate', label: 'Utilmate', icon: PlugIcon },
@@ -3911,7 +3898,7 @@ export function CustomerDetailsPage() {
                             {selectedDetailSection === 'vpp_certificate' && (
                                 <VppCertificateTab
                                     customerUid={selectedCustomerDetails.uid}
-                                    onUpdate={refetchCustomer}
+                                    onUpdate={handleVppUpdate}
                                     vppDetails={selectedCustomerDetails.vppDetails}
                                     solarDetails={selectedCustomerDetails.solarDetails}
                                     ratePlan={selectedCustomerDetails.ratePlan}
@@ -4943,7 +4930,7 @@ export function CustomerDetailsPage() {
                                 <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
                             </div>
                         </div>
-                        <div className="space-y-2 relative">
+                        {/* <div className="space-y-2 relative">
                             <label className="text-xs font-semibold uppercase text-muted-foreground">Export Limit</label>
                             <div className="relative">
                                 <Input
@@ -4955,7 +4942,7 @@ export function CustomerDetailsPage() {
                                 />
                                 <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
                             </div>
-                        </div>
+                        </div> */}
                         <div className="space-y-2 relative">
                             <label className="text-xs font-semibold uppercase text-muted-foreground">Inverter Capacity</label>
                             <div className="relative">

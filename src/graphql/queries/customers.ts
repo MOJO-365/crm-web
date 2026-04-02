@@ -619,6 +619,12 @@ export const GET_CUSTOMER_BY_ID = gql`
                 msatConnectedAt
                 msatUpdatedAt
             }
+            vppCertificateDetails {
+                id
+                certificateNo
+                isAllRequiredFilled
+                isVppCertificateEmailSent
+            }
         }
     }
 `;
@@ -868,6 +874,12 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 msatConnectedAt
                 msatUpdatedAt
             }
+            vppCertificateDetails {
+                id
+                certificateNo
+                isAllRequiredFilled
+                isVppCertificateEmailSent
+            }
         }
     }
 `;
@@ -1105,6 +1117,12 @@ export const GET_CUSTOMER_DOCUMENTS = gql`
                     name
                 }
             }
+            vppCertificateDetails {
+                id
+                certificateNo
+                isAllRequiredFilled
+                isVppCertificateEmailSent
+            }
         }
     }
 `;
@@ -1299,6 +1317,12 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
                     uid
                     name
                 }
+            }
+            vppCertificateDetails {
+                id
+                certificateNo
+                isAllRequiredFilled
+                isVppCertificateEmailSent
             }
         }
     }

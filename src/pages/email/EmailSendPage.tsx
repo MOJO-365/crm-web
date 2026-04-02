@@ -51,6 +51,7 @@ export function EmailSendPage() {
             type: 'CUSTOMER_CREATED',
             label: 'Customer Created (Welcome Email)',
             description: 'Sent automatically when a new customer is created in the system',
+            attachments: ['BESS2 and Nomination Form.pdf']
         },
         {
             type: 'CUSTOMER_UPDATED',
@@ -271,25 +272,23 @@ export function EmailSendPage() {
                 {previewTemplate ? (
                     <div className="flex flex-col rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 min-h-[400px]">
                         {/* Dynamic Template Status Notice */}
-                        <div className={`p-3 border-b flex items-start gap-2 ${
-                            previewTemplate?.isCustom 
+                        <div className={`p-3 border-b flex items-start gap-2 ${previewTemplate?.isCustom
                                 ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
                                 : "bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800"
-                        }`}>
+                            }`}>
                             {previewTemplate?.isCustom ? (
                                 <CheckCircleIcon size={16} className="text-green-600 dark:text-green-400 mt-0.5" />
                             ) : (
                                 <MailIcon size={16} className="text-amber-600 dark:text-amber-400 mt-0.5" />
                             )}
                             <div>
-                                <p className={`text-xs font-semibold ${
-                                    previewTemplate?.isCustom ? "text-green-800 dark:text-green-300" : "text-amber-800 dark:text-amber-300"
-                                }`}>
+                                <p className={`text-xs font-semibold ${previewTemplate?.isCustom ? "text-green-800 dark:text-green-300" : "text-amber-800 dark:text-amber-300"
+                                    }`}>
                                     {previewTemplate?.isCustom ? "Dynamic Template Assigned" : "Using System Default"}
                                 </p>
                                 <p className="text-[10px] text-muted-foreground">
-                                    {previewTemplate?.isCustom 
-                                        ? "This is the custom template currently assigned to this event." 
+                                    {previewTemplate?.isCustom
+                                        ? "This is the custom template currently assigned to this event."
                                         : "No custom template is assigned; the system is using the static default."}
                                 </p>
                             </div>
