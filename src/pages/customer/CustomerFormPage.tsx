@@ -245,13 +245,14 @@ const StepBadge: React.FC<StepBadgeProps> = ({ index, label, active, done, statu
 // RATE DETAILS COMPONENT
 // ============================================================================
 
-const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan }: {
+const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan, className }: {
     offer: any,
     discount: number,
     hasSolar: boolean,
     vpp: boolean,
     units?: Record<string, string>,
-    isVppPlan: boolean
+    isVppPlan: boolean,
+    className?: string
 }) => {
     const parsedDynamicRates = typeof offer.dynamicRates === 'string'
         ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
@@ -271,7 +272,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
     };
 
     return (
-        <div className="md:col-span-2 p-5 bg-card border border-border rounded-xl">
+        <div className={cn("p-5 bg-card border border-border rounded-xl", className)}>
             <h4 className="text-sm font-bold text-foreground mb-5">{offer.offerName || 'DEFAULT MARKET OFFER'}</h4>
             <div className="flex flex-wrap gap-5">
                 {/* Column 1: Energy Rates */}
@@ -2200,340 +2201,17 @@ export const CustomerFormPage = () => {
                                     </div>
 
                                     <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        {selectedRatePlan?.offers?.map((offer) => {
-                                            const discount = formData.discount || 0;
-
-                                            const parsedDynamicRates = typeof offer.dynamicRates === 'string'
-                                                ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
-                                                : (offer.dynamicRates || []);
-
-                                            const hasCL = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'controlled_load');
-                                            const hasFiT = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit');
-
-                                            const parsedPriceUnits: Record<string, string> = typeof offer.priceUnits === 'string'
-                                                ? (() => { try { return JSON.parse(offer.priceUnits); } catch { return {}; } })()
-                                                : (offer.priceUnits || {});
-
-                                            // Calculate yearly savings estimation
-                                            // Typical annual usage: 4000 kWh residential, 10000 kWh commercial
-                                            // const typicalKwh = formData.propertyType === 1 ? 10000 : 4000;
-
-                                            // // Get primary energy rate (anytime if flat rate, or weighted average for TOU)
-                                            // const getBaseEnergyRate = () => {
-                                            //     if (offer.anytime > 0) return offer.anytime;
-                                            //     // For TOU tariffs, use weighted average (40% peak, 30% shoulder, 30% off-peak typical distribution)
-                                            //     const touRates = [];
-                                            //     if (offer.peak > 0) touRates.push({ rate: offer.peak, weight: 0.4 });
-                                            //     if (offer.shoulder > 0) touRates.push({ rate: offer.shoulder, weight: 0.3 });
-                                            //     if (offer.offPeak > 0) touRates.push({ rate: offer.offPeak, weight: 0.3 });
-                                            //     if (touRates.length === 0) return 0;
-                                            //     // Normalize weights
-                                            //     const totalWeight = touRates.reduce((sum, r) => sum + r.weight, 0);
-                                            //     return touRates.reduce((sum, r) => sum + (r.rate * r.weight / totalWeight), 0);
-                                            // };
-
-                                            // const baseRate = getBaseEnergyRate();
-                                            // const usageCost = baseRate * typicalKwh;
-                                            // const yearlySaving = (usageCost * discount) / 100;
-
-
-
-                                            return (
-                                                <div key={offer.id} className="p-6 bg-card border border-border rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] relative overflow-hidden group">
-                                                    <div className="flex justify-between items-start mb-8">
-                                                        <div>
-                                                            <h3 className="text-base font-bold text-neutral-900 dark:text-white tracking-tight">{offer.offerName}</h3>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex flex-wrap gap-8">
-                                                        {/* Column 1: Energy Rates */}
-                                                        <div className="space-y-4 min-w-[180px] flex-1">
-                                                            <div className="flex items-center gap-2 text-blue-500 dark:text-blue-400">
-                                                                <Settings2Icon size={16} />
-                                                                <h4 className="text-sm font-bold uppercase tracking-wide">Energy Rates</h4>
-                                                            </div>
-                                                            <div className="space-y-3">
-                                                                {(parseFloat(String(offer.peak || 0)) ?? 0) > 0 && (
-                                                                    <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                        <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.peak || 0)), discount).toFixed(4)}/kWh</div>
-                                                                        <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Peak</div>
-                                                                    </div>
-                                                                )}
-                                                                {(parseFloat(String(offer.offPeak || 0)) ?? 0) > 0 && (
-                                                                    <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                        <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.offPeak || 0)), discount).toFixed(4)}/kWh</div>
-                                                                        <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Off-Peak</div>
-                                                                    </div>
-                                                                )}
-                                                                {(parseFloat(String(offer.shoulder || 0)) ?? 0) > 0 && (
-                                                                    <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                        <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.shoulder || 0)), discount).toFixed(4)}/kWh</div>
-                                                                        <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">Shoulder</div>
-                                                                    </div>
-                                                                )}
-                                                                {(parseFloat(String(offer.anytime || 0)) ?? 0) > 0 && (
-                                                                    <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                        <div className="text-orange-600 dark:text-orange-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.anytime || 0)), discount).toFixed(4)}/kWh</div>
-                                                                        <div className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider opacity-80">Anytime</div>
-                                                                    </div>
-                                                                )}
-                                                                {parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any, id: number) => {
-                                                                    const unit = r.unitId ? unitMap?.[r.unitId] : 'kWh';
-                                                                    const numericValue = parseFloat(String(r.value || '0'));
-                                                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                                    return (
-                                                                        <div key={id} className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                                                            <div className="text-blue-600 dark:text-blue-400 font-bold text-base tracking-tight">${price.toFixed(4)}/{unit.startsWith('/') ? unit.substring(1) : unit}</div>
-                                                                            <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider opacity-80">{r.name}</div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Column 2: Supply Charges */}
-                                                        <div className="space-y-4 min-w-[180px] flex-1">
-                                                            <div className="flex items-center gap-2 text-purple-500 dark:text-purple-400">
-                                                                <PlugIcon size={16} />
-                                                                <h4 className="text-sm font-bold uppercase tracking-wide">Supply Charges</h4>
-                                                            </div>
-                                                            <div className="space-y-3">
-                                                                <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                    <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${parseFloat(String(offer.supplyCharge || '0')).toFixed(4)}/day</div>
-                                                                    <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">Supply</div>
-                                                                </div>
-                                                                {parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any, id: number) => {
-                                                                    const unit = r.unitId ? unitMap?.[r.unitId] : 'day';
-                                                                    return (
-                                                                        <div key={id} className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${parseFloat(String(r.value || '0')).toFixed(4)}/{unit}</div>
-                                                                            <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">{r.name}</div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-
-                                                                {((offer.demand ?? 0) > 0 || (offer.demandOp ?? 0) > 0 || (offer.demandP ?? 0) > 0 || (offer.demandS ?? 0) > 0) && (
-                                                                    <>
-                                                                        <div className="flex items-center gap-2 text-rose-500 dark:text-rose-400 mt-4">
-                                                                            <ActivityIcon size={16} />
-                                                                            <h4 className="text-sm font-bold uppercase tracking-wide">Demand Charges</h4>
-                                                                        </div>
-                                                                        <div className="space-y-3">
-                                                                            {[
-                                                                                { label: 'Demand', value: offer.demand, type: 'demand' },
-                                                                                { label: 'Demand (Op)', value: offer.demandOp, type: 'demandOp' },
-                                                                                { label: 'Demand (P)', value: offer.demandP, type: 'demandP' },
-                                                                                { label: 'Demand (S)', value: offer.demandS, type: 'demandS' },
-                                                                                ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => {
-                                                                                    const numericValue = parseFloat(String(r.value || 0));
-                                                                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
-                                                                                })
-                                                                            ]
-                                                                                .filter((d: any) => (parseFloat(String(d.value || 0)) ?? 0) > 0)
-                                                                                .map((d, id) => {
-                                                                                    const unitKey = d.type === 'demand' ? 'demand' : d.type === 'demandOp' ? 'demandOp' : d.type === 'demandP' ? 'demandP' : d.type === 'demandS' ? 'demandS' : '';
-                                                                                    const unitUid = unitKey ? parsedPriceUnits[unitKey] : '';
-                                                                                    const unit = d.type === 'dynamic' ? (d.unitId ? unitMap?.[d.unitId] : 'kVA/day') : (unitUid ? unitMap?.[unitUid] : 'kVA/day');
-                                                                                    return (
-                                                                                        <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${parseFloat(String(d.value || '0')).toFixed(4)}{unit ? `/${unit}` : ''}</div>
-                                                                                            <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                        </div>
-                                                                    </>
-                                                                )}
-                                                                {(offer.vppOrcharge ?? 0) > 0 && (
-                                                                    <>
-                                                                        <div className="flex items-center gap-2 text-amber-500 dark:text-amber-400 mt-4">
-                                                                            <ActivityIcon size={16} />
-                                                                            <h4 className="text-sm font-bold uppercase tracking-wide">VPP Orchestration Charges</h4>
-                                                                        </div>
-                                                                        <div className="space-y-3">
-                                                                            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${parseFloat(String(offer.vppOrcharge || '0')).toFixed(4)}/day</div>
-                                                                                <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">Orchestration</div>
-                                                                            </div>
-                                                                            {parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any, id: number) => {
-                                                                                const unit = r.unitId ? unitMap?.[r.unitId] : 'day';
-                                                                                const numericValue = parseFloat(String(r.value || '0'));
-                                                                                const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                                                return (
-                                                                                    <div key={id} className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                        <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${price.toFixed(4)}/{unit}</div>
-                                                                                        <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">{r.name}</div>
-                                                                                    </div>
-                                                                                );
-                                                                            })}
-                                                                        </div>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Column 3: Solar FiT */}
-                                                        {hasFiT && (
-                                                            <div className="space-y-4 min-w-[180px] flex-1">
-                                                                <div className="flex items-center gap-2 text-teal-500 dark:text-teal-400">
-                                                                    <ZapIcon size={16} />
-                                                                    <h4 className="text-sm font-bold uppercase tracking-wide">Solar FiT</h4>
-                                                                </div>
-                                                                <div className="space-y-3">
-                                                                    {(parseFloat(String(offer.fit || 0)) ?? 0) > 0 && !formData.vpp && (
-                                                                        <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${parseFloat(String(offer.fit || 0)).toFixed(4)}/kWh</div>
-                                                                            <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">Feed-in</div>
-                                                                        </div>
-                                                                    )}
-                                                                    {(formData.vpp || !formData.hasSolar) && (
-                                                                        <>
-                                                                            {(parseFloat(String(offer.fitPeak || 0)) ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${parseFloat(String(offer.fitPeak || 0)).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">PREMIUM FiT</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {(parseFloat(String(offer.fitCritical || 0)) ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${parseFloat(String(offer.fitCritical || 0)).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">CRITICAL EVENT FiT</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {(parseFloat(String(offer.fitVpp || 0)) ?? 0) > 0 && (
-                                                                                <div className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                    <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">${parseFloat(String(offer.fitVpp || 0)).toFixed(4)}/kWh</div>
-                                                                                    <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">BASE FIT</div>
-                                                                                </div>
-                                                                            )}
-                                                                            {parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any, id: number) => {
-                                                                                const unit = r.unitId ? unitMap?.[r.unitId] : 'kWh';
-                                                                                const numericValue = parseFloat(String(r.value || '0'));
-                                                                                const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                                                return (
-                                                                                    <div key={id} className="bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                        <div className="text-teal-600 dark:text-teal-400 font-bold text-base tracking-tight">${price.toFixed(4)}/{unit}</div>
-                                                                                        <div className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider opacity-80">{r.name}</div>
-                                                                                    </div>
-                                                                                );
-                                                                            })}
-                                                                        </>
-                                                                    )}
-
-                                                                    {/* Dynamic FiT Rates handled in dynamic columns below */}
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Column 4: Controlled Load */}
-                                                        {hasCL && (
-                                                            <div className="space-y-4 min-w-[180px] flex-1">
-                                                                <div className="flex items-center gap-2 text-green-500 dark:text-green-400">
-                                                                    <PlugIcon size={16} />
-                                                                    <h4 className="text-sm font-bold uppercase tracking-wide">Controlled Load</h4>
-                                                                </div>
-                                                                <div className="space-y-3">
-                                                                    {(parseFloat(String(offer.cl1Usage || 0)) ?? 0) > 0 && (
-                                                                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.cl1Usage || 0)), discount).toFixed(4)}/kWh</div>
-                                                                            <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Usage</div>
-                                                                        </div>
-                                                                    )}
-                                                                    {(parseFloat(String(offer.cl1Supply || 0)) ?? 0) > 0 && (
-                                                                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${parseFloat(String(offer.cl1Supply || 0)).toFixed(4)}/day</div>
-                                                                            <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL1 Supply</div>
-                                                                        </div>
-                                                                    )}
-                                                                    {(parseFloat(String(offer.cl2Usage || 0)) ?? 0) > 0 && (
-                                                                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${calculateDiscountedRate(parseFloat(String(offer.cl2Usage || 0)), discount).toFixed(4)}/kWh</div>
-                                                                            <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Usage</div>
-                                                                        </div>
-                                                                    )}
-                                                                    {(parseFloat(String(offer.cl2Supply || 0)) ?? 0) > 0 && (
-                                                                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                            <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${parseFloat(String(offer.cl2Supply || 0)).toFixed(4)}/day</div>
-                                                                            <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">CL2 Supply</div>
-                                                                        </div>
-                                                                    )}
-                                                                    {parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any, id: number) => {
-                                                                        const unit = r.unitId ? unitMap?.[r.unitId] : (r.name.toLowerCase().includes('supply') ? 'day' : 'kWh');
-                                                                        const numericValue = parseFloat(String(r.value || 0));
-                                                                        const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                                        return (
-                                                                            <div key={id} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5">
-                                                                                <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${price.toFixed(4)}/{unit}</div>
-                                                                                <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{r.name}</div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Dynamic Rates Columns */}
-                                                        {(() => {
-
-                                                            const handledTypes = ['energy_rates', 'supply_charges', 'demand_charges', 'vpp_charges', 'solar_fit', 'controlled_load'];
-                                                            const remainingDynamicRates = parsedDynamicRates.filter((r: any) => !handledTypes.includes(r.type));
-
-                                                            if (remainingDynamicRates.length === 0) return null;
-
-                                                            const fitRates = remainingDynamicRates.filter((r: any) => r.type === 'fit' || r.type === 'extra_fit');
-                                                            const chargeRates = remainingDynamicRates.filter((r: any) => !r.type || r.type === 'charges' || r.type === 'extra_charges');
-                                                            const untypedRates = remainingDynamicRates.filter((r: any) => !r.type);
-
-                                                            const renderRatesColumn = (rates: any[], label: string, colorClass: string, icon: any = ActivityIcon) => {
-                                                                if (rates.length === 0) return null;
-                                                                const Icon = icon;
-                                                                return (
-                                                                    <div className="space-y-4 min-w-[180px] flex-1">
-                                                                        <div className={cn("flex items-center gap-2 mb-2",
-                                                                            colorClass === 'indigo' ? "text-indigo-500 dark:text-indigo-400" : "text-teal-500 dark:text-teal-400"
-                                                                        )}>
-                                                                            <Icon size={16} />
-                                                                            <h4 className="text-sm font-bold uppercase tracking-wide">{label}</h4>
-                                                                        </div>
-                                                                        <div className="space-y-3">
-                                                                            {rates.map((dRate: any, id: number) => {
-                                                                                const unitName = dRate.unitId ? unitMap?.[dRate.unitId] : '';
-                                                                                const numericValue = parseFloat(String(dRate.value || '0'));
-                                                                                const isSupply = dRate.name.toLowerCase().includes('supply');
-                                                                                const val = isSupply ? numericValue : calculateDiscountedRate(numericValue, discount);
-                                                                                return (
-                                                                                    <div key={id} className={cn(
-                                                                                        colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
-                                                                                        "rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
-                                                                                    )}>
-                                                                                        <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-base tracking-tight")}>
-                                                                                            ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
-                                                                                        </div>
-                                                                                        <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "text-[10px] font-bold uppercase tracking-wider opacity-80")}>
-                                                                                            {dRate.name}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                );
-                                                                            })}
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            };
-
-                                                            return (
-                                                                <>
-                                                                    {renderRatesColumn(chargeRates, "Extra Charges", "indigo")}
-                                                                    {renderRatesColumn(fitRates, "Extra FiT", "teal", ZapIcon)}
-                                                                    {untypedRates.length > 0 && renderRatesColumn(untypedRates, (formData.vpp || selectedRatePlan?.vpp === 1) ? "Extra FIT" : "Extra Charge", "indigo")}
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                        {selectedRatePlan?.offers?.map((offer) => (
+                                            <RateDetailsView
+                                                key={offer.id}
+                                                offer={offer}
+                                                discount={formData.discount || 0}
+                                                hasSolar={formData.hasSolar}
+                                                vpp={formData.vpp}
+                                                units={unitMap}
+                                                isVppPlan={selectedRatePlan?.vpp === 1}
+                                            />
+                                        ))}
                                     </div>
                                 </div>
                             )}
@@ -3051,6 +2729,7 @@ export const CustomerFormPage = () => {
                                                 vpp={formData.vpp}
                                                 units={unitMap}
                                                 isVppPlan={selectedRatePlan?.vpp === 1}
+                                                className="md:col-span-2"
                                             />
                                         )}
 
