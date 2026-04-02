@@ -817,7 +817,7 @@ export function CustomersPage() {
             // Priority: Sync with secondary API first
             try {
                 console.log('Attempting to call secondary API...');
-                await secondaryApiAxios.post('/api/v1/utilmate/user/add-user-battery', {
+                await secondaryApiAxios.post('/v1/utilmate/user/add-user-battery', {
                     userId: selectedCustomerDetails.uid,
                     batteryBrand: vppForm.batteryBrand,
                     snNumber: vppForm.snNumber,
@@ -1079,7 +1079,7 @@ export function CustomersPage() {
         try {
             // Priority: Sync with secondary API first
             try {
-                await secondaryApiAxios.post('/api/v1/utilmate/user/add-user-battery', {
+                await secondaryApiAxios.post('/v1/utilmate/user/add-user-battery', {
                     userId: selectedCustomerDetails.uid,
                     batteryBrand: selectedCustomerDetails.batteryDetails?.batterybrand || '',
                     snNumber: selectedCustomerDetails.batteryDetails?.snnumber || '',
@@ -1124,7 +1124,7 @@ export function CustomersPage() {
             // Priority: Sync with secondary API first
             try {
                 console.log('Attempting to call secondary API from handleConfirmVppConnect...');
-                await secondaryApiAxios.post('/api/v1/utilmate/user/add-user-battery', {
+                await secondaryApiAxios.post('/v1/utilmate/user/add-user-battery', {
                     userId: selectedCustomerDetails.uid,
                     batteryBrand: vppForm.batteryBrand,
                     snNumber: vppForm.snNumber,
@@ -1272,7 +1272,7 @@ export function CustomersPage() {
         try {
             // Priority: Sync with secondary API first
             try {
-                await secondaryApiAxios.post('/api/v1/utilmate/user/add-user', {
+                await secondaryApiAxios.post('/v1/utilmate/user/add-user', {
                     account_number: selectedCustomerDetails.utilmateDetails?.accountNumber || '',
                     site_identifier: selectedCustomerDetails.utilmateDetails?.siteIdentifier || '',
                     gee_id: selectedCustomerDetails.uid,
@@ -1322,7 +1322,7 @@ export function CustomersPage() {
             // Priority: Sync with secondary API first
             try {
                 console.log('Attempting to call secondary API for Utilmate Connect...');
-                await secondaryApiAxios.post('/api/v1/utilmate/user/add-user', {
+                await secondaryApiAxios.post('/v1/utilmate/user/add-user', {
                     account_number: utilmateForm.accountNumber,
                     site_identifier: utilmateForm.siteIdentifier,
                     gee_id: selectedCustomerDetails.uid, // Always use UID for GEE ID

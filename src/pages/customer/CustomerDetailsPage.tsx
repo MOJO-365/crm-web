@@ -1742,7 +1742,7 @@ export function CustomerDetailsPage() {
         try {
             // Priority: Sync with secondary API first
             try {
-                await secondaryApiAxios.post('/api/v1/utilmate/user/add-user-battery', {
+                await secondaryApiAxios.post('/v1/utilmate/user/add-user-battery', {
                     userId: selectedCustomerDetails.uid,
                     batteryBrand: vppForm.batteryBrand,
                     snNumber: vppForm.snNumber,
@@ -2167,7 +2167,7 @@ export function CustomerDetailsPage() {
         try {
             // Priority: Sync with secondary API first
             try {
-                await secondaryApiAxios.post('/api/v1/utilmate/user/add-user-battery', {
+                await secondaryApiAxios.post('/v1/utilmate/user/add-user-battery', {
                     user_id: selectedCustomerDetails.customerId,
                     battery_brand: vppForm.batteryBrand,
                     battery_sn_number: vppForm.snNumber,
@@ -2388,7 +2388,7 @@ export function CustomerDetailsPage() {
         try {
             // Priority: Sync with secondary API first
             // try {
-            //     await secondaryApiAxios.post('/api/v1/utilmate/user/add-user', {
+            //     await secondaryApiAxios.post('/v1/utilmate/user/add-user', {
             //         account_number: utilmateForm.accountNumber,
             //         site_identifier: utilmateForm.siteIdentifier,
             //         gee_id: selectedCustomerDetails.customerId || selectedCustomerDetails.uid,
@@ -2515,7 +2515,7 @@ export function CustomerDetailsPage() {
                 "client-reference": "T3D-20251209051318-ed8bc2",
                 "enquiry-client-reference": "12344556"
             };
-            const response = await secondaryApiAxios.post('/api/v1/equifax/user/get-credit-report', equifaxPayload);
+            const response = await secondaryApiAxios.post('/v1/equifax/user/get-credit-report', equifaxPayload);
             const score = response.data?.creditScoreData?.score?.score_masterscale || response.data?.creditScore;
 
             if (!score) {
