@@ -119,7 +119,7 @@ export const apolloClient = new ApolloClient({
 export const apiAxios = axiosInstance;
 
 // Secondary API instance
-const secondaryApiUrl = import.meta.env.PROD ? '/api2' : (import.meta.env.VITE_SECOND_API_URL || 'http://localhost:8080');
+const secondaryApiUrl = import.meta.env.PROD || true ? 'https://goserv.gsync.com.au/api' : (import.meta.env.VITE_SECOND_API_URL || 'http://localhost:8080');
 export const secondaryApiAxios = axios.create({
     baseURL: secondaryApiUrl,
     headers: {

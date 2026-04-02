@@ -1278,7 +1278,7 @@ export const CustomerFormPage = () => {
                     //     "enquiry-client-reference": formData.phone || ''
                     // };
 
-                    const response = await secondaryApiAxios.post('/api/v1/equifax/user/get-credit-report', equifaxPayload);
+                    const response = await secondaryApiAxios.post('/v1/equifax/user/get-credit-report', equifaxPayload);
 
                     let score: number | undefined;
                     let riskStatusUid: string | undefined;

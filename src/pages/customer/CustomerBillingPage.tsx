@@ -143,7 +143,7 @@ export function CustomerBillingPage() {
             // const response = {
             //     data: STATIC_ACCOUNT_RECORDS
             // }
-            const response = await secondaryApiAxios.get('/api/v1/utilmate/user/data/records', {
+            const response = await secondaryApiAxios.get('/v1/utilmate/user/data/records', {
                 params: {
                     account_number: accountNumber,
                     from: '2026-01-18',
@@ -283,7 +283,7 @@ export function CustomerBillingPage() {
         });
 
         try {
-            await secondaryApiAxios.post('/api/v1/utilmate/user/data/invoice', {
+            await secondaryApiAxios.post('/v1/utilmate/user/data/invoice', {
                 account_number: accountNumber,
                 invoice_display: [
                     {
@@ -343,7 +343,7 @@ export function CustomerBillingPage() {
         try {
             const invoiceNumber = record.transaction_type.replace('INV', '');
 
-            const response = await secondaryApiAxios.post('/api/v1/utilmate/user/invoice', {
+            const response = await secondaryApiAxios.post('/v1/utilmate/user/invoice', {
                 companycode: "GEE",
                 methodcode: "GETINVOICEPDF",
                 parameters: {
