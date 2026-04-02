@@ -7,13 +7,12 @@ import { Select } from '@/components/ui/Select';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Modal } from '@/components/common';
 import { apiAxios } from '@/lib/apollo';
-import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES, GET_BATTERY_MODELS } from '@/graphql';
-import { useLazyQuery } from '@apollo/client';
-import { FileTextIcon, ZapIcon, PlugIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon } from '@/components/icons';
+import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES } from '@/graphql';
+import { FileTextIcon, ZapIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon } from '@/components/icons';
 
 interface VppCertificateTabProps {
     customerUid: string;
-    onUpdate?: () => void;
+    onUpdate?: () => Promise<void> | void;
     vppDetails?: any;
     solarDetails?: any;
     ratePlan?: any;
@@ -72,25 +71,12 @@ export function VppCertificateTab({
 
     const { data: makesData } = useQuery(GET_BATTERY_MAKES);
 
-    const [getBatteryModels, { data: batteryModelsData, loading: loadingBatteryModels }] = useLazyQuery(GET_BATTERY_MODELS);
-    const [getInverterModels, { data: inverterModelsData, loading: loadingInverterModels }] = useLazyQuery(GET_BATTERY_MODELS);
-
     const handleManufacturerChange = (field: 'batteryManufacturer' | 'inverterManufacturer', value: string) => {
-        const make = makesData?.batteryMakes?.find((m: any) => m.make === value);
-
         setFormState(prev => ({
             ...prev,
             [field]: value,
             [field === 'batteryManufacturer' ? 'batteryModel' : 'inverterModel']: ''
         }));
-
-        if (make) {
-            if (field === 'batteryManufacturer') {
-                getBatteryModels({ variables: { makeUid: make.uid } });
-            } else {
-                getInverterModels({ variables: { makeUid: make.uid } });
-            }
-        }
     };
 
     const batteryMakeOptions = makesData?.batteryMakes?.map((m: any) => ({
@@ -98,19 +84,8 @@ export function VppCertificateTab({
         label: m.make
     })) || [];
 
-    const batteryModelOptions = batteryModelsData?.batteryModels?.map((m: any) => ({
-        value: m.model,
-        label: m.model
-    })) || [];
-
-    const inverterModelOptions = inverterModelsData?.batteryModels?.map((m: any) => ({
-        value: m.model,
-        label: m.model
-    })) || [];
-
     const STEPS = [
-        ...(solarDetails?.hassolar === 1 ? [{ id: 0, label: 'Solar Details', icon: SunIcon }] : []),
-        { id: 1, label: 'Inverter Details', icon: PlugIcon },
+        { id: 1, label: 'Solar and Inverter Details', icon: SunIcon },
         { id: 2, label: 'Battery Details', icon: ZapIcon },
         { id: 3, label: 'Network & API', icon: FileTextIcon },
         { id: 4, label: 'Testing & Verification', icon: ShieldCheckIcon },
@@ -247,7 +222,7 @@ export function VppCertificateTab({
             });
             toast.success('Draft saved successfully!');
             refetch();
-            onUpdate?.();
+            await onUpdate?.();
         } catch (error) {
             console.error('Error saving draft:', error);
             const msg = error instanceof Error ? error.message : 'Failed to save draft.';
@@ -271,7 +246,7 @@ export function VppCertificateTab({
             });
             toast.success('VPP Certificate generated successfully!');
             refetch();
-            onUpdate?.();
+            await onUpdate?.();
         } catch (error) {
             console.error('Error generating VPP Certificate:', error);
             const msg = error instanceof Error ? error.message : 'Failed to generate VPP Certificate.';
@@ -389,199 +364,23 @@ export function VppCertificateTab({
             {/* Step Content */}
             <div className="flex-1 overflow-y-auto pr-2 pb-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
                 <div className="bg-card border border-border rounded-xl p-6 animate-in fade-in slide-in-from-right-2 duration-300" key={currentStep}>
-                    {/* Step 0 — System Settings */}
-                    {STEPS[currentStep].id === 0 && (
-                        <div className="space-y-8">
-                            {/* Solar Section */}
-                            {solarDetails?.hassolar === 1 && (
-                                <div className="space-y-6">
-                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Solar Configuration</h4>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Solar Capacity</label>
-                                            <p className="font-medium">{solarDetails.solarcapacity} kW</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground uppercase font-semibold">Inverter Capacity</label>
-                                            <p className="font-medium">{solarDetails.invertercapacity} kW</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* VPP Section
-                            {(vppDetails?.vpp === 1 || ratePlan?.vpp === 1) && (
-                                <div className="space-y-6">
-                                    <div className="flex items-center justify-between border-b pb-2">
-                                        <h3 className="text-lg font-semibold">VPP Configuration</h3>
-                                        <div className="flex items-center gap-2">
-                                            {!isDeleted && handleVppToggle && (
-                                                <>
-                                                    <span className="text-sm font-medium text-muted-foreground">VPP Connected</span>
-                                                    <ToggleSwitch
-                                                        checked={vppDetails?.vppConnected === 1}
-                                                        onChange={(checked: boolean) => handleVppToggle(customerUid, checked)}
-                                                        disabled={false}
-                                                    />
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {vppDetails?.vppConnected === 1 && vppForm && setVppForm && setIsEditingVpp && handleSaveVppDetails && (
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-foreground">Signup Bonus ($)</label>
-                                                    <Input
-                                                        type="number"
-                                                        value={vppForm.vppSignupBonus}
-                                                        onChange={(e) => setVppForm({ ...vppForm, vppSignupBonus: e.target.value })}
-                                                        disabled={!isEditingVpp}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-foreground">Battery Brand</label>
-                                                    <Select
-                                                        value={vppForm.batteryBrand}
-                                                        onChange={(val: any) => setVppForm({ ...vppForm, batteryBrand: val })}
-                                                        disabled={!isEditingVpp}
-                                                        options={BATTERY_BRAND_OPTIONS}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-foreground">Serial Number</label>
-                                                    <Input
-                                                        value={vppForm.snNumber}
-                                                        onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
-                                                        disabled={!isEditingVpp}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-foreground">Battery Capacity (kWh)</label>
-                                                    <Input
-                                                        type="number"
-                                                        value={vppForm.batteryCapacity}
-                                                        onChange={(e) => setVppForm({ ...vppForm, batteryCapacity: e.target.value })}
-                                                        disabled={!isEditingVpp}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-foreground">Export Limit (kW)</label>
-                                                    <Input
-                                                        type="number"
-                                                        value={vppForm.exportLimit}
-                                                        onChange={(e) => setVppForm({ ...vppForm, exportLimit: e.target.value })}
-                                                        disabled={!isEditingVpp}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-foreground">Inverter Capacity (kW)</label>
-                                                    <Input
-                                                        type="number"
-                                                        value={vppForm.inverterCapacity}
-                                                        onChange={(e) => setVppForm({ ...vppForm, inverterCapacity: e.target.value })}
-                                                        disabled={!isEditingVpp}
-                                                    />
-                                                </div>
-                                                {(vppForm.batteryBrand === 'Fox ESS' || vppForm.batteryBrand === 'NeoVolt' || vppForm.batteryBrand === 'AlphaESS' || vppForm.batteryBrand === 'Alpha ESS' || vppForm.batteryBrand === 'Aerl') && (
-                                                    <div className="space-y-2">
-                                                        <label className="text-sm font-medium text-foreground">Check Code</label>
-                                                        <Input
-                                                            value={vppForm.checkCode}
-                                                            onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
-                                                            disabled={!isEditingVpp}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="flex justify-end gap-2 pt-4 border-t border-border/40 mt-6">
-                                                {isEditingVpp ? (
-                                                    <>
-                                                        <Button variant="outline" onClick={() => setIsEditingVpp(false)}>Cancel</Button>
-                                                        <Button onClick={handleSaveVppDetails}>Save VPP Details</Button>
-                                                    </>
-                                                ) : (
-                                                    <Button variant="outline" onClick={() => setIsEditingVpp(true)}>
-                                                        <PencilIcon className="w-4 h-4 mr-2" />
-                                                        Edit Details
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )} */}
-
-                            {solarDetails?.hassolar !== 1 && (
-                                <div className="text-center py-12 text-muted-foreground bg-white dark:bg-neutral-950 rounded-lg border border-dashed border-border">
-                                    <Settings2Icon className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                                    <p>No Solar or VPP configuration found for this customer.</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Step 2 — Battery Details */}
-                    {STEPS[currentStep].id === 2 && (
-                        <div className="space-y-6">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Battery Details</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Manufacturer</label>
-                                    <Select
-                                        value={formState.batteryManufacturer}
-                                        onChange={(v: any) => handleManufacturerChange('batteryManufacturer', v as string)}
-                                        options={batteryMakeOptions}
-                                        placeholder="Select brand"
-                                        disabled={vppDetails?.vppConnected === 1}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Model</label>
-                                    <Select
-                                        value={formState.batteryModel}
-                                        onChange={(v: any) => setFormState(prev => ({ ...prev, batteryModel: v as string }))}
-                                        options={batteryModelOptions}
-                                        placeholder={loadingBatteryModels ? "Loading models..." : "Select model"}
-                                        disabled={!formState.batteryManufacturer || loadingBatteryModels}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
-                                    <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" disabled={vppDetails?.vppConnected === 1} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Installed Date</label>
-                                    <DatePicker
-                                        value={formState.batteryInstalledDate || null}
-                                        onChange={(date) => setFormState(prev => ({ ...prev, batteryInstalledDate: date ? date.toISOString().split('T')[0] : '' }))}
-                                        placeholder="Select date"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Usable Capacity (kWh)</label>
-                                    <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} disabled={vppDetails?.vppConnected === 1} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Backup Port Connected</label>
-                                    <Select
-                                        value={formState.batteryPortConnected.toString()}
-                                        onChange={(v) => handleSelectChange('batteryPortConnected', v as string)}
-                                        options={[
-                                            { value: '0', label: 'No' },
-                                            { value: '1', label: 'Yes' }
-                                        ]}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 1 — Inverter Details */}
+                    {/* Step 1 — Solar and Inverter Details */}
                     {STEPS[currentStep].id === 1 && (
                         <div className="space-y-6">
+                            <div className="space-y-6">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Solar Configuration</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-foreground">Solar Capacity (kW)</label>
+                                        <Input value={solarDetails?.solarcapacity ? `${solarDetails.solarcapacity} kW` : '-'} disabled={true} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-foreground">Inverter Capacity (kW)</label>
+                                        <Input value={solarDetails?.invertercapacity ? `${solarDetails.invertercapacity} kW` : '-'} disabled={true} />
+                                    </div>
+                                </div>
+                            </div>
+
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Inverter Details</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <div className="space-y-2">
@@ -595,13 +394,7 @@ export function VppCertificateTab({
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Model</label>
-                                    <Select
-                                        value={formState.inverterModel}
-                                        onChange={(v: any) => setFormState(prev => ({ ...prev, inverterModel: v as string }))}
-                                        options={inverterModelOptions}
-                                        placeholder={loadingInverterModels ? "Loading models..." : "Select model"}
-                                        disabled={!formState.inverterManufacturer || loadingInverterModels}
-                                    />
+                                    <Input name="inverterModel" value={formState.inverterModel} onChange={handleChange} placeholder="Enter model name" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
@@ -625,6 +418,56 @@ export function VppCertificateTab({
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">If Yes, Details</label>
                                     <Input name="ifYesDetails" value={formState.ifYesDetails} onChange={handleChange} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 2 — Battery Details */}
+                    {STEPS[currentStep].id === 2 && (
+                        <div className="space-y-6">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Battery Details</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">Manufacturer</label>
+                                    <Select
+                                        value={formState.batteryManufacturer}
+                                        onChange={(v: any) => handleManufacturerChange('batteryManufacturer', v as string)}
+                                        options={batteryMakeOptions}
+                                        placeholder="Select brand"
+                                        disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryManufacturer}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">Model</label>
+                                    <Input name="batteryModel" value={formState.batteryModel} onChange={handleChange} placeholder="Enter model name" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
+                                    <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batterySerialNumber} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">Installed Date</label>
+                                    <DatePicker
+                                        value={formState.batteryInstalledDate || null}
+                                        onChange={(date) => setFormState(prev => ({ ...prev, batteryInstalledDate: date ? date.toISOString().split('T')[0] : '' }))}
+                                        placeholder="Select date"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">Usable Capacity (kWh)</label>
+                                    <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryUsableCapacity} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">Backup Port Connected</label>
+                                    <Select
+                                        value={formState.batteryPortConnected.toString()}
+                                        onChange={(v) => handleSelectChange('batteryPortConnected', v as string)}
+                                        options={[
+                                            { value: '0', label: 'No' },
+                                            { value: '1', label: 'Yes' }
+                                        ]}
+                                    />
                                 </div>
                             </div>
                         </div>
