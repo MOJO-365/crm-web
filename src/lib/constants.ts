@@ -256,7 +256,7 @@ export const BATTERY_BRAND_OPTIONS = [
     { value: 'LG Energy Solution', label: 'LG Energy Solution' },
     { value: 'BYD', label: 'BYD' },
     { value: 'Sonnen', label: 'Sonnen' },
-    { value: 'AlphaESS', label: 'AlphaESS' },
+    { value: 'Alpha ESS', label: 'Alpha ESS' },
     { value: 'Sungrow', label: 'Sungrow' },
     { value: 'Huawei', label: 'Huawei' },
     { value: 'Enphase', label: 'Enphase' },

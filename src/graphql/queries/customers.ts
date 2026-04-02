@@ -856,6 +856,12 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 isAllRequiredFilled
                 isVppCertificateEmailSent
                 isVppCertificateEmailSentAt
+                batteryManufacturer
+                batterySerialNumber
+                batteryUsableCapacity
+                inverterManufacturer
+                inverterSnNumbers
+                inverterCapacity
             }
             msatDetails {
                 msatConnected
@@ -897,6 +903,14 @@ export const GET_CUSTOMER_SOLAR_VPP_DETAILS = gql`
                 isDeleted
                 createdAt
                 updatedAt
+            }
+            vppCertificateDetails {
+                batteryManufacturer
+                batterySerialNumber
+                batteryUsableCapacity
+                inverterManufacturer
+                inverterSnNumbers
+                inverterCapacity
             }
         }
     }

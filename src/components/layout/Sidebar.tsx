@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import logo from '@/assets/main-logo-dark-1.png';
 import { useAccessibleMenus } from '@/stores/useAuthStore';
+import type { AccessibleMenu } from '@/stores/useAuthStore';
 import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon } from '@/components/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
 
@@ -47,7 +48,8 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     pdf_terms: FileTextIcon,
     customer_billing: CalendarIcon,
     bonus_master: ZapIcon,
-    leads: UserIcon
+    leads: UserIcon,
+    master_data: ShieldCheckIcon
 };
 
 // Path mapping
@@ -68,7 +70,8 @@ const pathMap: Record<string, string> = {
     pdf_terms: '/pdf-terms',
     customer_billing: '/customer-billing',
     bonus_master: '/bonus_master',
-    leads: '/leads'
+    leads: '/leads',
+    master_data: '/master-data'
     // user_management and email have no path, they are groupers
 };
 
@@ -128,7 +131,23 @@ const Portal = ({ children }: { children: React.ReactNode }) => {
 };
 
 export function Sidebar({ className, isOpen = true }: SidebarProps) {
-    const accessibleMenus = useAccessibleMenus();
+    const rawAccessibleMenus = useAccessibleMenus();
+    const accessibleMenus = useMemo(() => {
+        const menus = rawAccessibleMenus.map((m: AccessibleMenu) => {
+            if (m.menuCode === 'master_data') {
+                return { ...m, menuName: 'General' };
+            }
+            return { ...m };
+        });
+
+        const masterParent = menus.find(m => m.menuCode === 'master');
+        const masterData = menus.find(m => m.menuCode === 'master_data');
+
+        if (masterParent && masterData) {
+            masterData.parentUid = masterParent.menuUid;
+        }
+        return menus;
+    }, [rawAccessibleMenus]);
     const location = useLocation();
 
     // Track expanded parent menus
