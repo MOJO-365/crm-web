@@ -79,7 +79,7 @@ export function VppCertificateTab({
         }));
     };
 
-    const batteryMakeOptions = makesData?.batteryMakes?.map((m: any) => ({
+    const batteryMakeOptions = makesData?.batteryMakes?.filter((m: any) => m.productStatus === 1).map((m: any) => ({
         value: m.make,
         label: m.make
     })) || [];
@@ -269,7 +269,8 @@ export function VppCertificateTab({
     const isLastStep = currentStep === STEPS.length - 1;
     const isFirstStep = currentStep === 0;
 
-    const isFormComplete = validateRequiredFields().length === 0;
+    const missingFields = validateRequiredFields();
+    const isFormComplete = missingFields.length === 0;
 
     return (
         <div className="flex flex-col h-[500px] animate-in fade-in duration-300">
@@ -390,6 +391,7 @@ export function VppCertificateTab({
                                         onChange={(v: any) => handleManufacturerChange('inverterManufacturer', v as string)}
                                         options={batteryMakeOptions}
                                         placeholder="Select brand"
+                                        creatable
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -436,6 +438,7 @@ export function VppCertificateTab({
                                         options={batteryMakeOptions}
                                         placeholder="Select brand"
                                         disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryManufacturer}
+                                        creatable
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -626,7 +629,7 @@ export function VppCertificateTab({
                             onClick={handleGenerateCertificate}
                             isLoading={isSaving}
                             disabled={isSaving || isSavingDraft || !isFormComplete}
-                            title={!isFormComplete ? "Please fill all required fields to generate certificate" : ""}
+                            title={!isFormComplete ? `Missing: ${missingFields.join(', ')}` : ""}
                         >
                             {vppCertificateDetails?.id ? 'Update' : 'Generate'}
                         </Button>

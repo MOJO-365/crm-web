@@ -23,6 +23,7 @@ export interface SelectProps {
     error?: string;
     disabled?: boolean;
     multiple?: boolean;
+    creatable?: boolean;
 
     className?: string;
     containerClassName?: string;
@@ -44,6 +45,7 @@ export function Select({
     containerClassName,
     required,
     onBlur,
+    creatable = false,
 }: SelectProps) {
     const [isOpen, setIsOpen] = React.useState(false);
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -87,7 +89,8 @@ export function Select({
     // Sync search query with selected value for single select
     React.useEffect(() => {
         if (!multiple && !isOpen) {
-            const label = options.find(o => o.value === value)?.label || '';
+            const opt = options.find(o => o.value === value);
+            const label = opt ? opt.label : (value !== undefined && value !== null ? String(value) : '');
             setSearchQuery(label);
         }
     }, [value, isOpen, multiple, options]);
@@ -176,6 +179,8 @@ export function Select({
                     if (!option.disabled) {
                         handleSelect(option.value);
                     }
+                } else if (creatable && searchQuery) {
+                    handleSelect(searchQuery);
                 }
                 return;
             }
@@ -334,9 +339,18 @@ export function Select({
                             {/* Options List */}
                             <ul ref={listRef} className="overflow-auto max-h-48 py-1">
                                 {filteredOptions.length === 0 ? (
-                                    <li className="px-3 py-2 text-sm text-muted-foreground text-center">
-                                        No options found
-                                    </li>
+                                    creatable && searchQuery ? (
+                                        <li 
+                                            className="px-3 py-2 text-sm cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                            onClick={() => handleSelect(searchQuery)}
+                                        >
+                                            Add "{searchQuery}"
+                                        </li>
+                                    ) : (
+                                        <li className="px-3 py-2 text-sm text-muted-foreground text-center">
+                                            No options found
+                                        </li>
+                                    )
                                 ) : (
                                     filteredOptions.map((option, index) => {
                                         const isSelected = selectedValues.includes(option.value);
