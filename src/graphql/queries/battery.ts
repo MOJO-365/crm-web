@@ -5,11 +5,25 @@ export const GET_BATTERY_MAKES = gql`
     batteryMakes {
       uid
       make
+      shortName
+      description
+      batteryUsableCapacity
+      maxBackupLoad
+      batteryProdWarranty
+      productStatus
+      cecStatus
+      pdrsStatus
+      cegCapacity
+      batteryCapacityKwh
+      cegExpiryDate
       declaredModelCount
       actualModelRows
       minCapacity
       maxCapacity
       isActive
+      datasheetPath
+      datasheetUrl
+      datasheetName
     }
   }
 `;
