@@ -15,6 +15,8 @@ export * from './queries/userPermissions';
 export * from './queries/auditLogs';
 export * from './queries/dashboard';
 export * from './queries/battery';
+export * from './queries/inverter';
+
 
 // Mutations
 export * from './mutations/auth';
@@ -55,6 +57,8 @@ export * from './queries/bonus';
 export * from './queries/maintenance';
 export * from './mutations/maintenance';
 export * from './mutations/battery';
+export * from './mutations/inverter';
+
 
 // Leads
 export * from './queries/leads';

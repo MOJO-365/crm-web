@@ -4,7 +4,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import logo from '@/assets/main-logo-dark-1.png';
 import { useAccessibleMenus } from '@/stores/useAuthStore';
-import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon } from '@/components/icons';
+import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon } from '@/components/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 // Dashboard icon component (locally defined in Header originally)
@@ -48,7 +48,8 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     customer_billing: CalendarIcon,
     bonus_master: ZapIcon,
     leads: UserIcon,
-    battery_master: ZapIcon,
+    battery_master: BatteryIcon,
+    inverter_master: InverterIcon,
     master_data: ShieldCheckIcon
 };
 
@@ -72,6 +73,7 @@ const pathMap: Record<string, string> = {
     bonus_master: '/bonus_master',
     leads: '/leads',
     battery_master: '/battery-master',
+    inverter_master: '/inverter-master',
     master_data: '/master-data'
     // user_management and email have no path, they are groupers
 };

@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import {
-    GET_BATTERY_MAKES,
-    GET_BATTERY_MODELS,
-    CREATE_BATTERY_MAKE,
-    UPDATE_BATTERY_MAKE,
-    DELETE_BATTERY_MAKE,
-    CREATE_BATTERY_MODEL,
-    UPDATE_BATTERY_MODEL,
-    DELETE_BATTERY_MODEL,
+    GET_INVERTER_MAKES,
+    GET_INVERTER_MODELS,
+    CREATE_INVERTER_MAKE,
+    UPDATE_INVERTER_MAKE,
+    DELETE_INVERTER_MAKE,
+    CREATE_INVERTER_MODEL,
+    UPDATE_INVERTER_MODEL,
+    DELETE_INVERTER_MODEL,
     UPLOAD_FILE
 } from '@/graphql';
 import { Button } from '@/components/ui/Button';
@@ -16,66 +16,59 @@ import { Input } from '@/components/ui/Input';
 import { DataTable, type Column, Modal, ConfirmModal } from '@/components/common';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Switch } from '@/components/ui/Switch';
-import { PlusIcon, TrashIcon, PencilIcon, ZapIcon, ChevronRightIcon, CheckCircleIcon, CloseIcon, AlertCircleIcon } from '@/components/icons';
+import { PlusIcon, TrashIcon, PencilIcon, ZapIcon, ChevronRightIcon, CheckCircleIcon, CloseIcon } from '@/components/icons';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { cn } from '@/lib/utils';
 
-interface BatteryMake {
+interface InverterMake {
     uid: string;
     make: string;
     isActive: boolean;
-    declaredModelCount?: number;
-    actualModelRows?: number;
-    minCapacity?: number;
-    maxCapacity?: number;
     shortName?: string;
     description?: string;
-    batteryUsableCapacity?: number;
-    maxBackupLoad?: number;
-    batteryProdWarranty?: string;
+    minCapacity?: number;
+    maxCapacity?: number;
+    totalCapacity?: number;
+    usableCapacity?: number;
+    warrantyDetails?: string;
     productStatus?: number;
-    cecStatus?: number;
-    pdrsStatus?: number;
-    cegCapacity?: number;
-    batteryCapacityKwh?: number;
-    cegExpiryDate?: string;
+    cecCapacity?: number;
+    cecExpiryDate?: string;
     datasheetPath?: string;
     datasheetUrl?: string;
     datasheetName?: string;
 }
 
-interface BatteryModel {
+interface InverterModel {
     uid: string;
     makeUid: string;
     model: string;
     capacity: number;
-    vppProgram: string;
-    bess2Eligible: number;
-    vpp1Eligible: number;
+    warranty?: string;
     isActive: boolean;
 }
 
-export const BatteryMasterPage: React.FC = () => {
+export const InverterMasterPage: React.FC = () => {
     // Queries
-    const { data: makesData, loading: loadingMakes, refetch: refetchMakes } = useQuery(GET_BATTERY_MAKES);
-    const [selectedMake, setSelectedMake] = useState<BatteryMake | null>(null);
-    const { data: modelsData, loading: loadingModels, refetch: refetchModels } = useQuery(GET_BATTERY_MODELS, {
+    const { data: makesData, loading: loadingMakes, refetch: refetchMakes } = useQuery(GET_INVERTER_MAKES);
+    const [selectedMake, setSelectedMake] = useState<InverterMake | null>(null);
+    const { data: modelsData, loading: loadingModels, refetch: refetchModels } = useQuery(GET_INVERTER_MODELS, {
         variables: { makeUid: selectedMake?.uid || '' },
         skip: !selectedMake?.uid
     });
 
     // Mutations
-    const [createMake] = useMutation(CREATE_BATTERY_MAKE);
-    const [updateMake] = useMutation(UPDATE_BATTERY_MAKE);
-    const [deleteMake] = useMutation(DELETE_BATTERY_MAKE);
-    const [createModel] = useMutation(CREATE_BATTERY_MODEL);
-    const [updateModel] = useMutation(UPDATE_BATTERY_MODEL);
-    const [deleteModel] = useMutation(DELETE_BATTERY_MODEL);
+    const [createMake] = useMutation(CREATE_INVERTER_MAKE);
+    const [updateMake] = useMutation(UPDATE_INVERTER_MAKE);
+    const [deleteMake] = useMutation(DELETE_INVERTER_MAKE);
+    const [createModel] = useMutation(CREATE_INVERTER_MODEL);
+    const [updateModel] = useMutation(UPDATE_INVERTER_MODEL);
+    const [deleteModel] = useMutation(DELETE_INVERTER_MODEL);
     const [uploadFile] = useMutation(UPLOAD_FILE);
 
     // Permissions
-    const canManage = useAuthStore((state) => state.canEditInMenu('battery_master'));
+    const canManage = useAuthStore((state) => state.canEditInMenu('inverter_master'));
 
     // Search States
     const [makesSearch, setMakesSearch] = useState('');
@@ -83,24 +76,19 @@ export const BatteryMasterPage: React.FC = () => {
 
     // Modal States
     const [makeModalOpen, setMakeModalOpen] = useState(false);
-    const [editingMake, setEditingMake] = useState<BatteryMake | null>(null);
+    const [editingMake, setEditingMake] = useState<InverterMake | null>(null);
     const [makeForm, setMakeForm] = useState({
         make: '',
-        declaredModelCount: 0,
-        actualModelRows: 0,
-        minCapacity: 0,
-        maxCapacity: 0,
         shortName: '',
         description: '',
-        batteryUsableCapacity: 0,
-        maxBackupLoad: 0,
-        batteryProdWarranty: '',
+        minCapacity: 0,
+        maxCapacity: 0,
+        totalCapacity: 0,
+        usableCapacity: 0,
+        warrantyDetails: '',
         productStatus: 0,
-        cecStatus: 0,
-        pdrsStatus: 0,
-        cegCapacity: 0,
-        batteryCapacityKwh: 0,
-        cegExpiryDate: '',
+        cecCapacity: 0,
+        cecExpiryDate: '',
         isActive: true,
         datasheetPath: '',
         datasheetUrl: '',
@@ -108,13 +96,11 @@ export const BatteryMasterPage: React.FC = () => {
     });
 
     const [modelModalOpen, setModelModalOpen] = useState(false);
-    const [editingModel, setEditingModel] = useState<BatteryModel | null>(null);
+    const [editingModel, setEditingModel] = useState<InverterModel | null>(null);
     const [modelForm, setModelForm] = useState({
         model: '',
         capacity: 0,
-        vppProgram: '',
-        bess2Eligible: 0,
-        vpp1Eligible: 0,
+        warranty: '',
         isActive: true
     });
 
@@ -130,43 +116,38 @@ export const BatteryMasterPage: React.FC = () => {
 
 
     // Filtering logic for Makes
-    const filteredMakes = makesData?.batteryMakes?.filter((m: BatteryMake) =>
+    const filteredMakes = makesData?.inverterMakes?.filter((m: InverterMake) =>
         m.make.toLowerCase().includes(makesSearch.toLowerCase())
     ) || [];
 
     // Filtering logic for Models
-    const filteredModels = modelsData?.batteryModels?.filter((m: BatteryModel) =>
+    const filteredModels = modelsData?.inverterModels?.filter((m: InverterModel) =>
         m.model.toLowerCase().includes(modelsSearch.toLowerCase())
     ) || [];
 
     // Handle Make selection
     useEffect(() => {
-        if (makesData?.batteryMakes?.length > 0 && !selectedMake) {
-            setSelectedMake(makesData.batteryMakes[0]);
+        if (makesData?.inverterMakes?.length > 0 && !selectedMake) {
+            setSelectedMake(makesData.inverterMakes[0]);
         }
     }, [makesData, selectedMake]);
 
     // Make Handlers
-    const handleOpenMakeModal = (make?: BatteryMake) => {
+    const handleOpenMakeModal = (make?: InverterMake) => {
         if (make) {
             setEditingMake(make);
             setMakeForm({
                 make: make.make,
-                declaredModelCount: make.declaredModelCount || 0,
-                actualModelRows: make.actualModelRows || 0,
-                minCapacity: make.minCapacity || 0,
-                maxCapacity: make.maxCapacity || 0,
                 shortName: make.shortName || '',
                 description: make.description || '',
-                batteryUsableCapacity: make.batteryUsableCapacity || 0,
-                maxBackupLoad: make.maxBackupLoad || 0,
-                batteryProdWarranty: make.batteryProdWarranty || '',
+                minCapacity: make.minCapacity || 0,
+                maxCapacity: make.maxCapacity || 0,
+                totalCapacity: make.totalCapacity || 0,
+                usableCapacity: make.usableCapacity || 0,
+                warrantyDetails: make.warrantyDetails || '',
                 productStatus: make.productStatus || 0,
-                cecStatus: make.cecStatus || 0,
-                pdrsStatus: make.pdrsStatus || 0,
-                cegCapacity: make.cegCapacity || 0,
-                batteryCapacityKwh: make.batteryCapacityKwh || 0,
-                cegExpiryDate: make.cegExpiryDate ? new Date(make.cegExpiryDate).toISOString().split('T')[0] : '',
+                cecCapacity: make.cecCapacity || 0,
+                cecExpiryDate: make.cecExpiryDate ? new Date(make.cecExpiryDate).toISOString().split('T')[0] : '',
                 isActive: make.isActive,
                 datasheetPath: make.datasheetPath || '',
                 datasheetUrl: make.datasheetUrl || '',
@@ -176,21 +157,16 @@ export const BatteryMasterPage: React.FC = () => {
             setEditingMake(null);
             setMakeForm({
                 make: '',
-                declaredModelCount: 0,
-                actualModelRows: 0,
-                minCapacity: 0,
-                maxCapacity: 0,
                 shortName: '',
                 description: '',
-                batteryUsableCapacity: 0,
-                maxBackupLoad: 0,
-                batteryProdWarranty: '',
+                minCapacity: 0,
+                maxCapacity: 0,
+                totalCapacity: 0,
+                usableCapacity: 0,
+                warrantyDetails: '',
                 productStatus: 0,
-                cecStatus: 0,
-                pdrsStatus: 0,
-                cegCapacity: 0,
-                batteryCapacityKwh: 0,
-                cegExpiryDate: '',
+                cecCapacity: 0,
+                cecExpiryDate: '',
                 isActive: true,
                 datasheetPath: '',
                 datasheetUrl: '',
@@ -203,10 +179,9 @@ export const BatteryMasterPage: React.FC = () => {
     const handleMakeSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // Clean up input payload
             const inputPayload = {
                 ...makeForm,
-                cegExpiryDate: makeForm.cegExpiryDate || null,
+                cecExpiryDate: makeForm.cecExpiryDate || null,
             };
             // @ts-ignore
             delete inputPayload.datasheetUrl;
@@ -229,7 +204,7 @@ export const BatteryMasterPage: React.FC = () => {
         }
     };
 
-    const handleDeleteMake = (make: BatteryMake) => {
+    const handleDeleteMake = (make: InverterMake) => {
         setDeleteConfig({
             uid: make.uid,
             type: 'make',
@@ -245,7 +220,7 @@ export const BatteryMasterPage: React.FC = () => {
         try {
             if (deleteConfig.type === 'make') {
                 const { data } = await deleteMake({ variables: { uid: deleteConfig.uid } });
-                if (data?.deleteBatteryMake) {
+                if (data?.deleteInverterMake) {
                     toast.success('Manufacturer deleted');
                     if (selectedMake?.uid === deleteConfig.uid) setSelectedMake(null);
                     refetchMakes();
@@ -254,7 +229,7 @@ export const BatteryMasterPage: React.FC = () => {
                 }
             } else {
                 const { data } = await deleteModel({ variables: { uid: deleteConfig.uid } });
-                if (data?.deleteBatteryModel) {
+                if (data?.deleteInverterModel) {
                     toast.success('Model deleted');
                     refetchModels();
                 } else {
@@ -272,16 +247,15 @@ export const BatteryMasterPage: React.FC = () => {
     };
 
 
+
     // Model Handlers
-    const handleOpenModelModal = (model?: BatteryModel) => {
+    const handleOpenModelModal = (model?: InverterModel) => {
         if (model) {
             setEditingModel(model);
             setModelForm({
                 model: model.model,
                 capacity: model.capacity,
-                vppProgram: model.vppProgram || '',
-                bess2Eligible: model.bess2Eligible,
-                vpp1Eligible: model.vpp1Eligible,
+                warranty: model.warranty || '',
                 isActive: model.isActive
             });
         } else {
@@ -289,9 +263,7 @@ export const BatteryMasterPage: React.FC = () => {
             setModelForm({
                 model: '',
                 capacity: 0,
-                vppProgram: '',
-                bess2Eligible: 0,
-                vpp1Eligible: 0,
+                warranty: '',
                 isActive: true
             });
         }
@@ -320,7 +292,7 @@ export const BatteryMasterPage: React.FC = () => {
         }
     };
 
-    const handleDeleteModel = (model: BatteryModel) => {
+    const handleDeleteModel = (model: InverterModel) => {
         setDeleteConfig({
             uid: model.uid,
             type: 'model',
@@ -329,6 +301,7 @@ export const BatteryMasterPage: React.FC = () => {
         });
         setDeleteConfirmOpen(true);
     };
+
 
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'make' | 'model') => {
@@ -344,7 +317,7 @@ export const BatteryMasterPage: React.FC = () => {
                         input: {
                             fileContent: base64,
                             filename: file.name,
-                            folder: 'battery-datasheets'
+                            folder: 'inverter-datasheets'
                         }
                     }
                 });
@@ -366,47 +339,50 @@ export const BatteryMasterPage: React.FC = () => {
         reader.readAsDataURL(file);
     };
 
-    const modelColumns: Column<BatteryModel>[] = [
+    const modelColumns: Column<InverterModel>[] = [
         {
             header: 'Model Name',
             key: 'model',
-            render: (item: BatteryModel) => <span className="font-medium">{item.model}</span>
+            render: (item: InverterModel) => <span className="font-medium">{item.model}</span>
         },
         {
-            header: 'Capacity (kWh)',
+            header: 'Capacity (kW)',
             key: 'capacity',
-            render: (item: BatteryModel) => <span>{item.capacity}</span>
+            render: (item: InverterModel) => <span>{item.capacity}</span>
         },
         {
-            header: 'VPP Program',
-            key: 'vppProgram',
-            render: (item: BatteryModel) => <span>{item.vppProgram || '-'}</span>
+            header: 'Warranty',
+            key: 'warranty',
+            render: (item: InverterModel) => <span>{item.warranty || '-'}</span>
         },
         {
-            header: 'Eligibility',
-            key: 'eligibility',
-            render: (item: BatteryModel) => (
-                <div className="flex gap-2">
-                    {item.bess2Eligible === 1 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">BESS2</span>}
-                    {item.vpp1Eligible === 1 && <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">VPP1</span>}
-                </div>
+            header: 'Status',
+            key: 'isActive',
+            render: (item: InverterModel) => (
+                <span className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] uppercase font-bold",
+                    item.isActive ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                )}>
+                    {item.isActive ? 'Active' : 'Inactive'}
+                </span>
             )
         },
         {
             header: 'Actions',
             key: 'actions',
-            render: (item: BatteryModel) => (
+            render: (item: InverterModel) => (
                 <div className="flex gap-2">
                     {canManage && (
                         <>
                             <Tooltip content="Edit">
                                 <button onClick={() => handleOpenModelModal(item)} className="p-2 border border-border rounded-lg hover:bg-accent"><PencilIcon size={14} /></button>
                             </Tooltip>
-                            <Tooltip content="Delete">
+                             <Tooltip content="Delete">
                                 <button onClick={() => handleDeleteModel(item)} className="p-2 border border-border rounded-lg bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-900/50 transition-colors">
                                     <TrashIcon size={14} />
                                 </button>
                             </Tooltip>
+
 
                         </>
                     )}
@@ -420,9 +396,9 @@ export const BatteryMasterPage: React.FC = () => {
             <div className="flex justify-between items-center px-4">
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <ZapIcon className="text-primary" /> Battery Master Catalogue
+                        <ZapIcon className="text-primary" /> Inverter Master Catalogue
                     </h1>
-                    <p className="text-muted-foreground text-sm">Manage the database of battery manufacturers and models</p>
+                    <p className="text-muted-foreground text-sm">Manage the database of inverter manufacturers and models</p>
                 </div>
             </div>
 
@@ -453,7 +429,7 @@ export const BatteryMasterPage: React.FC = () => {
                             <div className="p-8 text-center text-muted-foreground italic">No manufacturers found</div>
                         ) : (
                             <div className="divide-y divide-border">
-                                {filteredMakes.map((m: BatteryMake) => (
+                                {filteredMakes.map((m: InverterMake) => (
                                     <div
                                         key={m.uid}
                                         onClick={() => setSelectedMake(m)}
@@ -464,8 +440,9 @@ export const BatteryMasterPage: React.FC = () => {
                                     >
                                         <div className="flex-1">
                                             <div className={cn("font-medium", selectedMake?.uid === m.uid ? "text-primary" : "text-foreground")}>
-                                                {m.make}
+                                                {m.make || 'Unnamed Manufacturer'}
                                             </div>
+
                                             <div className="flex items-center gap-2">
                                                 {!m.isActive && <span className="text-[10px] text-muted-foreground italic">(Inactive)</span>}
                                                 {m.datasheetUrl && (
@@ -484,7 +461,12 @@ export const BatteryMasterPage: React.FC = () => {
                                         <div className="flex items-center gap-2">
                                             {canManage && (
                                                 <div className="hidden group-hover:flex gap-1">
-                                                    <button onClick={(e) => { e.stopPropagation(); handleOpenMakeModal(m); }} className="p-1 hover:text-primary"><PencilIcon size={14} /></button>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); handleOpenMakeModal(m); }} 
+                                                        className="p-1 text-muted-foreground hover:text-primary transition-colors"
+                                                    >
+                                                        <PencilIcon size={14} />
+                                                    </button>
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); handleDeleteMake(m); }} 
                                                         className="p-1 text-red-500 hover:text-red-700 transition-colors"
@@ -494,6 +476,7 @@ export const BatteryMasterPage: React.FC = () => {
 
                                                 </div>
                                             )}
+
                                             <ChevronRightIcon size={16} className={cn("text-muted-foreground transition-transform", selectedMake?.uid === m.uid ? "rotate-90 text-primary" : "")} />
                                         </div>
                                     </div>
@@ -505,43 +488,32 @@ export const BatteryMasterPage: React.FC = () => {
                 {/* Right side: Models */}
                 <div className="flex-1 bg-card border border-border rounded-xl flex flex-col overflow-hidden shadow-sm">
                     <div className="p-4 border-b border-border space-y-4">
-
-
                         {selectedMake && (
                             <div className="space-y-4">
                                 <div className="grid grid-cols-4 gap-4">
                                     <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Declared Models</div>
-                                        <div className="text-xl font-bold text-foreground">{selectedMake.declaredModelCount || 0}</div>
-                                    </div>
-                                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Actual Rows</div>
-                                        <div className="text-xl font-bold text-foreground">{selectedMake.actualModelRows || 0}</div>
-                                    </div>
-                                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
                                         <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Min Capacity</div>
-                                        <div className="text-xl font-bold text-foreground">{selectedMake.minCapacity || 0} <span className="text-xs font-normal text-muted-foreground">kWh</span></div>
+                                        <div className="text-xl font-bold text-foreground">{selectedMake.minCapacity || 0} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
                                     </div>
                                     <div className="p-3 bg-muted/50 rounded-lg border border-border">
                                         <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Max Capacity</div>
-                                        <div className="text-xl font-bold text-foreground">{selectedMake.maxCapacity || 0} <span className="text-xs font-normal text-muted-foreground">kWh</span></div>
+                                        <div className="text-xl font-bold text-foreground">{selectedMake.maxCapacity || 0} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
                                     </div>
-
+                                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Total Capacity</div>
+                                        <div className="text-xl font-bold text-foreground">{selectedMake.totalCapacity || 0} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
+                                    </div>
                                     <div className="p-3 bg-muted/50 rounded-lg border border-border">
                                         <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Usable Capacity</div>
-                                        <div className="text-xl font-bold text-foreground">{selectedMake.batteryUsableCapacity || 0} <span className="text-xs font-normal text-muted-foreground">kWh</span></div>
-                                    </div>
-                                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Battery capacity</div>
-                                        <div className="text-xl font-bold text-foreground">{selectedMake.batteryCapacityKwh || 0} <span className="text-xs font-normal text-muted-foreground">kWh</span></div>
-                                    </div>
-                                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Max Backup Load</div>
-                                        <div className="text-xl font-bold text-foreground">{selectedMake.maxBackupLoad || 0} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
+                                        <div className="text-xl font-bold text-foreground">{selectedMake.usableCapacity || 0} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
                                     </div>
                                     <div className="p-3 bg-muted/50 rounded-lg border border-border">
                                         <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Warranty</div>
-                                        <div className="text-lg font-bold text-foreground leading-tight">{selectedMake.batteryProdWarranty || '-'}</div>
+                                        <div className="text-lg font-bold text-foreground leading-tight">{selectedMake.warrantyDetails || '-'}</div>
+                                    </div>
+                                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">CEC Capacity</div>
+                                        <div className="text-xl font-bold text-foreground">{selectedMake.cecCapacity || 0} <span className="text-xs font-normal text-muted-foreground">kW</span></div>
                                     </div>
                                 </div>
 
@@ -565,43 +537,14 @@ export const BatteryMasterPage: React.FC = () => {
                                                 {selectedMake.productStatus === 1 ? "ACTIVE" : "OFF"}
                                             </div>
                                         </div>
-
-                                        <div className={cn(
-                                            "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300",
-                                            selectedMake.cecStatus === 1
-                                                ? "bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-400 shadow-[0_2px_10px_-4px_rgba(59,130,246,0.3)]"
-                                                : "bg-muted/30 border-border/50 text-muted-foreground"
-                                        )}>
-                                            {selectedMake.cecStatus === 1 ? <CheckCircleIcon size={12} className="text-blue-500" /> : <AlertCircleIcon size={12} />}
-                                            <span className="text-[10px] font-bold uppercase tracking-wider">CEC Listed</span>
-                                            <div className={cn(
-                                                "w-10 py-0.5 rounded text-[8px] font-black leading-none text-center",
-                                                selectedMake.cecStatus === 1 ? "bg-blue-500 text-white" : "bg-muted-foreground/20 text-muted-foreground"
-                                            )}>
-                                                {selectedMake.cecStatus === 1 ? "ON" : "OFF"}
-                                            </div>
-                                        </div>
-
-                                        <div className={cn(
-                                            "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300",
-                                            selectedMake.pdrsStatus === 1
-                                                ? "bg-orange-500/10 border-orange-500/20 text-orange-700 dark:text-orange-400 shadow-[0_2px_10px_-4px_rgba(249,115,22,0.3)]"
-                                                : "bg-muted/30 border-border/50 text-muted-foreground"
-                                        )}>
-                                            {selectedMake.pdrsStatus === 1 ? <CheckCircleIcon size={12} className="text-orange-500" /> : <AlertCircleIcon size={12} />}
-                                            <span className="text-[10px] font-bold uppercase tracking-wider">PDRS</span>
-                                            <div className={cn(
-                                                "w-10 py-0.5 rounded text-[8px] font-black leading-none text-center",
-                                                selectedMake.pdrsStatus === 1 ? "bg-orange-500 text-white" : "bg-muted-foreground/20 text-muted-foreground"
-                                            )}>
-                                                {selectedMake.pdrsStatus === 1 ? "ON" : "OFF"}
-                                            </div>
-                                        </div>
                                     </div>
                                     <div className="ml-auto flex items-center gap-4">
-                                        {selectedMake.cegExpiryDate && (
+                                        {selectedMake.cecExpiryDate && (
                                             <div className="text-[10px] text-muted-foreground">
-                                                <span className="font-bold">CEG EXPIRY:</span> {new Date(selectedMake.cegExpiryDate).toLocaleDateString()}
+                                                <span className="font-bold">CEC EXPIRY:</span> {(() => {
+                                                    const d = new Date(selectedMake.cecExpiryDate);
+                                                    return isNaN(d.getTime()) ? selectedMake.cecExpiryDate : d.toLocaleDateString();
+                                                })()}
                                             </div>
                                         )}
                                         {selectedMake.datasheetUrl && (
@@ -657,7 +600,7 @@ export const BatteryMasterPage: React.FC = () => {
                             <DataTable
                                 data={filteredModels}
                                 columns={modelColumns}
-                                rowKey={(row: BatteryModel) => row.uid}
+                                rowKey={(row: InverterModel) => row.uid}
                                 emptyMessage="No models found for this manufacturer"
                             />
                         )}
@@ -679,7 +622,7 @@ export const BatteryMasterPage: React.FC = () => {
                             <Input
                                 value={makeForm.make}
                                 onChange={(e) => setMakeForm({ ...makeForm, make: e.target.value })}
-                                placeholder="e.g. Tesla"
+                                placeholder="e.g. Sungrow"
                                 required
                             />
                         </div>
@@ -688,7 +631,7 @@ export const BatteryMasterPage: React.FC = () => {
                             <Input
                                 value={makeForm.shortName}
                                 onChange={(e) => setMakeForm({ ...makeForm, shortName: e.target.value })}
-                                placeholder="e.g. TSLA"
+                                placeholder="e.g. SUN"
                             />
                         </div>
                     </div>
@@ -702,17 +645,9 @@ export const BatteryMasterPage: React.FC = () => {
                         />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Declared Models</label>
-                            <Input
-                                type="number"
-                                value={makeForm.declaredModelCount}
-                                onChange={(e) => setMakeForm({ ...makeForm, declaredModelCount: parseInt(e.target.value) })}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Min Capacity (kWh)</label>
+                            <label className="text-sm font-medium">Min Capacity (kW)</label>
                             <Input
                                 type="number"
                                 step="0.1"
@@ -721,7 +656,7 @@ export const BatteryMasterPage: React.FC = () => {
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Max Capacity (kWh)</label>
+                            <label className="text-sm font-medium">Max Capacity (kW)</label>
                             <Input
                                 type="number"
                                 step="0.1"
@@ -731,23 +666,32 @@ export const BatteryMasterPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Usable Capacity (kWh)</label>
+                            <label className="text-sm font-medium">Total Capacity (kW)</label>
                             <Input
                                 type="number"
                                 step="0.1"
-                                value={makeForm.batteryUsableCapacity}
-                                onChange={(e) => setMakeForm({ ...makeForm, batteryUsableCapacity: parseFloat(e.target.value) })}
+                                value={makeForm.totalCapacity}
+                                onChange={(e) => setMakeForm({ ...makeForm, totalCapacity: parseFloat(e.target.value) })}
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Max Backup Load (kW)</label>
+                            <label className="text-sm font-medium">Usable Capacity (kW)</label>
                             <Input
                                 type="number"
                                 step="0.1"
-                                value={makeForm.maxBackupLoad}
-                                onChange={(e) => setMakeForm({ ...makeForm, maxBackupLoad: parseFloat(e.target.value) })}
+                                value={makeForm.usableCapacity}
+                                onChange={(e) => setMakeForm({ ...makeForm, usableCapacity: parseFloat(e.target.value) })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">CEC Capacity (kW)</label>
+                            <Input
+                                type="number"
+                                step="0.1"
+                                value={makeForm.cecCapacity}
+                                onChange={(e) => setMakeForm({ ...makeForm, cecCapacity: parseFloat(e.target.value) })}
                             />
                         </div>
                     </div>
@@ -756,38 +700,17 @@ export const BatteryMasterPage: React.FC = () => {
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Warranty Details</label>
                             <Input
-                                value={makeForm.batteryProdWarranty}
-                                onChange={(e) => setMakeForm({ ...makeForm, batteryProdWarranty: e.target.value })}
+                                value={makeForm.warrantyDetails}
+                                onChange={(e) => setMakeForm({ ...makeForm, warrantyDetails: e.target.value })}
                                 placeholder="e.g. 10 Years"
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">CEG Capacity (kWh)</label>
-                            <Input
-                                type="number"
-                                step="0.1"
-                                value={makeForm.cegCapacity}
-                                onChange={(e) => setMakeForm({ ...makeForm, cegCapacity: parseFloat(e.target.value) })}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Battery Total Capacity (kWh)</label>
-                            <Input
-                                type="number"
-                                step="0.1"
-                                value={makeForm.batteryCapacityKwh}
-                                onChange={(e) => setMakeForm({ ...makeForm, batteryCapacityKwh: parseFloat(e.target.value) })}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">CEG Expiry Date</label>
+                            <label className="text-sm font-medium">CEC Expiry Date</label>
                             <Input
                                 type="date"
-                                value={makeForm.cegExpiryDate}
-                                onChange={(e) => setMakeForm({ ...makeForm, cegExpiryDate: e.target.value })}
+                                value={makeForm.cecExpiryDate}
+                                onChange={(e) => setMakeForm({ ...makeForm, cecExpiryDate: e.target.value })}
                             />
                         </div>
                     </div>
@@ -802,17 +725,10 @@ export const BatteryMasterPage: React.FC = () => {
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                             <Switch
-                                checked={makeForm.cecStatus === 1}
-                                onChange={(checked) => setMakeForm({ ...makeForm, cecStatus: checked ? 1 : 0 })}
+                                checked={makeForm.isActive}
+                                onChange={(checked) => setMakeForm({ ...makeForm, isActive: checked })}
                             />
-                            <span className="text-sm">CEC Listed</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <Switch
-                                checked={makeForm.pdrsStatus === 1}
-                                onChange={(checked) => setMakeForm({ ...makeForm, pdrsStatus: checked ? 1 : 0 })}
-                            />
-                            <span className="text-sm">PDRS Active</span>
+                            <span className="text-sm">Manufacturer Active</span>
                         </label>
                     </div>
 
@@ -844,7 +760,7 @@ export const BatteryMasterPage: React.FC = () => {
             <Modal
                 isOpen={modelModalOpen}
                 onClose={() => setModelModalOpen(false)}
-                title={editingModel ? 'Edit Battery Model' : 'Add New Battery Model'}
+                title={editingModel ? 'Edit Inverter Model' : 'Add New Inverter Model'}
                 size="md"
             >
                 <form onSubmit={handleModelSubmit} className="space-y-4">
@@ -853,54 +769,43 @@ export const BatteryMasterPage: React.FC = () => {
                         <Input
                             value={modelForm.model}
                             onChange={(e) => setModelForm({ ...modelForm, model: e.target.value })}
-                            placeholder="e.g. Powerwall 2"
+                            placeholder="e.g. SG5.0RS-ADA"
                             required
                         />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Capacity (kWh)</label>
-                            <Input
-                                type="number"
-                                step="0.1"
-                                value={modelForm.capacity}
-                                onChange={(e) => setModelForm({ ...modelForm, capacity: parseFloat(e.target.value) })}
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">VPP Program</label>
-                            <Input
-                                value={modelForm.vppProgram}
-                                onChange={(e) => setModelForm({ ...modelForm, vppProgram: e.target.value })}
-                                placeholder="Optional"
-                            />
-                        </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Capacity (kW)</label>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            value={modelForm.capacity}
+                            onChange={(e) => setModelForm({ ...modelForm, capacity: parseFloat(e.target.value) })}
+                            required
+                        />
                     </div>
-                    <div className="flex gap-6 py-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={modelForm.bess2Eligible === 1}
-                                onChange={(e) => setModelForm({ ...modelForm, bess2Eligible: e.target.checked ? 1 : 0 })}
-                            />
-                            <span className="text-sm">BESS2 Eligible</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={modelForm.vpp1Eligible === 1}
-                                onChange={(e) => setModelForm({ ...modelForm, vpp1Eligible: e.target.checked ? 1 : 0 })}
-                            />
-                            <span className="text-sm">VPP1 Eligible</span>
-                        </label>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Warranty</label>
+                        <Input
+                            value={modelForm.warranty}
+                            onChange={(e) => setModelForm({ ...modelForm, warranty: e.target.value })}
+                            placeholder="e.g. 5 Years"
+                        />
                     </div>
-                    <div className="flex justify-end gap-2 pt-4">
+                    <div className="flex items-center gap-2 py-2">
+                        <Switch
+                            checked={modelForm.isActive}
+                            onChange={(checked) => setModelForm({ ...modelForm, isActive: checked })}
+                        />
+                        <span className="text-sm">Model Active</span>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-6 border-t">
                         <Button type="button" variant="outline" onClick={() => setModelModalOpen(false)}>Cancel</Button>
-                        <Button type="submit">{editingModel ? 'Update' : 'Create'}</Button>
+                        <Button type="submit">{editingModel ? 'Update Model' : 'Create Model'}</Button>
                     </div>
                 </form>
             </Modal>
+
             {/* Delete Confirmation Modal */}
             <ConfirmModal
                 isOpen={deleteConfirmOpen}
