@@ -43,6 +43,8 @@ export const USER_FIELDS = gql`
         isActive
         isDeleted
         createdAt
+        ipAddress
+        isAllowedWithoutIp
         message
     }
 `;

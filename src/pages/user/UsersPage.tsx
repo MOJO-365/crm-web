@@ -10,8 +10,9 @@ import { DataTable, type Column, Modal } from '@/components/common';
 import {
     PlusIcon, PencilIcon, TrashIcon, ShieldCheckIcon,
     // EyeIcon, EyeOffIcon, CopyIcon,
-    RefreshCwIcon
+    RefreshCwIcon, ShieldIcon, UnlockedIcon
 } from '@/components/icons';
+import { Switch } from '@/components/ui/Switch';
 import { UserPermissionsModal } from '@/components/users/UserPermissionsModal';
 import { GET_USERS, UPDATE_USER, SOFT_DELETE_USER, RESTORE_USER, GET_ROLES, CREATE_USER } from '@/graphql';
 import { formatDateTime } from '@/lib/date';
@@ -31,7 +32,8 @@ interface User {
     isActive: boolean;
     isDeleted: boolean;
     createdAt: string;
-    message?: string;
+    ipAddress?: string;
+    isAllowedWithoutIp: number;
 }
 
 interface Role {
@@ -98,6 +100,8 @@ export function UsersPage() {
         password: '',
         number: '',
         roleUid: '',
+        ipAddress: '',
+        isAllowedWithoutIp: 1, // Default to true (Allowed)
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -276,6 +280,8 @@ export function UsersPage() {
             password: '',
             number: '',
             roleUid: '',
+            ipAddress: '',
+            isAllowedWithoutIp: 1,
         });
         setErrors({});
         setUserModalOpen(true);
@@ -297,6 +303,8 @@ export function UsersPage() {
             password: user.password || '', // Prefill with actual password hash
             number: user.number || '',
             roleUid: user.roleUid || '',
+            ipAddress: user.ipAddress || '',
+            isAllowedWithoutIp: user.isAllowedWithoutIp ?? 1,
         });
         setErrors({});
         setUserModalOpen(true);
@@ -333,6 +341,8 @@ export function UsersPage() {
                             password: formData.password,
                             number: formData.number,
                             roleUid: formData.roleUid,
+                            ipAddress: formData.ipAddress || null,
+                            isAllowedWithoutIp: formData.isAllowedWithoutIp,
                         }
                     }
                 });
@@ -345,6 +355,8 @@ export function UsersPage() {
                     name: formData.name,
                     number: formData.number,
                     role_uid: formData.roleUid,
+                    ipAddress: formData.ipAddress || null,
+                    isAllowedWithoutIp: formData.isAllowedWithoutIp,
                 };
 
                 // Only update password if it has changed from the original (hash)
@@ -504,6 +516,26 @@ export function UsersPage() {
             header: 'Created on',
             width: 'w-[150px]',
             render: (user) => <span className="text-muted-foreground dark:text-gray-400">{formatDateTime(user.createdAt)}</span>,
+        },
+        {
+            key: 'ipSecurity',
+            header: 'IP Security',
+            width: 'w-[120px]',
+            render: (user) => (
+                <div className="flex items-center gap-2">
+                    {user.isAllowedWithoutIp === 0 ? (
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 px-2 py-0.5 rounded-full border border-orange-100 dark:border-orange-900/50">
+                            <ShieldIcon size={12} />
+                            <span>Restricted</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-full">
+                            <UnlockedIcon size={12} />
+                            <span>Open</span>
+                        </div>
+                    )}
+                </div>
+            ),
         },
     ];
 
@@ -836,6 +868,44 @@ export function UsersPage() {
                             placeholder="Select role"
                             containerClassName="w-full"
                         />
+                    </div>
+
+                    <div className="pt-4 border-t border-border mt-4">
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                            <ShieldCheckIcon size={16} className="text-primary" />
+                            IP Security Settings
+                        </h4>
+                        
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-gray-50 dark:bg-gray-900/50">
+                                <div>
+                                    <p className="text-sm font-medium">Allow Login Without Specific IP</p>
+                                    <p className="text-xs text-muted-foreground">If disabled, this user can only log in from the authorized IP below.</p>
+                                </div>
+                                <Switch 
+                                    checked={formData.isAllowedWithoutIp === 1}
+                                    onChange={(checked: boolean) => setFormData(prev => ({ ...prev, isAllowedWithoutIp: checked ? 1 : 0 }))}
+                                />
+                            </div>
+
+                            {formData.isAllowedWithoutIp === 0 && (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <label className="text-sm font-medium">
+                                        Authorized IP Address <span className="text-red-500 ml-1">*</span>
+                                    </label>
+                                    <Input
+                                        placeholder="e.g. 192.168.1.1"
+                                        value={formData.ipAddress}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, ipAddress: e.target.value }))}
+                                        error={formData.isAllowedWithoutIp === 0 && !formData.ipAddress ? 'IP address is required when restriction is enabled' : undefined}
+                                        autoComplete="off"
+                                    />
+                                    <p className="text-[10px] text-muted-foreground italic">
+                                        Tip: You can use "Check My IP" online to find your current address.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </Modal>

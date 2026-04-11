@@ -2,6 +2,8 @@ import { ApolloClient, InMemoryCache, ApolloLink, Observable } from '@apollo/cli
 import { print } from 'graphql';
 import axios, { AxiosError } from 'axios';
 import { getAccessToken } from '@/lib/auth';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { toast } from 'react-toastify';
 
 const getApiUrl = () => {
     const rawUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:4000');
@@ -33,10 +35,32 @@ axiosInstance.interceptors.request.use((config) => {
 axiosInstance.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
-        // Handle 401 - token expired
+        // Handle 401 - token expired or security restriction
         if (error.response?.status === 401) {
-            // Could trigger token refresh here
-            console.warn('Authentication error - token may be expired');
+            const errorData: any = error.response?.data;
+            const configData = typeof error.config?.data === 'string' ? JSON.parse(error.config.data) : error.config?.data;
+            const operationName = configData?.operationName;
+
+            // Check both standard REST error and GraphQL error formats
+            const isIpRestricted = errorData?.error === 'IP restricted' || 
+                                  errorData?.errors?.[0]?.message === 'IP restricted';
+
+            if (isIpRestricted) {
+                toast.error('Security Alert: Access denied from this IP address. Please log in from an authorized location.', {
+                    toastId: 'ip-restricted-error',
+                    autoClose: 10000
+                });
+            } else if (operationName === 'Me') {
+                // Only show session expired for the initial 'Me' query to avoid spamming
+                toast.warn('Session expired. Please log in again.', {
+                    toastId: 'auth-error',
+                });
+            }
+
+            console.warn(`Authentication error in ${operationName || 'request'} - logging out`);
+            
+            // Trigger store logout which clears tokens and redirects
+            useAuthStore.getState().logout();
         }
         return Promise.reject(error);
     }
