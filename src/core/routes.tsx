@@ -32,6 +32,8 @@ const BonusMasterPage = lazyWithRetry(() => import('@/pages/master/BonusMasterPa
 const MasterDataPage = lazyWithRetry(() => import('@/pages/master/MasterDataPage').then(m => ({ default: m.MasterDataPage })));
 const LeadsPage = lazyWithRetry(() => import('@/pages/leads/LeadsPage'));
 const BatteryMasterPage = lazyWithRetry(() => import('@/pages/master/BatteryMasterPage').then(m => ({ default: m.BatteryMasterPage })));
+const InverterMasterPage = lazyWithRetry(() => import('@/pages/master/InverterMasterPage').then(m => ({ default: m.InverterMasterPage })));
+
 
 // Loading fallback component
 const PageLoader = () => (
@@ -96,6 +98,8 @@ const router = createBrowserRouter(
                 <Route path="/customer-billing" element={<RequirePermission menuCode="customer_billing"><CustomerBillingPage /></RequirePermission>} />
                 <Route path="/bonus_master" element={<RequirePermission menuCode="bonus_master"><BonusMasterPage /></RequirePermission>} />
                 <Route path="/battery-master" element={<RequirePermission menuCode="battery_master"><BatteryMasterPage /></RequirePermission>} />
+                <Route path="/inverter-master" element={<RequirePermission menuCode="inverter_master"><InverterMasterPage /></RequirePermission>} />
+
                 <Route path="/master-data" element={<RequirePermission menuCode="document_types"><MasterDataPage /></RequirePermission>} />
 
                 {/* General authenticated routes */}

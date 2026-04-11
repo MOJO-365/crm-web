@@ -1569,3 +1569,45 @@ export const BuildingIcon = ({ size = 18, className, ...props }: IconProps) => (
         <path d="M8 14h.01" />
     </svg>
 );
+
+export const BatteryIcon = ({ size = 18, className, ...props }: IconProps) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn(className)}
+        {...props}
+    >
+        <rect width="16" height="10" x="2" y="7" rx="2" ry="2" />
+        <line x1="22" y1="11" x2="22" y2="13" />
+        <line x1="6" y1="11" x2="6" y2="13" />
+        <line x1="10" y1="11" x2="10" y2="13" />
+        <line x1="14" y1="11" x2="14" y2="13" />
+    </svg>
+);
+
+export const InverterIcon = ({ size = 18, className, ...props }: IconProps) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn(className)}
+        {...props}
+    >
+        <rect width="20" height="16" x="2" y="4" rx="2" />
+        <path d="m6 12 3-3 6 6 3-3" />
+    </svg>
+);
+
