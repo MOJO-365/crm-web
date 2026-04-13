@@ -130,7 +130,6 @@ export const BatteryMasterPage: React.FC = () => {
     const [isSavingMake, setIsSavingMake] = useState(false);
     const [isSavingModel, setIsSavingModel] = useState(false);
 
-
     // Filtering logic for Makes
     const filteredMakes = makesData?.batteryMakes?.filter((m: BatteryMake) =>
         m.make.toLowerCase().includes(makesSearch.toLowerCase())
@@ -358,11 +357,11 @@ export const BatteryMasterPage: React.FC = () => {
                 });
                 if (data?.uploadFile) {
                     if (type === 'make') {
-                        setMakeForm({ 
-                            ...makeForm, 
-                            datasheetPath: data.uploadFile.path, 
-                            datasheetUrl: data.uploadFile.url, 
-                            datasheetName: data.uploadFile.filename 
+                        setMakeForm({
+                            ...makeForm,
+                            datasheetPath: data.uploadFile.path,
+                            datasheetUrl: data.uploadFile.url,
+                            datasheetName: data.uploadFile.filename
                         });
                     }
                     toast.success('Datasheet uploaded');
@@ -493,8 +492,8 @@ export const BatteryMasterPage: React.FC = () => {
                                             {canManage && (
                                                 <div className="hidden group-hover:flex gap-1">
                                                     <button onClick={(e) => { e.stopPropagation(); handleOpenMakeModal(m); }} className="p-1 hover:text-primary"><PencilIcon size={14} /></button>
-                                                    <button 
-                                                        onClick={(e) => { e.stopPropagation(); handleDeleteMake(m); }} 
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteMake(m); }}
                                                         className="p-1 text-red-500 hover:text-red-700 transition-colors"
                                                     >
                                                         <TrashIcon size={14} />
