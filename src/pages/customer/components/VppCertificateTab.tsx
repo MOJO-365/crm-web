@@ -7,7 +7,7 @@ import { Select } from '@/components/ui/Select';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Modal } from '@/components/common';
 import { apiAxios } from '@/lib/apollo';
-import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES } from '@/graphql';
+import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES, GET_INVERTER_MAKES } from '@/graphql';
 import { FileTextIcon, ZapIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon } from '@/components/icons';
 
 interface VppCertificateTabProps {
@@ -70,6 +70,7 @@ export function VppCertificateTab({
     });
 
     const { data: makesData } = useQuery(GET_BATTERY_MAKES);
+    const { data: inverterMakesData } = useQuery(GET_INVERTER_MAKES);
 
     const handleManufacturerChange = (field: 'batteryManufacturer' | 'inverterManufacturer', value: string) => {
         setFormState(prev => ({
@@ -80,6 +81,11 @@ export function VppCertificateTab({
     };
 
     const batteryMakeOptions = makesData?.batteryMakes?.filter((m: any) => m.productStatus === 1).map((m: any) => ({
+        value: m.make,
+        label: m.make
+    })) || [];
+
+    const inverterMakeOptions = inverterMakesData?.inverterMakes?.filter((m: any) => m.productStatus === 1).map((m: any) => ({
         value: m.make,
         label: m.make
     })) || [];
@@ -389,7 +395,7 @@ export function VppCertificateTab({
                                     <Select
                                         value={formState.inverterManufacturer}
                                         onChange={(v: any) => handleManufacturerChange('inverterManufacturer', v as string)}
-                                        options={batteryMakeOptions}
+                                        options={inverterMakeOptions}
                                         placeholder="Select brand"
                                         creatable
                                     />
