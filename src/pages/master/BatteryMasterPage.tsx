@@ -127,6 +127,8 @@ export const BatteryMasterPage: React.FC = () => {
         message: string;
     } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isSavingMake, setIsSavingMake] = useState(false);
+    const [isSavingModel, setIsSavingModel] = useState(false);
 
 
     // Filtering logic for Makes
@@ -202,6 +204,7 @@ export const BatteryMasterPage: React.FC = () => {
 
     const handleMakeSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsSavingMake(true);
         try {
             // Clean up input payload
             const inputPayload = {
@@ -226,6 +229,8 @@ export const BatteryMasterPage: React.FC = () => {
             console.error('Submit error:', error);
             const message = error.graphQLErrors?.[0]?.message || error.message || 'Action failed';
             toast.error(message);
+        } finally {
+            setIsSavingMake(false);
         }
     };
 
@@ -301,6 +306,7 @@ export const BatteryMasterPage: React.FC = () => {
     const handleModelSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedMake) return;
+        setIsSavingModel(true);
         try {
             if (editingModel) {
                 const res = await updateModel({ variables: { uid: editingModel.uid, input: modelForm } });
@@ -317,6 +323,8 @@ export const BatteryMasterPage: React.FC = () => {
             console.error('Submit error:', error);
             const message = error.graphQLErrors?.[0]?.message || error.message || 'Action failed';
             toast.error(message);
+        } finally {
+            setIsSavingModel(false);
         }
     };
 
@@ -834,8 +842,8 @@ export const BatteryMasterPage: React.FC = () => {
                     </div>
 
                     <div className="flex justify-end gap-2 pt-6 border-t">
-                        <Button type="button" variant="outline" onClick={() => setMakeModalOpen(false)}>Cancel</Button>
-                        <Button type="submit">{editingMake ? 'Update Manufacturer' : 'Create Manufacturer'}</Button>
+                        <Button type="button" variant="outline" onClick={() => setMakeModalOpen(false)} disabled={isSavingMake}>Cancel</Button>
+                        <Button type="submit" isLoading={isSavingMake}>{editingMake ? 'Update Manufacturer' : 'Create Manufacturer'}</Button>
                     </div>
                 </form>
             </Modal>
@@ -896,8 +904,8 @@ export const BatteryMasterPage: React.FC = () => {
                         </label>
                     </div>
                     <div className="flex justify-end gap-2 pt-4">
-                        <Button type="button" variant="outline" onClick={() => setModelModalOpen(false)}>Cancel</Button>
-                        <Button type="submit">{editingModel ? 'Update' : 'Create'}</Button>
+                        <Button type="button" variant="outline" onClick={() => setModelModalOpen(false)} disabled={isSavingModel}>Cancel</Button>
+                        <Button type="submit" isLoading={isSavingModel}>{editingModel ? 'Update' : 'Create'}</Button>
                     </div>
                 </form>
             </Modal>
