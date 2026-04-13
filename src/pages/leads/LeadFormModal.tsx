@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useLazyQuery } from '@apollo/client';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/common';
-import { GET_LEAD, CREATE_LEAD, UPDATE_LEAD, GET_LEADS, GET_LEAD_SOURCES, CREATE_LEAD_SOURCE } from '@/graphql';
+import { GET_LEAD, CREATE_LEAD, UPDATE_LEAD, GET_LEADS, GET_LEAD_SOURCES, CREATE_LEAD_SOURCE, CHECK_ADDRESS_EXISTS, CHECK_NMI_EXISTS } from '@/graphql';
 import { TITLE_OPTIONS } from '@/lib/constants';
 import LocationAutocomplete from '../LocationAutocomplete';
 import { PlusIcon } from '@/components/icons';
@@ -60,6 +60,10 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
     const [addressSearch, setAddressSearch] = useState('');
     const [isAddingNewSourceInline, setIsAddingNewSourceInline] = useState(false);
     const [newSourceName, setNewSourceName] = useState('');
+    const [duplicateErrors, setDuplicateErrors] = useState<{ address?: string; nmi?: string }>({});
+
+    const [checkAddressExists] = useLazyQuery(CHECK_ADDRESS_EXISTS);
+    const [checkNmiExists] = useLazyQuery(CHECK_NMI_EXISTS);
 
     const { data, loading } = useQuery(GET_LEAD, {
         variables: { uid },
@@ -75,7 +79,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 firstname: lead.firstname || '',
                 lastname: lead.lastname || '',
                 email: lead.email || '',
-                number: lead.number || '',
+                number: (lead.number || '').replace(/\D/g, '').replace(/^0/, '').substring(0, 9),
                 source: lead.source || '',
                 notes: lead.notes || '',
                 unitnumber: lead.unitnumber || '',
@@ -163,8 +167,80 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
         value: s.name
     })) || [];
 
+    const checkAddressDuplicate = async (addressData: {
+        unitNumber?: string;
+        streetNumber: string;
+        streetName: string;
+        streetType: string;
+        suburb: string;
+        postcode: string;
+        state?: string;
+        country?: string;
+    }) => {
+        if (isEditMode) return;
+        if (!addressData.streetNumber || !addressData.streetName || !addressData.suburb || !addressData.postcode) {
+            setDuplicateErrors(prev => ({ ...prev, address: undefined }));
+            return;
+        }
+
+        try {
+            const { data } = await checkAddressExists({
+                variables: {
+                    address: {
+                        unitNumber: addressData.unitNumber || undefined,
+                        streetNumber: addressData.streetNumber,
+                        streetName: addressData.streetName,
+                        streetType: addressData.streetType || undefined,
+                        suburb: addressData.suburb,
+                        postcode: addressData.postcode,
+                        state: addressData.state || undefined,
+                        country: addressData.country || undefined,
+                    }
+                }
+            });
+            if (data?.checkAddressExists) {
+                const existing = data.checkAddressExists;
+                setDuplicateErrors(prev => ({
+                    ...prev,
+                    address: `Address already exists: ${existing.firstName} ${existing.lastName} (${existing.customerId})`
+                }));
+            } else {
+                setDuplicateErrors(prev => ({ ...prev, address: undefined }));
+            }
+        } catch (err) {
+            console.error('Address check failed:', err);
+        }
+    };
+
+    const checkNmiDuplicate = async (nmi: string) => {
+        if (isEditMode) return;
+        if (!nmi || nmi.length < 10) {
+            setDuplicateErrors(prev => ({ ...prev, nmi: undefined }));
+            return;
+        }
+
+        try {
+            const { data } = await checkNmiExists({ variables: { nmi } });
+            if (data?.checkNmiExists) {
+                const existing = data.checkNmiExists;
+                setDuplicateErrors(prev => ({
+                    ...prev,
+                    nmi: `NMI already exists: ${existing.firstName} ${existing.lastName} (${existing.customerId})`
+                }));
+            } else {
+                setDuplicateErrors(prev => ({ ...prev, nmi: undefined }));
+            }
+        } catch (err) {
+            console.error('NMI check failed:', err);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (duplicateErrors.address || duplicateErrors.nmi) {
+            toast.error('Please resolve duplicate entries before saving');
+            return;
+        }
         try {
             if (isEditMode) {
                 await updateLead({
@@ -185,6 +261,31 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
+        
+        if (name === 'number') {
+            // Remove any non-numeric characters
+            let val = value.replace(/\D/g, '');
+            
+            // Should not start with 0
+            if (val.startsWith('0')) {
+                val = val.substring(1);
+            }
+            
+            // Should not exceed 9 digits
+            if (val.length > 9) {
+                val = val.substring(0, 9);
+            }
+            
+            setFormData(prev => ({ ...prev, [name]: val }));
+            return;
+        }
+
+        if (name === 'nmi') {
+            if (duplicateErrors.nmi) {
+                setDuplicateErrors(prev => ({ ...prev, nmi: undefined }));
+            }
+        }
+
         const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
         setFormData(prev => ({ ...prev, [name]: val }));
     };
@@ -247,6 +348,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                             value={formData.number}
                                             onChange={handleChange}
                                             required
+                                            maxLength={9}
                                             className="rounded-l-none rounded-r-md"
                                             placeholder="400 000 000"
                                         />
@@ -307,15 +409,19 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
 
                             {/* Row 3: Address Search & NMI */}
                             <div className="md:col-span-2">
-                                <Field label="Search Address" hint="Start typing to verify address">
+                                <Field label="Search Address" hint="Start typing to verify address" error={duplicateErrors.address}>
                                     <LocationAutocomplete
                                         value={addressSearch}
-                                        onChange={setAddressSearch}
+                                        onChange={(val) => {
+                                            setAddressSearch(val);
+                                            if (duplicateErrors.address) {
+                                                setDuplicateErrors(prev => ({ ...prev, address: undefined }));
+                                            }
+                                        }}
                                         zIndexClass="z-[10001]"
                                         onSelect={(place) => {
                                             setAddressSearch(place.address);
-                                            setFormData(prev => ({
-                                                ...prev,
+                                            const newAddressData = {
                                                 unitnumber: place.unitNumber || '',
                                                 streetnumber: place.streetNumber || '',
                                                 streetname: place.streetName || '',
@@ -324,15 +430,38 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                                 state: place.state || '',
                                                 postcode: place.postcode || '',
                                                 country: place.country || 'Australia',
+                                            };
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                ...newAddressData
                                             }));
+
+                                            // Check for duplicate address
+                                            checkAddressDuplicate({
+                                                unitNumber: place.unitNumber || '',
+                                                streetNumber: place.streetNumber || '',
+                                                streetName: place.streetName || '',
+                                                streetType: place.streetType || '',
+                                                suburb: place.suburb || '',
+                                                state: place.state || '',
+                                                postcode: place.postcode || '',
+                                                country: place.country || 'Australia',
+                                            });
                                         }}
                                         placeholder="Start typing address..."
                                     />
                                 </Field>
                             </div>
                             <div className="md:col-span-1">
-                                <Field label="NMI">
-                                    <Input name="nmi" value={formData.nmi} onChange={handleChange} maxLength={11} placeholder="NMI number" />
+                                <Field label="NMI" error={duplicateErrors.nmi}>
+                                    <Input 
+                                        name="nmi" 
+                                        value={formData.nmi} 
+                                        onChange={handleChange} 
+                                        onBlur={() => checkNmiDuplicate(formData.nmi)}
+                                        maxLength={11} 
+                                        placeholder="NMI number" 
+                                    />
                                 </Field>
                             </div>
 
