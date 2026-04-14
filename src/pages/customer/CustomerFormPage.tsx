@@ -122,6 +122,9 @@ const initialFormData: CustomerFormData = {
     showAsBusinessName: false,
     showName: true,
     unitNumber: '',
+    houseNumber: '',
+    buildingName: '',
+    floorLevelNumber: '',
     streetNumber: '',
     streetName: '',
     streetType: '',
@@ -795,6 +798,9 @@ export const CustomerFormPage = () => {
                 showAsBusinessName: c.showAsBusinessName || false,
                 showName: c.showName ?? true,
                 unitNumber: c.address?.unitNumber || '',
+                houseNumber: c.address?.houseNumber || '',
+                buildingName: c.address?.buildingName || '',
+                floorLevelNumber: c.address?.floorLevelNumber || '',
                 streetNumber: c.address?.streetNumber || '',
                 streetName: c.address?.streetName || '',
                 streetType: c.address?.streetType || '',
@@ -892,6 +898,9 @@ export const CustomerFormPage = () => {
                     variables: {
                         address: {
                             unitNumber: formData.unitNumber || undefined,
+                            houseNumber: formData.houseNumber || undefined,
+                            buildingName: formData.buildingName || undefined,
+                            floorLevelNumber: formData.floorLevelNumber || undefined,
                             streetNumber: formData.streetNumber,
                             streetName: formData.streetName,
                             streetType: formData.streetType || undefined,
@@ -2041,6 +2050,9 @@ export const CustomerFormPage = () => {
                                                         setAddressSearch(place.address);
                                                         const newAddressData = {
                                                             unitNumber: place.unitNumber || '',
+                                                            houseNumber: place.houseNumber || '',
+                                                            buildingName: place.buildingName || '',
+                                                            floorLevelNumber: place.floorLevelNumber || '',
                                                             streetNumber: place.streetNumber || '',
                                                             streetName: place.streetName || '',
                                                             streetType: place.streetType || '',
@@ -2077,14 +2089,35 @@ export const CustomerFormPage = () => {
 
                                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-xl border border-border">
                                             <div className="col-span-2 lg:col-span-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Detailed Breakdown</div>
-                                            <Input label="Unit No." disabled className="bg-background" value={formData.unitNumber} onChange={(e) => updateField('unitNumber', e.target.value)} onBlur={() => handleBlur('unitNumber')} placeholder="e.g. 5" />
-                                            <Input label="Street No." disabled required error={errors.streetNumber} className="bg-background" value={formData.streetNumber} onChange={(e) => updateField('streetNumber', e.target.value)} onBlur={() => handleBlur('streetNumber')} placeholder="e.g. 123" />
-                                            <Input label="Street Name" disabled required error={errors.streetName} className="bg-background" value={formData.streetName} onChange={(e) => updateField('streetName', e.target.value)} onBlur={() => handleBlur('streetName')} placeholder="e.g. Smith" />
+                                            <Input label="Unit No." disabled className="bg-background font-medium" value={formData.unitNumber} onChange={(e) => updateField('unitNumber', e.target.value)} onBlur={() => handleBlur('unitNumber')} placeholder="e.g. 5" />
+                                            <Input label="House No." disabled className="bg-background font-medium" value={formData.houseNumber} onChange={(e) => updateField('houseNumber', e.target.value)} onBlur={() => handleBlur('houseNumber')} placeholder="e.g. 10A" />
+                                            <Input label="Building Name" disabled className="bg-background font-medium" value={formData.buildingName} onChange={(e) => updateField('buildingName', e.target.value)} onBlur={() => handleBlur('buildingName')} placeholder="e.g. Eureka Tower" />
+                                            <Input label="Floor/Level" disabled className="bg-background font-medium" value={formData.floorLevelNumber} onChange={(e) => updateField('floorLevelNumber', e.target.value)} onBlur={() => handleBlur('floorLevelNumber')} placeholder="e.g. 25" />
+                                            <Input label="Street No." disabled required error={errors.streetNumber} className="bg-background font-medium" value={formData.streetNumber} onChange={(e) => updateField('streetNumber', e.target.value)} onBlur={() => handleBlur('streetNumber')} placeholder="e.g. 123" />
+                                            <Input label="Street Name" disabled required error={errors.streetName} className="bg-background font-medium" value={formData.streetName} onChange={(e) => updateField('streetName', e.target.value)} onBlur={() => handleBlur('streetName')} placeholder="e.g. Smith" />
                                             <Select label="Type" disabled options={streetTypeOptions} value={formData.streetType} onChange={(val) => updateField('streetType', val)} placeholder="Type" />
-                                            <Input label="Suburb" disabled required error={errors.suburb} className="bg-background" value={formData.suburb} onChange={(e) => updateField('suburb', e.target.value)} onBlur={() => handleBlur('suburb')} placeholder="e.g. Collingwood" />
+                                            <Input label="Suburb" disabled required error={errors.suburb} className="bg-background font-medium" value={formData.suburb} onChange={(e) => updateField('suburb', e.target.value)} onBlur={() => handleBlur('suburb')} placeholder="e.g. Collingwood" />
                                             <Select label="State" disabled options={STATE_OPTIONS} value={formData.state} onChange={(val) => updateField('state', val as string)} placeholder="State" />
-                                            <Input label="Postcode" disabled required error={errors.postcode} className="bg-background" value={formData.postcode} onChange={(e) => updateField('postcode', e.target.value)} onBlur={() => handleBlur('postcode')} maxLength={4} placeholder="e.g. 3066" />
-                                            <Input label="Country" disabled className="bg-background" value={formData.country} onChange={(e) => updateField('country', e.target.value)} />
+                                            <Input label="Postcode" disabled required error={errors.postcode} className="bg-background font-medium" value={formData.postcode} onChange={(e) => updateField('postcode', e.target.value)} onBlur={() => handleBlur('postcode')} maxLength={4} placeholder="e.g. 3066" />
+                                            <Input label="Country" disabled className="bg-background font-medium" value={formData.country} onChange={(e) => updateField('country', e.target.value)} />
+
+                                            {/* <div className="col-span-2 lg:col-span-4 mt-2 pt-3 border-t border-border/50">
+                                                <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1 flex items-center gap-1.5 leading-none">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                                    Formatted Address Preview
+                                                </div>
+                                                <div className="text-sm font-medium text-foreground bg-primary/5 py-3 px-4 rounded-lg border border-primary/10 shadow-sm transition-all duration-200 hover:bg-primary/10">
+                                                    {[
+                                                        formData.buildingName,
+                                                        formData.unitNumber ? (formData.unitNumber.toLowerCase().includes('level') || formData.unitNumber.toLowerCase().includes('floor') ? formData.unitNumber : `Unit ${formData.unitNumber}`) : '',
+                                                        formData.floorLevelNumber && formData.floorLevelNumber !== formData.unitNumber ? (formData.floorLevelNumber.toLowerCase().includes('level') || formData.floorLevelNumber.toLowerCase().includes('floor') ? formData.floorLevelNumber : `Level ${formData.floorLevelNumber}`) : '',
+                                                        formData.houseNumber && formData.houseNumber !== formData.streetNumber ? formData.houseNumber : '',
+                                                        [formData.streetNumber, formData.streetName, formData.streetType].filter(Boolean).join(' '),
+                                                        `${formData.suburb} ${formData.state} ${formData.postcode}`.trim(),
+                                                        formData.country
+                                                    ].filter(Boolean).join(', ')}
+                                                </div>
+                                            </div> */}
                                         </div>
 
 
@@ -2946,27 +2979,24 @@ export const CustomerFormPage = () => {
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4 mb-4">
-                            <div className={`p-3 rounded-md flex items-start gap-2 mb-2 border ${
-                                emailPreview?.isCustom 
-                                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/50" 
+                            <div className={`p-3 rounded-md flex items-start gap-2 mb-2 border ${emailPreview?.isCustom
+                                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/50"
                                     : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-900/50"
-                            }`}>
+                                }`}>
                                 {emailPreview?.isCustom ? (
                                     <CheckCircleIcon size={18} className="text-green-600 dark:text-green-400 mt-0.5" />
                                 ) : (
                                     <MailIcon size={18} className="text-amber-600 dark:text-amber-400 mt-0.5" />
                                 )}
                                 <div>
-                                    <p className={`text-sm font-medium ${
-                                        emailPreview?.isCustom ? "text-green-800 dark:text-green-300" : "text-amber-800 dark:text-amber-300"
-                                    }`}>
+                                    <p className={`text-sm font-medium ${emailPreview?.isCustom ? "text-green-800 dark:text-green-300" : "text-amber-800 dark:text-amber-300"
+                                        }`}>
                                         {emailPreview?.isCustom ? "Dynamic Template In Use" : "Default Template Notice"}
                                     </p>
-                                    <p className={`text-xs ${
-                                        emailPreview?.isCustom ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400"
-                                    }`}>
-                                        {emailPreview?.isCustom 
-                                            ? "This is your custom dynamic template that is currently assigned to this event." 
+                                    <p className={`text-xs ${emailPreview?.isCustom ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400"
+                                        }`}>
+                                        {emailPreview?.isCustom
+                                            ? "This is your custom dynamic template that is currently assigned to this event."
                                             : "This is the default system template that will be sent to the customer for this event."}
                                     </p>
                                 </div>

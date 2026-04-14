@@ -46,6 +46,9 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
         source: '',
         notes: '',
         unitnumber: '',
+        housenumber: '',
+        buildingname: '',
+        floorlevelnumber: '',
         streetnumber: '',
         streetname: '',
         streettype: '',
@@ -83,6 +86,9 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 source: lead.source || '',
                 notes: lead.notes || '',
                 unitnumber: lead.unitnumber || '',
+                housenumber: lead.housenumber || '',
+                buildingname: lead.buildingname || '',
+                floorlevelnumber: lead.floorlevelnumber || '',
                 streetnumber: lead.streetnumber || '',
                 streetname: lead.streetname || '',
                 streettype: lead.streettype || '',
@@ -98,6 +104,9 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
             // Set address search string
             const fullAddr = [
                 lead.unitnumber ? `Unit ${lead.unitnumber}` : '',
+                lead.buildingname,
+                lead.floorlevelnumber ? `Level ${lead.floorlevelnumber}` : '',
+                lead.housenumber,
                 lead.streetnumber,
                 lead.streetname,
                 lead.streettype,
@@ -117,6 +126,9 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 source: '',
                 notes: '',
                 unitnumber: '',
+                housenumber: '',
+                buildingname: '',
+                floorlevelnumber: '',
                 streetnumber: '',
                 streetname: '',
                 streettype: '',
@@ -169,6 +181,9 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
 
     const checkAddressDuplicate = async (addressData: {
         unitNumber?: string;
+        houseNumber?: string;
+        buildingName?: string;
+        floorLevelNumber?: string;
         streetNumber: string;
         streetName: string;
         streetType: string;
@@ -188,6 +203,9 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 variables: {
                     address: {
                         unitNumber: addressData.unitNumber || undefined,
+                        houseNumber: addressData.houseNumber || undefined,
+                        buildingName: addressData.buildingName || undefined,
+                        floorLevelNumber: addressData.floorLevelNumber || undefined,
                         streetNumber: addressData.streetNumber,
                         streetName: addressData.streetName,
                         streetType: addressData.streetType || undefined,
@@ -261,21 +279,21 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
-        
+
         if (name === 'number') {
             // Remove any non-numeric characters
             let val = value.replace(/\D/g, '');
-            
+
             // Should not start with 0
             if (val.startsWith('0')) {
                 val = val.substring(1);
             }
-            
+
             // Should not exceed 9 digits
             if (val.length > 9) {
                 val = val.substring(0, 9);
             }
-            
+
             setFormData(prev => ({ ...prev, [name]: val }));
             return;
         }
@@ -423,6 +441,9 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                             setAddressSearch(place.address);
                                             const newAddressData = {
                                                 unitnumber: place.unitNumber || '',
+                                                housenumber: place.houseNumber || '',
+                                                buildingname: place.buildingName || '',
+                                                floorlevelnumber: place.floorLevelNumber || '',
                                                 streetnumber: place.streetNumber || '',
                                                 streetname: place.streetName || '',
                                                 streettype: place.streetType || '',
@@ -439,6 +460,9 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                             // Check for duplicate address
                                             checkAddressDuplicate({
                                                 unitNumber: place.unitNumber || '',
+                                                houseNumber: place.houseNumber || '',
+                                                buildingName: place.buildingName || '',
+                                                floorLevelNumber: place.floorLevelNumber || '',
                                                 streetNumber: place.streetNumber || '',
                                                 streetName: place.streetName || '',
                                                 streetType: place.streetType || '',
@@ -454,13 +478,13 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                             </div>
                             <div className="md:col-span-1">
                                 <Field label="NMI" error={duplicateErrors.nmi}>
-                                    <Input 
-                                        name="nmi" 
-                                        value={formData.nmi} 
-                                        onChange={handleChange} 
+                                    <Input
+                                        name="nmi"
+                                        value={formData.nmi}
+                                        onChange={handleChange}
                                         onBlur={() => checkNmiDuplicate(formData.nmi)}
-                                        maxLength={11} 
-                                        placeholder="NMI number" 
+                                        maxLength={11}
+                                        placeholder="NMI number"
                                     />
                                 </Field>
                             </div>
@@ -481,6 +505,18 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Unit No.</label>
                                         <Input disabled value={formData.unitnumber || '-'} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">House No.</label>
+                                        <Input disabled value={formData.housenumber || '-'} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Building</label>
+                                        <Input disabled value={formData.buildingname || '-'} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Floor/Level</label>
+                                        <Input disabled value={formData.floorlevelnumber || '-'} />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">St. No.</label>
@@ -506,6 +542,28 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                         <label className="text-sm font-medium">Postcode</label>
                                         <Input disabled value={formData.postcode || '-'} />
                                     </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Country</label>
+                                        <Input disabled value={formData.country || '-'} />
+                                    </div>
+
+                                    {/* <div className="md:col-span-4 mt-2 pt-3 border-t border-border/50">
+                                        <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1 flex items-center gap-1.5 leading-none">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                            Formatted Address Preview
+                                        </div>
+                                        <div className="text-sm font-medium text-foreground bg-primary/5 py-3 px-4 rounded-lg border border-primary/10 shadow-sm transition-all duration-200 hover:bg-primary/10">
+                                            {[
+                                                formData.buildingname,
+                                                formData.unitnumber ? (formData.unitnumber.toLowerCase().includes('level') || formData.unitnumber.toLowerCase().includes('floor') ? formData.unitnumber : `Unit ${formData.unitnumber}`) : '',
+                                                formData.floorlevelnumber && formData.floorlevelnumber !== formData.unitnumber ? (formData.floorlevelnumber.toLowerCase().includes('level') || formData.floorlevelnumber.toLowerCase().includes('floor') ? formData.floorlevelnumber : `Level ${formData.floorlevelnumber}`) : '',
+                                                formData.housenumber && formData.housenumber !== formData.streetnumber ? formData.housenumber : '',
+                                                [formData.streetnumber, formData.streetname, formData.streettype].filter(Boolean).join(' '),
+                                                `${formData.suburb} ${formData.state} ${formData.postcode}`.trim(),
+                                                formData.country
+                                            ].filter(Boolean).join(', ')}
+                                        </div>
+                                    </div> */}
                                 </div>
                             </div>
                         </div>

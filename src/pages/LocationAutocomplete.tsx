@@ -17,6 +17,9 @@ type Props = {
         suburb?: string;
         postcode?: string;
         unitNumber?: string;
+        houseNumber?: string;
+        buildingName?: string;
+        floorLevelNumber?: string;
         streetNumber?: string;
         streetName?: string;
         streetType?: string;
@@ -43,7 +46,7 @@ export default function LocationAutocomplete({
     onSelect,
     placeholder = 'Start typing address',
     countries = ['au'],
-    types = ['geocode'],
+    types = ['geocode', 'establishment'],
     zIndexClass = 'z-50',
     label,
     error,
@@ -164,19 +167,72 @@ export default function LocationAutocomplete({
         const state = byType('administrative_area_level_1', 'short_name');
         const suburb = byType('locality') || byType('sublocality') || byType('postal_town');
         const postcode = byType('postal_code');
-        const unitNumber = byType('subpremise');
+        const rawSubpremise = byType('subpremise');
+        const premiseFromComponents = byType('premise');
         const streetNumber = byType('street_number');
         const route = byType('route');
         const routeParts = route.trim().split(/\s+/).filter(Boolean);
         const streetType = routeParts.length > 1 ? routeParts[routeParts.length - 1] : '';
         const streetName = routeParts.length > 1 ? routeParts.slice(0, -1).join(' ') : route;
-        const country = byType('country', 'short_name') || byType('country');
+        const country = byType('country', 'short_name') || 'AU';
+
+        // Parse subpremise: could be a unit ("5"), a level ("level 25"), or combined ("level 25/unit 5")
+        let unitNumber = '';
+        let floorLevelNumber = '';
+        if (rawSubpremise) {
+            const lower = rawSubpremise.toLowerCase();
+            if (lower.startsWith('level') || lower.startsWith('floor') || lower.startsWith('lvl') || lower.startsWith('l ')) {
+                // It's a floor/level identifier
+                floorLevelNumber = rawSubpremise;
+            } else if (lower.includes('/')) {
+                // Could be "level 25/unit 5" or "25/5"
+                const parts = rawSubpremise.split('/');
+                for (const part of parts) {
+                    const p = part.trim().toLowerCase();
+                    if (p.startsWith('level') || p.startsWith('floor') || p.startsWith('lvl')) {
+                        floorLevelNumber = part.trim();
+                    } else {
+                        unitNumber = part.trim();
+                    }
+                }
+            } else {
+                // Plain number like "5" — treat as unit number
+                unitNumber = rawSubpremise;
+            }
+        }
+
+        // Building name: use premise component, or fall back to place.name for establishments
+        let buildingName = premiseFromComponents;
+        if (!buildingName && place.name) {
+            // Check if the place name is NOT just the street address (e.g., "Eureka Tower" vs "7 Riverside Quay")
+            const placeTypes = place.types || [];
+            const isEstablishment = placeTypes.some(t =>
+                ['premise', 'establishment', 'point_of_interest', 'shopping_mall', 'lodging', 'real_estate_agency'].includes(t)
+            );
+            if (isEstablishment) {
+                buildingName = place.name;
+            } else if (place.name && place.formatted_address && !place.formatted_address.startsWith(place.name)) {
+                // The name is different from the formatted address start — likely a building name
+                buildingName = place.name;
+            }
+        }
+
+        // Log for debugging
+        console.log('[LocationAutocomplete] Parsed:', {
+            rawSubpremise, premiseFromComponents, placeName: place.name, placeTypes: place.types,
+            unitNumber, floorLevelNumber, buildingName, streetNumber, streetName, streetType,
+            suburb, state, postcode, country
+        });
+
         const loc = place.geometry?.location;
         return {
             state,
             suburb,
             postcode,
             unitNumber,
+            houseNumber: streetNumber,
+            buildingName,
+            floorLevelNumber,
             streetNumber,
             streetName,
             streetType,
@@ -196,6 +252,9 @@ export default function LocationAutocomplete({
                 address: p.description,
                 placeId: p.place_id,
                 unitNumber: '',
+                houseNumber: '',
+                buildingName: '',
+                floorLevelNumber: '',
                 streetNumber: '',
                 streetName: '',
                 streetType: '',
@@ -210,7 +269,7 @@ export default function LocationAutocomplete({
         psRef.current.getDetails(
             {
                 placeId: p.place_id,
-                fields: ['formatted_address', 'address_components', 'geometry', 'place_id'],
+                fields: ['formatted_address', 'address_components', 'geometry', 'place_id', 'name', 'types'],
                 sessionToken: tokenRef.current || undefined,
             },
             (place: any, status: any) => {

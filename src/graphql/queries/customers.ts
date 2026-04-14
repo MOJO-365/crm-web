@@ -148,6 +148,9 @@ export const GET_CUSTOMERS = gql`
                     id
                     customerUid
                     unitNumber
+                    houseNumber
+                    buildingName
+                    floorLevelNumber
                     streetNumber
                     streetName
                     streetType
@@ -317,6 +320,9 @@ export const GET_CUSTOMERS_LIST = gql`
                     id
                     customerUid
                     unitNumber
+                    houseNumber
+                    buildingName
+                    floorLevelNumber
                     streetNumber
                     streetName
                     streetType
@@ -505,6 +511,9 @@ export const GET_CUSTOMER_BY_ID = gql`
                 id
                 customerUid
                 unitNumber
+                houseNumber
+                buildingName
+                floorLevelNumber
                 streetNumber
                 streetName
                 streetType
@@ -674,6 +683,9 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 id
                 customerUid
                 unitNumber
+                houseNumber
+                buildingName
+                floorLevelNumber
                 streetNumber
                 streetName
                 streetType
@@ -1192,6 +1204,9 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
                 id
                 customerUid
                 unitNumber
+                houseNumber
+                buildingName
+                floorLevelNumber
                 streetNumber
                 streetName
                 streetType

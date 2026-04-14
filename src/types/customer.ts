@@ -19,6 +19,9 @@ export interface CustomerFormData {
 
     // Address
     unitNumber: string;
+    houseNumber: string;
+    buildingName: string;
+    floorLevelNumber: string;
     streetNumber: string;
     streetName: string;
     streetType: string;
