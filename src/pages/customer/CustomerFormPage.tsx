@@ -45,7 +45,9 @@ import {
     ShieldCheckIcon,
     DownloadIcon,
     MailIcon,
-    CheckCircleIcon
+    CheckCircleIcon,
+    SearchIcon,
+    SpinnerIcon
 } from '@/components/icons';
 import { sendVerification, checkVerification } from '@/lib/twilio';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
@@ -570,7 +572,9 @@ export const CustomerFormPage = () => {
     // Duplicate check state
     const [duplicateErrors, setDuplicateErrors] = useState<{ address?: string; nmi?: string }>({});
     const [addressSearch, setAddressSearch] = useState('');
-
+    const [isNmiLookupLoading, setIsNmiLookupLoading] = useState(false);
+    const [nmiOptions, setNmiOptions] = useState<any[]>([]);
+    const [isNmiModalOpen, setIsNmiModalOpen] = useState(false);
     // Rate plans
     const [selectedRatePlan, setSelectedRatePlan] = useState<RatePlan | null>(null);
     const [isCustomDiscountMode, setIsCustomDiscountMode] = useState(false);
@@ -1008,6 +1012,92 @@ export const CustomerFormPage = () => {
             }
         } catch (err) {
             console.error('NMI check failed:', err);
+        }
+    };
+
+    const autoSelectTariff = (selectedTariff: string) => {
+        if (!selectedTariff || !tariffOptions?.length) return;
+
+        const matchedTariff = tariffOptions.find((opt: any) =>
+            opt?.value?.toLowerCase() === selectedTariff.toLowerCase() ||
+            opt?.value?.toLowerCase().includes(selectedTariff.toLowerCase()) ||
+            opt?.label?.toLowerCase().includes(selectedTariff.toLowerCase())
+        );
+
+        if (matchedTariff) {
+            updateField('tariffCode', matchedTariff.value);
+            handleTariffChange(matchedTariff.value);
+        } else {
+            console.warn('⚠️ No matching tariff found for:', selectedTariff);
+            // optional:
+            // toast.warning(`Tariff ${selectedTariff} not found`);
+        }
+    };
+
+    const handleNmiLookup = async () => {
+        try {
+            setIsNmiLookupLoading(true);
+
+            const body = {
+                jurisdictionCode: formData.state || 'NSW',
+                stateOrTerritory: formData.state || 'NSW',
+                postcode: formData.postcode || '',
+                houseNumber: formData.houseNumber || formData.streetNumber || '',
+                streetName: formData.streetName || '',
+                StreetType: formData.streetType || '',
+                SuburbOrPlaceOrLocality: formData.suburb || ''
+            };
+
+            const response = await fetch(`${import.meta.env.VITE_MSAT_API_URL}/api/nmi-lookup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const data = await response.json();
+
+            // ✅ Multiple NMIs → open modal
+            if (Array.isArray(data?.results) && data.results.length > 1) {
+                setNmiOptions(data.results);
+                setIsNmiModalOpen(true);
+                return;
+            }
+
+            // ✅ Extract NMI + Tariff
+            const item =
+                data?.results?.[0] ||
+                data?.data?.[0] ||
+                data?.data ||
+                data;
+
+            const nmi =
+                item?.nmi ||
+                data?.nmi ||
+                data?.nationalMeterIdentifier ||
+                (typeof data === 'string' ? data : null);
+
+            const tariff = item?.network?.tariff;
+
+            if (nmi) {
+                updateField('nmi', nmi);
+                checkNmiDuplicate(nmi);
+
+                // ✅ Auto tariff match
+                if (tariff) {
+                    autoSelectTariff(tariff);
+                }
+
+                toast.success('NMI successfully found');
+            } else {
+                console.log('❌ NMI Lookup Response:', data);
+                toast.error('NMI not found for this address');
+            }
+
+        } catch (error) {
+            console.error('❌ Error fetching NMI:', error);
+            toast.error('Failed to lookup NMI');
+        } finally {
+            setIsNmiLookupLoading(false);
         }
     };
 
@@ -2082,6 +2172,20 @@ export const CustomerFormPage = () => {
                                                 }}
                                                 maxLength={11}
                                                 placeholder="1234567890"
+                                                rightIcon={
+                                                    (formData.streetType && formData.suburb && (formData.houseNumber || formData.streetNumber) && formData.state && formData.postcode && formData.streetName) ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleNmiLookup}
+                                                            disabled={isNmiLookupLoading}
+                                                            className="text-xs bg-primary/10 text-primary hover:bg-primary/20 px-2 py-1 rounded-md flex items-center gap-1 transition-colors disabled:opacity-50"
+                                                            title="Lookup NMI from Address"
+                                                        >
+                                                            {isNmiLookupLoading ? <SpinnerIcon className="animate-spin" size={12} /> : <SearchIcon size={12} />}
+                                                            Lookup
+                                                        </button>
+                                                    ) : undefined
+                                                }
                                             />
                                         </div>
 
@@ -2155,8 +2259,14 @@ export const CustomerFormPage = () => {
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
-                                        <Select label="Tariff Code" required options={tariffOptions} value={formData.tariffCode} onChange={(val) => handleTariffChange(val as string)} placeholder="Select tariff" />
-                                        {/* Discount Field with Pill Selector */}
+                                        <Select
+                                            label="Tariff Code"
+                                            required
+                                            options={tariffOptions}
+                                            value={formData.tariffCode}
+                                            onChange={(val) => handleTariffChange(val as string)}
+                                            placeholder="Select tariff"
+                                        />                                        {/* Discount Field with Pill Selector */}
                                         {selectedRatePlan?.discountApplies === 1 && (
                                             <div className="space-y-1">
                                                 <label className="text-sm font-medium text-title leading-none block">
@@ -2892,7 +3002,70 @@ export const CustomerFormPage = () => {
                         </div>
                     </div>
                 </div>
+                <Modal
+                    isOpen={isNmiModalOpen}
+                    onClose={() => setIsNmiModalOpen(false)}
+                    title={<span className="text-primary">Select NMI</span>}
+                    footer={
+                        <div className="flex justify-end">
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsNmiModalOpen(false)}
+                                className="border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="max-h-[300px] overflow-y-auto space-y-2">
+                        {nmiOptions.map((item, index) => (
+                            <div
+                                key={index}
+                                className={`border p-3 rounded-md cursor-pointer transition ${formData.nmi === item?.nmi
+                                        ? 'border-primary bg-primary/10'
+                                        : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                                    }`}
+                                onClick={() => {
+                                    const selectedNmi = item?.nmi;
+                                    const selectedTariff = item?.network?.tariff;
 
+                                    // ✅ Set NMI
+                                    updateField('nmi', selectedNmi);
+                                    checkNmiDuplicate(selectedNmi);
+
+                                    // ✅ Auto-select tariff
+                                    if (selectedTariff) {
+                                        autoSelectTariff(selectedTariff);
+                                    }
+
+                                    setIsNmiModalOpen(false);
+                                    toast.success('NMI & Tariff selected successfully');
+                                }}
+                            >
+                                <p className="font-medium text-sm">
+                                    NMI: <span className="text-primary">{item?.nmi}</span>
+                                </p>
+
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {item?.address?.houseNumber} {item?.address?.streetName} {item?.address?.streetType},{" "}
+                                    {item?.address?.suburb} {item?.address?.postcode}
+                                </p>
+
+                                {/* Extra Info */}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Tariff: {item?.network?.tariff || 'N/A'}
+                                </p>
+
+                                {item?.meters?.length > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Meter: {item.meters[0]?.serialNumber} ({item.meters[0]?.statusLabel || 'N/A'})
+                                    </p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </Modal>
                 <Modal
                     isOpen={blocker.state === 'blocked'}
                     onClose={() => blocker.reset && blocker.reset()}
@@ -2980,8 +3153,8 @@ export const CustomerFormPage = () => {
                     ) : (
                         <div className="flex flex-col gap-4 mb-4">
                             <div className={`p-3 rounded-md flex items-start gap-2 mb-2 border ${emailPreview?.isCustom
-                                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/50"
-                                    : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-900/50"
+                                ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/50"
+                                : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-900/50"
                                 }`}>
                                 {emailPreview?.isCustom ? (
                                     <CheckCircleIcon size={18} className="text-green-600 dark:text-green-400 mt-0.5" />
