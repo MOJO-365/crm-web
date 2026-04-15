@@ -1077,6 +1077,7 @@ export const CustomerFormPage = () => {
                 (typeof data === 'string' ? data : null);
 
             const tariff = item?.network?.tariff;
+            const customerType = item?.customerType;
 
             if (nmi) {
                 updateField('nmi', nmi);
@@ -1085,6 +1086,13 @@ export const CustomerFormPage = () => {
                 // ✅ Auto tariff match
                 if (tariff) {
                     autoSelectTariff(tariff);
+                }
+
+                // ✅ Auto property type mapping
+                if (customerType === 'RESIDENTIAL') {
+                    updateField('propertyType', 0);
+                } else if (customerType === 'BUSINESS' || customerType === 'COMMERCIAL') {
+                    updateField('propertyType', 1);
                 }
 
                 toast.success('NMI successfully found');
@@ -3023,12 +3031,13 @@ export const CustomerFormPage = () => {
                             <div
                                 key={index}
                                 className={`border p-3 rounded-md cursor-pointer transition ${formData.nmi === item?.nmi
-                                        ? 'border-primary bg-primary/10'
-                                        : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                                    ? 'border-primary bg-primary/10'
+                                    : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
                                     }`}
                                 onClick={() => {
                                     const selectedNmi = item?.nmi;
                                     const selectedTariff = item?.network?.tariff;
+                                    const selectedCustomerType = item?.customerType;
 
                                     // ✅ Set NMI
                                     updateField('nmi', selectedNmi);
@@ -3037,6 +3046,13 @@ export const CustomerFormPage = () => {
                                     // ✅ Auto-select tariff
                                     if (selectedTariff) {
                                         autoSelectTariff(selectedTariff);
+                                    }
+
+                                    // ✅ Auto property type mapping
+                                    if (selectedCustomerType === 'RESIDENTIAL') {
+                                        updateField('propertyType', 0);
+                                    } else if (selectedCustomerType === 'BUSINESS' || selectedCustomerType === 'COMMERCIAL') {
+                                        updateField('propertyType', 1);
                                     }
 
                                     setIsNmiModalOpen(false);
