@@ -3196,7 +3196,14 @@ export const CustomerFormPage = () => {
                                                     >
                                                         <div className="text-left">
                                                             <div className="text-sm text-primary">{t}</div>
-                                                            {register?.type && <div className="text-[10px] font-medium text-muted-foreground uppercase">{register.type}</div>}
+                                                            {register?.type && (
+                                                                <div className="text-[10px] font-medium text-muted-foreground uppercase">
+                                                                    {register.networkAdditionalInfo === 'Controlled load 1 Interval' ? 'CL1' :
+                                                                     register.networkAdditionalInfo === 'Flat All time with demand Int' ? 'Anytime' :
+                                                                     register.networkAdditionalInfo === 'Controlled load 2 Interval' ? 'CL2' :
+                                                                     register.networkAdditionalInfo}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <CheckIcon className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                                                     </button>
