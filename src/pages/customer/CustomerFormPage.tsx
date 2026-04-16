@@ -575,6 +575,7 @@ export const CustomerFormPage = () => {
     const [isNmiLookupLoading, setIsNmiLookupLoading] = useState(false);
     const [nmiOptions, setNmiOptions] = useState<any[]>([]);
     const [isNmiModalOpen, setIsNmiModalOpen] = useState(false);
+    const [selectedNmiForTariff, setSelectedNmiForTariff] = useState<any | null>(null);
     // Rate plans
     const [selectedRatePlan, setSelectedRatePlan] = useState<RatePlan | null>(null);
     const [isCustomDiscountMode, setIsCustomDiscountMode] = useState(false);
@@ -1018,19 +1019,48 @@ export const CustomerFormPage = () => {
     const autoSelectTariff = (selectedTariff: string) => {
         if (!selectedTariff || !tariffOptions?.length) return;
 
-        const matchedTariff = tariffOptions.find((opt: any) =>
-            opt?.value?.toLowerCase() === selectedTariff.toLowerCase() ||
-            opt?.value?.toLowerCase().includes(selectedTariff.toLowerCase()) ||
-            opt?.label?.toLowerCase().includes(selectedTariff.toLowerCase())
-        );
+        const s = selectedTariff.toLowerCase().trim();
+        const sNoPrefix = s.startsWith('vpp ') ? s.substring(4) : s;
+
+        // 1. Try exact matches first (best quality)
+        let matchedTariff = tariffOptions.find((opt: any) => {
+            const v = opt.value.toLowerCase().trim();
+            const vNoPrefix = v.startsWith('vpp ') ? v.substring(4) : v;
+            return v === s || vNoPrefix === sNoPrefix;
+        });
+
+        // 2. Try exact matches on label components
+        if (!matchedTariff) {
+            matchedTariff = tariffOptions.find((opt: any) => {
+                const l = opt.label.toLowerCase().trim();
+                const firstPart = l.split(' - ')[0]?.trim();
+                return l === s || firstPart === s || firstPart === `vpp ${s}`;
+            });
+        }
+
+        // 3. Try "part of a list" match (e.g. "N73" inside "N73/N54")
+        if (!matchedTariff) {
+            matchedTariff = tariffOptions.find((opt: any) => {
+                const parts = opt.value.toLowerCase().split(/[\/\s,]+/);
+                return parts.includes(s) || parts.includes(sNoPrefix);
+            });
+        }
+
+        // 4. Fallback to broad partial match
+        if (!matchedTariff) {
+            matchedTariff = tariffOptions.find((opt: any) =>
+                opt?.value?.toLowerCase().includes(s) ||
+                opt?.label?.toLowerCase().includes(s)
+            );
+        }
 
         if (matchedTariff) {
             updateField('tariffCode', matchedTariff.value);
             handleTariffChange(matchedTariff.value);
         } else {
             console.warn('⚠️ No matching tariff found for:', selectedTariff);
-            // optional:
-            // toast.warning(`Tariff ${selectedTariff} not found`);
+            updateField('tariffCode', '');
+            handleTariffChange('');
         }
     };
 
@@ -1076,14 +1106,28 @@ export const CustomerFormPage = () => {
                 data?.nationalMeterIdentifier ||
                 (typeof data === 'string' ? data : null);
 
-            const tariff = item?.network?.tariff;
             const customerType = item?.customerType;
 
+            // ✅ Extract Tariffs from registers
+            const allTariffs = Array.from(new Set([
+                item?.network?.tariff,
+                ...(item?.registers?.map((r: any) => r.tariffCode) || []),
+                ...(item?.meters?.flatMap((m: any) => m.registers?.map((r: any) => r.tariffCode)) || [])
+            ].filter(Boolean)));
+
             if (nmi) {
+                // ✅ If multiple tariffs found, open modal even for single results
+                if (allTariffs.length > 1 && !isNmiModalOpen) {
+                    setNmiOptions(data.results || [item]);
+                    setIsNmiModalOpen(true);
+                    return;
+                }
+
                 updateField('nmi', nmi);
                 checkNmiDuplicate(nmi);
 
-                // ✅ Auto tariff match
+                // ✅ Auto tariff match (use primary tariff or first found)
+                const tariff = allTariffs[0] as string;
                 if (tariff) {
                     autoSelectTariff(tariff);
                 }
@@ -1093,6 +1137,19 @@ export const CustomerFormPage = () => {
                     updateField('propertyType', 0);
                 } else if (customerType === 'BUSINESS' || customerType === 'COMMERCIAL') {
                     updateField('propertyType', 1);
+                }
+
+                // ✅ Auto-prefill address
+                const address = item?.address;
+                if (address) {
+                    updateField('unitNumber', address.flatOrUnitNumber || '');
+                    updateField('houseNumber', address.houseNumber || '');
+                    updateField('streetNumber', address.houseNumber || '');
+                    updateField('streetName', address.streetName || '');
+                    updateField('streetType', address.streetType || '');
+                    updateField('suburb', address.suburb || '');
+                    updateField('state', address.state || '');
+                    updateField('postcode', address.postcode || '');
                 }
 
                 toast.success('NMI successfully found');
@@ -3012,13 +3069,28 @@ export const CustomerFormPage = () => {
                 </div>
                 <Modal
                     isOpen={isNmiModalOpen}
-                    onClose={() => setIsNmiModalOpen(false)}
-                    title={<span className="text-primary">Select NMI</span>}
+                    onClose={() => {
+                        setIsNmiModalOpen(false);
+                        setSelectedNmiForTariff(null);
+                    }}
+                    title={<span className="text-primary">{selectedNmiForTariff ? 'Select Tariff' : 'Select NMI'}</span>}
                     footer={
-                        <div className="flex justify-end">
+                        <div className="flex justify-between items-center w-full">
+                            {selectedNmiForTariff ? (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setSelectedNmiForTariff(null)}
+                                    className="border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                >
+                                    Back to NMIs
+                                </Button>
+                            ) : <div />}
                             <Button
                                 variant="outline"
-                                onClick={() => setIsNmiModalOpen(false)}
+                                onClick={() => {
+                                    setIsNmiModalOpen(false);
+                                    setSelectedNmiForTariff(null);
+                                }}
                                 className="border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                             >
                                 Cancel
@@ -3026,60 +3098,115 @@ export const CustomerFormPage = () => {
                         </div>
                     }
                 >
-                    <div className="max-h-[300px] overflow-y-auto space-y-2">
-                        {nmiOptions.map((item, index) => (
-                            <div
-                                key={index}
-                                className={`border p-3 rounded-md cursor-pointer transition ${formData.nmi === item?.nmi
-                                    ? 'border-primary bg-primary/10'
-                                    : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                                    }`}
-                                onClick={() => {
-                                    const selectedNmi = item?.nmi;
-                                    const selectedTariff = item?.network?.tariff;
-                                    const selectedCustomerType = item?.customerType;
-
-                                    // ✅ Set NMI
-                                    updateField('nmi', selectedNmi);
-                                    checkNmiDuplicate(selectedNmi);
-
-                                    // ✅ Auto-select tariff
-                                    if (selectedTariff) {
-                                        autoSelectTariff(selectedTariff);
-                                    }
-
-                                    // ✅ Auto property type mapping
-                                    if (selectedCustomerType === 'RESIDENTIAL') {
-                                        updateField('propertyType', 0);
-                                    } else if (selectedCustomerType === 'BUSINESS' || selectedCustomerType === 'COMMERCIAL') {
-                                        updateField('propertyType', 1);
-                                    }
-
-                                    setIsNmiModalOpen(false);
-                                    toast.success('NMI & Tariff selected successfully');
-                                }}
-                            >
-                                <p className="font-medium text-sm">
-                                    NMI: <span className="text-primary">{item?.nmi}</span>
-                                </p>
-
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    {item?.address?.houseNumber} {item?.address?.streetName} {item?.address?.streetType},{" "}
-                                    {item?.address?.suburb} {item?.address?.postcode}
-                                </p>
-
-                                {/* Extra Info */}
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Tariff: {item?.network?.tariff || 'N/A'}
-                                </p>
-
-                                {item?.meters?.length > 0 && (
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Meter: {item.meters[0]?.serialNumber} ({item.meters[0]?.statusLabel || 'N/A'})
-                                    </p>
-                                )}
+                    <div className="max-h-[400px] overflow-y-auto pr-1">
+                        {!selectedNmiForTariff ? (
+                            <div className="space-y-2">
+                                {nmiOptions.map((item, index) => (
+                                    <div
+                                        key={index}
+                                        className={`border p-3 rounded-md cursor-pointer transition ${formData.nmi === item?.nmi
+                                            ? 'border-primary bg-primary/10'
+                                            : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                                            }`}
+                                        onClick={() => {
+                                            if (!item) return;
+                                            setSelectedNmiForTariff(item);
+                                        }}
+                                    >
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <p className="font-bold text-sm">
+                                                    NMI: <span className="text-primary">{item?.nmi}</span>
+                                                </p>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    {item?.address?.flatOrUnitNumber ? `Unit ${item.address.flatOrUnitNumber}, ` : ''}
+                                                    {item?.address?.houseNumber} {item?.address?.streetName} {item?.address?.streetType},{" "}
+                                                    {item?.address?.suburb} {item?.address?.postcode}
+                                                </p>
+                                            </div>
+                                            <ChevronRightIcon className="w-4 h-4 text-muted-foreground" />
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        ) : (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                                <div className="p-3 bg-muted rounded-lg border border-border">
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Selected Property</p>
+                                    <p className="font-bold text-sm text-primary">{selectedNmiForTariff.nmi}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {selectedNmiForTariff.address?.flatOrUnitNumber ? `Unit ${selectedNmiForTariff.address.flatOrUnitNumber}, ` : ''}
+                                        {selectedNmiForTariff.address?.houseNumber} {selectedNmiForTariff.address?.streetName} {selectedNmiForTariff.address?.streetType}, {selectedNmiForTariff.address?.suburb}
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <p className="text-xs font-bold text-foreground uppercase tracking-tight flex items-center gap-2">
+                                        <ZapIcon size={12} className="text-primary" /> Available Tariffs / Registers
+                                    </p>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {(() => {
+                                            const tariffs = Array.from(new Set([
+                                                selectedNmiForTariff.network?.tariff,
+                                                ...(selectedNmiForTariff.registers?.map((r: any) => r.tariffCode) || []),
+                                                ...(selectedNmiForTariff.meters?.flatMap((m: any) => m.registers?.map((r: any) => r.tariffCode)) || [])
+                                            ].filter(Boolean))) as string[];
+
+                                            if (tariffs.length === 0) return <p className="text-xs text-muted-foreground italic p-2 bg-neutral-50 rounded">No tariffs found for this NMI</p>;
+
+                                            return tariffs.map((t, tidx) => {
+                                                // Find register type for helpful label
+                                                const register =
+                                                    (selectedNmiForTariff.registers?.find((r: any) => r.tariffCode === t)) ||
+                                                    (selectedNmiForTariff.meters?.flatMap((m: any) => m.registers || []).find((r: any) => r.tariffCode === t));
+
+                                                return (
+                                                    <button
+                                                        key={tidx}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const item = selectedNmiForTariff;
+                                                            updateField('nmi', item.nmi);
+                                                            checkNmiDuplicate(item.nmi);
+                                                            autoSelectTariff(t);
+
+                                                            if (item.customerType === 'RESIDENTIAL') {
+                                                                updateField('propertyType', 0);
+                                                            } else if (item.customerType === 'BUSINESS' || item.customerType === 'COMMERCIAL') {
+                                                                updateField('propertyType', 1);
+                                                            }
+
+                                                            const addr = item.address;
+                                                            if (addr) {
+                                                                updateField('unitNumber', addr.flatOrUnitNumber || '');
+                                                                updateField('houseNumber', addr.houseNumber || '');
+                                                                updateField('streetNumber', addr.houseNumber || '');
+                                                                updateField('streetName', addr.streetName || '');
+                                                                updateField('streetType', addr.streetType || '');
+                                                                updateField('suburb', addr.suburb || '');
+                                                                updateField('state', addr.state || '');
+                                                                updateField('postcode', addr.postcode || '');
+                                                            }
+
+                                                            setIsNmiModalOpen(false);
+                                                            setSelectedNmiForTariff(null);
+                                                            toast.success(`NMI and Tariff ${t} selected successfully`);
+                                                        }}
+                                                        className="flex items-center justify-between p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all font-bold group"
+                                                    >
+                                                        <div className="text-left">
+                                                            <div className="text-sm text-primary">{t}</div>
+                                                            {register?.type && <div className="text-[10px] font-medium text-muted-foreground uppercase">{register.type}</div>}
+                                                        </div>
+                                                        <CheckIcon className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    </button>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </Modal>
                 <Modal

@@ -25,6 +25,7 @@ export const GET_ALL_EMAIL_LOGS = gql`
                 createdBy
                 tenant
                 verificationCode
+                attachments
             }
         }
     }
@@ -55,6 +56,7 @@ export const GET_CUSTOMER_EMAIL_LOGS = gql`
                 createdBy
                 tenant
                 verificationCode
+                attachments
             }
         }
     }
