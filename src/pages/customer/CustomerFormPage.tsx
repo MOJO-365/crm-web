@@ -115,7 +115,7 @@ const initialFormData: CustomerFormData = {
     gender: 0,
     relationshipStatus: 0,
     enquiryAmount: '',
-    checkCreditScore: false,
+    checkCreditScore: true,
     employerName: '',
     dob: '',
     propertyType: 0,
@@ -1397,7 +1397,7 @@ export const CustomerFormPage = () => {
         // Temporarily disable dirty check to allow navigation
         setIsFormDirty(false);
         try {
-            let creditScoreData = {};
+            let creditScoreData: { creditScore?: number; isCreditScoreFetched?: number; riskStatus?: string } = {};
 
             // Credit Score Check (Only on Create)
             if (!isEditMode && formData.checkCreditScore) {
@@ -1405,24 +1405,34 @@ export const CustomerFormPage = () => {
 
 
                     const equifaxPayload = {
+                        "title": "Mr",
                         "first-name": "Pal",
                         "first-given-name": "Patel",
+                        "gender": "Male",
                         "address": {
+                            "street-number": "19",
                             "street-name": "COOYAL",
                             "street-type": "PL",
                             "suburb": "GLENWOOD",
-                            "state-code": "NSW"
+                            "state-code": "NSW",
+                            "postcode": "2768",
+                            "country-code": "AUS"
                         },
                         "license-number": "DL123456",
                         "gender-code": "M",
                         "date-of-birth": "2003-03-19",
                         "employer-name": "DATA FISH PTY LTD",
+                        "credit_enquirer_name": "GEE ENERGY API TEST BRANCH",
+
                         "account-type-code": "CC",
+                        "enquiry-amount-currency": "AUD",
                         "enquiry-amount": 1000,
                         "relationship-code": "1",
                         "client-reference": "T3D-20251209051318-ed8bc2",
-                        "enquiry-client-reference": "12344556"
-                    };
+                        "enquiry-client-reference": "12344556",
+                        "enquiry-date": "2026-02-04"
+                    }
+
                     // const equifaxPayload = {
                     //     "first-name": formData.firstName,
                     //     "first-given-name": formData.lastName,
@@ -1498,10 +1508,8 @@ export const CustomerFormPage = () => {
 
                 } catch (error) {
                     console.error('Credit check failed:', error);
-                    toast.error('Credit check failed. Customer creation aborted.');
-                    setIsFormDirty(true);
-                    setSubmittingStatus(null);
-                    return; // Abort creation if credit check fails (optional, but safer)
+                    toast.warn('Automated credit check failed. Customer will be created with default status.');
+                    // Proceeding without aborting creation
                 }
             }
 
@@ -1584,9 +1592,10 @@ export const CustomerFormPage = () => {
                 gender: formData.gender,
                 relationshipStatus: formData.relationshipStatus,
                 enquiryAmount: formData.enquiryAmount ? parseFloat(formData.enquiryAmount) : undefined,
-                checkCreditScore: formData.checkCreditScore ? 1 : 0,
+                checkCreditScore: (formData.checkCreditScore || !creditScoreData?.isCreditScoreFetched) ? 1 : 0,
                 employerName: formData.employerName,
-                ...creditScoreData, // Add credit score data to input
+                isCreditScoreFetched: creditScoreData?.isCreditScoreFetched || 0,
+                ...creditScoreData, // Add credit score data to input (overrides if present)
                 enrollmentDetails: {
                     saletype: formData.saleType,
                     connectiondate: formData.connectionDate || null,
@@ -3199,9 +3208,9 @@ export const CustomerFormPage = () => {
                                                             {register?.type && (
                                                                 <div className="text-[10px] font-medium text-muted-foreground uppercase">
                                                                     {register.networkAdditionalInfo === 'Controlled load 1 Interval' ? 'CL1' :
-                                                                     register.networkAdditionalInfo === 'Flat All time with demand Int' ? 'Anytime' :
-                                                                     register.networkAdditionalInfo === 'Controlled load 2 Interval' ? 'CL2' :
-                                                                     register.networkAdditionalInfo}
+                                                                        register.networkAdditionalInfo === 'Flat All time with demand Int' ? 'Anytime' :
+                                                                            register.networkAdditionalInfo === 'Controlled load 2 Interval' ? 'CL2' :
+                                                                                register.networkAdditionalInfo}
                                                                 </div>
                                                             )}
                                                         </div>

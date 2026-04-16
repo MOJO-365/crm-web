@@ -1794,7 +1794,7 @@ export function CustomerDetailsPage() {
                 skipStatusUpdate: true
             };
 
-                await updateCustomer({
+            await updateCustomer({
                 variables: {
                     uid: selectedCustomerDetails.uid,
                     input
@@ -2273,7 +2273,7 @@ export function CustomerDetailsPage() {
             setSelectedCustomerDetails(result.data.customer);
         }
     };
- 
+
     const handleMsatToggle = async (customerUid: string, newValue: boolean) => {
         if (!selectedCustomerDetails) return;
 
@@ -4123,7 +4123,7 @@ export function CustomerDetailsPage() {
                                             <div>
                                                 <h3 className="text-md font-semibold text-foreground tracking-tight">Documents</h3>
                                                 <p className="text-xs text-muted-foreground">Manage customer documents</p>
-                                                  
+
                                             </div>
                                         </div>
                                     </div>
