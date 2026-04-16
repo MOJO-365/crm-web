@@ -274,6 +274,7 @@ interface EmailLog {
     body: string | null;
     status: number;
     errorMessage: string | null;
+    attachments?: string[] | null;
     sentAt: string | null;
     verifiedAt: string | null;
     createdAt: string;
@@ -778,6 +779,27 @@ const CustomerEmailLogsTable = ({ customerUid }: { customerUid: string }) => {
                                     </div>
                                 </div>
                             </div>
+
+                            {selectedLog.attachments && selectedLog.attachments.length > 0 && (
+                                <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                                    <h4 className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        <FileTextIcon size={12} />
+                                        Attachments ({selectedLog.attachments.length})
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {selectedLog.attachments.map((fileName, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 text-sm text-foreground bg-white dark:bg-neutral-800 p-2 rounded-lg border border-border/50 shadow-sm">
+                                                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                                    <FileTextIcon size={14} />
+                                                </div>
+                                                <span className="font-medium truncate flex-1" title={fileName}>
+                                                    {fileName}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {selectedLog.errorMessage && (
                                 <div className="p-4 rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800">
@@ -4101,6 +4123,7 @@ export function CustomerDetailsPage() {
                                             <div>
                                                 <h3 className="text-md font-semibold text-foreground tracking-tight">Documents</h3>
                                                 <p className="text-xs text-muted-foreground">Manage customer documents</p>
+                                                  
                                             </div>
                                         </div>
                                     </div>
@@ -4297,7 +4320,7 @@ export function CustomerDetailsPage() {
                                                         (d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2'))
                                                     ).map(d => ({
                                                         doc: d,
-                                                        label: d.documentType?.name || d.name || 'Document',
+                                                        label: d.name || d.documentType?.name || 'Document',
                                                         type: d.type || 'other',
                                                         category: d.documentType?.category || '0',
                                                         show: true

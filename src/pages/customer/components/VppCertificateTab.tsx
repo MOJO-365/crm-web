@@ -8,7 +8,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { Modal } from '@/components/common';
 import { apiAxios } from '@/lib/apollo';
 import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES, GET_INVERTER_MAKES } from '@/graphql';
-import { FileTextIcon, ZapIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon } from '@/components/icons';
+import { FileTextIcon, ZapIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon, DownloadIcon } from '@/components/icons';
 
 interface VppCertificateTabProps {
     customerUid: string;
@@ -177,6 +177,12 @@ export function VppCertificateTab({
         const baseUrl = apiAxios.defaults.baseURL || '';
         setPreviewUrl(`${baseUrl}/vpp-certificate/preview/${customerUid}`);
         setPreviewModalOpen(true);
+    };
+
+    const handleDownload = () => {
+        const baseUrl = apiAxios.defaults.baseURL || '';
+        const downloadUrl = `${baseUrl}/vpp-certificate/preview/${customerUid}?format=pdf`;
+        window.open(downloadUrl, '_blank');
     };
 
 
@@ -682,6 +688,9 @@ export function VppCertificateTab({
                     )}
                 </div>
                 <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={handleDownload} className="text-blue-600 border-blue-200 hover:bg-blue-50">
+                        <DownloadIcon size={16} className="mr-2" /> Download PDF
+                    </Button>
                     <Button variant="outline" onClick={() => { setPreviewModalOpen(false); setIsLoadingPreview(false); }}>
                         Close
                     </Button>
