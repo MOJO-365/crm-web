@@ -2499,7 +2499,7 @@ export function CustomerDetailsPage() {
                 "date-of-birth": selectedCustomerDetails.dob ? new Date(selectedCustomerDetails.dob).toISOString().split('T')[0] : '',
                 "employer-name": selectedCustomerDetails.employerName || '',
                 "account-type-code": "CC",
-                "enquiry-amount": Number(selectedCustomerDetails.enquiryAmount) || 0,
+                "enquiry-amount": Math.floor(Number(selectedCustomerDetails.enquiryAmount) || 0),
                 "relationship-code": String(selectedCustomerDetails.relationshipStatus || '1'),
                 "client-reference": `${selectedCustomerDetails.customerId || selectedCustomerDetails.uid}-${Date.now()}`,
                 "enquiry-client-reference": selectedCustomerDetails.number || ''

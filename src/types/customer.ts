@@ -30,6 +30,7 @@ export interface CustomerFormData {
     postcode: string;
     country: string;
     nmi: string;
+    ownershipStatus?: number;
 
     // Solar Details
     hasSolar: boolean;

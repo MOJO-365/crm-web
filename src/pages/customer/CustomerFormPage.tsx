@@ -134,6 +134,7 @@ const initialFormData: CustomerFormData = {
     state: '',
     postcode: '',
     country: 'Australia',
+    ownershipStatus: 0,
     nmi: '',
     hasSolar: false,
     solarCapacity: '',
@@ -1446,7 +1447,7 @@ export const CustomerFormPage = () => {
                         "date-of-birth": formData.dob ? new Date(formData.dob).toISOString().split('T')[0] : '',
                         "employer-name": formData.employerName,
                         "account-type-code": "CC",
-                        "enquiry-amount": Number(formData.enquiryAmount) || 0,
+                        "enquiry-amount": Math.floor(Number(formData.enquiryAmount) || 0),
                         "relationship-code": String(formData.relationshipStatus || '1'),
                         "client-reference": `REF-${Date.now()}`,
                         "enquiry-client-reference": formData.phone || ''
@@ -3163,11 +3164,11 @@ export const CustomerFormPage = () => {
                                                 const id = (r.registerId || '').toUpperCase();
                                                 const type = (r.type || '').toLowerCase();
                                                 const info = (r.networkAdditionalInfo || '').toLowerCase();
-                                                
+
                                                 // Exclude B1/B2 IDs, or anything mentioning Export or Generation
-                                                return id !== 'B1' && id !== 'B2' && 
-                                                       !type.includes('export') && 
-                                                       !info.includes('generation');
+                                                return id !== 'B1' && id !== 'B2' &&
+                                                    !type.includes('export') &&
+                                                    !info.includes('generation');
                                             });
 
                                             const tariffs = Array.from(new Set(validRegisters.map((r: any) => r.tariffCode).filter(Boolean))) as string[];
