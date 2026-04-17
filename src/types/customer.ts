@@ -61,6 +61,8 @@ export interface CustomerFormData {
     licenseNumber: string;
     licenseState: string;
     licenseExpiry: string;
+    licenseCardNumber: string;
+    medicareCardType: number;
 
     concession: boolean;
     lifeSupport: boolean;

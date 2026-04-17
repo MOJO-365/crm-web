@@ -27,7 +27,7 @@ import {
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
-import { formatDateTime } from '@/lib/date';
+import { formatDateTime, formatSydneyTime } from '@/lib/date';
 import {
     ChevronRightIcon,
     HomeIcon,
@@ -156,6 +156,8 @@ const initialFormData: CustomerFormData = {
     licenseNumber: '',
     licenseState: '',
     licenseExpiry: '',
+    licenseCardNumber: '',
+    medicareCardType: 0,
     concession: false,
     lifeSupport: false,
     additionalDocument: null,
@@ -797,7 +799,7 @@ export const CustomerFormPage = () => {
                 enquiryAmount: c.enquiryAmount?.toString() || '',
                 checkCreditScore: c.checkCreditScore === 1,
                 employerName: c.employerName || '',
-                dob: c.dob ? c.dob.split('T')[0] : '',
+                dob: c.dob ? formatSydneyTime(c.dob, 'YYYY-MM-DD') : '',
                 propertyType: c.propertyType || 0,
                 businessName: c.businessName || '',
                 abn: c.abn || '',
@@ -826,15 +828,17 @@ export const CustomerFormPage = () => {
                 snNumber: c.batteryDetails?.snnumber || '',
                 exportLimit: c.batteryDetails?.exportlimit?.toString() || '',
                 saleType: c.enrollmentDetails?.saletype || 0,
-                connectionDate: c.enrollmentDetails?.connectiondate ? c.enrollmentDetails.connectiondate.split('T')[0] : '',
+                connectionDate: c.enrollmentDetails?.connectiondate ? formatSydneyTime(c.enrollmentDetails.connectiondate, 'YYYY-MM-DD') : '',
                 idType: c.enrollmentDetails?.idtype || 0,
                 idNumber: c.enrollmentDetails?.idnumber || '',
                 idState: c.enrollmentDetails?.idstate || '',
                 idCountry: c.enrollmentDetails?.idcountry || '',
-                idExpiry: c.enrollmentDetails?.idexpiry ? c.enrollmentDetails.idexpiry.split('T')[0] : '',
+                idExpiry: c.enrollmentDetails?.idexpiry ? formatSydneyTime(c.enrollmentDetails.idexpiry, 'YYYY-MM-DD') : '',
                 licenseNumber: c.enrollmentDetails?.licenseNumber || '',
                 licenseState: c.enrollmentDetails?.licenseState || '',
-                licenseExpiry: c.enrollmentDetails?.licenseExpiry ? c.enrollmentDetails.licenseExpiry.split('T')[0] : '',
+                licenseExpiry: c.enrollmentDetails?.licenseExpiry ? formatSydneyTime(c.enrollmentDetails.licenseExpiry, 'YYYY-MM-DD') : '',
+                licenseCardNumber: c.enrollmentDetails?.licenseCardNumber || '',
+                medicareCardType: c.enrollmentDetails?.medicareCardType || 0,
                 concession: c.enrollmentDetails?.concession === 1,
                 lifeSupport: c.enrollmentDetails?.lifesupport === 1,
                 billingPreference: c.enrollmentDetails?.billingpreference || 0,
@@ -847,7 +851,7 @@ export const CustomerFormPage = () => {
                 bsb: c.debitDetails?.bsb || '',
                 accountNumber: c.debitDetails?.accountNumber || '',
                 paymentFrequency: c.debitDetails?.paymentFrequency || 0,
-                firstDebitDate: c.debitDetails?.firstDebitDate ? c.debitDetails.firstDebitDate.split('T')[0] : '',
+                firstDebitDate: c.debitDetails?.firstDebitDate ? formatSydneyTime(c.debitDetails.firstDebitDate, 'YYYY-MM-DD') : '',
                 tariffCode: c.tariffCode || '',
                 discount: c.discount || 0,
                 creditScore: c.creditScore,
@@ -1293,7 +1297,7 @@ export const CustomerFormPage = () => {
 
         // Handle Date objects from DatePicker
         if (value instanceof Date) {
-            finalValue = value.toISOString().split('T')[0];
+            finalValue = formatSydneyTime(value, 'YYYY-MM-DD');
         }
 
         setFormData(prev => ({ ...prev, [field]: finalValue }));
@@ -1444,7 +1448,7 @@ export const CustomerFormPage = () => {
                         },
                         "license-number": formData.licenseNumber,
                         "gender-code": formData.gender === 0 ? 'M' : (formData.gender === 1 ? 'F' : 'O'),
-                        "date-of-birth": formData.dob ? new Date(formData.dob).toISOString().split('T')[0] : '',
+                        "date-of-birth": formData.dob,
                         "employer-name": formData.employerName,
                         "account-type-code": "CC",
                         "enquiry-amount": Math.floor(Number(formData.enquiryAmount) || 0),
@@ -1610,6 +1614,8 @@ export const CustomerFormPage = () => {
                     licenseNumber: formData.licenseNumber,
                     licenseState: formData.licenseState,
                     licenseExpiry: formData.licenseExpiry || null,
+                    licenseCardNumber: formData.licenseCardNumber,
+                    medicareCardType: formData.medicareCardType,
                 },
                 address: {
                     unitNumber: formData.unitNumber || undefined,
@@ -2522,6 +2528,23 @@ export const CustomerFormPage = () => {
                                                 }}
                                             />
                                             <Input label="ID Number" placeholder="Number" value={formData.idNumber} onChange={(e) => updateField('idNumber', e.target.value)} />
+                                            
+                                            {formData.idType === 0 && (
+                                                <Input label="License Card Number" placeholder="Enter card number" value={formData.licenseCardNumber} onChange={(e) => updateField('licenseCardNumber', e.target.value)} />
+                                            )}
+
+                                            {formData.idType === 1 && (
+                                                <Select
+                                                    label="Medicare Card Type"
+                                                    options={[
+                                                        { value: '0', label: 'Standard (Green)' },
+                                                        { value: '1', label: 'Interim (Blue)' },
+                                                        { value: '2', label: 'Reciprocal (Yellow)' }
+                                                    ]}
+                                                    value={formData.medicareCardType?.toString() || '0'}
+                                                    onChange={(val) => updateField('medicareCardType', parseInt(val as string))}
+                                                />
+                                            )}
                                             {formData.idType === 2 ? (
                                                 <Select
                                                     label="ID Country"

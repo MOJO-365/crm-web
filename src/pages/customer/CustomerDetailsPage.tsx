@@ -149,6 +149,8 @@ interface CustomerDetails {
         licenseNumber?: string;
         licenseState?: string;
         licenseExpiry?: string;
+        licenseCardNumber?: string;
+        medicareCardType?: number;
     };
     ratePlan?: {
         uid?: string;
@@ -2496,7 +2498,7 @@ export function CustomerDetailsPage() {
                 },
                 "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
                 "gender-code": selectedCustomerDetails.gender === 0 ? 'M' : (selectedCustomerDetails.gender === 1 ? 'F' : 'O'),
-                "date-of-birth": selectedCustomerDetails.dob ? new Date(selectedCustomerDetails.dob).toISOString().split('T')[0] : '',
+                "date-of-birth": selectedCustomerDetails.dob ? formatSydneyTime(selectedCustomerDetails.dob, 'YYYY-MM-DD') : '',
                 "employer-name": selectedCustomerDetails.employerName || '',
                 "account-type-code": "CC",
                 "enquiry-amount": Math.floor(Number(selectedCustomerDetails.enquiryAmount) || 0),
@@ -3535,6 +3537,26 @@ export function CustomerDetailsPage() {
                                                     {selectedCustomerDetails.enrollmentDetails?.idexpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.idexpiry) : '-'}
                                                 </p>
                                             </div>
+                                            
+                                            {selectedCustomerDetails.enrollmentDetails?.idtype === 0 && (
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-muted-foreground uppercase font-semibold">License Card Number</label>
+                                                    <p className="font-medium">
+                                                        {selectedCustomerDetails.enrollmentDetails?.licenseCardNumber || '-'}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {selectedCustomerDetails.enrollmentDetails?.idtype === 1 && (
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-muted-foreground uppercase font-semibold">Medicare Card Type</label>
+                                                    <p className="font-medium">
+                                                        {selectedCustomerDetails.enrollmentDetails?.medicareCardType === 0 ? 'Standard (Green)' :
+                                                         selectedCustomerDetails.enrollmentDetails?.medicareCardType === 1 ? 'Interim (Blue)' :
+                                                         selectedCustomerDetails.enrollmentDetails?.medicareCardType === 2 ? 'Reciprocal (Yellow)' : '-'}
+                                                    </p>
+                                                </div>
+                                            )}
                                             {selectedCustomerDetails.enrollmentDetails?.idtype === 2 ? (
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-muted-foreground uppercase font-semibold">ID Country</label>
