@@ -1403,55 +1403,54 @@ export const CustomerFormPage = () => {
             if (!isEditMode && formData.checkCreditScore) {
                 try {
 
+                    // const equifaxPayload = {
+                    //     "title": "Mr",
+                    //     "first-name": "Pal",
+                    //     "first-given-name": "Patel",
+                    //     "gender": "Male",
+                    //     "address": {
+                    //         "street-number": "19",
+                    //         "street-name": "COOYAL",
+                    //         "street-type": "PL",
+                    //         "suburb": "GLENWOOD",
+                    //         "state-code": "NSW",
+                    //         "postcode": "2768",
+                    //         "country-code": "AUS"
+                    //     },
+                    //     "license-number": "DL123456",
+                    //     "gender-code": "M",
+                    //     "date-of-birth": "2003-03-19",
+                    //     "employer-name": "DATA FISH PTY LTD",
+                    //     "credit_enquirer_name": "GEE ENERGY API TEST BRANCH",
+
+                    //     "account-type-code": "CC",
+                    //     "enquiry-amount-currency": "AUD",
+                    //     "enquiry-amount": 1000,
+                    //     "relationship-code": "1",
+                    //     "client-reference": "T3D-20251209051318-ed8bc2",
+                    //     "enquiry-client-reference": "12344556",
+                    //     "enquiry-date": "2026-02-04"
+                    // }
 
                     const equifaxPayload = {
-                        "title": "Mr",
-                        "first-name": "Pal",
-                        "first-given-name": "Patel",
-                        "gender": "Male",
+                        "first-name": formData.firstName,
+                        "first-given-name": formData.lastName,
                         "address": {
-                            "street-number": "19",
-                            "street-name": "COOYAL",
-                            "street-type": "PL",
-                            "suburb": "GLENWOOD",
-                            "state-code": "NSW",
-                            "postcode": "2768",
-                            "country-code": "AUS"
+                            "street-name": formData.streetName,
+                            "street-type": formData.streetType,
+                            "suburb": formData.suburb,
+                            "state-code": formData.state
                         },
-                        "license-number": "DL123456",
-                        "gender-code": "M",
-                        "date-of-birth": "2003-03-19",
-                        "employer-name": "DATA FISH PTY LTD",
-                        "credit_enquirer_name": "GEE ENERGY API TEST BRANCH",
-
+                        "license-number": formData.licenseNumber,
+                        "gender-code": formData.gender === 0 ? 'M' : (formData.gender === 1 ? 'F' : 'O'),
+                        "date-of-birth": formData.dob ? new Date(formData.dob).toISOString().split('T')[0] : '',
+                        "employer-name": formData.employerName,
                         "account-type-code": "CC",
-                        "enquiry-amount-currency": "AUD",
-                        "enquiry-amount": 1000,
-                        "relationship-code": "1",
-                        "client-reference": "T3D-20251209051318-ed8bc2",
-                        "enquiry-client-reference": "12344556",
-                        "enquiry-date": "2026-02-04"
-                    }
-
-                    // const equifaxPayload = {
-                    //     "first-name": formData.firstName,
-                    //     "first-given-name": formData.lastName,
-                    //     "address": {
-                    //         "street-name": formData.streetName,
-                    //         "street-type": formData.streetType,
-                    //         "suburb": formData.suburb,
-                    //         "state-code": formData.state
-                    //     },
-                    //     "license-number": formData.licenseNumber,
-                    //     "gender-code": formData.gender === 0 ? 'M' : (formData.gender === 1 ? 'F' : 'O'),
-                    //     "date-of-birth": formData.dob ? new Date(formData.dob).toISOString().split('T')[0] : '',
-                    //     "employer-name": formData.employerName,
-                    //     "account-type-code": "CC",
-                    //     "enquiry-amount": Number(formData.enquiryAmount) || 0,
-                    //     "relationship-code": String(formData.relationshipStatus || '1'),
-                    //     "client-reference": `REF-${Date.now()}`,
-                    //     "enquiry-client-reference": formData.phone || ''
-                    // };
+                        "enquiry-amount": Number(formData.enquiryAmount) || 0,
+                        "relationship-code": String(formData.relationshipStatus || '1'),
+                        "client-reference": `REF-${Date.now()}`,
+                        "enquiry-client-reference": formData.phone || ''
+                    };
 
                     const response = await secondaryApiAxios.post('/v1/equifax/user/get-credit-report', equifaxPayload);
 
@@ -3155,19 +3154,29 @@ export const CustomerFormPage = () => {
                                     </p>
                                     <div className="grid grid-cols-1 gap-2">
                                         {(() => {
-                                            const tariffs = Array.from(new Set([
-                                                selectedNmiForTariff.network?.tariff,
-                                                ...(selectedNmiForTariff.registers?.map((r: any) => r.tariffCode) || []),
-                                                ...(selectedNmiForTariff.meters?.flatMap((m: any) => m.registers?.map((r: any) => r.tariffCode)) || [])
-                                            ].filter(Boolean))) as string[];
+                                            const allRegisters = [
+                                                ...(selectedNmiForTariff.registers || []),
+                                                ...(selectedNmiForTariff.meters?.flatMap((m: any) => m.registers || []) || [])
+                                            ];
+
+                                            const validRegisters = allRegisters.filter((r: any) => {
+                                                const id = (r.registerId || '').toUpperCase();
+                                                const type = (r.type || '').toLowerCase();
+                                                const info = (r.networkAdditionalInfo || '').toLowerCase();
+                                                
+                                                // Exclude B1/B2 IDs, or anything mentioning Export or Generation
+                                                return id !== 'B1' && id !== 'B2' && 
+                                                       !type.includes('export') && 
+                                                       !info.includes('generation');
+                                            });
+
+                                            const tariffs = Array.from(new Set(validRegisters.map((r: any) => r.tariffCode).filter(Boolean))) as string[];
 
                                             if (tariffs.length === 0) return <p className="text-xs text-muted-foreground italic p-2 bg-neutral-50 rounded">No tariffs found for this NMI</p>;
 
                                             return tariffs.map((t, tidx) => {
                                                 // Find register type for helpful label
-                                                const register =
-                                                    (selectedNmiForTariff.registers?.find((r: any) => r.tariffCode === t)) ||
-                                                    (selectedNmiForTariff.meters?.flatMap((m: any) => m.registers || []).find((r: any) => r.tariffCode === t));
+                                                const register = validRegisters.find((r: any) => r.tariffCode === t);
 
                                                 return (
                                                     <button
