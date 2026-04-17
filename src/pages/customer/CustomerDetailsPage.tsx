@@ -2485,45 +2485,45 @@ export function CustomerDetailsPage() {
         setIsCheckingCreditScore(true);
         try {
             // Construct Equifax API Payload
-            // const equifaxPayload = {
-            //     "first-name": selectedCustomerDetails.firstName || '',
-            //     "first-given-name": selectedCustomerDetails.lastName || '',
-            //     "address": {
-            //         "street-name": selectedCustomerDetails.address?.streetName || '',
-            //         "street-type": selectedCustomerDetails.address?.streetType || '',
-            //         "suburb": selectedCustomerDetails.address?.suburb || '',
-            //         "state-code": selectedCustomerDetails.address?.state || ''
-            //     },
-            //     "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
-            //     "gender-code": selectedCustomerDetails.gender === 0 ? 'M' : (selectedCustomerDetails.gender === 1 ? 'F' : 'O'),
-            //     "date-of-birth": selectedCustomerDetails.dob ? new Date(selectedCustomerDetails.dob).toISOString().split('T')[0] : '',
-            //     "employer-name": selectedCustomerDetails.employerName || '',
-            //     "account-type-code": "CC",
-            //     "enquiry-amount": Number(selectedCustomerDetails.enquiryAmount) || 0,
-            //     "relationship-code": String(selectedCustomerDetails.relationshipStatus || '1'),
-            //     "client-reference": `${selectedCustomerDetails.customerId || selectedCustomerDetails.uid}-${Date.now()}`,
-            //     "enquiry-client-reference": selectedCustomerDetails.number || ''
-            // };
-
             const equifaxPayload = {
-                "first-name": "Pal",
-                "first-given-name": "Patel",
+                "first-name": selectedCustomerDetails.firstName || '',
+                "first-given-name": selectedCustomerDetails.lastName || '',
                 "address": {
-                    "street-name": "COOYAL",
-                    "street-type": "PL",
-                    "suburb": "GLENWOOD",
-                    "state-code": "NSW"
+                    "street-name": selectedCustomerDetails.address?.streetName || '',
+                    "street-type": selectedCustomerDetails.address?.streetType || '',
+                    "suburb": selectedCustomerDetails.address?.suburb || '',
+                    "state-code": selectedCustomerDetails.address?.state || ''
                 },
-                "license-number": "DL123456",
-                "gender-code": "M",
-                "date-of-birth": "2003-03-19",
-                "employer-name": "DATA FISH PTY LTD",
+                "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
+                "gender-code": selectedCustomerDetails.gender === 0 ? 'M' : (selectedCustomerDetails.gender === 1 ? 'F' : 'O'),
+                "date-of-birth": selectedCustomerDetails.dob ? new Date(selectedCustomerDetails.dob).toISOString().split('T')[0] : '',
+                "employer-name": selectedCustomerDetails.employerName || '',
                 "account-type-code": "CC",
-                "enquiry-amount": 1000,
-                "relationship-code": "1",
-                "client-reference": "T3D-20251209051318-ed8bc2",
-                "enquiry-client-reference": "12344556"
+                "enquiry-amount": Number(selectedCustomerDetails.enquiryAmount) || 0,
+                "relationship-code": String(selectedCustomerDetails.relationshipStatus || '1'),
+                "client-reference": `${selectedCustomerDetails.customerId || selectedCustomerDetails.uid}-${Date.now()}`,
+                "enquiry-client-reference": selectedCustomerDetails.number || ''
             };
+
+            // const equifaxPayload = {
+            //     "first-name": "Pal",
+            //     "first-given-name": "Patel",
+            //     "address": {
+            //         "street-name": "COOYAL",
+            //         "street-type": "PL",
+            //         "suburb": "GLENWOOD",
+            //         "state-code": "NSW"
+            //     },
+            //     "license-number": "DL123456",
+            //     "gender-code": "M",
+            //     "date-of-birth": "2003-03-19",
+            //     "employer-name": "DATA FISH PTY LTD",
+            //     "account-type-code": "CC",
+            //     "enquiry-amount": 1000,
+            //     "relationship-code": "1",
+            //     "client-reference": "T3D-20251209051318-ed8bc2",
+            //     "enquiry-client-reference": "12344556"
+            // };
             const response = await secondaryApiAxios.post('/v1/equifax/user/get-credit-report', equifaxPayload);
             const score = response.data?.creditScoreData?.score?.score_masterscale || response.data?.creditScore;
 
