@@ -2496,8 +2496,10 @@ export function CustomerDetailsPage() {
                     "suburb": selectedCustomerDetails.address?.suburb || '',
                     "state-code": selectedCustomerDetails.address?.state || ''
                 },
-                "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
                 "gender-code": selectedCustomerDetails.gender === 0 ? 'M' : (selectedCustomerDetails.gender === 1 ? 'F' : 'O'),
+                "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
+                "license-card-number": selectedCustomerDetails.enrollmentDetails?.licenseCardNumber || '',
+                "license-state": selectedCustomerDetails.enrollmentDetails?.licenseState || '',
                 "date-of-birth": selectedCustomerDetails.dob ? formatSydneyTime(selectedCustomerDetails.dob, 'YYYY-MM-DD') : '',
                 "employer-name": selectedCustomerDetails.employerName || '',
                 "account-type-code": "CC",
@@ -3441,7 +3443,7 @@ export function CustomerDetailsPage() {
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">Connection Date</label>
                                             <p className="font-medium">
                                                 {selectedCustomerDetails.enrollmentDetails?.connectiondate
-                                                    ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.connectiondate)
+                                                    ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.connectiondate, 'DD/MM/YYYY')
                                                     : '-'}
                                             </p>
                                         </div>
@@ -3464,19 +3466,19 @@ export function CustomerDetailsPage() {
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">Birth Date</label>
                                             <p className="font-medium">
-                                                {selectedCustomerDetails.dob ? formatSydneyTime(selectedCustomerDetails.dob) : '-'}
+                                                {selectedCustomerDetails.dob ? formatSydneyTime(selectedCustomerDetails.dob, 'DD/MM/YYYY') : '-'}
                                             </p>
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">Sale Type</label>
                                             <p className="font-medium">
-                                                {SALE_TYPE_LABELS[selectedCustomerDetails.enrollmentDetails?.saletype as keyof typeof SALE_TYPE_LABELS] || 'Unknown'}
+                                                {SALE_TYPE_LABELS[selectedCustomerDetails.enrollmentDetails?.saletype as keyof typeof SALE_TYPE_LABELS] || '-'}
                                             </p>
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">Billing Preference</label>
                                             <p className="font-medium">
-                                                {BILLING_PREF_LABELS[selectedCustomerDetails.enrollmentDetails?.billingpreference as keyof typeof BILLING_PREF_LABELS] || 'Unknown'}
+                                                {BILLING_PREF_LABELS[selectedCustomerDetails.enrollmentDetails?.billingpreference as keyof typeof BILLING_PREF_LABELS] || '-'}
                                             </p>
                                         </div>
                                         <div className="space-y-1">
@@ -3511,7 +3513,7 @@ export function CustomerDetailsPage() {
                                             <div className="space-y-1">
                                                 <label className="text-xs text-muted-foreground uppercase font-semibold">License Expiry</label>
                                                 <p className="font-medium">
-                                                    {selectedCustomerDetails.enrollmentDetails?.licenseExpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.licenseExpiry) : '-'}
+                                                    {selectedCustomerDetails.enrollmentDetails?.licenseExpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.licenseExpiry, 'DD/MM/YYYY') : '-'}
                                                 </p>
                                             </div>
                                         </div>
@@ -3534,10 +3536,10 @@ export function CustomerDetailsPage() {
                                             <div className="space-y-1">
                                                 <label className="text-xs text-muted-foreground uppercase font-semibold">ID Expiry</label>
                                                 <p className="font-medium">
-                                                    {selectedCustomerDetails.enrollmentDetails?.idexpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.idexpiry) : '-'}
+                                                    {selectedCustomerDetails.enrollmentDetails?.idexpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.idexpiry, 'DD/MM/YYYY') : '-'}
                                                 </p>
                                             </div>
-                                            
+
                                             {selectedCustomerDetails.enrollmentDetails?.idtype === 0 && (
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-muted-foreground uppercase font-semibold">License Card Number</label>
@@ -3552,8 +3554,8 @@ export function CustomerDetailsPage() {
                                                     <label className="text-xs text-muted-foreground uppercase font-semibold">Medicare Card Type</label>
                                                     <p className="font-medium">
                                                         {selectedCustomerDetails.enrollmentDetails?.medicareCardType === 0 ? 'Standard (Green)' :
-                                                         selectedCustomerDetails.enrollmentDetails?.medicareCardType === 1 ? 'Interim (Blue)' :
-                                                         selectedCustomerDetails.enrollmentDetails?.medicareCardType === 2 ? 'Reciprocal (Yellow)' : '-'}
+                                                            selectedCustomerDetails.enrollmentDetails?.medicareCardType === 1 ? 'Interim (Blue)' :
+                                                                selectedCustomerDetails.enrollmentDetails?.medicareCardType === 2 ? 'Reciprocal (Yellow)' : '-'}
                                                     </p>
                                                 </div>
                                             )}
