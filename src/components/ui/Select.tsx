@@ -24,6 +24,7 @@ export interface SelectProps {
     disabled?: boolean;
     multiple?: boolean;
     creatable?: boolean;
+    isLoading?: boolean;
 
     className?: string;
     containerClassName?: string;
@@ -46,6 +47,7 @@ export function Select({
     required,
     onBlur,
     creatable = false,
+    isLoading = false,
 }: SelectProps) {
     const [isOpen, setIsOpen] = React.useState(false);
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -305,17 +307,21 @@ export function Select({
                                 <CloseIcon size={isCompact ? 10 : 14} />
                             </button>
                         )}
-                        <ChevronDownIcon
-                            size={isCompact ? 12 : 16}
-                            className={cn(
-                                "transition-transform text-muted-foreground",
-                                isOpen && "rotate-180"
-                            )}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggle();
-                            }}
-                        />
+                        {isLoading ? (
+                            <div className="w-4 h-4 rounded-full border-2 border-muted/30 border-t-primary animate-spin" />
+                        ) : (
+                            <ChevronDownIcon
+                                size={isCompact ? 12 : 16}
+                                className={cn(
+                                    "transition-transform text-muted-foreground",
+                                    isOpen && "rotate-180"
+                                )}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggle();
+                                }}
+                            />
+                        )}
                     </div>
                 </div>
 

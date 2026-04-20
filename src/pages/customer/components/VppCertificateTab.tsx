@@ -7,7 +7,7 @@ import { Select } from '@/components/ui/Select';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Modal } from '@/components/common';
 import { apiAxios } from '@/lib/apollo';
-import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES, GET_INVERTER_MAKES } from '@/graphql';
+import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES, GET_INVERTER_MAKES, GET_BATTERY_MODELS, GET_INVERTER_MODELS } from '@/graphql';
 import { FileTextIcon, ZapIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon, DownloadIcon } from '@/components/icons';
 
 interface VppCertificateTabProps {
@@ -69,14 +69,24 @@ export function VppCertificateTab({
         additionalNotes: ''
     });
 
-    const { data: makesData } = useQuery(GET_BATTERY_MAKES);
-    const { data: inverterMakesData } = useQuery(GET_INVERTER_MAKES);
+    const { data: makesData, loading: loadingBatteryMakes } = useQuery(GET_BATTERY_MAKES);
+    const { data: inverterMakesData, loading: loadingInverterMakes } = useQuery(GET_INVERTER_MAKES);
 
     const handleManufacturerChange = (field: 'batteryManufacturer' | 'inverterManufacturer', value: string) => {
+        let capacityUpdate = {};
+
+        if (field === 'batteryManufacturer') {
+            const makeObj = makesData?.batteryMakes?.find((m: any) => m.make === value);
+            if (makeObj?.batteryUsableCapacity) {
+                capacityUpdate = { batteryUsableCapacity: makeObj.batteryUsableCapacity.toString() };
+            }
+        }
+
         setFormState(prev => ({
             ...prev,
             [field]: value,
-            [field === 'batteryManufacturer' ? 'batteryModel' : 'inverterModel']: ''
+            [field === 'batteryManufacturer' ? 'batteryModel' : 'inverterModel']: '',
+            ...capacityUpdate
         }));
     };
 
@@ -89,6 +99,49 @@ export function VppCertificateTab({
         value: m.make,
         label: m.make
     })) || [];
+
+    const selectedBatteryMake = makesData?.batteryMakes?.find((m: any) => m.make?.toLowerCase() === formState.batteryManufacturer?.toLowerCase());
+    const selectedInverterMake = inverterMakesData?.inverterMakes?.find((m: any) => m.make?.toLowerCase() === formState.inverterManufacturer?.toLowerCase());
+
+    const { data: batteryModelsData, loading: loadingBatteryModels } = useQuery(GET_BATTERY_MODELS, {
+        variables: { makeUid: selectedBatteryMake?.uid },
+        skip: !selectedBatteryMake?.uid,
+        fetchPolicy: 'cache-first'
+    });
+
+    const { data: inverterModelsData, loading: loadingInverterModels } = useQuery(GET_INVERTER_MODELS, {
+        variables: { makeUid: selectedInverterMake?.uid },
+        skip: !selectedInverterMake?.uid,
+        fetchPolicy: 'cache-first'
+    });
+
+    const batteryModelOptions = batteryModelsData?.batteryModels?.filter((m: any) => m.isActive).map((m: any) => ({
+        value: m.model,
+        label: m.model
+    })) || [];
+
+    const inverterModelOptions = inverterModelsData?.inverterModels?.filter((m: any) => m.isActive).map((m: any) => ({
+        value: m.model,
+        label: m.model
+    })) || [];
+
+    const handleBatteryModelChange = (value: string) => {
+        const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.model === value);
+        setFormState(prev => ({
+            ...prev,
+            batteryModel: value,
+            ...(modelObj?.capacity ? { batteryUsableCapacity: modelObj.capacity.toString() } : {})
+        }));
+    };
+
+    const handleInverterModelChange = (value: string) => {
+        const modelObj = inverterModelsData?.inverterModels?.find((m: any) => m.model === value);
+        setFormState(prev => ({
+            ...prev,
+            inverterModel: value,
+            ...(modelObj?.capacity ? { inverterCapacity: modelObj.capacity.toString() } : {})
+        }));
+    };
 
     const STEPS = [
         { id: 1, label: 'Solar and Inverter Details', icon: SunIcon },
@@ -404,11 +457,19 @@ export function VppCertificateTab({
                                         options={inverterMakeOptions}
                                         placeholder="Select brand"
                                         creatable
+                                        isLoading={loadingInverterMakes}
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Model</label>
-                                    <Input name="inverterModel" value={formState.inverterModel} onChange={handleChange} placeholder="Enter model name" />
+                                    <Select
+                                        value={formState.inverterModel}
+                                        onChange={(v) => handleInverterModelChange(v as string)}
+                                        options={inverterModelOptions}
+                                        placeholder="Select model"
+                                        creatable={true}
+                                        isLoading={loadingInverterModels}
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
@@ -451,11 +512,20 @@ export function VppCertificateTab({
                                         placeholder="Select brand"
                                         disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryManufacturer}
                                         creatable
+                                        isLoading={loadingBatteryMakes}
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Model</label>
-                                    <Input name="batteryModel" value={formState.batteryModel} onChange={handleChange} placeholder="Enter model name" />
+                                    <Select
+                                        value={formState.batteryModel}
+                                        onChange={(v) => handleBatteryModelChange(v as string)}
+                                        options={batteryModelOptions}
+                                        placeholder="Select model"
+                                        disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryModel}
+                                        creatable={true}
+                                        isLoading={loadingBatteryModels}
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
