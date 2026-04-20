@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
-import { useAccessibleMenus } from '@/stores/useAuthStore';
+import { useAccessibleMenus, useUser } from '@/stores/useAuthStore';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -70,6 +70,7 @@ const getRoleBadgeClass = (role: string) => {
 };
 
 export function UsersPage() {
+    const currentUser = useUser();
     const [roleFilter, setRoleFilter] = useState<string>('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ACTIVE');
     const [searchQuery, setSearchQuery] = useState('');
@@ -164,18 +165,6 @@ export function UsersPage() {
     useEffect(() => {
         if (data?.users?.data) {
             let fetchedUsers = data.users.data;
-
-            // If status filter is ACTIVE, ensure we only keep non-deleted and active users
-            // Or if filter is INACTIVE, keep non-deleted and inactive.
-            // However, the API *should* ideally handle this via the `status` variable passed to it.
-            // But if the API returns mixed results or if we are doing client side logic:
-
-            if (statusFilter === 'ACTIVE') {
-                fetchedUsers = fetchedUsers.filter(u => !u.isDeleted && u.isActive);
-            } else if (statusFilter === 'INACTIVE') {
-                fetchedUsers = fetchedUsers.filter(u => !u.isDeleted && !u.isActive);
-            }
-            // If ALL, show everything (including deleted if API returns them)
 
             if (page === 1) {
                 setAllUsers(fetchedUsers);
@@ -300,7 +289,7 @@ export function UsersPage() {
         setFormData({
             name: user.name || '',
             email: user.email || '',
-            password: user.password || '', // Prefill with actual password hash
+            password: '',
             number: user.number || '',
             roleUid: user.roleUid || '',
             ipAddress: user.ipAddress || '',
@@ -586,7 +575,7 @@ export function UsersPage() {
                                     </button>
                                 </Tooltip>
                             )}
-                            {userPermissions.canDelete && (
+                            {userPermissions.canDelete && currentUser?.uid !== user.uid && (
                                 <Tooltip content="Delete user">
                                     <button
                                         className="p-2 border border-red-200 dark:border-red-800 rounded-lg bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
@@ -875,14 +864,14 @@ export function UsersPage() {
                             <ShieldCheckIcon size={16} className="text-primary" />
                             IP Security Settings
                         </h4>
-                        
+
                         <div className="space-y-4">
                             <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-gray-50 dark:bg-gray-900/50">
                                 <div>
                                     <p className="text-sm font-medium">Allow Login Without Specific IP</p>
                                     <p className="text-xs text-muted-foreground">If disabled, this user can only log in from the authorized IP below.</p>
                                 </div>
-                                <Switch 
+                                <Switch
                                     checked={formData.isAllowedWithoutIp === 1}
                                     onChange={(checked: boolean) => setFormData(prev => ({ ...prev, isAllowedWithoutIp: checked ? 1 : 0 }))}
                                 />

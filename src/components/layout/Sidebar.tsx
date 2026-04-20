@@ -50,7 +50,8 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     leads: UserIcon,
     battery_master: BatteryIcon,
     inverter_master: InverterIcon,
-    master_data: ShieldCheckIcon
+    master_data: ShieldCheckIcon,
+    customer_approvals: ShieldCheckIcon
 };
 
 // Path mapping
@@ -74,7 +75,8 @@ const pathMap: Record<string, string> = {
     leads: '/leads',
     battery_master: '/battery-master',
     inverter_master: '/inverter-master',
-    master_data: '/master-data'
+    master_data: '/master-data',
+    customer_approvals: '/customer-approvals'
     // user_management and email have no path, they are groupers
 };
 

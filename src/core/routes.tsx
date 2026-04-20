@@ -13,6 +13,7 @@ const ChangePasswordPage = lazyWithRetry(() => import('@/pages/user/ChangePasswo
 const CustomersPage = lazyWithRetry(() => import('@/pages/customer/CustomersPage').then(m => ({ default: m.CustomersPage })));
 const CustomerFormPage = lazyWithRetry(() => import('@/pages/customer/CustomerFormPage').then(m => ({ default: m.CustomerFormPage })));
 const CustomerDetailsPage = lazyWithRetry(() => import('@/pages/customer/CustomerDetailsPage').then(m => ({ default: m.CustomerDetailsPage })));
+const CustomerApprovalsPage = lazyWithRetry(() => import('@/pages/customer/CustomerApprovalsPage').then(m => ({ default: m.CustomerApprovalsPage })));
 const RatesPage = lazyWithRetry(() => import('@/pages/rates/RatesPage').then(m => ({ default: m.RatesPage })));
 const OfferAccessPage = lazyWithRetry(() => import('@/pages/OfferAccessPage').then(m => ({ default: m.OfferAccessPage })));
 const NotFoundPage = lazyWithRetry(() => import('@/pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
@@ -81,6 +82,7 @@ const router = createBrowserRouter(
                 <Route path="/customers/new" element={<RequirePermission menuCode="customers"><CustomerFormPage /></RequirePermission>} />
                 <Route path="/customers/:uid" element={<RequirePermission menuCode="customers"><CustomerDetailsPage /></RequirePermission>} />
                 <Route path="/customers/:uid/edit" element={<RequirePermission menuCode="customers"><CustomerFormPage /></RequirePermission>} />
+                <Route path="/customer-approvals" element={<RequirePermission menuCode="customer_approvals"><CustomerApprovalsPage /></RequirePermission>} />
                 <Route path="/users" element={<RequirePermission menuCode="users"><UsersPage /></RequirePermission>} />
                 <Route path="/roles" element={<RequirePermission menuCode="roles"><RolePage /></RequirePermission>} />
                 <Route path="/rates" element={<RequirePermission menuCode="rates"><RatesPage /></RequirePermission>} />

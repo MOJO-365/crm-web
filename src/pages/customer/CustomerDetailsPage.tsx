@@ -3436,7 +3436,7 @@ export function CustomerDetailsPage() {
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">Property Type</label>
                                             <p className="font-medium">
-                                                {selectedCustomerDetails.businessName ? 'Commercial' : 'Residential'}
+                                                {selectedCustomerDetails.propertyType === 1 ? 'Commercial' : 'Residential'}
                                             </p>
                                         </div>
                                         <div className="space-y-1">

@@ -278,3 +278,14 @@ export const GENERATE_VPP_CERTIFICATE = gql`
     }
 }
 `;
+
+export const APPROVE_WEB_ENROLLMENT = gql`
+    mutation ApproveWebEnrollment($uid: String!) {
+        approveWebEnrollment(uid: $uid) {
+            uid
+            firstName
+            lastName
+            email
+        }
+    }
+`;

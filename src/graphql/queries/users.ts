@@ -24,6 +24,8 @@ export const GET_USERS = gql`
                 isActive
                 isDeleted
                 createdAt
+                ipAddress
+                isAllowedWithoutIp
             }
         }
     }
@@ -43,6 +45,8 @@ export const GET_USER_BY_ID = gql`
             isActive
             isDeleted
             createdAt
+            ipAddress
+            isAllowedWithoutIp
         }
     }
 `;

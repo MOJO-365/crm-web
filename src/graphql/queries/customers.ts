@@ -1424,3 +1424,22 @@ export const GET_NEXT_CUSTOMER_ID = gql`
         getNextCustomerId
     }
 `;
+export const GET_WEB_ENROLLMENTS = gql`
+    query GetWebEnrollments($page: Int, $limit: Int, $search: String) {
+        webEnrollments(page: $page, limit: $limit, search: $search) {
+            data {
+                id
+                uid
+                payload
+                processed
+                createdAt
+            }
+            meta {
+                totalRecords
+                currentPage
+                totalPages
+                recordsPerPage
+            }
+        }
+    }
+`;
