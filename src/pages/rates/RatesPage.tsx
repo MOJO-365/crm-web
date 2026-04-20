@@ -21,6 +21,9 @@ import { STATE_OPTIONS, DNSP_OPTIONS, DNSP_MAP, RATE_TYPE_MAP } from '@/lib/cons
 import { Tooltip } from '@/components/ui/Tooltip';
 import { RatesHistoryModal } from './components/RatesHistoryModal';
 import { v4 as uuidv4 } from 'uuid';
+import { Switch } from '@/components/ui/Switch';
+import { cn } from '@/lib/utils';
+
 
 
 // Interfaces based on the query
@@ -182,7 +185,8 @@ export function RatesPage() {
     const [ratePlanToRestore, setRatePlanToRestore] = useState<RatePlan | null>(null);
     const [isRestoring, setIsRestoring] = useState(false);
 
-    // Mutations
+    const [isGSTInclusive, setIsGSTInclusive] = useState(false);
+
     // Mutations
     const [createRatePlan] = useMutation(CREATE_RATE_PLAN);
     // const [updateRatePlan] = useMutation(UPDATE_RATE_PLAN);
@@ -1112,402 +1116,437 @@ export function RatesPage() {
 
 
 
-    const columns: Column<RatePlan>[] = useMemo(() => [
+    const columns: Column<RatePlan>[] = useMemo(() => {
+        const getRateValue = (val: any, inclusive: boolean) => {
+            if (val === undefined || val === null || val === '') return '-';
+            const num = parseFloat(String(val));
+            if (isNaN(num)) return val;
+            return inclusive ? Number((num * 1.1).toFixed(6)) : num;
+        };
 
+        const renderRate = (val: any) => {
+            if (val === undefined || val === null || val === '') return '-';
+            const num = parseFloat(String(val));
+            if (isNaN(num)) return val;
+            
+            const exc = getRateValue(val, false);
+            if (!isGSTInclusive) return exc;
 
-        {
-            key: 'state',
-            header: 'State',
-            width: 'w-[60px]',
-            sticky: 'left' as const,
-            stickyOffset: 0,
-            render: (row: RatePlan) => (
-                <Tooltip content={isFieldChanged(row, 'state') ? `Old: ${getOldValue(row, 'state')}` : null}>
-                    <span className={isFieldChanged(row, 'state') ? 'bg-orange-800 text-white font-bold px-2 py-0.5 rounded' : ''}>{row.state || '-'}</span>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'codes',
-            header: 'Code',
-            width: 'w-[150px]',
-            sticky: 'left' as const,
-            stickyOffset: 60,
-            render: (row: RatePlan) => {
-                let codes: string[] = [];
-                if (Array.isArray(row.codes)) {
-                    codes = row.codes;
-                } else if (typeof row.codes === 'string') {
-                    try {
-                        // Try parsing as JSON first (e.g. "[\"E1\"]")
-                        const parsed = JSON.parse(row.codes);
-                        if (Array.isArray(parsed)) codes = parsed;
-                        else codes = [row.codes];
-                    } catch {
-                        // Fallback to comma separation or single value
-                        codes = (row.codes as string).includes(',')
-                            ? (row.codes as string).split(',').map(c => c.trim())
-                            : [row.codes];
-                    }
-                }
+            const inc = getRateValue(val, true);
+            return (
+                <div className="flex flex-col leading-tight items-center py-0.5">
+                    <span className="text-xs">{exc}</span>
+                    <span className="text-[10px] opacity-80 font-medium whitespace-nowrap">({inc})</span>
+                </div>
+            );
+        };
+        
+        const displayRate = (val: any) => getRateValue(val, isGSTInclusive);
 
-                const codesChanged = isFieldChanged(row, 'codes');
+        return [
 
-                return (
-                    <Tooltip content={codesChanged ? `Old: ${getOldValue(row, 'codes')}` : null}>
-                        <div className={`flex flex-wrap gap-1 ${codesChanged ? 'bg-orange-300 dark:bg-orange-700/50 -m-2 p-2 rounded ring-1 ring-orange-400' : ''}`}>
-                            {codes.map((code, idx) => (
-                                <span key={idx} className={`text-xs px-2 py-0.5 rounded ${codesChanged ? 'bg-orange-800 text-white dark:bg-orange-500/50 dark:text-orange-100 font-bold' : 'bg-gray-100 text-gray-900 dark:bg-zinc-700 dark:text-zinc-100'}`}>
-                                    {code}
-                                </span>
-                            )) || '-'}
-                        </div>
+            {
+                key: 'state',
+                header: 'State',
+                width: 'w-[60px]',
+                sticky: 'left' as const,
+                stickyOffset: 0,
+                render: (row: RatePlan) => (
+                    <Tooltip content={isFieldChanged(row, 'state') ? `Old: ${getOldValue(row, 'state')}` : null}>
+                        <span className={isFieldChanged(row, 'state') ? 'bg-orange-800 text-white font-bold px-2 py-0.5 rounded' : ''}>{row.state || '-'}</span>
                     </Tooltip>
-                );
+                ),
             },
-        },
-        {
-            key: 'dnsp',
-            header: 'DNSP',
-            width: 'w-[120px]',
-            render: (row: RatePlan) => (
-                <div className={isFieldChanged(row, 'dnsp') ? "bg-orange-800 text-white -m-2 p-2 rounded ring-1 ring-orange-500" : ""}>
-                    <Tooltip content={isFieldChanged(row, 'dnsp') ? `Old: ${DNSP_MAP[String(getOldValue(row, 'dnsp'))] || getOldValue(row, 'dnsp')}` : null}>
-                        <StatusField type="dnsp" value={row.dnsp} mode="badge" />
-                    </Tooltip>
-                </div>
-            ),
-        },
-        {
-            key: 'type',
-            header: 'Type',
-            width: 'w-[120px]',
-            render: (row: RatePlan) => (
-                <div className={isFieldChanged(row, 'type') ? "bg-orange-800 text-white -m-2 p-2 rounded ring-1 ring-orange-500" : ""}>
-                    <Tooltip content={isFieldChanged(row, 'type') ? `Old: ${RATE_TYPE_MAP[String(getOldValue(row, 'type'))] || getOldValue(row, 'type')}` : null}>
-                        <StatusField type="rate_type" value={row.type} mode="badge" />
-                    </Tooltip>
-                </div>
-            ),
-        },
-        {
-            key: 'anytime',
-            header: 'Anytime',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_anytime') ? `Old: ${getOldValue(row, 'offer_anytime')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_anytime') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-orange-200 text-orange-950 dark:bg-orange-900/20 dark:text-orange-400'}`}>
-                        {row.offers?.[0]?.anytime || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'peak',
-            header: 'Peak',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_peak') ? `Old: ${getOldValue(row, 'offer_peak')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_peak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
-                        {row.offers?.[0]?.peak || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'shoulder',
-            header: 'Shoulder',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_shoulder') ? `Old: ${getOldValue(row, 'offer_shoulder')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_shoulder') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
-                        {row.offers?.[0]?.shoulder || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'offPeak',
-            header: 'Off-Peak',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_offPeak') ? `Old: ${getOldValue(row, 'offer_offPeak')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_offPeak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
-                        {row.offers?.[0]?.offPeak || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'supplyCharge',
-            header: 'Supply Charge',
-            width: 'w-[120px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_supplyCharge') ? `Old: ${getOldValue(row, 'offer_supplyCharge')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_supplyCharge') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-purple-200 text-purple-950 dark:bg-purple-900/20 dark:text-purple-400'}`}>
-                        {row.offers?.[0]?.supplyCharge || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'cl1Supply',
-            header: 'CL1 Supply',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl1Supply') ? `Old: ${getOldValue(row, 'offer_cl1Supply')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl1Supply') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
-                        {row.offers?.[0]?.cl1Supply || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'cl1Usage',
-            header: 'CL1 Usage', // Assuming 'Usage' in image maps here or CL1 Usage
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl1Usage') ? `Old: ${getOldValue(row, 'offer_cl1Usage')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl1Usage') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
-                        {row.offers?.[0]?.cl1Usage || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'cl2Supply',
-            header: 'CL2 Supply',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl2Supply') ? `Old: ${getOldValue(row, 'offer_cl2Supply')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl2Supply') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
-                        {row.offers?.[0]?.cl2Supply || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'cl2Usage',
-            header: 'CL2 Usage',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl2Usage') ? `Old: ${getOldValue(row, 'offer_cl2Usage')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl2Usage') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
-                        {row.offers?.[0]?.cl2Usage || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'demand',
-            header: 'Demand',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_demand') ? `Old: ${getOldValue(row, 'offer_demand')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demand') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
-                        {row.offers?.[0]?.demand || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'demandOp',
-            header: 'Demand(OP)',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_demandOp') ? `Old: ${getOldValue(row, 'offer_demandOp')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandOp') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
-                        {row.offers?.[0]?.demandOp || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'demandP',
-            header: 'Demand(P)',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_demandP') ? `Old: ${getOldValue(row, 'offer_demandP')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandP') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
-                        {row.offers?.[0]?.demandP || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'demandS',
-            header: 'Demand(S)',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_demandS') ? `Old: ${getOldValue(row, 'offer_demandS')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandS') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
-                        {row.offers?.[0]?.demandS || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'fit',
-            header: 'FIT',
-            width: 'w-[80px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_fit') ? `Old: ${getOldValue(row, 'offer_fit')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fit') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
-                        {row.offers?.[0]?.fit || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'fitPeak',
-            header: 'Premium FIT',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitPeak') ? `Old: ${getOldValue(row, 'offer_fitPeak')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitPeak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
-                        {row.offers?.[0]?.fitPeak || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'fitCritical',
-            header: 'CRITICAL EVENT FIT',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitCritical') ? `Old: ${getOldValue(row, 'offer_fitCritical')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitCritical') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
-                        {row.offers?.[0]?.fitCritical || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'fitVpp',
-            header: 'BASE FIT',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitVpp') ? `Old: ${getOldValue(row, 'offer_fitVpp')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitVpp') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
-                        {row.offers?.[0]?.fitVpp || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        {
-            key: 'vppOrcharge',
-            header: 'VPP Orchestration',
-            width: 'w-[140px]',
-            render: (row: RatePlan) => (
-                <Tooltip fullWidth content={isFieldChanged(row, 'offer_vppOrcharge') ? `Old: ${getOldValue(row, 'offer_vppOrcharge')}` : null}>
-                    <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_vppOrcharge') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
-                        {row.offers?.[0]?.vppOrcharge || '-'}
-                    </div>
-                </Tooltip>
-            ),
-        },
-        ...dynamicFieldNames.map(fieldName => ({
-            key: `dynamic_${fieldName}`,
-            header: fieldName,
-            width: 'w-[150px]',
-            render: (row: RatePlan) => {
-                const rate = row.offers?.[0]?.dynamicRates?.find(r => r.name?.toLowerCase() === fieldName.toLowerCase());
-                if (!rate) return '-';
-                const isChanged = isFieldChanged(row, `dynamic_${fieldName}`);
-                const oldValue = getOldValue(row, `dynamic_${fieldName}`);
+            {
+                key: 'codes',
+                header: 'Code',
+                width: 'w-[150px]',
+                sticky: 'left' as const,
+                stickyOffset: 60,
+                render: (row: RatePlan) => {
+                    let codes: string[] = [];
+                    if (Array.isArray(row.codes)) {
+                        codes = row.codes;
+                    } else if (typeof row.codes === 'string') {
+                        try {
+                            // Try parsing as JSON first (e.g. "[\"E1\"]")
+                            const parsed = JSON.parse(row.codes);
+                            if (Array.isArray(parsed)) codes = parsed;
+                            else codes = [row.codes];
+                        } catch {
+                            // Fallback to comma separation or single value
+                            codes = (row.codes as string).includes(',')
+                                ? (row.codes as string).split(',').map(c => c.trim())
+                                : [row.codes];
+                        }
+                    }
 
-                return (
-                    <Tooltip fullWidth content={isChanged ? `Old: ${oldValue}` : null}>
-                        <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isChanged ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-100 text-blue-950 dark:bg-blue-900/20 dark:text-blue-300'}`}>
-                            {rate.value}
-                        </div>
-                    </Tooltip>
-                );
-            }
-        })),
-        {
-            key: 'discount',
-            header: 'Discount',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => {
-                const isChanged = isFieldChanged(row, 'discountApplies') || isFieldChanged(row, 'discountPercentage');
-                return (
-                    <div className={isChanged ? "bg-orange-800 -m-2 p-2 rounded ring-1 ring-orange-500" : ""}>
-                        <Tooltip content={isChanged ? `Old: ${getOldValue(row, 'discountApplies') ? 'Yes' : 'No'}` : null}>
-                            <div className={`w-11 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${row.discountApplies ? 'bg-primary' : 'bg-gray-300'}`} onClick={() => console.log('Toggle Discount', row.uid)}>
-                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${row.discountApplies ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                    const codesChanged = isFieldChanged(row, 'codes');
+
+                    return (
+                        <Tooltip content={codesChanged ? `Old: ${getOldValue(row, 'codes')}` : null}>
+                            <div className={`flex flex-wrap gap-1 ${codesChanged ? 'bg-orange-300 dark:bg-orange-700/50 -m-2 p-2 rounded ring-1 ring-orange-400' : ''}`}>
+                                {codes.map((code, idx) => (
+                                    <span key={idx} className={`text-xs px-2 py-0.5 rounded ${codesChanged ? 'bg-orange-800 text-white dark:bg-orange-500/50 dark:text-orange-100 font-bold' : 'bg-gray-100 text-gray-900 dark:bg-zinc-700 dark:text-zinc-100'}`}>
+                                        {code}
+                                    </span>
+                                )) || '-'}
                             </div>
                         </Tooltip>
-                    </div>
-                );
+                    );
+                },
             },
-        },
-        {
-            key: 'tariff',
-            header: 'Tariff Code',
-            width: 'w-[100px]',
-            render: (row: RatePlan) => <span className="font-medium text-foreground">{row.tariff || '-'}</span>,
-        },
-        {
-            key: 'planId',
-            header: 'Plan ID',
-            width: 'w-[150px]',
-            render: (row: RatePlan) => <span className="font-medium text-foreground">{row.planId || '-'}</span>,
-        },
-        {
-            key: 'updatedAt',
-            header: 'Updated',
-            width: 'w-[150px]',
-            render: (row: RatePlan) => <span className="text-muted-foreground">{formatSydneyTime(row.updatedAt)}</span>,
-        },
-        {
-            key: 'actions',
-            header: 'Actions',
-            width: 'w-[100px]',
-            sticky: 'right' as const,
-            stickyOffset: 0,
-            render: (row: RatePlan) => (
-                <div className="flex items-center gap-2">
-                    {row.isDeleted ? (
-                        canDelete && (
-                            <Tooltip content="Restore Rate">
-                                <button
-                                    className="p-2 border border-green-200 dark:border-green-800 rounded-lg bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
-                                    onClick={() => handleRestoreClick(row)}
-                                >
-                                    <RefreshCwIcon size={16} />
-                                </button>
+            {
+                key: 'dnsp',
+                header: 'DNSP',
+                width: 'w-[120px]',
+                render: (row: RatePlan) => (
+                    <div className={isFieldChanged(row, 'dnsp') ? "bg-orange-800 text-white -m-2 p-2 rounded ring-1 ring-orange-500" : ""}>
+                        <Tooltip content={isFieldChanged(row, 'dnsp') ? `Old: ${DNSP_MAP[String(getOldValue(row, 'dnsp'))] || getOldValue(row, 'dnsp')}` : null}>
+                            <StatusField type="dnsp" value={row.dnsp} mode="badge" />
+                        </Tooltip>
+                    </div>
+                ),
+            },
+            {
+                key: 'type',
+                header: 'Type',
+                width: 'w-[120px]',
+                render: (row: RatePlan) => (
+                    <div className={isFieldChanged(row, 'type') ? "bg-orange-800 text-white -m-2 p-2 rounded ring-1 ring-orange-500" : ""}>
+                        <Tooltip content={isFieldChanged(row, 'type') ? `Old: ${RATE_TYPE_MAP[String(getOldValue(row, 'type'))] || getOldValue(row, 'type')}` : null}>
+                            <StatusField type="rate_type" value={row.type} mode="badge" />
+                        </Tooltip>
+                    </div>
+                ),
+            },
+            {
+                key: 'anytime',
+                header: 'Anytime',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_anytime') ? `Old: ${displayRate(getOldValue(row, 'offer_anytime'))}` : null}>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_anytime') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-orange-200 text-orange-950 dark:bg-orange-900/20 dark:text-orange-400'}`}>
+                            {renderRate(row.offers?.[0]?.anytime)}
+                        </div>
+                    </Tooltip>
+                ),
+            },
+            {
+                key: 'peak',
+                header: 'Peak',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_peak') ? `Old: ${displayRate(getOldValue(row, 'offer_peak'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_peak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
+                        {renderRate(row.offers?.[0]?.peak)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'shoulder',
+                header: 'Shoulder',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_shoulder') ? `Old: ${displayRate(getOldValue(row, 'offer_shoulder'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_shoulder') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
+                        {renderRate(row.offers?.[0]?.shoulder)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'offPeak',
+                header: 'Off-Peak',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_offPeak') ? `Old: ${displayRate(getOldValue(row, 'offer_offPeak'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_offPeak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
+                        {renderRate(row.offers?.[0]?.offPeak)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'supplyCharge',
+                header: 'Supply Charge',
+                width: 'w-[120px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_supplyCharge') ? `Old: ${displayRate(getOldValue(row, 'offer_supplyCharge'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_supplyCharge') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-purple-200 text-purple-950 dark:bg-purple-900/20 dark:text-purple-400'}`}>
+                        {renderRate(row.offers?.[0]?.supplyCharge)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'cl1Supply',
+                header: 'CL1 Supply',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl1Supply') ? `Old: ${displayRate(getOldValue(row, 'offer_cl1Supply'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl1Supply') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
+                        {renderRate(row.offers?.[0]?.cl1Supply)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'cl1Usage',
+                header: 'CL1 Usage', // Assuming 'Usage' in image maps here or CL1 Usage
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl1Usage') ? `Old: ${displayRate(getOldValue(row, 'offer_cl1Usage'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl1Usage') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
+                        {renderRate(row.offers?.[0]?.cl1Usage)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'cl2Supply',
+                header: 'CL2 Supply',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl2Supply') ? `Old: ${displayRate(getOldValue(row, 'offer_cl2Supply'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl2Supply') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
+                        {renderRate(row.offers?.[0]?.cl2Supply)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'cl2Usage',
+                header: 'CL2 Usage',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl2Usage') ? `Old: ${displayRate(getOldValue(row, 'offer_cl2Usage'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl2Usage') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
+                        {renderRate(row.offers?.[0]?.cl2Usage)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'demand',
+                header: 'Demand',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_demand') ? `Old: ${displayRate(getOldValue(row, 'offer_demand'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demand') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
+                        {renderRate(row.offers?.[0]?.demand)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'demandOp',
+                header: 'Demand(OP)',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_demandOp') ? `Old: ${displayRate(getOldValue(row, 'offer_demandOp'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandOp') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
+                        {renderRate(row.offers?.[0]?.demandOp)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'demandP',
+                header: 'Demand(P)',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_demandP') ? `Old: ${displayRate(getOldValue(row, 'offer_demandP'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandP') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
+                        {renderRate(row.offers?.[0]?.demandP)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'demandS',
+                header: 'Demand(S)',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_demandS') ? `Old: ${displayRate(getOldValue(row, 'offer_demandS'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandS') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
+                        {renderRate(row.offers?.[0]?.demandS)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            {
+                key: 'fit',
+                header: 'FIT',
+                width: 'w-[80px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_fit') ? `Old: ${getOldValue(row, 'offer_fit')}` : null}>
+                        <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fit') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
+                            {row.offers?.[0]?.fit || '-'}
+                        </div>
+                    </Tooltip>
+                ),
+            },
+            {
+                key: 'fitPeak',
+                header: 'Premium FIT',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitPeak') ? `Old: ${getOldValue(row, 'offer_fitPeak')}` : null}>
+                        <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitPeak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
+                            {row.offers?.[0]?.fitPeak || '-'}
+                        </div>
+                    </Tooltip>
+                ),
+            },
+            {
+                key: 'fitCritical',
+                header: 'CRITICAL EVENT FIT',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitCritical') ? `Old: ${getOldValue(row, 'offer_fitCritical')}` : null}>
+                        <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitCritical') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
+                            {row.offers?.[0]?.fitCritical || '-'}
+                        </div>
+                    </Tooltip>
+                ),
+            },
+            {
+                key: 'fitVpp',
+                header: 'BASE FIT',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitVpp') ? `Old: ${getOldValue(row, 'offer_fitVpp')}` : null}>
+                        <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitVpp') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
+                            {row.offers?.[0]?.fitVpp || '-'}
+                        </div>
+                    </Tooltip>
+                ),
+            },
+            {
+                key: 'vppOrcharge',
+                header: 'VPP Orchestration',
+                width: 'w-[140px]',
+                render: (row: RatePlan) => (
+                    <Tooltip fullWidth content={isFieldChanged(row, 'offer_vppOrcharge') ? `Old: ${displayRate(getOldValue(row, 'offer_vppOrcharge'))}` : null}>
+                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_vppOrcharge') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
+                        {renderRate(row.offers?.[0]?.vppOrcharge)}
+                    </div>
+                </Tooltip>
+                ),
+            },
+            ...dynamicFieldNames.map(fieldName => ({
+                key: `dynamic_${fieldName}`,
+                header: fieldName,
+                width: 'w-[150px]',
+                render: (row: RatePlan) => {
+                    const rate = row.offers?.[0]?.dynamicRates?.find(r => r.name?.toLowerCase() === fieldName.toLowerCase());
+                    if (!rate) return '-';
+                    const isChanged = isFieldChanged(row, `dynamic_${fieldName}`);
+                    const oldValue = getOldValue(row, `dynamic_${fieldName}`);
+
+                    return (
+                        <Tooltip fullWidth content={isChanged ? `Old: ${displayRate(oldValue)}` : null}>
+                            <div className={`py-1 rounded font-bold text-xs w-full text-center ${isChanged ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-100 text-blue-950 dark:bg-blue-900/20 dark:text-blue-300'}`}>
+                                {renderRate(rate.value)}
+                            </div>
+                        </Tooltip>
+                    );
+                }
+            })),
+            {
+                key: 'discount',
+                header: 'Discount',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => {
+                    const isChanged = isFieldChanged(row, 'discountApplies') || isFieldChanged(row, 'discountPercentage');
+                    return (
+                        <div className={cn(isChanged && "bg-orange-800 -m-2 p-2 rounded ring-1 ring-orange-500", isGSTInclusive && "opacity-50 pointer-events-none")}>
+                            <Tooltip content={isGSTInclusive ? "Disabled in GST Inclusive mode" : (isChanged ? `Old: ${getOldValue(row, 'discountApplies') ? 'Yes' : 'No'}` : null)}>
+                                <div className={cn("w-11 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors", row.discountApplies ? 'bg-primary' : 'bg-gray-300')} onClick={() => !isGSTInclusive && console.log('Toggle Discount', row.uid)}>
+                                    <div className={cn("bg-white w-4 h-4 rounded-full shadow-md transform transition-transform", row.discountApplies ? 'translate-x-5' : 'translate-x-0')}></div>
+                                </div>
                             </Tooltip>
-                        )
-                    ) : (
-                        <>
-                            {canEdit && (
-                                <Tooltip content="Edit Rate">
+                        </div>
+                    );
+                },
+            },
+            {
+                key: 'tariff',
+                header: 'Tariff Code',
+                width: 'w-[100px]',
+                render: (row: RatePlan) => <span className="font-medium text-foreground">{row.tariff || '-'}</span>,
+            },
+            {
+                key: 'planId',
+                header: 'Plan ID',
+                width: 'w-[150px]',
+                render: (row: RatePlan) => <span className="font-medium text-foreground">{row.planId || '-'}</span>,
+            },
+            {
+                key: 'updatedAt',
+                header: 'Updated',
+                width: 'w-[150px]',
+                render: (row: RatePlan) => <span className="text-muted-foreground">{formatSydneyTime(row.updatedAt)}</span>,
+            },
+            {
+                key: 'actions',
+                header: 'Actions',
+                width: 'w-[100px]',
+                sticky: 'right' as const,
+                stickyOffset: 0,
+                render: (row: RatePlan) => (
+                    <div className="flex items-center gap-2">
+                        {row.isDeleted ? (
+                            canDelete && (
+                                <Tooltip content="Restore Rate">
                                     <button
-                                        className="p-2 border border-border rounded-lg bg-card hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                                        onClick={() => handleEditRate(row)}
+                                        className="p-2 border border-green-200 dark:border-green-800 rounded-lg bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+                                        onClick={() => handleRestoreClick(row)}
                                     >
-                                        <PencilIcon size={16} />
+                                        <RefreshCwIcon size={16} />
                                     </button>
                                 </Tooltip>
-                            )}
-                            {canDelete && (
-                                <Tooltip content="Delete Rate">
-                                    <button
-                                        className="p-2 border border-red-200 dark:border-red-800 rounded-lg bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
-                                        onClick={() => handleDeleteClick(row)}
-                                    >
-                                        <TrashIcon size={16} />
-                                    </button>
-                                </Tooltip>
-                            )}
-                        </>
-                    )}
-                    {!canEdit && !canDelete && !row.isDeleted && <span className="text-muted-foreground">-</span>}
-                </div>
-            )
-        },
-    ], [handleEditRate, handleDeleteClick, handleRestoreClick, canEdit, canDelete, isFieldChanged, getOldValue, dynamicFieldNames, unitMap]);
+                            )
+                        ) : (
+                            <>
+                                {canEdit && (
+                                    <Tooltip content={isGSTInclusive ? "Edit disabled in GST Inclusive mode" : "Edit Rate"}>
+                                        <button
+                                            className={cn(
+                                                "p-2 border border-border rounded-lg bg-card transition-colors",
+                                                isGSTInclusive ? "opacity-50 cursor-not-allowed" : "hover:bg-accent text-muted-foreground hover:text-foreground"
+                                            )}
+                                            onClick={() => !isGSTInclusive && handleEditRate(row)}
+                                            disabled={isGSTInclusive}
+                                        >
+                                            <PencilIcon size={16} />
+                                        </button>
+                                    </Tooltip>
+                                )}
+                                {canDelete && (
+                                    <Tooltip content={isGSTInclusive ? "Delete disabled in GST Inclusive mode" : "Delete Rate"}>
+                                        <button
+                                            className={cn(
+                                                "p-2 border border-red-200 dark:border-red-800 rounded-lg bg-red-50 dark:bg-red-900/30 transition-colors",
+                                                isGSTInclusive ? "opacity-50 cursor-not-allowed" : "hover:bg-red-100 dark:hover:bg-red-900/50 text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                                            )}
+                                            onClick={() => !isGSTInclusive && handleDeleteClick(row)}
+                                            disabled={isGSTInclusive}
+                                        >
+                                            <TrashIcon size={16} />
+                                        </button>
+                                    </Tooltip>
+                                )}
+                            </>
+                        )}
+                        {!canEdit && !canDelete && !row.isDeleted && <span className="text-muted-foreground">-</span>}
+                    </div>
+                )
+            },
+        ];
+    }, [handleEditRate, handleDeleteClick, handleRestoreClick, canEdit, canDelete, isFieldChanged, getOldValue, dynamicFieldNames, unitMap, isGSTInclusive]);
 
     return (
         <div className="space-y-6">
@@ -1527,12 +1566,15 @@ export function RatesPage() {
                         </Button>
                     )}
                     {canCreate && (
-                        <Button
-                            leftIcon={<PlusIcon size={16} />}
-                            onClick={handleAddRate}
-                        >
-                            Add Rate
-                        </Button>
+                        <Tooltip content={isGSTInclusive ? "Adding rates is disabled in GST Inclusive mode" : ""}>
+                            <Button
+                                leftIcon={<PlusIcon size={16} />}
+                                onClick={handleAddRate}
+                                disabled={isGSTInclusive}
+                            >
+                                Add Rate
+                            </Button>
+                        </Tooltip>
                     )}
                     {canEdit && (
                         <>
@@ -1611,6 +1653,16 @@ export function RatesPage() {
                                 />
                             </div>
 
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-medium text-muted-foreground">GST Inclusive</label>
+                                <div className="flex items-center h-10">
+                                    <Switch
+                                        checked={isGSTInclusive}
+                                        onChange={setIsGSTInclusive}
+                                    />
+                                </div>
+                            </div>
+
                             {/* <Button variant="outline" leftIcon={<FilterIcon size={16} />} className="self-end">
                                 Filters
                             </Button>
@@ -1668,9 +1720,11 @@ export function RatesPage() {
                         <p className="text-sm text-muted-foreground">
                             {meta ? `Showing ${allRatePlans.length} out of ${meta.totalRecords} records` : 'Loading...'}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                            * All rates are exclusive of GST
-                        </p>
+                        {!isGSTInclusive && (
+                            <p className="text-sm text-muted-foreground">
+                                * All rates are exclusive of GST
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -1686,6 +1740,7 @@ export function RatesPage() {
                     hasMore={hasMore}
                     isLoadingMore={isLoadingMore}
                     onLoadMore={handleLoadMore}
+                    containerHeightClass="h-[calc(100vh-330px)]"
 
 
                     rowClassName={(row: RatePlan) => (changedRatePlanUids.has(row.uid) || localModifiedUids.has(row.uid) || localCreatedUids.has(row.uid) || localDeletedUids.has(row.uid) || localRestoredUids.has(row.uid)) ? '[&>td]:!bg-orange-100 dark:[&>td]:!bg-orange-950/50 font-medium' : ''}
