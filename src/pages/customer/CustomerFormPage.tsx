@@ -1438,25 +1438,28 @@ export const CustomerFormPage = () => {
                     // }
 
                     const equifaxPayload = {
-                        "first-name": formData.firstName,
-                        "first-given-name": formData.lastName,
-                        "address": {
-                            "street-name": formData.streetName,
-                            "street-type": formData.streetType,
-                            "suburb": formData.suburb,
-                            "state-code": formData.state
+                        "reportRequest": {
+                            "first-name": formData.firstName,
+                            "first-given-name": formData.lastName,
+                            "address": {
+                                "street-name": formData.streetName,
+                                "street-type": formData.streetType,
+                                "suburb": formData.suburb,
+                                "state-code": formData.state
+                            },
+                            "gender-code": formData.gender === 0 ? 'M' : (formData.gender === 1 ? 'F' : 'O'),
+                            "license-number": formData.licenseNumber,
+                            "license-card-number": formData.licenseCardNumber,
+                            "license-state": formData.licenseState,
+                            "date-of-birth": formData.dob,
+                            "employer-name": formData.employerName,
+                            "account-type-code": "CC",
+                            "enquiry-amount": Math.floor(Number(formData.enquiryAmount) || 0),
+                            "relationship-code": String(formData.relationshipStatus || '1'),
+                            "client-reference": `REF-${Date.now()}`,
+                            "enquiry-client-reference": formData.phone || ''
                         },
-                        "gender-code": formData.gender === 0 ? 'M' : (formData.gender === 1 ? 'F' : 'O'),
-                        "license-number": formData.licenseNumber,
-                        "license-card-number": formData.licenseCardNumber,
-                        "license-state": formData.licenseState,
-                        "date-of-birth": formData.dob,
-                        "employer-name": formData.employerName,
-                        "account-type-code": "CC",
-                        "enquiry-amount": Math.floor(Number(formData.enquiryAmount) || 0),
-                        "relationship-code": String(formData.relationshipStatus || '1'),
-                        "client-reference": `REF-${Date.now()}`,
-                        "enquiry-client-reference": formData.phone || ''
+                        "type": "PROD"
                     };
 
                     const response = await secondaryApiAxios.post('/v1/equifax/user/get-credit-report', equifaxPayload);
@@ -2530,7 +2533,7 @@ export const CustomerFormPage = () => {
                                                 }}
                                             />
                                             <Input label="ID Number" placeholder="Number" value={formData.idNumber} onChange={(e) => updateField('idNumber', e.target.value)} />
-                                            
+
                                             {formData.idType === 0 && (
                                                 <Input label="License Card Number" placeholder="Enter card number" value={formData.licenseCardNumber} onChange={(e) => updateField('licenseCardNumber', e.target.value)} />
                                             )}
