@@ -1598,7 +1598,7 @@ export const CustomerFormPage = () => {
                 gender: formData.gender,
                 relationshipStatus: formData.relationshipStatus,
                 enquiryAmount: formData.enquiryAmount ? parseFloat(formData.enquiryAmount) : undefined,
-                checkCreditScore: (formData.checkCreditScore || !creditScoreData?.isCreditScoreFetched) ? 1 : 0,
+                checkCreditScore: formData.checkCreditScore ? 1 : 0,
                 employerName: formData.employerName,
                 isCreditScoreFetched: creditScoreData?.isCreditScoreFetched || 0,
                 ...creditScoreData, // Add credit score data to input (overrides if present)
