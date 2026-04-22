@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useBlocker } from 'react-router-dom';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
@@ -1427,123 +1428,6 @@ export function RatesPage() {
         };
         reader.readAsBinaryString(file);
     };
-
-    const handleExportExcel = useCallback(async () => {
-        const toastId = toast.loading("Fetching all records for export...");
-        try {
-            // 1. Fetch matching data from server
-            const { data: exportDataResponse } = await client.query({
-                query: GET_RATE_PLANS,
-                variables: {
-                    page: 1,
-                    limit: 9999, // Fetch all matching records
-                    search: debouncedSearchCode,
-                    state: stateFilter,
-                    dnsp: dnspFilter ? parseInt(dnspFilter, 10) : undefined,
-                    type: typeFilter ? parseInt(typeFilter, 10) : undefined,
-                },
-                fetchPolicy: 'network-only'
-            });
-
-            const serverPlans = exportDataResponse.ratePlans.data;
-
-            // 2. Merge with local state to include unsaved changes
-            const mergedPlans = serverPlans.map((sp: RatePlan) => {
-                const local = allRatePlans.find(lp => lp.uid === sp.uid);
-                return local || sp;
-            });
-
-            // 3. Add locally created plans that aren't on server yet
-            allRatePlans.forEach(lp => {
-                if (!mergedPlans.find((mp: any) => mp.uid === lp.uid)) {
-                    mergedPlans.push(lp);
-                }
-            });
-
-            if (!mergedPlans.length) {
-                toast.update(toastId, { render: "No data to export", type: "info", isLoading: false, autoClose: 3000 });
-                return;
-            }
-
-            // Compute dynamic field names for the entire export set
-            const exportDynamicFieldNames = new Set<string>();
-            mergedPlans.forEach((plan: RatePlan) => {
-                plan.offers?.[0]?.dynamicRates?.forEach(rate => {
-                    if (rate.name) exportDynamicFieldNames.add(rate.name.toLowerCase());
-                });
-            });
-            const dynamicFields = Array.from(exportDynamicFieldNames).sort();
-
-            const exportData = mergedPlans.map((plan: RatePlan) => {
-                const offer = plan.offers?.[0];
-                const row: Record<string, any> = {
-                    'State': plan.state || '-',
-                    'Codes': Array.isArray(plan.codes) ? plan.codes.join(', ') : (plan.codes || '-'),
-                    'Plan ID': plan.planId || '', // Change: Export empty string for empty ids to avoid hyphen jitter
-                    'DNSP': DNSP_MAP[String(plan.dnsp)] || plan.dnsp || '-',
-                    'Type': RATE_TYPE_MAP[String(plan.type)] || plan.type || '-',
-                    'Tariff Code': plan.tariff || '', // Change: Export empty string for empty tariff to avoid hyphen jitter
-                    'VPP': plan.vpp === 1 ? 'Yes' : 'No',
-                    'Discount Applies': plan.discountApplies ? 'Yes' : 'No',
-                    'Discount %': plan.discountPercentage || 0,
-                };
-
-                // Initialize all observed dynamic rates to 0 for this row
-                dynamicFields.forEach(name => {
-                    row[name] = 0;
-                });
-
-                if (offer) {
-                    row['Anytime'] = offer.anytime;
-                    row['Peak'] = offer.peak;
-                    row['Shoulder'] = offer.shoulder;
-                    row['Off-Peak'] = offer.offPeak;
-                    row['Supply Charge'] = offer.supplyCharge;
-                    row['CL1 Supply'] = offer.cl1Supply;
-                    row['CL1 Usage'] = offer.cl1Usage;
-                    row['CL2 Supply'] = offer.cl2Supply;
-                    row['CL2 Usage'] = offer.cl2Usage;
-                    row['Demand'] = offer.demand;
-                    row['Demand(OP)'] = offer.demandOp;
-                    row['Demand(P)'] = offer.demandP;
-                    row['Demand(S)'] = offer.demandS;
-                    row['FIT'] = offer.fit;
-                    row['Premium FIT'] = offer.fitPeak;
-                    row['Critical FIT'] = offer.fitCritical;
-                    row['Base FIT'] = offer.fitVpp;
-                    row['VPP Orchestration'] = offer.vppOrcharge;
-
-                    // Add dynamic rates
-                    offer.dynamicRates?.forEach(dr => {
-                        if (dr.name) {
-                            // Find the case-insensitive header name used in the dynamicFields set
-                            const headerName = dynamicFields.find(h => h.toLowerCase() === dr.name.toLowerCase()) || dr.name;
-                            row[headerName] = dr.value || 0;
-                        }
-                    });
-                }
-
-                // Move ID to the end and rename to deter editing
-                row['SYSTEM_ID (DO NOT EDIT)'] = plan.id;
-
-                return row;
-            });
-
-            const worksheet = XLSX.utils.json_to_sheet(exportData);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Rates");
-
-            const date = new Date().toISOString().split('T')[0];
-            XLSX.writeFile(workbook, `Rates_Export_${date}.xlsx`);
-            toast.update(toastId, { render: "Excel export successful", type: "success", isLoading: false, autoClose: 2000 });
-        } catch (error: any) {
-            console.error("Export failed:", error);
-            toast.update(toastId, { render: "Excel export failed", type: "error", isLoading: false, autoClose: 3000 });
-        }
-    }, [allRatePlans, client, debouncedSearchCode, stateFilter, dnspFilter, typeFilter]);
-
-
-
     const columns: Column<RatePlan>[] = useMemo(() => {
         const getRateValue = (val: any, inclusive: boolean) => {
             if (val === undefined || val === null || val === '') return '-';
@@ -1975,6 +1859,123 @@ export function RatesPage() {
             },
         ];
     }, [handleEditRate, handleDeleteClick, handleRestoreClick, canEdit, canDelete, isFieldChanged, getOldValue, dynamicFieldNames, unitMap, isGSTInclusive]);
+
+    const handleExportExcel = useCallback(async () => {
+        const toastId = toast.loading("Fetching all records for export...");
+        try {
+            // 1. Fetch matching data from server
+            const { data: exportDataResponse } = await client.query({
+                query: GET_RATE_PLANS,
+                variables: {
+                    page: 1,
+                    limit: 9999, // Fetch all matching records
+                    search: debouncedSearchCode,
+                    state: stateFilter,
+                    dnsp: dnspFilter ? parseInt(dnspFilter, 10) : undefined,
+                    type: typeFilter ? parseInt(typeFilter, 10) : undefined,
+                },
+                fetchPolicy: 'network-only'
+            });
+
+            const serverPlans = exportDataResponse.ratePlans.data;
+
+            // 2. Merge with local state to include unsaved changes
+            const mergedPlans = serverPlans.map((sp: RatePlan) => {
+                const local = allRatePlans.find(lp => lp.uid === sp.uid);
+                return local || sp;
+            });
+
+            // 3. Add locally created plans that aren't on server yet
+            allRatePlans.forEach(lp => {
+                if (!mergedPlans.find((mp: any) => mp.uid === lp.uid)) {
+                    mergedPlans.push(lp);
+                }
+            });
+
+            if (!mergedPlans.length) {
+                toast.update(toastId, { render: "No data to export", type: "info", isLoading: false, autoClose: 3000 });
+                return;
+            }
+
+            // Compute dynamic field names for the entire export set
+            const exportDynamicFieldNames = new Set<string>();
+            mergedPlans.forEach((plan: RatePlan) => {
+                plan.offers?.[0]?.dynamicRates?.forEach(rate => {
+                    if (rate.name) exportDynamicFieldNames.add(rate.name.toLowerCase());
+                });
+            });
+            const dynamicFields = Array.from(exportDynamicFieldNames).sort();
+
+            const exportData = mergedPlans.map((plan: RatePlan) => {
+                const offer = plan.offers?.[0];
+                const row: Record<string, any> = {
+                    'State': plan.state || '-',
+                    'Codes': Array.isArray(plan.codes) ? plan.codes.join(', ') : (plan.codes || '-'),
+                    'Plan ID': plan.planId || '', // Change: Export empty string for empty ids to avoid hyphen jitter
+                    'DNSP': DNSP_MAP[String(plan.dnsp)] || plan.dnsp || '-',
+                    'Type': RATE_TYPE_MAP[String(plan.type)] || plan.type || '-',
+                    'Tariff Code': plan.tariff || '', // Change: Export empty string for empty tariff to avoid hyphen jitter
+                    'VPP': plan.vpp === 1 ? 'Yes' : 'No',
+                    'Discount Applies': plan.discountApplies ? 'Yes' : 'No',
+                    'Discount %': plan.discountPercentage || 0,
+                };
+
+                // Initialize all observed dynamic rates to 0 for this row
+                dynamicFields.forEach(name => {
+                    row[name] = 0;
+                });
+
+                if (offer) {
+                    row['Anytime'] = offer.anytime;
+                    row['Peak'] = offer.peak;
+                    row['Shoulder'] = offer.shoulder;
+                    row['Off-Peak'] = offer.offPeak;
+                    row['Supply Charge'] = offer.supplyCharge;
+                    row['CL1 Supply'] = offer.cl1Supply;
+                    row['CL1 Usage'] = offer.cl1Usage;
+                    row['CL2 Supply'] = offer.cl2Supply;
+                    row['CL2 Usage'] = offer.cl2Usage;
+                    row['Demand'] = offer.demand;
+                    row['Demand(OP)'] = offer.demandOp;
+                    row['Demand(P)'] = offer.demandP;
+                    row['Demand(S)'] = offer.demandS;
+                    row['FIT'] = offer.fit;
+                    row['Premium FIT'] = offer.fitPeak;
+                    row['Critical FIT'] = offer.fitCritical;
+                    row['Base FIT'] = offer.fitVpp;
+                    row['VPP Orchestration'] = offer.vppOrcharge;
+
+                    // Add dynamic rates
+                    offer.dynamicRates?.forEach(dr => {
+                        if (dr.name) {
+                            // Find the case-insensitive header name used in the dynamicFields set
+                            const headerName = dynamicFields.find(h => h.toLowerCase() === dr.name.toLowerCase()) || dr.name;
+                            row[headerName] = dr.value || 0;
+                        }
+                    });
+                }
+
+                // Move ID to the end and rename to deter editing
+                row['SYSTEM_ID (DO NOT EDIT)'] = plan.id;
+
+                return row;
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Rates");
+
+            const date = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(workbook, `Rates_Export_${date}.xlsx`);
+            toast.update(toastId, { render: "Excel export successful", type: "success", isLoading: false, autoClose: 2000 });
+        } catch (error: any) {
+            console.error("Export failed:", error);
+            toast.update(toastId, { render: "Excel export failed", type: "error", isLoading: false, autoClose: 3000 });
+        }
+    }, [allRatePlans, client, debouncedSearchCode, stateFilter, dnspFilter, typeFilter]);
+
+
+
 
     return (
         <div className="space-y-6">
