@@ -9,15 +9,13 @@ import {
     ShieldIcon, 
     CloseIcon, 
     ZapIcon,
-    DashboardIcon,
-    UsersIcon,
-    UserCircleIcon,
+    UserIcon,
     BatteryIcon,
     InverterIcon,
     CustomerIcon,
-    EmailIcon,
-    LogsIcon,
-    SettingsIcon
+    MailIcon,
+    FileTextIcon,
+    UserSettingIcon
 } from '@/components/icons';
 import {
     GET_MENUS,
@@ -219,14 +217,13 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
     
     // Icon mapping for modules
     const iconMap: Record<string, any> = {
-        dashboard: DashboardIcon,
-        leads: UserCircleIcon,
-        customers: UsersIcon,
+        leads: UserIcon,
+        customers: CustomerIcon,
         customer_group: CustomerIcon,
-        user_management: ShieldCheckIcon,
-        email: EmailIcon,
-        audit_logs: LogsIcon,
-        settings: SettingsIcon,
+        user_management: UserSettingIcon,
+        email: MailIcon,
+        audit_logs: FileTextIcon,
+        settings: UserSettingIcon,
         master_data: ShieldCheckIcon,
         battery_master: BatteryIcon,
         inverter_master: InverterIcon,

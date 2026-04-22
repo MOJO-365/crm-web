@@ -9,15 +9,13 @@ import {
     ShieldIcon, 
     CloseIcon, 
     ZapIcon,
-    DashboardIcon,
-    UsersIcon,
-    UserCircleIcon,
+    UserIcon,
     BatteryIcon,
     InverterIcon,
     CustomerIcon,
-    EmailIcon,
-    LogsIcon,
-    SettingsIcon
+    MailIcon,
+    FileTextIcon,
+    UserSettingIcon
 } from '@/components/icons';
 import { GET_MENUS, GET_ROLE_PERMISSIONS, GET_USER_PERMISSIONS, UPSERT_USER_PERMISSION, GET_FEATURES, GET_ROLE_FEATURE_PERMISSIONS, GET_USER_FEATURE_PERMISSIONS, UPSERT_USER_FEATURE_PERMISSION } from '@/graphql';
 import { cn } from '@/lib/utils';
@@ -621,14 +619,13 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
 
     // Icon mapping for modules
     const iconMap: Record<string, any> = {
-        dashboard: DashboardIcon,
-        leads: UserCircleIcon,
-        customers: UsersIcon,
+        leads: UserIcon,
+        customers: CustomerIcon,
         customer_group: CustomerIcon,
-        user_management: ShieldCheckIcon,
-        email: EmailIcon,
-        audit_logs: LogsIcon,
-        settings: SettingsIcon,
+        user_management: UserSettingIcon,
+        email: MailIcon,
+        audit_logs: FileTextIcon,
+        settings: UserSettingIcon,
         master_data: ShieldCheckIcon,
         battery_master: BatteryIcon,
         inverter_master: InverterIcon,
