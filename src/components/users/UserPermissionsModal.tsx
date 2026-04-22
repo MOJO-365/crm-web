@@ -557,7 +557,7 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
 
     // Save changes
     const handleSave = async () => {
-        if (changedMenus.size === 0) {
+        if (changedMenus.size === 0 && changedFeatures.size === 0) {
             onClose();
             return;
         }
