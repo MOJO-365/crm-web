@@ -13,17 +13,53 @@ function authHeader() {
     return "Basic " + btoa(`${accountSid}:${authToken}`);
 }
 
-function normalisePhone(to: string) {
-    let digits = to.trim().replace(/[\s-]/g, "");
-    if (digits.startsWith("+")) {
-        return "+" + digits.slice(1).replace(/\D/g, "");
+export function normalisePhone(to: string | null | undefined): string {
+    if (!to) return '';
+
+    let cleaned = to.trim();
+    const hasPlus = cleaned.startsWith('+');
+    let digits = cleaned.replace(/\D/g, "");
+
+    if (hasPlus) {
+        return '+' + digits;
     }
-    digits = digits.replace(/\D/g, "");
-    if (digits.startsWith("0")) return `+61${digits.slice(1)}`;
-    if (digits.startsWith("61")) return `+61${digits.slice(2)}`;
-    // Handle 9 digit numbers (missing leading 0, e.g. 412345678)
-    if (digits.length === 9 && digits.startsWith("4")) return `+61${digits}`;
-    return `+${digits}`;
+
+    // AU Mobiles/Landlines
+    if (digits.startsWith("0")) {
+        return `+61${digits.slice(1)}`;
+    }
+
+    if (digits.startsWith("61")) {
+        if (digits.length >= 11) {
+            return `+${digits}`;
+        }
+    }
+
+    if (digits.length === 9) {
+        return `+61${digits}`;
+    }
+
+    return digits.length > 0 ? `+${digits}` : '';
+}
+
+/**
+ * Denormalises a phone number for the UI by removing common prefixes.
+ * @param phone The normalised phone number.
+ * @returns The digits only, stripped of +61 or leading 0.
+ */
+export function denormalisePhone(phone: string | null | undefined): string {
+    if (!phone) return '';
+    let digits = phone.replace(/\D/g, "");
+    
+    if (digits.startsWith("61")) {
+        return digits.slice(2);
+    }
+    
+    if (digits.startsWith("0")) {
+        return digits.slice(1);
+    }
+    
+    return digits;
 }
 
 export async function sendVerification(to: string) {

@@ -263,7 +263,7 @@ export function DataTable<T>({
                                     <th
                                         key={col.key}
                                         className={cn(
-                                            'px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider bg-background border-b border-border align-top whitespace-nowrap',
+                                            'px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider bg-background border-b border-border align-top whitespace-nowrap min-w-0',
                                             col.width,
                                             isLastSticky && isScrolledHorizontally && "shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]",
                                             isRightSticky && canScrollRight && "shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]"
@@ -355,6 +355,7 @@ export function DataTable<T>({
                                                         key={col.key}
                                                         className={cn(
                                                             "px-3 py-3 text-sm transition-colors overflow-hidden",
+                                                            col.width,
                                                             // For sticky columns, we need to manually match the row's background color
                                                             // to prevent transparency issues when scrolling
                                                             (isSticky || isRightSticky) && (

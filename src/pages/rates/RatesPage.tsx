@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useBlocker } from 'react-router-dom';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DataTable, type Column, Modal } from '@/components/common';
-import { PlusIcon, RefreshCwIcon, TrashIcon, PencilIcon, SaveIcon, ClockIcon, AlertCircleIcon } from '@/components/icons';
+import { PlusIcon, RefreshCwIcon, TrashIcon, PencilIcon, SaveIcon, ClockIcon, AlertCircleIcon, UploadIcon } from '@/components/icons';
 import { GET_RATE_PLANS, HAS_RATES_CHANGES, GET_MEASUREMENT_UNITS } from '@/graphql/queries/rates';
 import {
     CREATE_RATE_PLAN,
@@ -21,8 +21,9 @@ import { STATE_OPTIONS, DNSP_OPTIONS, DNSP_MAP, RATE_TYPE_MAP } from '@/lib/cons
 import { Tooltip } from '@/components/ui/Tooltip';
 import { RatesHistoryModal } from './components/RatesHistoryModal';
 import { v4 as uuidv4 } from 'uuid';
-import { Switch } from '@/components/ui/Switch';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
+import { DownloadIcon } from '@/components/icons';
 
 
 
@@ -102,6 +103,7 @@ interface RatePlansResponse {
 }
 
 export function RatesPage() {
+    const client = useApolloClient();
     const [searchCode, setSearchCode] = useState('');
     const [debouncedSearchCode, setDebouncedSearchCode] = useState('');
     const [stateFilter, setStateFilter] = useState('');
@@ -186,6 +188,7 @@ export function RatesPage() {
     const [isRestoring, setIsRestoring] = useState(false);
 
     const [isGSTInclusive, setIsGSTInclusive] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Mutations
     const [createRatePlan] = useMutation(CREATE_RATE_PLAN);
@@ -405,43 +408,63 @@ export function RatesPage() {
 
     // Helper to compare if plan has changes
     const hasPlanChanged = (current: any, snapshot: any) => {
-        // Compare basic fields
-        if (current.planId !== snapshot.planId) return true;
-        if (current.tariff !== snapshot.tariff) return true;
-        if (current.state !== snapshot.state) return true;
+        const isStringMatch = (a: any, b: any) => {
+            // Use nullish coalescing to avoid treating 0 as empty
+            let s1 = String(a ?? '').trim();
+            let s2 = String(b ?? '').trim();
 
-        // Loose comparison for DNSP numbers vs strings
-        if (String(current.dnsp || '') != String(snapshot.dnsp || '')) return true;
-        if (String(current.type || '') != String(snapshot.type || '')) return true;
-        if (current.vpp != snapshot.vpp) return true;
+            // Normalize common "empty" representations
+            if (s1 === '-' || s1.toLowerCase() === 'null') s1 = '';
+            if (s2 === '-' || s2.toLowerCase() === 'null') s2 = '';
 
-        const currentDiscount = current.discountApplies ? 1 : 0;
-        const snapshotDiscount = snapshot.discountApplies ? 1 : 0;
-        if (currentDiscount != snapshotDiscount) return true;
+            return s1 === s2;
+        };
 
-        if (current.discountPercentage != snapshot.discountPercentage) return true;
+        const isNumMatch = (a: any, b: any) => {
+            // Use nullish coalescing to avoid treating 0 as falsy
+            const n1 = parseFloat(String(a ?? 0));
+            const n2 = parseFloat(String(b ?? 0));
+            return Math.abs(n1 - n2) < 0.0001;
+        };
 
-        // Compare codes - Normalize spacing
         const normalizeCodes = (c: any) => {
             if (!c) return '';
             const arr = Array.isArray(c) ? c : String(c).split(',');
             return arr.map((s: string) => s.trim()).sort().join(',');
         };
-        if (normalizeCodes(current.codes) !== normalizeCodes(snapshot.codes)) return true;
 
-        // Compare Offers
+        const logChange = (field: string, v1: any, v2: any) => {
+            console.log(`[Rate Change] Field: ${field} | Current: "${v1}" | Snapshot: "${v2}"`);
+        };
+
+        // 1. Basic fields
+        if (!isStringMatch(current.planId, snapshot.planId)) { logChange('planId', current.planId, snapshot.planId); return true; }
+        if (!isStringMatch(current.tariff, snapshot.tariff)) { logChange('tariff', current.tariff, snapshot.tariff); return true; }
+        if (!isStringMatch(current.state, snapshot.state)) { logChange('state', current.state, snapshot.state); return true; }
+        if (!isStringMatch(current.dnsp, snapshot.dnsp)) { logChange('dnsp', current.dnsp, snapshot.dnsp); return true; }
+        if (!isStringMatch(current.type, snapshot.type)) { logChange('type', current.type, snapshot.type); return true; }
+        if (current.vpp != snapshot.vpp) { logChange('vpp', current.vpp, snapshot.vpp); return true; }
+
+        const cNorm = normalizeCodes(current.codes);
+        const sNorm = normalizeCodes(snapshot.codes);
+        if (cNorm !== sNorm) { logChange('codes', cNorm, sNorm); return true; }
+
+        const currentDiscount = current.discountApplies ? 1 : 0;
+        const snapshotDiscount = snapshot.discountApplies ? 1 : 0;
+        if (currentDiscount != snapshotDiscount) { logChange('discountApplies', currentDiscount, snapshotDiscount); return true; }
+        if (!isNumMatch(current.discountPercentage, snapshot.discountPercentage)) { logChange('discountPercentage', current.discountPercentage, snapshot.discountPercentage); return true; }
+
+        // 2. Offers
         const cOffers = current.offers || [];
         const sOffers = snapshot.offers || [];
-
-        if (cOffers.length !== sOffers.length) return true;
+        if (cOffers.length !== sOffers.length) { logChange('offersCount', cOffers.length, sOffers.length); return true; }
 
         for (let i = 0; i < cOffers.length; i++) {
             const cOffer = cOffers[i];
             const sOffer = sOffers.find((o: any) => o.offerName === cOffer.offerName) || sOffers[i];
+            if (!sOffer) { logChange('missingOffer', i, 'none'); return true; }
 
-            if (!sOffer) return true;
-
-            const fields = [
+            const numericFields = [
                 'anytime', 'supplyCharge', 'vppOrcharge',
                 'peak', 'shoulder', 'offPeak',
                 'cl1Supply', 'cl1Usage', 'cl2Supply', 'cl2Usage',
@@ -449,17 +472,23 @@ export function RatesPage() {
                 'fit', 'fitPeak', 'fitCritical', 'fitVpp'
             ];
 
-            for (const field of fields) {
-                // Parse float to handle string "0.00" vs number 0
-                const v1 = parseFloat(String(cOffer[field] || 0));
-                const v2 = parseFloat(String(sOffer[field] || 0));
-                if (Math.abs(v1 - v2) > 0.0001) return true; // Float comparison
+            for (const field of numericFields) {
+                if (!isNumMatch(cOffer[field], sOffer[field])) { logChange(`offer_${field}`, cOffer[field], sOffer[field]); return true; }
             }
 
-            // Compare dynamic rates
-            const cDyn = JSON.stringify(cOffer.dynamicRates || []);
-            const sDyn = JSON.stringify(sOffer.dynamicRates || []);
-            if (cDyn !== sDyn) return true;
+            // 3. Dynamic Rates
+            const cDyn = cOffer.dynamicRates || [];
+            const sDyn = sOffer.dynamicRates || [];
+            if (cDyn.length !== sDyn.length) { logChange('dynamicRatesCount', cDyn.length, sDyn.length); return true; }
+
+            for (const cr of cDyn) {
+                const sr = sDyn.find((r: any) => String(r.name || '').toLowerCase() === String(cr.name || '').toLowerCase());
+                if (!sr) { logChange('missingDynamicRate', cr.name, 'none'); return true; }
+
+                if (!isStringMatch(cr.value, sr.value)) {
+                    if (!isNumMatch(cr.value, sr.value)) { logChange(`dynamic_${cr.name}`, cr.value, sr.value); return true; }
+                }
+            }
         }
 
         return false;
@@ -1114,6 +1143,405 @@ export function RatesPage() {
         }
     };
 
+    const handleImportExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const data = e.target?.result;
+            const workbook = XLSX.read(data, { type: 'binary' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+            if (!jsonData.length) {
+                toast.error("The selected file is empty");
+                return;
+            }
+
+            const toastId = toast.loading("Processing import...");
+
+            try {
+                // 1. Fetch matching data from server for global matching
+                const { data: serverDataResponse } = await client.query({
+                    query: GET_RATE_PLANS,
+                    variables: {
+                        page: 1,
+                        limit: 9999, // Fetch all matching records
+                        search: undefined,
+                        state: undefined,
+                        dnsp: undefined,
+                        type: undefined,
+                    },
+                    fetchPolicy: 'network-only'
+                });
+                const serverPlans = serverDataResponse.ratePlans.data;
+
+                const updatedPlans = [...allRatePlans];
+                let modifiedCount = 0;
+                let createdCount = 0;
+                let ignoredCount = 0;
+
+                const newModifiedUids = new Set(localModifiedUids);
+                const newCreatedUids = new Set(localCreatedUids);
+                const newOriginals = new Map(localOriginals);
+
+                const standardFields = new Set([
+                    'State', 'Codes', 'Plan ID', 'DNSP', 'Type', 'Tariff Code', 'Tariff', 'VPP',
+                    'Discount Applies', 'Discount %',
+                    'Anytime', 'Peak', 'Shoulder', 'Off-Peak',
+                    'Supply Charge', 'CL1 Supply', 'CL1 Usage', 'CL2 Supply', 'CL2 Usage',
+                    'Demand', 'Demand(OP)', 'Demand(P)', 'Demand(S)',
+                    'FIT', 'Premium FIT', 'Critical FIT', 'Base FIT', 'VPP Orchestration',
+                    'SYSTEM_ID (DO NOT EDIT)'
+                ]);
+
+                jsonData.forEach(row => {
+                    const systemId = String(row['SYSTEM_ID (DO NOT EDIT)'] || '').trim();
+
+                    // Match with UI state OR Server state
+                    // 1. Try matching by SYSTEM_ID
+                    let uiPlan = updatedPlans.find(p => String(p.id) === systemId && systemId !== '' && systemId !== '0');
+                    let serverPlan = serverPlans.find((p: any) => String(p.id) === systemId && systemId !== '' && systemId !== '0');
+
+                    // 2. Fallback: Match by attributes (Code + State + DNSP + Type) if ID is missing or not found
+                    if (!uiPlan && !serverPlan) {
+                        const excelCodes = String(row['Codes'] || '').split(',').map(s => s.trim()).sort().join(',');
+                        const excelState = String(row['State'] || '').trim();
+                        const excelDnspLabel = String(row['DNSP'] || '').trim().toLowerCase();
+                        const excelTypeLabel = String(row['Type'] || '').trim().toLowerCase();
+
+                        const findByAttr = (list: RatePlan[]) => list.find(p => {
+                            const pCodes = (Array.isArray(p.codes) ? p.codes : []).map(s => s.trim()).sort().join(',');
+                            if (pCodes !== excelCodes) return false;
+                            if (String(p.state || '').trim() !== excelState) return false;
+
+                            const pDnspLabel = String(DNSP_MAP[p.dnsp] || '').toLowerCase();
+                            if (pDnspLabel !== excelDnspLabel) return false;
+
+                            const pTypeLabel = String(RATE_TYPE_MAP[p.type] || '').toLowerCase();
+                            if (pTypeLabel !== excelTypeLabel) return false;
+
+                            return true;
+                        });
+
+                        uiPlan = findByAttr(updatedPlans);
+                        serverPlan = findByAttr(serverPlans);
+                    }
+
+                    const basePlan = uiPlan || serverPlan;
+
+                    if (basePlan) {
+                        // POTENTIAL UPDATE - Create imported version of the plan
+                        const importedPlan: RatePlan = JSON.parse(JSON.stringify(basePlan));
+
+                        // Map values from Excel to importedPlan
+                        if (row['State']) importedPlan.state = String(row['State']).trim();
+                        if (row['Codes']) importedPlan.codes = String(row['Codes']).split(',').map(s => s.trim());
+                        if (row['Plan ID']) {
+                            const val = String(row['Plan ID']).trim();
+                            importedPlan.planId = (val === '-' || val.toLowerCase() === 'null') ? '' : val;
+                        }
+                        if (row['Tariff Code'] || row['Tariff']) {
+                            const val = String(row['Tariff Code'] || row['Tariff']).trim();
+                            importedPlan.tariff = (val === '-' || val.toLowerCase() === 'null') ? '' : val;
+                        }
+
+                        if (row['DNSP']) {
+                            const dnspOpt = DNSP_OPTIONS.find(opt => opt.label.toLowerCase() === String(row['DNSP']).trim().toLowerCase());
+                            if (dnspOpt) importedPlan.dnsp = dnspOpt.value;
+                        }
+
+                        if (row['Type']) {
+                            const typeLabel = String(row['Type']).trim().toLowerCase();
+                            if (typeLabel === 'residential') importedPlan.type = '1';
+                            else if (typeLabel === 'business' || typeLabel === 'commercial') importedPlan.type = '0';
+                        }
+
+                        if (row['VPP']) {
+                            importedPlan.vpp = String(row['VPP']).trim().toLowerCase() === 'yes' ? 1 : 0;
+                        }
+
+                        if (row['Discount Applies'] !== undefined) {
+                            importedPlan.discountApplies = String(row['Discount Applies']).trim().toLowerCase() === 'yes';
+                        }
+                        if (row['Discount %'] !== undefined) {
+                            importedPlan.discountPercentage = parseFloat(String(row['Discount %'])) || 0;
+                        }
+
+                        if (importedPlan.offers?.[0]) {
+                            const offer = importedPlan.offers[0];
+                            const priceFieldMap: Record<string, keyof RateOffer> = {
+                                'Anytime': 'anytime', 'Peak': 'peak', 'Shoulder': 'shoulder', 'Off-Peak': 'offPeak',
+                                'Supply Charge': 'supplyCharge', 'CL1 Supply': 'cl1Supply', 'CL1 Usage': 'cl1Usage',
+                                'CL2 Supply': 'cl2Supply', 'CL2 Usage': 'cl2Usage', 'Demand': 'demand',
+                                'Demand(OP)': 'demandOp', 'Demand(P)': 'demandP', 'Demand(S)': 'demandS',
+                                'FIT': 'fit', 'Premium FIT': 'fitPeak', 'Critical FIT': 'fitCritical',
+                                'Base FIT': 'fitVpp', 'VPP Orchestration': 'vppOrcharge'
+                            };
+
+                            Object.entries(priceFieldMap).forEach(([excelKey, objKey]) => {
+                                if (row[excelKey] !== undefined) {
+                                    (offer as any)[objKey] = parseFloat(String(row[excelKey])) || 0;
+                                }
+                            });
+
+                            // Dynamic Rates
+                            Object.keys(row).forEach(key => {
+                                if (!standardFields.has(key)) {
+                                    if (!offer.dynamicRates) offer.dynamicRates = [];
+                                    const dr = offer.dynamicRates.find(r => String(r.name || '').toLowerCase() === String(key).trim().toLowerCase());
+                                    if (dr) {
+                                        dr.value = String(row[key] ?? '').trim();
+                                    }
+                                }
+                            });
+                        }
+
+                        // DEEP COMPARE to check if anything actually changed
+                        if (hasPlanChanged(basePlan, importedPlan)) {
+                            // REAL CHANGE found
+                            if (uiPlan) {
+                                // Already in current view, update it
+                                const idx = updatedPlans.findIndex(p => p.uid === uiPlan.uid);
+                                if (!newOriginals.has(uiPlan.uid)) {
+                                    newOriginals.set(uiPlan.uid, JSON.parse(JSON.stringify(uiPlan)));
+                                }
+                                updatedPlans[idx] = importedPlan;
+                            } else {
+                                // Not in current view, add to top so user sees the change
+                                if (!newOriginals.has(importedPlan.uid)) {
+                                    newOriginals.set(importedPlan.uid, JSON.parse(JSON.stringify(serverPlan)));
+                                }
+                                updatedPlans.unshift(importedPlan);
+                            }
+                            newModifiedUids.add(importedPlan.uid);
+                            modifiedCount++;
+                        } else {
+                            // NO CHANGE -> ignore to prevent cluttering UI
+                            ignoredCount++;
+                        }
+                    } else {
+                        // INSERT NEW
+                        const newUid = uuidv4();
+                        const newPlan: RatePlan = {
+                            uid: newUid,
+                            id: '0',
+                            codes: String(row['Codes'] || '').split(',').map(s => s.trim()),
+                            planId: '',
+                            dnsp: DNSP_OPTIONS.find(opt => opt.label.toLowerCase() === String(row['DNSP'] || '').trim().toLowerCase())?.value || '0',
+                            state: String(row['State'] || 'NSW').trim(),
+                            type: String(row['Type'] || '').trim().toLowerCase() === 'residential' ? '1' : '0',
+                            vpp: String(row['VPP'] || '').trim().toLowerCase() === 'yes' ? 1 : 0,
+                            discountApplies: String(row['Discount Applies'] || '').trim().toLowerCase() === 'yes',
+                            discountPercentage: parseFloat(String(row['Discount %'] || '0')) || 0,
+                            tariff: String(row['Tariff Code'] || row['Tariff'] || '').trim(),
+                            isActive: true,
+                            isDeleted: 0,
+                            offers: [{
+                                id: uuidv4(),
+                                uid: uuidv4(),
+                                offerName: 'Imported Offer',
+                                type: 'standard',
+                                anytime: 0,
+                                cl1Supply: 0,
+                                cl1Usage: 0,
+                                cl2Supply: 0,
+                                cl2Usage: 0,
+                                demand: 0,
+                                demandOp: 0,
+                                demandP: 0,
+                                demandS: 0,
+                                fit: 0,
+                                offPeak: 0,
+                                peak: 0,
+                                shoulder: 0,
+                                supplyCharge: 0,
+                                vppOrcharge: 0,
+                                isActive: true,
+                                isDeleted: false,
+                                dynamicRates: []
+                            } as any],
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        const offer = newPlan.offers[0];
+                        const priceFieldMap: Record<string, keyof RateOffer> = {
+                            'Anytime': 'anytime', 'Peak': 'peak', 'Shoulder': 'shoulder', 'Off-Peak': 'offPeak',
+                            'Supply Charge': 'supplyCharge', 'CL1 Supply': 'cl1Supply', 'CL1 Usage': 'cl1Usage',
+                            'CL2 Supply': 'cl2Supply', 'CL2 Usage': 'cl2Usage', 'Demand': 'demand',
+                            'Demand(OP)': 'demandOp', 'Demand(P)': 'demandP', 'Demand(S)': 'demandS',
+                            'FIT': 'fit', 'Premium FIT': 'fitPeak', 'Critical FIT': 'fitCritical',
+                            'Base FIT': 'fitVpp', 'VPP Orchestration': 'vppOrcharge'
+                        };
+
+                        Object.entries(priceFieldMap).forEach(([excelKey, objKey]) => {
+                            if (row[excelKey] !== undefined) {
+                                (offer as any)[objKey] = parseFloat(String(row[excelKey])) || 0;
+                            }
+                        });
+
+                        // Dynamic Rates for new records
+                        Object.keys(row).forEach(key => {
+                            if (!standardFields.has(key)) {
+                                if (!offer.dynamicRates) offer.dynamicRates = [];
+                                offer.dynamicRates.push({
+                                    id: uuidv4(),
+                                    name: key,
+                                    value: String(row[key] ?? ''),
+                                    unitId: '', // Default unit
+                                    type: 'charges'
+                                });
+                            }
+                        });
+
+                        updatedPlans.unshift(newPlan);
+                        newCreatedUids.add(newUid);
+                        createdCount++;
+                    }
+                });
+
+                setAllRatePlans(updatedPlans);
+                setLocalModifiedUids(newModifiedUids);
+                setLocalCreatedUids(newCreatedUids);
+                setLocalOriginals(newOriginals);
+
+                toast.update(toastId, {
+                    render: `Import complete: ${modifiedCount} updated, ${createdCount} new, ${ignoredCount} records ignored (no changes).`,
+                    type: "success",
+                    isLoading: false,
+                    autoClose: 4000
+                });
+                if (fileInputRef.current) fileInputRef.current.value = '';
+
+            } catch (err) {
+                console.error('Import failed:', err);
+                toast.update(toastId, {
+                    render: "Import failed during processing",
+                    type: "error",
+                    isLoading: false,
+                    autoClose: 3000
+                });
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    const handleExportExcel = useCallback(async () => {
+        const toastId = toast.loading("Fetching all records for export...");
+        try {
+            // 1. Fetch matching data from server
+            const { data: exportDataResponse } = await client.query({
+                query: GET_RATE_PLANS,
+                variables: {
+                    page: 1,
+                    limit: 9999, // Fetch all matching records
+                    search: debouncedSearchCode,
+                    state: stateFilter,
+                    dnsp: dnspFilter ? parseInt(dnspFilter, 10) : undefined,
+                    type: typeFilter ? parseInt(typeFilter, 10) : undefined,
+                },
+                fetchPolicy: 'network-only'
+            });
+
+            const serverPlans = exportDataResponse.ratePlans.data;
+
+            // 2. Merge with local state to include unsaved changes
+            const mergedPlans = serverPlans.map((sp: RatePlan) => {
+                const local = allRatePlans.find(lp => lp.uid === sp.uid);
+                return local || sp;
+            });
+
+            // 3. Add locally created plans that aren't on server yet
+            allRatePlans.forEach(lp => {
+                if (!mergedPlans.find((mp: any) => mp.uid === lp.uid)) {
+                    mergedPlans.push(lp);
+                }
+            });
+
+            if (!mergedPlans.length) {
+                toast.update(toastId, { render: "No data to export", type: "info", isLoading: false, autoClose: 3000 });
+                return;
+            }
+
+            // Compute dynamic field names for the entire export set
+            const exportDynamicFieldNames = new Set<string>();
+            mergedPlans.forEach((plan: RatePlan) => {
+                plan.offers?.[0]?.dynamicRates?.forEach(rate => {
+                    if (rate.name) exportDynamicFieldNames.add(rate.name.toLowerCase());
+                });
+            });
+            const dynamicFields = Array.from(exportDynamicFieldNames).sort();
+
+            const exportData = mergedPlans.map((plan: RatePlan) => {
+                const offer = plan.offers?.[0];
+                const row: Record<string, any> = {
+                    'State': plan.state || '-',
+                    'Codes': Array.isArray(plan.codes) ? plan.codes.join(', ') : (plan.codes || '-'),
+                    'Plan ID': plan.planId || '', // Change: Export empty string for empty ids to avoid hyphen jitter
+                    'DNSP': DNSP_MAP[String(plan.dnsp)] || plan.dnsp || '-',
+                    'Type': RATE_TYPE_MAP[String(plan.type)] || plan.type || '-',
+                    'Tariff Code': plan.tariff || '', // Change: Export empty string for empty tariff to avoid hyphen jitter
+                    'VPP': plan.vpp === 1 ? 'Yes' : 'No',
+                    'Discount Applies': plan.discountApplies ? 'Yes' : 'No',
+                    'Discount %': plan.discountPercentage || 0,
+                };
+
+                // Initialize all observed dynamic rates to 0 for this row
+                dynamicFields.forEach(name => {
+                    row[name] = 0;
+                });
+
+                if (offer) {
+                    row['Anytime'] = offer.anytime;
+                    row['Peak'] = offer.peak;
+                    row['Shoulder'] = offer.shoulder;
+                    row['Off-Peak'] = offer.offPeak;
+                    row['Supply Charge'] = offer.supplyCharge;
+                    row['CL1 Supply'] = offer.cl1Supply;
+                    row['CL1 Usage'] = offer.cl1Usage;
+                    row['CL2 Supply'] = offer.cl2Supply;
+                    row['CL2 Usage'] = offer.cl2Usage;
+                    row['Demand'] = offer.demand;
+                    row['Demand(OP)'] = offer.demandOp;
+                    row['Demand(P)'] = offer.demandP;
+                    row['Demand(S)'] = offer.demandS;
+                    row['FIT'] = offer.fit;
+                    row['Premium FIT'] = offer.fitPeak;
+                    row['Critical FIT'] = offer.fitCritical;
+                    row['Base FIT'] = offer.fitVpp;
+                    row['VPP Orchestration'] = offer.vppOrcharge;
+
+                    // Add dynamic rates
+                    offer.dynamicRates?.forEach(dr => {
+                        if (dr.name) {
+                            // Find the case-insensitive header name used in the dynamicFields set
+                            const headerName = dynamicFields.find(h => h.toLowerCase() === dr.name.toLowerCase()) || dr.name;
+                            row[headerName] = dr.value || 0;
+                        }
+                    });
+                }
+
+                // Move ID to the end and rename to deter editing
+                row['SYSTEM_ID (DO NOT EDIT)'] = plan.id;
+
+                return row;
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Rates");
+
+            const date = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(workbook, `Rates_Export_${date}.xlsx`);
+            toast.update(toastId, { render: "Excel export successful", type: "success", isLoading: false, autoClose: 2000 });
+        } catch (error: any) {
+            console.error("Export failed:", error);
+            toast.update(toastId, { render: "Excel export failed", type: "error", isLoading: false, autoClose: 3000 });
+        }
+    }, [allRatePlans, client, debouncedSearchCode, stateFilter, dnspFilter, typeFilter]);
+
 
 
     const columns: Column<RatePlan>[] = useMemo(() => {
@@ -1128,7 +1556,7 @@ export function RatesPage() {
             if (val === undefined || val === null || val === '') return '-';
             const num = parseFloat(String(val));
             if (isNaN(num)) return val;
-            
+
             const exc = getRateValue(val, false);
             if (!isGSTInclusive) return exc;
 
@@ -1140,7 +1568,7 @@ export function RatesPage() {
                 </div>
             );
         };
-        
+
         const displayRate = (val: any) => getRateValue(val, isGSTInclusive);
 
         return [
@@ -1148,7 +1576,7 @@ export function RatesPage() {
             {
                 key: 'state',
                 header: 'State',
-                width: 'w-[60px]',
+                width: 'w-[50px]',
                 sticky: 'left' as const,
                 stickyOffset: 0,
                 render: (row: RatePlan) => (
@@ -1160,7 +1588,7 @@ export function RatesPage() {
             {
                 key: 'codes',
                 header: 'Code',
-                width: 'w-[150px]',
+                width: 'w-[130px]',
                 sticky: 'left' as const,
                 stickyOffset: 60,
                 render: (row: RatePlan) => {
@@ -1199,7 +1627,7 @@ export function RatesPage() {
             {
                 key: 'dnsp',
                 header: 'DNSP',
-                width: 'w-[120px]',
+                width: 'w-[100px]',
                 render: (row: RatePlan) => (
                     <div className={isFieldChanged(row, 'dnsp') ? "bg-orange-800 text-white -m-2 p-2 rounded ring-1 ring-orange-500" : ""}>
                         <Tooltip content={isFieldChanged(row, 'dnsp') ? `Old: ${DNSP_MAP[String(getOldValue(row, 'dnsp'))] || getOldValue(row, 'dnsp')}` : null}>
@@ -1211,7 +1639,7 @@ export function RatesPage() {
             {
                 key: 'type',
                 header: 'Type',
-                width: 'w-[120px]',
+                width: 'w-[90px]',
                 render: (row: RatePlan) => (
                     <div className={isFieldChanged(row, 'type') ? "bg-orange-800 text-white -m-2 p-2 rounded ring-1 ring-orange-500" : ""}>
                         <Tooltip content={isFieldChanged(row, 'type') ? `Old: ${RATE_TYPE_MAP[String(getOldValue(row, 'type'))] || getOldValue(row, 'type')}` : null}>
@@ -1223,7 +1651,7 @@ export function RatesPage() {
             {
                 key: 'anytime',
                 header: 'Anytime',
-                width: 'w-[100px]',
+                width: 'w-[72px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_anytime') ? `Old: ${displayRate(getOldValue(row, 'offer_anytime'))}` : null}>
                         <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_anytime') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-orange-200 text-orange-950 dark:bg-orange-900/20 dark:text-orange-400'}`}>
@@ -1238,148 +1666,148 @@ export function RatesPage() {
                 width: 'w-[100px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_peak') ? `Old: ${displayRate(getOldValue(row, 'offer_peak'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_peak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
-                        {renderRate(row.offers?.[0]?.peak)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 px-2 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_peak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
+                            {renderRate(row.offers?.[0]?.peak)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'shoulder',
                 header: 'Shoulder',
-                width: 'w-[100px]',
+                width: 'w-[72px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_shoulder') ? `Old: ${displayRate(getOldValue(row, 'offer_shoulder'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_shoulder') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
-                        {renderRate(row.offers?.[0]?.shoulder)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_shoulder') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
+                            {renderRate(row.offers?.[0]?.shoulder)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'offPeak',
                 header: 'Off-Peak',
-                width: 'w-[100px]',
+                width: 'w-[72px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_offPeak') ? `Old: ${displayRate(getOldValue(row, 'offer_offPeak'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_offPeak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
-                        {renderRate(row.offers?.[0]?.offPeak)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_offPeak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-blue-200 text-blue-950 dark:bg-blue-900/20 dark:text-blue-400'}`}>
+                            {renderRate(row.offers?.[0]?.offPeak)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'supplyCharge',
                 header: 'Supply Charge',
-                width: 'w-[120px]',
+                width: 'w-[95px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_supplyCharge') ? `Old: ${displayRate(getOldValue(row, 'offer_supplyCharge'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_supplyCharge') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-purple-200 text-purple-950 dark:bg-purple-900/20 dark:text-purple-400'}`}>
-                        {renderRate(row.offers?.[0]?.supplyCharge)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_supplyCharge') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-purple-200 text-purple-950 dark:bg-purple-900/20 dark:text-purple-400'}`}>
+                            {renderRate(row.offers?.[0]?.supplyCharge)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'cl1Supply',
                 header: 'CL1 Supply',
-                width: 'w-[100px]',
+                width: 'w-[75px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl1Supply') ? `Old: ${displayRate(getOldValue(row, 'offer_cl1Supply'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl1Supply') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
-                        {renderRate(row.offers?.[0]?.cl1Supply)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl1Supply') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
+                            {renderRate(row.offers?.[0]?.cl1Supply)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'cl1Usage',
                 header: 'CL1 Usage', // Assuming 'Usage' in image maps here or CL1 Usage
-                width: 'w-[100px]',
+                width: 'w-[75px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl1Usage') ? `Old: ${displayRate(getOldValue(row, 'offer_cl1Usage'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl1Usage') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
-                        {renderRate(row.offers?.[0]?.cl1Usage)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl1Usage') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
+                            {renderRate(row.offers?.[0]?.cl1Usage)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'cl2Supply',
                 header: 'CL2 Supply',
-                width: 'w-[100px]',
+                width: 'w-[75px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl2Supply') ? `Old: ${displayRate(getOldValue(row, 'offer_cl2Supply'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl2Supply') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
-                        {renderRate(row.offers?.[0]?.cl2Supply)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl2Supply') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
+                            {renderRate(row.offers?.[0]?.cl2Supply)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'cl2Usage',
                 header: 'CL2 Usage',
-                width: 'w-[100px]',
+                width: 'w-[75px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_cl2Usage') ? `Old: ${displayRate(getOldValue(row, 'offer_cl2Usage'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl2Usage') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
-                        {renderRate(row.offers?.[0]?.cl2Usage)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_cl2Usage') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-green-200 text-green-950 dark:bg-green-900/20 dark:text-green-400'}`}>
+                            {renderRate(row.offers?.[0]?.cl2Usage)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'demand',
                 header: 'Demand',
-                width: 'w-[100px]',
+                width: 'w-[72px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_demand') ? `Old: ${displayRate(getOldValue(row, 'offer_demand'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demand') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
-                        {renderRate(row.offers?.[0]?.demand)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demand') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
+                            {renderRate(row.offers?.[0]?.demand)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'demandOp',
                 header: 'Demand(OP)',
-                width: 'w-[100px]',
+                width: 'w-[80px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_demandOp') ? `Old: ${displayRate(getOldValue(row, 'offer_demandOp'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandOp') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
-                        {renderRate(row.offers?.[0]?.demandOp)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandOp') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
+                            {renderRate(row.offers?.[0]?.demandOp)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'demandP',
                 header: 'Demand(P)',
-                width: 'w-[100px]',
+                width: 'w-[80px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_demandP') ? `Old: ${displayRate(getOldValue(row, 'offer_demandP'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandP') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
-                        {renderRate(row.offers?.[0]?.demandP)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandP') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
+                            {renderRate(row.offers?.[0]?.demandP)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'demandS',
                 header: 'Demand(S)',
-                width: 'w-[100px]',
+                width: 'w-[80px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_demandS') ? `Old: ${displayRate(getOldValue(row, 'offer_demandS'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandS') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
-                        {renderRate(row.offers?.[0]?.demandS)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_demandS') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
+                            {renderRate(row.offers?.[0]?.demandS)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             {
                 key: 'fit',
                 header: 'FIT',
-                width: 'w-[80px]',
+                width: 'w-[100px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_fit') ? `Old: ${getOldValue(row, 'offer_fit')}` : null}>
                         <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fit') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
@@ -1391,7 +1819,7 @@ export function RatesPage() {
             {
                 key: 'fitPeak',
                 header: 'Premium FIT',
-                width: 'w-[100px]',
+                width: 'w-[80px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitPeak') ? `Old: ${getOldValue(row, 'offer_fitPeak')}` : null}>
                         <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitPeak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
@@ -1403,7 +1831,7 @@ export function RatesPage() {
             {
                 key: 'fitCritical',
                 header: 'CRITICAL EVENT FIT',
-                width: 'w-[100px]',
+                width: 'w-[80px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitCritical') ? `Old: ${getOldValue(row, 'offer_fitCritical')}` : null}>
                         <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitCritical') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
@@ -1415,7 +1843,7 @@ export function RatesPage() {
             {
                 key: 'fitVpp',
                 header: 'BASE FIT',
-                width: 'w-[100px]',
+                width: 'w-[72px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitVpp') ? `Old: ${getOldValue(row, 'offer_fitVpp')}` : null}>
                         <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitVpp') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
@@ -1427,19 +1855,19 @@ export function RatesPage() {
             {
                 key: 'vppOrcharge',
                 header: 'VPP Orchestration',
-                width: 'w-[140px]',
+                width: 'w-[100px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_vppOrcharge') ? `Old: ${displayRate(getOldValue(row, 'offer_vppOrcharge'))}` : null}>
-                    <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_vppOrcharge') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
-                        {renderRate(row.offers?.[0]?.vppOrcharge)}
-                    </div>
-                </Tooltip>
+                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_vppOrcharge') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-red-200 text-red-950 dark:bg-red-900/20 dark:text-red-400'}`}>
+                            {renderRate(row.offers?.[0]?.vppOrcharge)}
+                        </div>
+                    </Tooltip>
                 ),
             },
             ...dynamicFieldNames.map(fieldName => ({
                 key: `dynamic_${fieldName}`,
                 header: fieldName,
-                width: 'w-[150px]',
+                width: 'w-[110px]',
                 render: (row: RatePlan) => {
                     const rate = row.offers?.[0]?.dynamicRates?.find(r => r.name?.toLowerCase() === fieldName.toLowerCase());
                     if (!rate) return '-';
@@ -1458,7 +1886,7 @@ export function RatesPage() {
             {
                 key: 'discount',
                 header: 'Discount',
-                width: 'w-[100px]',
+                width: 'w-[75px]',
                 render: (row: RatePlan) => {
                     const isChanged = isFieldChanged(row, 'discountApplies') || isFieldChanged(row, 'discountPercentage');
                     return (
@@ -1475,25 +1903,25 @@ export function RatesPage() {
             {
                 key: 'tariff',
                 header: 'Tariff Code',
-                width: 'w-[100px]',
+                width: 'w-[90px]',
                 render: (row: RatePlan) => <span className="font-medium text-foreground">{row.tariff || '-'}</span>,
             },
             {
                 key: 'planId',
                 header: 'Plan ID',
-                width: 'w-[150px]',
+                width: 'w-[120px]',
                 render: (row: RatePlan) => <span className="font-medium text-foreground">{row.planId || '-'}</span>,
             },
             {
                 key: 'updatedAt',
                 header: 'Updated',
-                width: 'w-[150px]',
+                width: 'w-[120px]',
                 render: (row: RatePlan) => <span className="text-muted-foreground">{formatSydneyTime(row.updatedAt)}</span>,
             },
             {
                 key: 'actions',
                 header: 'Actions',
-                width: 'w-[100px]',
+                width: 'w-[85px]',
                 sticky: 'right' as const,
                 stickyOffset: 0,
                 render: (row: RatePlan) => (
@@ -1577,35 +2005,33 @@ export function RatesPage() {
                         </Tooltip>
                     )}
                     {canEdit && (
-                        <>
-
-                            <Button
-                                variant="outline"
-                                leftIcon={<ClockIcon size={16} />}
-                                onClick={handleOpenHistory}
-                            >
-                                Versions
-                            </Button>
-                        </>
+                        <Button
+                            variant="outline"
+                            leftIcon={<ClockIcon size={16} />}
+                            onClick={handleOpenHistory}
+                        >
+                            Versions
+                        </Button>
                     )}
                 </div>
             </div>
 
             {/* Content Area */}
             <div className="p-5 bg-background rounded-lg border border-border shadow-sm">
-                {/* Filters */}
-                <div className="flex flex-col gap-4 mb-6">
+                {/* Toolbar */}
+                <div className="flex flex-col gap-3 mb-5">
                     <div className="flex items-end justify-between gap-4 flex-wrap">
-                        <div className="flex items-end gap-4 flex-wrap">
+                        {/* Left: Filters */}
+                        <div className="flex items-end gap-3 flex-wrap">
                             <Input
                                 type="search"
-                                placeholder="Search"
+                                placeholder="Search codes, tariffs..."
                                 value={searchCode}
                                 onChange={(e) => setSearchCode(e.target.value)}
-                                containerClassName="w-[200px]"
+                                containerClassName="w-[220px]"
                             />
                             <div className="flex flex-col gap-1">
-                                <label className="text-xs font-medium text-muted-foreground">State</label>
+                                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">State</label>
                                 <StatusField
                                     type="state"
                                     mode="select"
@@ -1617,11 +2043,11 @@ export function RatesPage() {
                                         setStateFilter(val as string);
                                     }}
                                     placeholder="All"
-                                    className="w-[150px]"
+                                    className="w-[140px]"
                                 />
                             </div>
                             <div className="flex flex-col gap-1">
-                                <label className="text-xs font-medium text-muted-foreground">DNSP</label>
+                                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">DNSP</label>
                                 <StatusField
                                     type="dnsp"
                                     mode="select"
@@ -1633,11 +2059,11 @@ export function RatesPage() {
                                         setDnspFilter(val as string);
                                     }}
                                     placeholder="All"
-                                    className="w-[150px]"
+                                    className="w-[140px]"
                                 />
                             </div>
                             <div className="flex flex-col gap-1">
-                                <label className="text-xs font-medium text-muted-foreground">Type</label>
+                                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Type</label>
                                 <StatusField
                                     type="rate_type"
                                     mode="select"
@@ -1649,33 +2075,82 @@ export function RatesPage() {
                                         setTypeFilter(val as string);
                                     }}
                                     placeholder="All"
-                                    className="w-[150px]"
+                                    className="w-[140px]"
                                 />
                             </div>
 
+                            {/* Separator */}
+                            <div className="hidden sm:block w-px h-8 bg-border self-end mb-1" />
+
+                            {/* GST Segmented Toggle */}
                             <div className="flex flex-col gap-1">
-                                <label className="text-xs font-medium text-muted-foreground">GST Inclusive</label>
-                                <div className="flex items-center h-10">
-                                    <Switch
-                                        checked={isGSTInclusive}
-                                        onChange={setIsGSTInclusive}
-                                    />
+                                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Pricing</label>
+                                <div className="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5 h-[38px]">
+                                    <button
+                                        onClick={() => setIsGSTInclusive(false)}
+                                        className={cn(
+                                            "relative px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap",
+                                            !isGSTInclusive
+                                                ? "bg-background text-foreground shadow-sm border border-border/50"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        Excl. GST
+                                    </button>
+                                    <button
+                                        onClick={() => setIsGSTInclusive(true)}
+                                        className={cn(
+                                            "relative px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap",
+                                            isGSTInclusive
+                                                ? "bg-emerald-600 text-white shadow-sm"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        Incl. GST
+                                    </button>
                                 </div>
                             </div>
 
-                            {/* <Button variant="outline" leftIcon={<FilterIcon size={16} />} className="self-end">
-                                Filters
-                            </Button>
+                            {/* Separator */}
+                            <div className="hidden sm:block w-px h-8 bg-border self-end mb-1" />
 
-
-                            <button
-                                onClick={handleClearAll}
-                                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors self-end pb-2"
-                            >
-                                <RefreshCwIcon size={14} />
-                                Clear all
-                            </button> */}
+                            {/* Import / Export Group */}
+                            {canEdit && (
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Data</label>
+                                    <div className="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5 h-[38px]">
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            className="hidden"
+                                            accept=".xlsx, .xls"
+                                            onChange={handleImportExcel}
+                                        />
+                                        <Tooltip content="Import rates from Excel">
+                                            <button
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-all duration-150"
+                                            >
+                                                <UploadIcon size={14} />
+                                                Import
+                                            </button>
+                                        </Tooltip>
+                                        <div className="w-px h-4 bg-border" />
+                                        <Tooltip content="Export rates to Excel">
+                                            <button
+                                                onClick={handleExportExcel}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-all duration-150"
+                                            >
+                                                <DownloadIcon size={14} />
+                                                Export
+                                            </button>
+                                        </Tooltip>
+                                    </div>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Right: Save Controls */}
                         <div className="flex items-center gap-2">
                             {hasLocalChanges && (
                                 <Button
@@ -1687,15 +2162,18 @@ export function RatesPage() {
                                     Reset
                                 </Button>
                             )}
-                            <Tooltip content={(hasUnsavedChanges || hasLocalChanges) ? "Unsaved changes - Click to save version" : "All changes saved"}>
+                            <Tooltip content={(hasUnsavedChanges || hasLocalChanges) ? "Unsaved changes — click to save version" : "All changes saved"}>
                                 <Button
                                     variant={(hasUnsavedChanges || hasLocalChanges) ? "default" : "outline"}
                                     onClick={handleCreateSnapshot}
                                     isLoading={isSnapshotting || isUpdating}
                                     disabled={(!hasUnsavedChanges && !hasLocalChanges) || isSnapshotting || isUpdating}
-                                    className={`px-4 gap-2 transition-all duration-300 ${(hasUnsavedChanges || hasLocalChanges)
-                                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg border-0'
-                                        : 'border-green-300 bg-green-50 text-green-600 cursor-default'}`}
+                                    className={cn(
+                                        "px-4 gap-2 transition-all duration-300",
+                                        (hasUnsavedChanges || hasLocalChanges)
+                                            ? "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg border-0"
+                                            : "border-green-300 bg-green-50 text-green-600 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400 cursor-default"
+                                    )}
                                 >
                                     {!isSnapshotting && !isUpdating && (
                                         (hasUnsavedChanges || hasLocalChanges) ? (
@@ -1716,17 +2194,26 @@ export function RatesPage() {
                             </Tooltip>
                         </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                            {meta ? `Showing ${allRatePlans.length} out of ${meta.totalRecords} records` : 'Loading...'}
+                    {/* Status Bar */}
+                    <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                        <p className="text-xs text-muted-foreground">
+                            {meta ? (
+                                <>
+                                    Showing <span className="font-semibold text-foreground">{allRatePlans.length}</span> of <span className="font-semibold text-foreground">{meta.totalRecords}</span> records
+                                </>
+                            ) : 'Loading...'}
                         </p>
-                        {!isGSTInclusive && (
-                            <p className="text-sm text-muted-foreground">
-                                * All rates are exclusive of GST
-                            </p>
-                        )}
+                        <p className={cn(
+                            "text-xs font-medium px-2.5 py-1 rounded-full transition-all duration-200",
+                            isGSTInclusive
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                        )}>
+                            {isGSTInclusive ? '✓ GST Inclusive pricing' : 'Rates exclusive of GST'}
+                        </p>
                     </div>
                 </div>
+
 
                 <DataTable
                     columns={columns}

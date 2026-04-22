@@ -49,7 +49,8 @@ import {
     SearchIcon,
     SpinnerIcon
 } from '@/components/icons';
-import { sendVerification, checkVerification } from '@/lib/twilio';
+import { sendVerification, checkVerification, normalisePhone, denormalisePhone } from '@/lib/twilio';
+
 import { calculateDiscountedRate } from '@/lib/rate-utils';
 import {
     uploadDocument,
@@ -629,7 +630,7 @@ export const CustomerFormPage = () => {
                 firstName: prefill.firstname || prev.firstName,
                 lastName: prefill.lastname || prev.lastName,
                 email: prefill.email || prev.email,
-                phone: prefill.number || prev.phone,
+                phone: denormalisePhone(prefill.number || prev.phone),
                 unitNumber: prefill.unitnumber || prev.unitNumber,
                 streetNumber: prefill.streetnumber || prev.streetNumber,
                 streetName: prefill.streetname || prev.streetName,
@@ -793,7 +794,7 @@ export const CustomerFormPage = () => {
                 firstName: c.firstName || '',
                 lastName: c.lastName || '',
                 email: c.email || '',
-                phone: c.number || '',
+                phone: denormalisePhone(c.number || ''),
                 gender: c.gender || 0,
                 relationshipStatus: c.relationshipStatus || 0,
                 enquiryAmount: c.enquiryAmount?.toString() || '',
@@ -1533,7 +1534,8 @@ export const CustomerFormPage = () => {
                     formData.lastName !== (c.lastName || ''),
                     formData.businessName !== (c.businessName || ''),
                     formData.abn !== (c.abn || ''),
-                    formData.phone !== (c.number || ''),
+                    normalisePhone(formData.phone) !== normalisePhone(c.number || ''),
+
                     formData.propertyType !== (c.propertyType || 0),
                     formData.tariffCode !== (c.tariffCode || ''),
                     formData.discount !== (c.discount || 0),
@@ -1591,7 +1593,8 @@ export const CustomerFormPage = () => {
                 abn: formData.abn,
                 showAsBusinessName: formData.showAsBusinessName,
                 showName: formData.showName,
-                number: formData.phone,
+                number: normalisePhone(formData.phone),
+
                 dob: formData.dob || null,
                 phoneVerifiedAt: phoneVerifiedAt,
                 propertyType: formData.propertyType,
@@ -1761,8 +1764,9 @@ export const CustomerFormPage = () => {
                 name: `${formData.title ? `${formData.title} ` : ''}${formData.firstName} ${formData.lastName}`.trim(),
                 businessName: (formData.showAsBusinessName && formData.businessName) ? formData.businessName : '',
                 email: formData.email || '',
-                mobile: formData.phone || '',
-                businessContact: formData.phone || '',
+                mobile: normalisePhone(formData.phone),
+                businessContact: normalisePhone(formData.phone),
+
                 contractStart: today,
                 connectionDate: formData.connectionDate ? new Date(formData.connectionDate).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' }) : today,
                 offerAcceptance: today,
