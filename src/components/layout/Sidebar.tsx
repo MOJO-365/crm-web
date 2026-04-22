@@ -260,20 +260,26 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                 {/* Dynamic menus */}
                 {rootMenus.map((menu) => {
                     const children = getChildren(menu.menuUid);
-                    const hasChildren = children.length > 0;
-                    const IconComponent = iconMap[menu.menuCode];
+                    
+                    // If a group has only ONE sub-menu, simplify it to a direct link
+                    const isSingleChild = children.length === 1;
+                    const effectiveMenu = isSingleChild ? children[0] : menu;
+                    const hasSubMenus = children.length > 1;
+                    
+                    // Priority for icon: Child icon > Parent Icon
+                    const IconComponent = iconMap[effectiveMenu.menuCode] || iconMap[menu.menuCode];
 
-                    // Simple item (Leaf)
-                    if (!hasChildren) {
-                        const path = pathMap[menu.menuCode] || `/${menu.menuCode}`;
+                    // Simple item (Leaf or simplified group)
+                    if (!hasSubMenus) {
+                        const path = pathMap[effectiveMenu.menuCode] || `/${effectiveMenu.menuCode}`;
                         return (
                             <NavLink
-                                key={menu.menuUid}
+                                key={effectiveMenu.menuUid}
                                 to={path}
-                                state={menu.menuCode === 'customers' ? { resetFilters: true } : undefined}
+                                state={effectiveMenu.menuCode === 'customers' ? { resetFilters: true } : undefined}
                             >
                                 {({ isActive }) => (
-                                    <SidebarNavItem title={menu.menuName} isActive={isActive} isOpen={isOpen || false}>
+                                    <SidebarNavItem title={effectiveMenu.menuName} isActive={isActive} isOpen={isOpen || false}>
                                         {IconComponent && (
                                             <IconComponent
                                                 size={isOpen ? 18 : 20}
@@ -283,7 +289,7 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                                                 )}
                                             />
                                         )}
-                                        {isOpen && <span className="truncate">{menu.menuName}</span>}
+                                        {isOpen && <span className="truncate">{effectiveMenu.menuName}</span>}
                                     </SidebarNavItem>
                                 )}
                             </NavLink>

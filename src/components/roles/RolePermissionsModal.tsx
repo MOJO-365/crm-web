@@ -3,7 +3,22 @@ import { useQuery, useMutation } from '@apollo/client';
 import { toast } from 'react-toastify';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/ui/Button';
-import { ChevronRightIcon, ShieldCheckIcon, ShieldIcon, CloseIcon, ZapIcon } from '@/components/icons';
+import { 
+    ChevronRightIcon, 
+    ShieldCheckIcon, 
+    ShieldIcon, 
+    CloseIcon, 
+    ZapIcon,
+    DashboardIcon,
+    UsersIcon,
+    UserCircleIcon,
+    BatteryIcon,
+    InverterIcon,
+    CustomerIcon,
+    EmailIcon,
+    LogsIcon,
+    SettingsIcon
+} from '@/components/icons';
 import {
     GET_MENUS,
     GET_ROLE_PERMISSIONS,
@@ -201,6 +216,22 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
         [menus]);
 
     const currentFeatures = useMemo(() => featureData?.features || [], [featureData]);
+    
+    // Icon mapping for modules
+    const iconMap: Record<string, any> = {
+        dashboard: DashboardIcon,
+        leads: UserCircleIcon,
+        customers: UsersIcon,
+        customer_group: CustomerIcon,
+        user_management: ShieldCheckIcon,
+        email: EmailIcon,
+        audit_logs: LogsIcon,
+        settings: SettingsIcon,
+        master_data: ShieldCheckIcon,
+        battery_master: BatteryIcon,
+        inverter_master: InverterIcon,
+        rates: ZapIcon
+    };
 
     // Default Selection
     useEffect(() => {
@@ -514,9 +545,13 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
                                             <div className="flex items-center gap-3 overflow-hidden">
                                                 {/* Status Dot */}
                                                 <div className={cn(
-                                                    "w-2 h-2 rounded-full transition-colors shrink-0",
+                                                    "w-1.5 h-1.5 rounded-full transition-colors shrink-0",
                                                     hasAccess ? "bg-[#5c8a14]" : "bg-gray-300"
                                                 )} />
+                                                {(() => {
+                                                    const Icon = iconMap[menu.code];
+                                                    return Icon ? <Icon size={16} className={cn(isSelected ? "text-[#5c8a14]" : "text-gray-400")} /> : null;
+                                                })()}
                                                 <span className="font-semibold text-sm truncate">{menu.name}</span>
                                             </div>
 

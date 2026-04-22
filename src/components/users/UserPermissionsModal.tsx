@@ -3,7 +3,22 @@ import { useQuery, useMutation } from '@apollo/client';
 import { toast } from 'react-toastify';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/ui/Button';
-import { ChevronRightIcon, ShieldCheckIcon, ShieldIcon, CloseIcon, ZapIcon } from '@/components/icons';
+import { 
+    ChevronRightIcon, 
+    ShieldCheckIcon, 
+    ShieldIcon, 
+    CloseIcon, 
+    ZapIcon,
+    DashboardIcon,
+    UsersIcon,
+    UserCircleIcon,
+    BatteryIcon,
+    InverterIcon,
+    CustomerIcon,
+    EmailIcon,
+    LogsIcon,
+    SettingsIcon
+} from '@/components/icons';
 import { GET_MENUS, GET_ROLE_PERMISSIONS, GET_USER_PERMISSIONS, UPSERT_USER_PERMISSION, GET_FEATURES, GET_ROLE_FEATURE_PERMISSIONS, GET_USER_FEATURE_PERMISSIONS, UPSERT_USER_FEATURE_PERMISSION } from '@/graphql';
 import { cn } from '@/lib/utils';
 
@@ -599,11 +614,26 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
         }
     };
 
-    // Features for the selected menu
     const currentFeatures = useMemo(() => {
         if (!selectedMenuUid) return [];
         return featuresMap[selectedMenuUid] || [];
     }, [selectedMenuUid, featuresMap]);
+
+    // Icon mapping for modules
+    const iconMap: Record<string, any> = {
+        dashboard: DashboardIcon,
+        leads: UserCircleIcon,
+        customers: UsersIcon,
+        customer_group: CustomerIcon,
+        user_management: ShieldCheckIcon,
+        email: EmailIcon,
+        audit_logs: LogsIcon,
+        settings: SettingsIcon,
+        master_data: ShieldCheckIcon,
+        battery_master: BatteryIcon,
+        inverter_master: InverterIcon,
+        rates: ZapIcon
+    };
 
 
     // Reset - Discard all changes and restore initial maps
@@ -708,9 +738,13 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
                                             <div className="flex items-center gap-3 overflow-hidden">
                                                 {/* Status Dot */}
                                                 <div className={cn(
-                                                    "w-2 h-2 rounded-full transition-colors shrink-0",
+                                                    "w-1.5 h-1.5 rounded-full transition-colors shrink-0",
                                                     hasAccess ? "bg-[#5c8a14]" : "bg-gray-300"
                                                 )} />
+                                                {(() => {
+                                                    const Icon = iconMap[menu.code];
+                                                    return Icon ? <Icon size={16} className={cn(isSelected ? "text-[#5c8a14]" : "text-gray-400")} /> : null;
+                                                })()}
                                                 <span className="font-semibold text-sm truncate">{menu.name}</span>
                                                 {hasUserOverride && (
                                                     <span className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-[10px] font-bold rounded">CUSTOM</span>
