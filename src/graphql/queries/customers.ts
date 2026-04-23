@@ -385,6 +385,7 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
         $searchUtilmateStatus: Int, 
         $searchMsatConnected: Int,
         $searchRiskStatus: String,
+        $searchAssignedTo: String,
         $includeDeleted: String
     ) {
         customersCursor(
@@ -402,6 +403,7 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
             searchVppConnected: $searchVppConnected, 
             searchUtilmateStatus: $searchUtilmateStatus, 
             searchMsatConnected: $searchMsatConnected,
+            searchAssignedTo: $searchAssignedTo,
             includeDeleted: $includeDeleted
         ) {
             data {
@@ -415,8 +417,8 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
 `;
 
 export const GET_CUSTOMERS_CURSOR = gql`
-    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: String, $searchVpp: Int, $searchVppConnected: Int, $searchUtilmateStatus: Int, $searchMsatConnected: Int, $includeDeleted: String) {
-        customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchRiskStatus: $searchRiskStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchUtilmateStatus: $searchUtilmateStatus, searchMsatConnected: $searchMsatConnected, includeDeleted: $includeDeleted) {
+    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: String, $searchVpp: Int, $searchVppConnected: Int, $searchUtilmateStatus: Int, $searchMsatConnected: Int, $searchAssignedTo: String, $includeDeleted: String) {
+        customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchRiskStatus: $searchRiskStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchUtilmateStatus: $searchUtilmateStatus, searchMsatConnected: $searchMsatConnected, searchAssignedTo: $searchAssignedTo, includeDeleted: $includeDeleted) {
             data {
                 id
                 uid
@@ -451,6 +453,12 @@ export const GET_CUSTOMERS_CURSOR = gql`
                 address {
                     fullAddress
                 }
+                assignedToUid
+                assignedToUser {
+                    uid
+                    name
+                    email
+                }
                 isDeleted
             }
             pageInfo {
@@ -469,6 +477,12 @@ export const GET_CUSTOMER_BY_ID = gql`
     query GetCustomerById($uid: String!) {
         customer(uid: $uid) {
             uid
+            assignedToUid
+            assignedToUser {
+                uid
+                name
+                email
+            }
             selectedBonuses
             customerId
             email

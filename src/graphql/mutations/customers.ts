@@ -139,6 +139,12 @@ const CUSTOMER_FULL_RESPONSE = `
         firstDebitDate
         optIn
     }
+    assignedToUid
+    assignedToUser {
+        uid
+        name
+        email
+    }
     message
 `;
 
@@ -293,5 +299,13 @@ export const APPROVE_WEB_ENROLLMENT = gql`
 export const REJECT_WEB_ENROLLMENT = gql`
     mutation RejectWebEnrollment($uid: String!) {
         rejectWebEnrollment(uid: $uid)
+    }
+`;
+
+export const ASSIGN_CUSTOMER = gql`
+    mutation AssignCustomer($uid: String!, $userUid: String!) {
+        assignCustomer(uid: $uid, userUid: $userUid) {
+            ${CUSTOMER_FULL_RESPONSE}
+        }
     }
 `;

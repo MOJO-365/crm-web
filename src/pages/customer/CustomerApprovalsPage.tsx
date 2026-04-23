@@ -530,7 +530,7 @@ export function CustomerApprovalsPage() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 title="Enrollment Payload Data"
-                size="xl"
+                size="3xl"
             >
                 <div className="space-y-6">
                     {selectedEnrollment?.payload ? (
@@ -600,12 +600,53 @@ export function CustomerApprovalsPage() {
                                     <span className="font-medium">
                                         {selectedEnrollment.payload.idType === 0 ? 'Driver License' : selectedEnrollment.payload.idType === 1 ? 'Medicare' : selectedEnrollment.payload.idType === 2 ? 'Passport' : 'Unknown'}
                                     </span>
-                                    <span className="text-muted-foreground">ID Number</span>
-                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
-                                    <span className="text-muted-foreground">Issue State</span>
-                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idstate)}</span>
-                                    <span className="text-muted-foreground">Expiry Date</span>
-                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idexpiary || selectedEnrollment.payload.idexpiry)}</span>
+                                    
+                                    {/* Conditional fields based on ID Type */}
+                                    {selectedEnrollment.payload.idType === 0 && (
+                                        <>
+                                            <span className="text-muted-foreground">ID Number</span>
+                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
+                                            <span className="text-muted-foreground">Issue State</span>
+                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idstate)}</span>
+                                            <span className="text-muted-foreground">Card Number</span>
+                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idcardnumber || selectedEnrollment.payload.licenseCardNumber || selectedEnrollment.payload.cardnumber)}</span>
+                                        </>
+                                    )}
+
+                                    {selectedEnrollment.payload.idType === 1 && (
+                                        <>
+                                            <span className="text-muted-foreground">Card Type</span>
+                                            <span className="font-medium">
+                                                {(selectedEnrollment.payload.medicareCardType === 0 || selectedEnrollment.payload.medicare_card_type === 0) ? 'Standard (Green)' : 
+                                                 (selectedEnrollment.payload.medicareCardType === 1 || selectedEnrollment.payload.medicare_card_type === 1) ? 'Interim (Blue)' : 
+                                                 (selectedEnrollment.payload.medicareCardType === 2 || selectedEnrollment.payload.medicare_card_type === 2) ? 'Reciprocal (Yellow)' : 
+                                                 renderPayloadField(selectedEnrollment.payload.medicareCardType || selectedEnrollment.payload.medicare_card_type || selectedEnrollment.payload.cardtype)}
+                                            </span>
+                                            <span className="text-muted-foreground">Card Number</span>
+                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
+                                            <span className="text-muted-foreground">Expiry Date</span>
+                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idexpiary || selectedEnrollment.payload.idexpiry || selectedEnrollment.payload.expiarydate)}</span>
+                                        </>
+                                    )}
+
+                                    {selectedEnrollment.payload.idType === 2 && (
+                                        <>
+                                            <span className="text-muted-foreground">Passport Number</span>
+                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
+                                            <span className="text-muted-foreground">Expiry Date</span>
+                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idexpiary || selectedEnrollment.payload.idexpiry)}</span>
+                                        </>
+                                    )}
+
+                                    {/* Fallback for other types or missing type */}
+                                    {selectedEnrollment.payload.idType !== 0 && selectedEnrollment.payload.idType !== 1 && selectedEnrollment.payload.idType !== 2 && (
+                                        <>
+                                            <span className="text-muted-foreground">ID Number</span>
+                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
+                                            <span className="text-muted-foreground">Expiry Date</span>
+                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idexpiary || selectedEnrollment.payload.idexpiry)}</span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -624,6 +665,7 @@ export function CustomerApprovalsPage() {
                                     className="text-destructive hover:bg-destructive/10"
                                     onClick={() => handleReject(selectedEnrollment!)}
                                     isLoading={rejectingUid === selectedEnrollment.uid}
+                                    loadingText="Rejecting..."
                                     disabled={approvingUid === selectedEnrollment.uid}
                                 >
                                     Reject Enrollment
@@ -631,6 +673,7 @@ export function CustomerApprovalsPage() {
                                 <Button
                                     onClick={() => handleApprove(selectedEnrollment!)}
                                     isLoading={approvingUid === selectedEnrollment.uid}
+                                    loadingText="Integrating..."
                                     disabled={rejectingUid === selectedEnrollment.uid}
                                 >
                                     Approve & Integrate
@@ -640,7 +683,7 @@ export function CustomerApprovalsPage() {
                     </div>
                 </div>
             </Modal>
-            
+
             {/* Rejection Confirmation Modal */}
             <Modal
                 isOpen={isRejectDialogOpen}
@@ -662,18 +705,19 @@ export function CustomerApprovalsPage() {
                             </p>
                         </div>
                     </div>
-                    
+
                     <div className="flex flex-col gap-2 pt-2">
-                        <Button 
-                            variant="destructive" 
+                        <Button
+                            variant="destructive"
                             className="w-full h-11"
                             onClick={handleConfirmReject}
                             isLoading={rejectingUid === enrollmentToReject?.uid}
+                            loadingText="Rejecting..."
                         >
                             Yes, Reject Enrollment
                         </Button>
-                        <Button 
-                            variant="ghost" 
+                        <Button
+                            variant="ghost"
                             className="w-full h-11 text-foreground"
                             onClick={() => setIsRejectDialogOpen(false)}
                             disabled={rejectingUid !== null}

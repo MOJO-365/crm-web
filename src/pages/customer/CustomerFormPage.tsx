@@ -23,6 +23,7 @@ import {
     GET_NEXT_CUSTOMER_ID,
     PREVIEW_SYSTEM_TEMPLATE,
     UPDATE_LEAD,
+    GET_USERS
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
@@ -180,6 +181,7 @@ const initialFormData: CustomerFormData = {
     previousBill: null,
     identityProof: null,
     selectedBonuses: [],
+    assignedToUid: undefined,
 };
 
 
@@ -583,9 +585,19 @@ export const CustomerFormPage = () => {
     // Rate plans
     const [selectedRatePlan, setSelectedRatePlan] = useState<RatePlan | null>(null);
     const [isCustomDiscountMode, setIsCustomDiscountMode] = useState(false);
-    const { hasFeatureAccess } = useAuthStore();
+    const { hasFeatureAccess, user } = useAuthStore();
     const canAccessCustomDiscount = hasFeatureAccess('feature_custom_discount');
+    const canViewAllCustomers = hasFeatureAccess('feature_view_all_customers');
     const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!isEditMode && user?.uid && !canViewAllCustomers && formData.assignedToUid !== user.uid) {
+            setFormData(prev => ({
+                ...prev,
+                assignedToUid: user.uid
+            }));
+        }
+    }, [isEditMode, user?.uid, canViewAllCustomers, formData.assignedToUid]);
     const eighteenYearsAgo = useMemo(() => {
         const d = new Date();
         d.setFullYear(d.getFullYear() - 18);
@@ -598,6 +610,17 @@ export const CustomerFormPage = () => {
         skip: !isEditMode,
         fetchPolicy: 'network-only',
     });
+
+    const { data: usersData } = useQuery(GET_USERS, {
+        variables: { limit: 1000, status: 'active' },
+        fetchPolicy: 'cache-first'
+    });
+    const userOptions = useMemo(() => {
+        return (usersData?.users?.data || []).map((u: any) => ({
+            value: u.uid,
+            label: u.name || u.email
+        }));
+    }, [usersData]);
 
     // Document upload state
     const [generatedCustomerId, setGeneratedCustomerId] = useState<string>('');
@@ -803,6 +826,7 @@ export const CustomerFormPage = () => {
                 dob: c.dob ? formatSydneyTime(c.dob, 'YYYY-MM-DD') : '',
                 propertyType: c.propertyType || 0,
                 businessName: c.businessName || '',
+                assignedToUid: c.assignedToUid || undefined,
                 abn: c.abn || '',
                 showAsBusinessName: c.showAsBusinessName || false,
                 showName: c.showName ?? true,
@@ -1598,6 +1622,7 @@ export const CustomerFormPage = () => {
                 dob: formData.dob || null,
                 phoneVerifiedAt: phoneVerifiedAt,
                 propertyType: formData.propertyType,
+                assignedToUid: formData.assignedToUid,
                 tariffCode: formData.tariffCode,
                 discount: formData.discount,
                 status: finalStatus,
@@ -2467,6 +2492,15 @@ export const CustomerFormPage = () => {
                                                 onBlur={() => handleBlur('dob')}
                                             />
                                             <Input label="Email" required helperText="We'll send confirmations here" error={errors.email} type="email" placeholder="name@example.com" value={formData.email} onChange={(e) => updateField('email', e.target.value)} onBlur={() => handleBlur('email')} />
+                                            {canViewAllCustomers && (
+                                                <Select
+                                                    label="Assigned To"
+                                                    options={userOptions}
+                                                    value={formData.assignedToUid || ''}
+                                                    onChange={(val) => updateField('assignedToUid', val as string)}
+                                                    placeholder="Select User"
+                                                />
+                                            )}
                                         </div>
                                     </div>
 

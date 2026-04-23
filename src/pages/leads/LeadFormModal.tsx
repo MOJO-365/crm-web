@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/common';
-import { GET_LEAD, CREATE_LEAD, UPDATE_LEAD, GET_LEADS, GET_LEAD_SOURCES, CREATE_LEAD_SOURCE, CHECK_ADDRESS_EXISTS, CHECK_NMI_EXISTS } from '@/graphql';
+import { GET_LEAD, CREATE_LEAD, UPDATE_LEAD, GET_LEADS, GET_LEAD_SOURCES, CREATE_LEAD_SOURCE, CHECK_ADDRESS_EXISTS, CHECK_NMI_EXISTS, GET_USERS } from '@/graphql';
 import { TITLE_OPTIONS } from '@/lib/constants';
 import LocationAutocomplete from '../LocationAutocomplete';
 import { PlusIcon } from '@/components/icons';
@@ -58,6 +58,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
         country: 'Australia',
         nmi: '',
         referralName: '',
+        assignedToUid: '',
     });
 
     const [addressSearch, setAddressSearch] = useState('');
@@ -98,6 +99,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 country: lead.country || 'Australia',
                 nmi: lead.nmi || '',
                 referralName: lead.referralName || '',
+                assignedToUid: lead.assignedTo || '',
             };
             setFormData(newFormData);
 
@@ -138,6 +140,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 country: 'Australia',
                 nmi: '',
                 referralName: '',
+                assignedToUid: '',
             });
             setAddressSearch('');
         }
@@ -178,6 +181,17 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
         label: s.name,
         value: s.name
     })) || [];
+
+    const { data: userData } = useQuery(GET_USERS, {
+        variables: { limit: 1000, status: 'active' },
+        skip: !isOpen
+    });
+    const userOptions = React.useMemo(() => {
+        return (userData?.users?.data || []).map((u: any) => ({
+            value: u.uid,
+            label: u.name || u.email
+        }));
+    }, [userData]);
 
     const checkAddressDuplicate = async (addressData: {
         unitNumber?: string;
@@ -327,9 +341,9 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                     </div>
                 ) : (
                     <>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                            {/* Row 1: Title, First Name, Last Name */}
-                            <div className="md:col-span-1">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-x-6 gap-y-4">
+                            {/* Row 1: Title, First Name, Last Name, Assigned To */}
+                            <div className="md:col-span-2">
                                 <Field label="Title">
                                     <Select
                                         options={TITLE_OPTIONS}
@@ -338,24 +352,34 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                     />
                                 </Field>
                             </div>
-                            <div className="md:col-span-1">
+                            <div className="md:col-span-3">
                                 <Field label="First Name" required>
                                     <Input name="firstname" value={formData.firstname} onChange={handleChange} required placeholder="First name" />
                                 </Field>
                             </div>
-                            <div className="md:col-span-1">
+                            <div className="md:col-span-3">
                                 <Field label="Last Name" required>
                                     <Input name="lastname" value={formData.lastname} onChange={handleChange} required placeholder="Last name" />
                                 </Field>
                             </div>
+                            <div className="md:col-span-4">
+                                <Field label="Assigned To">
+                                    <Select
+                                        options={[{ value: '', label: 'Unassigned' }, ...userOptions]}
+                                        value={formData.assignedToUid}
+                                        onChange={(val) => handleSelectChange('assignedToUid', val as string)}
+                                        placeholder="Unassigned"
+                                    />
+                                </Field>
+                            </div>
 
                             {/* Row 2: Email, Phone, Source */}
-                            <div className="md:col-span-1">
+                            <div className="md:col-span-4">
                                 <Field label="Email" required>
                                     <Input name="email" type="email" value={formData.email} onChange={handleChange} required placeholder="Email address" />
                                 </Field>
                             </div>
-                            <div className="md:col-span-1">
+                            <div className="md:col-span-4">
                                 <Field label="Phone Number" required>
                                     <div className="flex items-center">
                                         <div className="flex items-center justify-center h-10 px-3 bg-muted border border-r-0 border-border rounded-l-md text-sm font-medium text-muted-foreground whitespace-nowrap">
@@ -373,7 +397,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                     </div>
                                 </Field>
                             </div>
-                            <div className="md:col-span-1">
+                            <div className="md:col-span-4">
                                 <Field
                                     label="Lead Source"
                                     action={
@@ -426,7 +450,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                             </div>
 
                             {/* Row 3: Address Search & NMI */}
-                            <div className="md:col-span-2">
+                            <div className="md:col-span-8">
                                 <Field label="Search Address" hint="Start typing to verify address" error={duplicateErrors.address}>
                                     <LocationAutocomplete
                                         value={addressSearch}
@@ -476,7 +500,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                     />
                                 </Field>
                             </div>
-                            <div className="md:col-span-1">
+                            <div className="md:col-span-4">
                                 <Field label="NMI" error={duplicateErrors.nmi}>
                                     <Input
                                         name="nmi"
@@ -491,7 +515,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
 
                             {/* Row 4: Referral Name & Is Customer Now */}
                             {formData.source === 'Referral' && (
-                                <div className="md:col-span-2">
+                                <div className="md:col-span-12">
                                     <Field label="Referral Name">
                                         <Input name="referralName" value={formData.referralName} onChange={handleChange} placeholder="Who referred this lead?" />
                                     </Field>
@@ -500,7 +524,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
 
 
                             {/* Row 4: Detailed Breakdown Grid */}
-                            <div className="md:col-span-3">
+                            <div className="md:col-span-12">
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4 pt-4 border-t border-border mt-2">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Unit No.</label>

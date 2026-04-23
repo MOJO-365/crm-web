@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@apollo/client';
 import { DataTable, type Column } from '@/components/common';
 import {
     PlusIcon, PencilIcon, TrashIcon, XIcon, ArrowRightIcon
 } from '@/components/icons';
-import { GET_LEADS, DELETE_LEAD, GET_LEAD_SOURCES } from '@/graphql';
+import { GET_LEADS, DELETE_LEAD, GET_LEAD_SOURCES, GET_USERS } from '@/graphql';
 import { Button, Input, Select, Tooltip } from '@/components/ui';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -27,6 +27,8 @@ interface Lead {
     isCustomerNow: boolean;
     referralName?: string;
     createdAt: string;
+    assignedTo?: string;
+    assignedToUser?: { uid: string; name: string; };
 }
 
 interface LeadsResponse {
@@ -47,6 +49,7 @@ interface LeadsFilters {
     number: string;
     source: string;
     address: string;
+    assignedTo: string;
 }
 
 const INITIAL_FILTERS: LeadsFilters = {
@@ -55,6 +58,7 @@ const INITIAL_FILTERS: LeadsFilters = {
     number: '',
     source: '',
     address: '',
+    assignedTo: '',
 };
 
 export default function LeadsPage() {
@@ -97,10 +101,21 @@ export default function LeadsPage() {
             ].filter(Boolean).join(' ') || undefined,
             source: debouncedFilters.source || undefined,
             isCustomerNow: false,
+            searchAssignedTo: debouncedFilters.assignedTo || undefined,
         },
         fetchPolicy: 'network-only',
     });
     const { data: sourcesData } = useQuery(GET_LEAD_SOURCES);
+
+    const { data: userData } = useQuery(GET_USERS, {
+        variables: { limit: 1000, status: 'active' },
+    });
+    const userOptions = useMemo(() => {
+        return (userData?.users?.data || []).map((u: any) => ({
+            value: u.uid,
+            label: u.name || u.email,
+        }));
+    }, [userData]);
 
     const [deleteLeadMutation, { loading: deleting }] = useMutation(DELETE_LEAD);
 
@@ -329,6 +344,40 @@ export default function LeadsPage() {
                 <span className="text-sm truncate max-w-[200px] block" title={row.fullAddress}>
                     {row.fullAddress || '-'}
                 </span>
+            ),
+        },
+        {
+            key: 'assignedTo',
+            header: (
+                <div className="flex flex-col gap-1 items-start">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.assignedTo ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Assigned To
+                        </span>
+                        {searchFilters.assignedTo && <div className="w-1 h-1 rounded-full bg-primary" />}
+                    </div>
+                    <Select
+                        options={[{ value: '', label: 'All' }, ...userOptions]}
+                        value={searchFilters.assignedTo}
+                        onChange={(val) => handleSearchChange('assignedTo', val as string)}
+                        placeholder="All"
+                        className={cn(
+                            "h-7 text-xs w-[120px] transition-all duration-200",
+                            searchFilters.assignedTo && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                    />
+                </div>
+            ),
+            width: 'w-[150px]',
+            render: (row) => (
+                <div className="whitespace-nowrap">
+                    <span className="text-xs font-medium text-foreground">
+                        {row.assignedToUser?.name || '-'}
+                    </span>
+                </div>
             ),
         },
         {

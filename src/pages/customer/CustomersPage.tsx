@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useLazyQuery, useMutation } from '@apollo/client';
@@ -7,7 +7,7 @@ import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, RefreshCwIcon, CreditCardIcon
 } from '@/components/icons';
-import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES } from '@/graphql';
+import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES, GET_USERS } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -66,6 +66,7 @@ interface Customer {
         utilmateConnected?: number;
     };
     riskStatus?: string;
+    assignedToUser?: { uid: string; name: string; email: string };
     isDeleted?: boolean;
 }
 
@@ -98,6 +99,7 @@ interface SearchFilters {
     utilmateStatus: string;
     msatConnected: string;
     riskStatus: string;
+    assignedTo: string;
 }
 const CUSTOMERS_FILTER_KEY = 'customers_search_filters';
 
@@ -115,6 +117,7 @@ const INITIAL_FILTERS: SearchFilters = {
     utilmateStatus: '',
     msatConnected: '',
     riskStatus: '',
+    assignedTo: '',
 };
 
 export function CustomersPage() {
@@ -124,6 +127,7 @@ export function CustomersPage() {
     const canCreate = useAuthStore((state) => state.canCreateInMenu('customers'));
     const canEdit = useAuthStore((state) => state.canEditInMenu('customers'));
     const canDelete = useAuthStore((state) => state.canDeleteInMenu('customers'));
+    const canViewAllCustomers = useAuthStore((state) => state.hasFeatureAccess('feature_view_all_customers'));
     const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => {
         const saved = sessionStorage.getItem(CUSTOMERS_FILTER_KEY);
         try {
@@ -177,6 +181,16 @@ export function CustomersPage() {
     const { data: rsData } = useQuery(GET_RISK_STATUSES);
     const riskStatuses = rsData?.riskStatuses || [];
 
+    const { data: userData } = useQuery(GET_USERS, {
+        variables: { limit: 1000, status: 'active' },
+    });
+    const userOptions = useMemo(() => {
+        return (userData?.users?.data || []).map((u: any) => ({
+            value: u.uid,
+            label: u.name || u.email,
+        }));
+    }, [userData]);
+
     // Debounce search and reset pagination
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -210,6 +224,7 @@ export function CustomersPage() {
             searchUtilmateStatus: debouncedFilters.utilmateStatus !== '' ? parseInt(debouncedFilters.utilmateStatus) : undefined,
             searchMsatConnected: debouncedFilters.msatConnected !== '' ? parseInt(debouncedFilters.msatConnected) : undefined,
             searchRiskStatus: debouncedFilters.riskStatus || undefined,
+            searchAssignedTo: debouncedFilters.assignedTo || undefined,
             includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : 'false',
         },
         fetchPolicy: 'network-only',
@@ -343,7 +358,8 @@ export function CustomersPage() {
                     searchVppConnected: debouncedFilters.vppConnected !== '' ? parseInt(debouncedFilters.vppConnected) : undefined,
                     searchUtilmateStatus: debouncedFilters.utilmateStatus !== '' ? parseInt(debouncedFilters.utilmateStatus) : undefined,
                     searchMsatConnected: debouncedFilters.msatConnected !== '' ? parseInt(debouncedFilters.msatConnected) : undefined,
-                    searchRiskStatus: debouncedFilters.riskStatus ? debouncedFilters.riskStatus : undefined,
+                    searchRiskStatus: debouncedFilters.riskStatus || undefined,
+                    searchAssignedTo: debouncedFilters.assignedTo || undefined,
                     includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : 'false',
                 },
             });
@@ -578,6 +594,40 @@ export function CustomersPage() {
                 </div>
             ),
         },
+        ...(canViewAllCustomers ? [{
+            key: 'assignedTo',
+            header: (
+                <div className="flex flex-col gap-1 items-start">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            searchFilters.assignedTo ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Assigned To
+                        </span>
+                        {searchFilters.assignedTo && <div className="w-1 h-1 rounded-full bg-primary" />}
+                    </div>
+                    <Select
+                        options={[{ value: '', label: 'All' }, ...userOptions]}
+                        value={searchFilters.assignedTo}
+                        onChange={(val) => handleSearchChange('assignedTo', val as string)}
+                        placeholder="All"
+                        className={cn(
+                            "h-7 text-xs w-[120px] transition-all duration-200",
+                            searchFilters.assignedTo && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                    />
+                </div>
+            ),
+            width: 'w-[150px]',
+            render: (row: Customer) => (
+                <div className="whitespace-nowrap">
+                    <span className="text-xs font-medium text-foreground">
+                        {row.assignedToUser?.name || '-'}
+                    </span>
+                </div>
+            ),
+        }] : []),
         {
             key: 'vppConnected',
             header: (

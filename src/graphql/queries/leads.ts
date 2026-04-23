@@ -2,8 +2,8 @@ import { gql } from '@apollo/client';
 import { LEAD_FIELDS } from '../fragments';
 
 export const GET_LEADS = gql`
-    query GetLeads($page: Int, $limit: Int, $search: String, $source: String, $isCustomerNow: Boolean) {
-        leads(page: $page, limit: $limit, search: $search, source: $source, isCustomerNow: $isCustomerNow) {
+    query GetLeads($page: Int, $limit: Int, $search: String, $source: String, $isCustomerNow: Boolean, $searchAssignedTo: String) {
+        leads(page: $page, limit: $limit, search: $search, source: $source, isCustomerNow: $isCustomerNow, searchAssignedTo: $searchAssignedTo) {
             data {
                 ...LeadFields
             }

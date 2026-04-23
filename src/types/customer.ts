@@ -92,6 +92,7 @@ export interface CustomerFormData {
     licenseDocument?: CustomerDocument | null;
     additionalDocument?: CustomerDocument | null;
     selectedBonuses: string[]; // Array of bonus UIDs
+    assignedToUid?: string;
 }
 
 export interface CustomerDocument {
