@@ -361,6 +361,32 @@ export function CustomerApprovalsPage() {
             }
         },
         {
+            key: 'vpp',
+            header: (
+                <div className="flex flex-col gap-1 items-center">
+                    <div className="h-7 flex items-center justify-center">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            VPP
+                        </span>
+                    </div>
+                    <div className="h-7" />
+                </div>
+            ),
+            render: (row) => (
+                <div className="flex justify-center">
+                    {(row.payload?.isVpp === 1 || row.payload?.isVpp === '1') ? (
+                        <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-1">
+                            <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        </div>
+                    ) : (
+                        <div className="rounded-full bg-red-100 dark:bg-red-900/30 p-1">
+                            <XIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        </div>
+                    )}
+                </div>
+            )
+        },
+        {
             key: 'status',
             header: (
                 <div className="flex flex-col gap-1">
@@ -588,6 +614,22 @@ export function CustomerApprovalsPage() {
                                         {selectedEnrollment.payload.ownership_status !== undefined
                                             ? selectedEnrollment.payload.ownership_status === 0 ? 'Owner' : 'Renter'
                                             : '-'}
+                                    </span>
+                                    <span className="text-muted-foreground">Discount</span>
+                                    <span className="font-medium">
+                                        {selectedEnrollment.payload.discount !== undefined ? `${selectedEnrollment.payload.discount}%` : '-'}
+                                    </span>
+                                    <span className="text-muted-foreground">VPP Participation</span>
+                                    <span className="font-medium">
+                                        {selectedEnrollment.payload.isVpp === 1 || selectedEnrollment.payload.isVpp === '1' ? (
+                                            <span className="inline-flex items-center gap-1.5 text-green-600 font-bold uppercase text-[10px]">
+                                                <CheckIcon size={14} /> YES
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 text-red-500 font-bold uppercase text-[10px]">
+                                                <XIcon size={14} /> NO
+                                            </span>
+                                        )}
                                     </span>
                                 </div>
                             </div>

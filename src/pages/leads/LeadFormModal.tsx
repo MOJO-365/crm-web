@@ -36,6 +36,7 @@ interface LeadFormModalProps {
 export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalProps) {
     const isEditMode = !!uid;
     const canManageLeadSources = useAuthStore((state) => state.hasFeatureAccess('feature_manage_lead_sources'));
+    const canViewAllCustomers = useAuthStore((state) => state.hasFeatureAccess('feature_view_all_customers'));
 
     const [formData, setFormData] = useState({
         title: '',
@@ -352,26 +353,28 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                     />
                                 </Field>
                             </div>
-                            <div className="md:col-span-3">
+                            <div className={canViewAllCustomers ? "md:col-span-3" : "md:col-span-5"}>
                                 <Field label="First Name" required>
                                     <Input name="firstname" value={formData.firstname} onChange={handleChange} required placeholder="First name" />
                                 </Field>
                             </div>
-                            <div className="md:col-span-3">
+                            <div className={canViewAllCustomers ? "md:col-span-3" : "md:col-span-5"}>
                                 <Field label="Last Name" required>
                                     <Input name="lastname" value={formData.lastname} onChange={handleChange} required placeholder="Last name" />
                                 </Field>
                             </div>
-                            <div className="md:col-span-4">
-                                <Field label="Assigned To">
-                                    <Select
-                                        options={[{ value: '', label: 'Unassigned' }, ...userOptions]}
-                                        value={formData.assignedToUid}
-                                        onChange={(val) => handleSelectChange('assignedToUid', val as string)}
-                                        placeholder="Unassigned"
-                                    />
-                                </Field>
-                            </div>
+                            {canViewAllCustomers && (
+                                <div className="md:col-span-4">
+                                    <Field label="Assigned To">
+                                        <Select
+                                            options={[{ value: '', label: 'Unassigned' }, ...userOptions]}
+                                            value={formData.assignedToUid}
+                                            onChange={(val) => handleSelectChange('assignedToUid', val as string)}
+                                            placeholder="Unassigned"
+                                        />
+                                    </Field>
+                                </div>
+                            )}
 
                             {/* Row 2: Email, Phone, Source */}
                             <div className="md:col-span-4">
