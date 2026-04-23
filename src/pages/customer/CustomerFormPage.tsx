@@ -1474,7 +1474,7 @@ export const CustomerFormPage = () => {
                             },
                             "gender-code": formData.gender === 0 ? 'M' : (formData.gender === 1 ? 'F' : 'O'),
                             "license-number": formData.licenseNumber,
-                            "license-card-number": formData.licenseCardNumber,
+                            // "license-card-number": formData.licenseCardNumber,
                             "license-state": formData.licenseState,
                             "date-of-birth": formData.dob,
                             "employer-name": formData.employerName,
