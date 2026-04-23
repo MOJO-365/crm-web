@@ -2498,7 +2498,7 @@ export function CustomerDetailsPage() {
                 },
                 "gender-code": selectedCustomerDetails.gender === 0 ? 'M' : (selectedCustomerDetails.gender === 1 ? 'F' : 'O'),
                 "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
-                "license-card-number": selectedCustomerDetails.enrollmentDetails?.licenseCardNumber || '',
+                // "license-card-number": selectedCustomerDetails.enrollmentDetails?.licenseCardNumber || '',
                 "license-state": selectedCustomerDetails.enrollmentDetails?.licenseState || '',
                 "date-of-birth": selectedCustomerDetails.dob ? formatSydneyTime(selectedCustomerDetails.dob, 'YYYY-MM-DD') : '',
                 "employer-name": selectedCustomerDetails.employerName || '',
