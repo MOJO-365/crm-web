@@ -2113,41 +2113,43 @@ export function RatesPage() {
                             </div>
 
                             {/* Separator */}
-                            <div className="hidden sm:block w-px h-8 bg-border self-end mb-1" />
 
                             {/* Import / Export Group */}
                             {canEdit && (
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Data</label>
-                                    <div className="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5 h-[38px]">
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            className="hidden"
-                                            accept=".xlsx, .xls"
-                                            onChange={handleImportExcel}
-                                        />
-                                        <Tooltip content="Import rates from Excel">
-                                            <button
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-all duration-150"
-                                            >
-                                                <UploadIcon size={14} />
-                                                Import
-                                            </button>
-                                        </Tooltip>
-                                        <div className="w-px h-4 bg-border" />
-                                        <Tooltip content="Export rates to Excel">
-                                            <button
-                                                onClick={handleExportExcel}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-all duration-150"
-                                            >
-                                                <DownloadIcon size={14} />
-                                                Export
-                                            </button>
-                                        </Tooltip>
+                                <>
+                                    <div className="hidden sm:block w-px h-8 bg-border self-end mb-1" />
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Data</label>
+                                        <div className="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5 h-[38px]">
+                                            <input
+                                                type="file"
+                                                ref={fileInputRef}
+                                                className="hidden"
+                                                accept=".xlsx, .xls"
+                                                onChange={handleImportExcel}
+                                            />
+                                            <Tooltip content="Import rates from Excel">
+                                                <button
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-all duration-150"
+                                                >
+                                                    <UploadIcon size={14} />
+                                                    Import
+                                                </button>
+                                            </Tooltip>
+                                            <div className="w-px h-4 bg-border" />
+                                            <Tooltip content="Export rates to Excel">
+                                                <button
+                                                    onClick={handleExportExcel}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-all duration-150"
+                                                >
+                                                    <DownloadIcon size={14} />
+                                                    Export
+                                                </button>
+                                            </Tooltip>
+                                        </div>
                                     </div>
-                                </div>
+                                </>
                             )}
                         </div>
 

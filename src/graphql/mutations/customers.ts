@@ -289,3 +289,9 @@ export const APPROVE_WEB_ENROLLMENT = gql`
         }
     }
 `;
+
+export const REJECT_WEB_ENROLLMENT = gql`
+    mutation RejectWebEnrollment($uid: String!) {
+        rejectWebEnrollment(uid: $uid)
+    }
+`;
