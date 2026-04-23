@@ -387,6 +387,27 @@ export function CustomerApprovalsPage() {
             )
         },
         {
+            key: 'portalname',
+            header: (
+                <div className="flex flex-col gap-1">
+                    <div className="h-7 flex items-center">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            Portal
+                        </span>
+                    </div>
+                </div>
+            ),
+            render: (row) => {
+                const portal = row.payload?.portalname;
+
+                return (
+                    <span className="text-foreground font-medium">
+                        {portal ? portal : '-'}
+                    </span>
+                );
+            }
+        },
+        {
             key: 'status',
             header: (
                 <div className="flex flex-col gap-1">
@@ -642,7 +663,7 @@ export function CustomerApprovalsPage() {
                                     <span className="font-medium">
                                         {selectedEnrollment.payload.idType === 0 ? 'Driver License' : selectedEnrollment.payload.idType === 1 ? 'Medicare' : selectedEnrollment.payload.idType === 2 ? 'Passport' : 'Unknown'}
                                     </span>
-                                    
+
                                     {/* Conditional fields based on ID Type */}
                                     {selectedEnrollment.payload.idType === 0 && (
                                         <>
@@ -659,10 +680,10 @@ export function CustomerApprovalsPage() {
                                         <>
                                             <span className="text-muted-foreground">Card Type</span>
                                             <span className="font-medium">
-                                                {(selectedEnrollment.payload.medicareCardType === 0 || selectedEnrollment.payload.medicare_card_type === 0) ? 'Standard (Green)' : 
-                                                 (selectedEnrollment.payload.medicareCardType === 1 || selectedEnrollment.payload.medicare_card_type === 1) ? 'Interim (Blue)' : 
-                                                 (selectedEnrollment.payload.medicareCardType === 2 || selectedEnrollment.payload.medicare_card_type === 2) ? 'Reciprocal (Yellow)' : 
-                                                 renderPayloadField(selectedEnrollment.payload.medicareCardType || selectedEnrollment.payload.medicare_card_type || selectedEnrollment.payload.cardtype)}
+                                                {(selectedEnrollment.payload.medicareCardType === 0 || selectedEnrollment.payload.medicare_card_type === 0) ? 'Standard (Green)' :
+                                                    (selectedEnrollment.payload.medicareCardType === 1 || selectedEnrollment.payload.medicare_card_type === 1) ? 'Interim (Blue)' :
+                                                        (selectedEnrollment.payload.medicareCardType === 2 || selectedEnrollment.payload.medicare_card_type === 2) ? 'Reciprocal (Yellow)' :
+                                                            renderPayloadField(selectedEnrollment.payload.medicareCardType || selectedEnrollment.payload.medicare_card_type || selectedEnrollment.payload.cardtype)}
                                             </span>
                                             <span className="text-muted-foreground">Card Number</span>
                                             <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
