@@ -132,5 +132,10 @@ export const LEAD_FIELDS = gql`
         isDeleted
         createdAt
         updatedAt
+        assignedTo
+        assignedToUser {
+            uid
+            name
+        }
     }
 `;
