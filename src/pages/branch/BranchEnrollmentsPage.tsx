@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input';
 
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
-import { EyeIcon, CheckIcon, MapPinIcon, UserIcon, IdCardIcon, ClockIcon } from '@/components/icons';
+import { EyeIcon, CheckIcon, MapPinIcon, UserIcon, IdCardIcon, ClockIcon, ZapIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/stores/useAuthStore';
 import { BranchLayout } from './BranchLayout';
@@ -90,11 +90,11 @@ export function BranchEnrollmentsPage() {
             header: 'Date Submitted',
             render: (row) => <span className="text-sm text-subtitle">{new Date(row.createdAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
         },
+        {
             key: 'name',
             header: 'Customer Name',
             render: (row) => {
-                const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : (row.payload || {});
-                const { title, firstname, lastname } = payload;
+                const { title, firstname, lastname } = row.payload || {};
                 const fullName = [title, firstname, lastname].filter(v => v && typeof v !== 'object').join(' ');
                 return <span className="font-semibold text-title">{fullName || '-'}</span>;
             }
@@ -102,18 +102,24 @@ export function BranchEnrollmentsPage() {
         {
             key: 'email',
             header: 'Email Address',
-            render: (row) => {
-                const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : (row.payload || {});
-                return <span className="text-sm text-subtitle">{payload?.email || '-'}</span>;
-            }
+            render: (row) => <span className="text-sm text-subtitle">{row.payload?.email || '-'}</span>
         },
         {
             key: 'nmi',
             header: 'NMI',
-            render: (row) => {
-                const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : (row.payload || {});
-                return <span className="text-xs font-mono font-semibold bg-primary/5 text-primary px-2 py-1 rounded-md">{payload?.nmi || '-'}</span>;
-            }
+            render: (row) => <span className="text-xs font-mono font-bold bg-primary/5 text-primary px-2.5 py-1 rounded-lg border border-primary/10">{row.payload?.nmi || '-'}</span>
+        },
+        {
+            key: 'isVpp',
+            header: 'VPP',
+            render: (row) => row.payload?.isVpp ? (
+                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] uppercase tracking-wider">
+                    <ZapIcon size={12} fill="currentColor" />
+                    Enrolled
+                </div>
+            ) : (
+                <span className="text-[10px] font-bold text-subtitle uppercase tracking-wider opacity-40">Standard</span>
+            )
         },
         {
             key: 'status',
@@ -263,10 +269,15 @@ export function BranchEnrollmentsPage() {
                                     {[
                                         { label: 'Address', value: selectedEnrollment.payload?.address },
                                         { label: 'Customer Type', value: selectedEnrollment.payload?.customerType },
+                                        { label: 'Ownership', value: selectedEnrollment.payload?.ownership_status === 0 ? 'Owns' : 'Rents' },
+                                        { label: 'VPP Participation', value: selectedEnrollment.payload?.isVpp ? 'Enrolled' : 'Standard' },
                                     ].map((item, i) => (
                                         <div key={i} className="flex items-center justify-between px-3 py-2.5 gap-4">
                                             <span className="text-[11px] text-subtitle font-bold uppercase tracking-wider opacity-60 shrink-0">{item.label}</span>
-                                            <span className="text-sm font-bold text-title text-right truncate">{item.value || '—'}</span>
+                                            <span className={cn(
+                                                "text-sm font-bold text-right truncate",
+                                                item.label === 'VPP Participation' && item.value === 'Enrolled' ? "text-emerald-500" : "text-title"
+                                            )}>{item.value || '—'}</span>
                                         </div>
                                     ))}
                                 </div>

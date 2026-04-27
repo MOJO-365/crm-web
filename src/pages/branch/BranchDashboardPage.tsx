@@ -141,11 +141,12 @@ export function BranchDashboardPage() {
         [now],
     );
 
-    // Fetch stats
+    // Fetch stats - focusing Recent Submissions on Pending Approvals only
     const { data: statsData, loading: statsLoading } = useQuery(GET_WEB_ENROLLMENTS, {
         variables: {
             page: 1,
             limit: 5,
+            processed: 0, // Only show pending in the "Recent Submissions" list
             searchPortal: user?.name || 'Branch Portal'
         },
         skip: !user
@@ -266,14 +267,14 @@ export function BranchDashboardPage() {
                                     ))
                                 ) : statsData?.webEnrollments?.data?.length > 0 ? (
                                     statsData.webEnrollments.data.map((item: any) => {
-                                        const payload = typeof item.payload === 'string' ? JSON.parse(item.payload) : (item.payload || {});
-                                        const name = `${payload.firstName || ''} ${payload.lastName || ''}`.trim() || 'New Enrollment';
+                                        const payload = typeof item.payload === 'string' ? JSON.parse(item.payload || '{}') : (item.payload || {});
+                                        const name = `${payload.firstname || ''} ${payload.lastname || ''}`.trim() || 'New Enrollment';
 
                                         return (
                                             <div
                                                 key={item.uid}
                                                 className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-border/50"
-                                                onClick={() => navigate(`/branch-portal/enrollments?search=${payload.firstName || ''}`)}
+                                                onClick={() => navigate(`/branch-portal/enrollments?search=${payload.firstname || ''}`)}
                                             >
                                                 <div className={cn(
                                                     'w-2 h-2 rounded-full shrink-0',
