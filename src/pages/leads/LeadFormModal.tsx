@@ -184,16 +184,29 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
         value: s.name
     })) || [];
 
+    const currentUserName = useAuthStore((state) => state.user?.name);
+
     const { data: userData } = useQuery(GET_USERS, {
-        variables: { limit: 1000, status: 'active' },
+        variables: { limit: 1000, status: 'ACTIVE', onlyVisibleRoles: true },
         skip: !isOpen
     });
+
     const userOptions = React.useMemo(() => {
-        return (userData?.users?.data || []).map((u: any) => ({
+        const options = (userData?.users?.data || []).map((u: any) => ({
             value: u.uid,
             label: u.name || u.email
         }));
-    }, [userData]);
+
+        // Ensure current user is always in the list to prevent UID showing as pre-filled
+        if (currentUserUid && !options.find(o => o.value === currentUserUid)) {
+            options.unshift({
+                value: currentUserUid,
+                label: currentUserName || 'Me'
+            });
+        }
+
+        return options;
+    }, [userData, currentUserUid, currentUserName]);
 
     const checkAddressDuplicate = async (addressData: {
         unitNumber?: string;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
-import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT } from '@/graphql';
+import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, GET_USERS, GET_ROLES } from '@/graphql';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/Select';
 import { XIcon, EyeIcon, CheckIcon, AlertCircleIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-toastify';
+import React from 'react';
 
 interface WebEnrollment {
     id: string;
@@ -38,6 +39,8 @@ interface SearchFilters {
     tariff: string;
     address: string;
     status: string;
+    portal: string;
+    vpp: string;
 }
 
 const INITIAL_FILTERS: SearchFilters = {
@@ -47,7 +50,9 @@ const INITIAL_FILTERS: SearchFilters = {
     nmi: '',
     tariff: '',
     address: '',
-    status: '0' // Default to show Pending (0)
+    status: '0', // Default to show Pending (0)
+    portal: '',
+    vpp: ''
 };
 
 export function CustomerApprovalsPage() {
@@ -81,10 +86,40 @@ export function CustomerApprovalsPage() {
             searchNmi: debouncedFilters.nmi || undefined,
             searchTariff: debouncedFilters.tariff || undefined,
             searchAddress: debouncedFilters.address || undefined,
+            searchPortal: debouncedFilters.portal || undefined,
+            searchVpp: debouncedFilters.vpp !== '' ? parseInt(debouncedFilters.vpp) : undefined,
             processed: debouncedFilters.status !== '' ? parseInt(debouncedFilters.status) : undefined
         },
         fetchPolicy: 'network-only'
     });
+
+    // Fetch Branch Portal roles to get users
+    const { data: rolesData } = useQuery(GET_ROLES, {
+        variables: { limit: 100 }
+    });
+
+    const branchPortalRoleUid = React.useMemo(() => {
+        return rolesData?.roles?.data?.find((r: any) => r.name === 'Branch Portal')?.uid;
+    }, [rolesData]);
+
+    const { data: portalUsersData } = useQuery(GET_USERS, {
+        variables: { roleUid: branchPortalRoleUid, status: 'ACTIVE' },
+        skip: !branchPortalRoleUid
+    });
+
+    const portalOptions = React.useMemo(() => {
+        const options = [
+            { value: '', label: 'All Portals' },
+            { value: 'Gee Energy', label: 'Gee Energy' }
+        ];
+
+        const users = (portalUsersData?.users?.data || []).map((u: any) => ({
+            value: u.name,
+            label: u.name
+        }));
+
+        return [...options, ...users];
+    }, [portalUsersData]);
 
     const enrollments = data?.webEnrollments?.data || [];
     const meta = data?.webEnrollments?.meta;
@@ -364,12 +399,29 @@ export function CustomerApprovalsPage() {
             key: 'vpp',
             header: (
                 <div className="flex flex-col gap-1 items-center">
-                    <div className="h-7 flex items-center justify-center">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <div className="h-7 flex items-center justify-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            filters.vpp !== '' ? "text-primary" : "text-muted-foreground"
+                        )}>
                             VPP
                         </span>
+                        {filters.vpp !== '' && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
-                    <div className="h-7" />
+                    <Select
+                        options={[
+                            { value: '', label: 'All' },
+                            { value: '1', label: 'Yes' },
+                            { value: '0', label: 'No' }
+                        ]}
+                        value={filters.vpp}
+                        onChange={(val) => handleFilterChange('vpp', val as string)}
+                        placeholder="All"
+                        className={cn(
+                            "h-7 text-xs w-[70px] transition-all duration-200",
+                            filters.vpp !== '' && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                    />
                 </div>
             ),
             render: (row) => (
@@ -390,18 +442,31 @@ export function CustomerApprovalsPage() {
             key: 'portalname',
             header: (
                 <div className="flex flex-col gap-1">
-                    <div className="h-7 flex items-center">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            filters.portal ? "text-primary" : "text-muted-foreground"
+                        )}>
                             Portal
                         </span>
+                        {filters.portal && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
+                    <Select
+                        options={portalOptions}
+                        value={filters.portal}
+                        onChange={(val) => handleFilterChange('portal', val as string)}
+                        placeholder="All"
+                        className={cn(
+                            "h-7 text-xs w-[120px] transition-all duration-200",
+                            filters.portal && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                    />
                 </div>
             ),
             render: (row) => {
                 const portal = row.payload?.portalname;
-
                 return (
-                    <span className="text-foreground font-medium">
+                    <span className="text-foreground font-medium text-xs">
                         {portal ? portal : '-'}
                     </span>
                 );

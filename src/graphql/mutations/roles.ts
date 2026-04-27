@@ -8,6 +8,7 @@ export const CREATE_ROLE = gql`
             description
             isActive
             isIndependentUi
+            isVisibleInLists
             message
         }
     }
@@ -21,6 +22,7 @@ export const UPDATE_ROLE = gql`
             description
             isActive
             isIndependentUi
+            isVisibleInLists
             message
         }
     }

@@ -613,15 +613,25 @@ export const CustomerFormPage = () => {
     });
 
     const { data: usersData } = useQuery(GET_USERS, {
-        variables: { limit: 1000, status: 'active' },
+        variables: { limit: 1000, status: 'ACTIVE', onlyVisibleRoles: true },
         fetchPolicy: 'cache-first'
     });
     const userOptions = useMemo(() => {
-        return (usersData?.users?.data || []).map((u: any) => ({
+        const options = (usersData?.users?.data || []).map((u: any) => ({
             value: u.uid,
             label: u.name || u.email
         }));
-    }, [usersData]);
+
+        // Ensure current user is always in the list to prevent UID showing as pre-filled
+        if (user?.uid && !options.find(o => o.value === user.uid)) {
+            options.unshift({
+                value: user.uid,
+                label: user.name || 'Me'
+            });
+        }
+
+        return options;
+    }, [usersData, user]);
 
     // Document upload state
     const [generatedCustomerId, setGeneratedCustomerId] = useState<string>('');

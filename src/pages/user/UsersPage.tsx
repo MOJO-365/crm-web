@@ -40,6 +40,7 @@ interface Role {
     uid: string;
     name: string;
     isDeleted: boolean;
+    isVisibleInLists?: boolean;
 }
 
 interface UsersResponse {
@@ -144,14 +145,18 @@ export function UsersPage() {
     // Create role options for the filter dropdown
     const filterRoleOptions = [
         { value: '', label: 'All Roles' },
-        ...roles.filter((r: Role) => !r.isDeleted).map((r: Role) => ({ value: r.uid, label: r.name }))
+        ...roles
+            .filter((r: Role) => !r.isDeleted && (r.isVisibleInLists !== false || r.uid === roleFilter))
+            .map((r: Role) => ({ value: r.uid, label: r.name }))
     ];
 
     // Prepend "All Roles" option if desired, or just handle empty value as "All"
     // The Select component usually handles clearing if allowed, or we can add an "All" option manually if needed.
     // For now, let's keep it simple: if roleFilter is empty string, it shows placeholder "Role" and filters by nothing (which means all).
 
-    const roleDropdownOptions = roles.filter((r: Role) => !r.isDeleted).map((r: Role) => ({ value: r.uid, label: r.name }));
+    const roleDropdownOptions = roles
+        .filter((r: Role) => !r.isDeleted && (r.isVisibleInLists !== false || r.uid === formData.roleUid))
+        .map((r: Role) => ({ value: r.uid, label: r.name }));
 
     const [createUser] = useMutation(CREATE_USER);
     const [updateUser] = useMutation(UPDATE_USER);

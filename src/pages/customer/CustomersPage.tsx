@@ -182,7 +182,7 @@ export function CustomersPage() {
     const riskStatuses = rsData?.riskStatuses || [];
 
     const { data: userData } = useQuery(GET_USERS, {
-        variables: { limit: 1000, status: 'active' },
+        variables: { limit: 1000, status: 'ACTIVE', onlyVisibleRoles: true },
     });
     const userOptions = useMemo(() => {
         return (userData?.users?.data || []).map((u: any) => ({

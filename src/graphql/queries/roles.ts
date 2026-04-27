@@ -3,8 +3,8 @@
 import { gql } from '@apollo/client';
 
 export const GET_ROLES = gql`
-    query GetRoles {
-        roles(page: 1, limit: 100) {
+    query GetRoles($page: Int, $limit: Int, $isVisibleInLists: Boolean) {
+        roles(page: $page, limit: $limit, isVisibleInLists: $isVisibleInLists) {
             data {
                 uid
                 name
@@ -13,6 +13,13 @@ export const GET_ROLES = gql`
                 isDeleted
                 createdAt
                 isIndependentUi
+                isVisibleInLists
+            }
+            meta {
+                totalRecords
+                currentPage
+                totalPages
+                recordsPerPage
             }
         }
     }
