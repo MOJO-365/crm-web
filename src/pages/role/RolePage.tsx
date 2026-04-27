@@ -22,6 +22,7 @@ interface Role {
     isDeleted: boolean;
     createdAt: string;
     isIndependentUi?: boolean;
+    isVisibleInLists?: boolean;
 }
 
 interface RolesResponse {
@@ -57,7 +58,8 @@ export function RolePage() {
         name: '',
         description: '',
         isActive: true,
-        isIndependentUi: false
+        isIndependentUi: false,
+        isVisibleInLists: true
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -163,7 +165,7 @@ export function RolePage() {
     const handleAddRole = () => {
         setModalMode('create');
         setEditingRole(null);
-        setFormData({ name: '', description: '', isActive: true, isIndependentUi: false });
+        setFormData({ name: '', description: '', isActive: true, isIndependentUi: false, isVisibleInLists: true });
         setErrors({});
         setRoleModalOpen(true);
     };
@@ -175,7 +177,8 @@ export function RolePage() {
             name: role.name,
             description: role.description || '',
             isActive: role.isActive,
-            isIndependentUi: role.isIndependentUi || false
+            isIndependentUi: role.isIndependentUi || false,
+            isVisibleInLists: role.isVisibleInLists !== false
         });
         setErrors({});
         setRoleModalOpen(true);
@@ -205,7 +208,8 @@ export function RolePage() {
                         input: {
                             name: capitalizedName,
                             description: formData.description,
-                            isIndependentUi: formData.isIndependentUi
+                            isIndependentUi: formData.isIndependentUi,
+                            isVisibleInLists: formData.isVisibleInLists
                         }
                     }
                 });
@@ -221,7 +225,8 @@ export function RolePage() {
                             name: capitalizedName,
                             description: formData.description,
                             isActive: formData.isActive,
-                            isIndependentUi: formData.isIndependentUi
+                            isIndependentUi: formData.isIndependentUi,
+                            isVisibleInLists: formData.isVisibleInLists
                         }
                     }
                 });
@@ -367,6 +372,18 @@ export function RolePage() {
             header: 'Created On',
             width: 'w-[150px]',
             render: (role) => <span className="text-muted-foreground">{formatDateTime(role.createdAt)}</span>
+        },
+        {
+            key: 'visibility',
+            header: 'Visibility',
+            width: 'w-[120px]',
+            render: (role) => (
+                <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${role.isVisibleInLists !== false ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}>
+                        {role.isVisibleInLists !== false ? 'Visible' : 'Hidden'}
+                    </span>
+                </div>
+            )
         },
         // Access Control column - only show if user has edit permissions
         ...(canEdit ? [{
@@ -543,6 +560,19 @@ export function RolePage() {
                             <label htmlFor="isIndependentUi" className="text-sm font-medium flex items-center gap-2">
                                 Independent UI Role
                                 <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-md font-bold uppercase tracking-wider">Independent</span>
+                            </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="isVisibleInLists"
+                                checked={formData.isVisibleInLists}
+                                onChange={(e) => setFormData(prev => ({ ...prev, isVisibleInLists: e.target.checked }))}
+                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <label htmlFor="isVisibleInLists" className="text-sm font-medium flex items-center gap-2">
+                                Visible in Selection Lists
+                                <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md font-bold uppercase tracking-wider">Visible</span>
                             </label>
                         </div>
                     </div>

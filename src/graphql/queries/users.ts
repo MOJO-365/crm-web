@@ -3,8 +3,8 @@
 import { gql } from '@apollo/client';
 
 export const GET_USERS = gql`
-    query GetUsers($page: Int, $limit: Int, $status: String, $search: String, $roleUid: String) {
-        users(page: $page, limit: $limit, status: $status, search: $search, roleUid: $roleUid) {
+    query GetUsers($page: Int, $limit: Int, $status: String, $search: String, $roleUid: String, $onlyVisibleRoles: Boolean) {
+        users(page: $page, limit: $limit, status: $status, search: $search, roleUid: $roleUid, onlyVisibleRoles: $onlyVisibleRoles) {
             meta {
                 totalRecords
                 currentPage

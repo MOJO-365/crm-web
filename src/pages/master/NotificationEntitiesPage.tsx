@@ -81,8 +81,9 @@ export function NotificationEntitiesPage() {
     // Fetch Users
     const { data: usersData } = useQuery(GET_USERS, {
         variables: {
-            status: '1', // Active users
-            limit: 1000
+            status: 'ACTIVE', // Active users
+            limit: 1000,
+            onlyVisibleRoles: true
         },
         fetchPolicy: 'cache-and-network'
     });

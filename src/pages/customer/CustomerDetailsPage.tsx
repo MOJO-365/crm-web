@@ -1384,7 +1384,7 @@ export function CustomerDetailsPage() {
 
     // Fetch users for note assignment
     const { data: userData } = useQuery(GET_USERS, {
-        variables: { limit: 100 },
+        variables: { limit: 1000, status: 'ACTIVE', onlyVisibleRoles: true },
         skip: selectedDetailSection !== 'notes' && !noteModalOpen && !maintenanceModalOpen,
     });
 
