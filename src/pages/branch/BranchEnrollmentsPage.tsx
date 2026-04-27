@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
-import { GET_WEB_ENROLLMENTS } from '@/graphql';
+import { GET_WEB_ENROLLMENTS } from '@/graphql/queries/customers';
 import { Input } from '@/components/ui/Input';
+
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { EyeIcon, CheckIcon, ChevronLeftIcon, MapPinIcon, CalendarIcon, PhoneIcon, UserIcon, MailIcon, IdCardIcon } from '@/components/icons';
@@ -80,8 +81,9 @@ export function BranchEnrollmentsPage() {
             searchPortal: user?.name || 'Branch Portal'
         },
         fetchPolicy: 'network-only',
-        skip: !user
+        skip: !user || !GET_WEB_ENROLLMENTS
     });
+
 
     const enrollments = data?.webEnrollments?.data || [];
     const meta = data?.webEnrollments?.meta;
