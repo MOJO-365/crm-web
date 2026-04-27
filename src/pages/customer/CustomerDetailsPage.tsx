@@ -2876,31 +2876,31 @@ export function CustomerDetailsPage() {
                                                             </button>
                                                         </>
                                                     )}
-                                                    {!selectedCustomerDetails.signedPdfPath && (
-                                                        <>
-                                                            <div className="my-1 border-t border-border" />
-                                                            <button
-                                                                onClick={() => {
-                                                                    handleDeleteCustomer();
-                                                                }}
-                                                                disabled={isDeletingCustomer}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
-                                                            >
-                                                                <TrashIcon size={15} />
-                                                                {isDeletingCustomer ? 'Archiving...' : 'Archive'}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    handleDeleteCustomer(true);
-                                                                }}
-                                                                disabled={isDeletingCustomer}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors disabled:opacity-50 font-semibold"
-                                                            >
-                                                                <TrashIcon size={15} className="text-red-600" />
-                                                                {isDeletingCustomer ? 'Deleting...' : 'Delete'}
-                                                            </button>
-                                                        </>
-                                                    )}
+                                                    {/* {!selectedCustomerDetails.signedPdfPath && ( */}
+                                                    <>
+                                                        <div className="my-1 border-t border-border" />
+                                                        <button
+                                                            onClick={() => {
+                                                                handleDeleteCustomer();
+                                                            }}
+                                                            disabled={isDeletingCustomer}
+                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                                                        >
+                                                            <TrashIcon size={15} />
+                                                            {isDeletingCustomer ? 'Archiving...' : 'Archive'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                handleDeleteCustomer(true);
+                                                            }}
+                                                            disabled={isDeletingCustomer}
+                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors disabled:opacity-50 font-semibold"
+                                                        >
+                                                            <TrashIcon size={15} className="text-red-600" />
+                                                            {isDeletingCustomer ? 'Deleting...' : 'Delete'}
+                                                        </button>
+                                                    </>
+                                                    {/* // )} */}
                                                 </div>
                                             }
                                             isOpen={actionsMenuOpen}

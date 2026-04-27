@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/Input';
 
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
-import { EyeIcon, CheckIcon, ChevronLeftIcon, MapPinIcon, CalendarIcon, PhoneIcon, UserIcon, MailIcon, IdCardIcon } from '@/components/icons';
+import { EyeIcon, CheckIcon, ChevronLeftIcon, MapPinIcon, UserIcon, IdCardIcon, ZapIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useUser } from '@/stores/useAuthStore';
 import { useNavigate } from 'react-router-dom';
 
@@ -40,18 +41,6 @@ const INITIAL_FILTERS: SearchFilters = {
     name: '',
     status: ''
 };
-
-const SummaryItem = ({ icon: Icon, label, value }: { icon: any, label: string, value: string }) => (
-    <div className="flex items-start gap-3 p-3 rounded-xl bg-accent/5 border border-border/50">
-        <div className="mt-1 p-1.5 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-            <Icon size={14} />
-        </div>
-        <div className="space-y-0.5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{label}</p>
-            <p className="text-sm font-bold text-title truncate max-w-[200px]" title={value}>{value || '-'}</p>
-        </div>
-    </div>
-);
 
 export function BranchEnrollmentsPage() {
     const user = useUser();
@@ -109,7 +98,7 @@ export function BranchEnrollmentsPage() {
             render: (row) => {
                 const { title, firstname, lastname } = row.payload || {};
                 const fullName = [title, firstname, lastname].filter(v => v && typeof v !== 'object').join(' ');
-                return <span className="font-bold text-title">{fullName || '-'}</span>;
+                return <span className="font-semibold text-title">{fullName || '-'}</span>;
             }
         },
         {
@@ -120,14 +109,14 @@ export function BranchEnrollmentsPage() {
         {
             key: 'nmi',
             header: 'NMI',
-            render: (row) => <span className="text-xs font-mono font-bold bg-primary/5 text-primary px-2 py-1 rounded-md">{row.payload?.nmi || '-'}</span>
+            render: (row) => <span className="text-xs font-mono font-semibold bg-primary/5 text-primary px-2 py-1 rounded-md">{row.payload?.nmi || '-'}</span>
         },
         {
             key: 'status',
             header: 'Status',
             render: (row) => (
                 <div className={cn(
-                    "inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                    "inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
                     row.processed === 1
                         ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                         : row.processed === 2
@@ -159,40 +148,63 @@ export function BranchEnrollmentsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-background p-6">
-            <div className="max-w-6xl mx-auto space-y-8">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors cursor-pointer mb-2" onClick={() => navigate('/branch-portal')}>
+        <div className="h-screen flex flex-col bg-gradient-to-br from-gray-50 via-slate-50 to-gray-100 dark:from-[#0a0a0a] dark:via-[#0d0d0d] dark:to-[#0a0a0a] overflow-hidden relative">
+            {/* decorative background orbs */}
+            <div className="absolute w-[400px] h-[400px] bg-blue-400/15 rounded-full blur-3xl -top-48 -right-48 pointer-events-none" />
+            <div className="absolute w-[300px] h-[300px] bg-primary/15 rounded-full blur-3xl -bottom-32 -left-32 pointer-events-none" />
+
+            {/* ── top bar ── */}
+            <header className="relative z-10 shrink-0">
+                <div className="flex items-center justify-between px-4 sm:px-6 py-3">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => navigate('/branch-portal')}
+                            className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
+                        >
                             <ChevronLeftIcon size={16} />
-                            <span className="text-xs font-black uppercase tracking-widest">Back to Dashboard</span>
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-emerald-500 flex items-center justify-center shadow-md shadow-primary/20">
+                                <ZapIcon size={14} className="text-white" />
+                            </div>
+                        </button>
+                        <div className="hidden sm:block">
+                            <h1 className="text-lg font-bold text-title tracking-tight leading-none">
+                                My Enrollments
+                            </h1>
+                            <p className="text-xs text-subtitle mt-0.5">
+                                View and track the status of your customer submissions
+                            </p>
                         </div>
-                        <h1 className="text-3xl font-black text-title tracking-tight">My Enrollments</h1>
-                        <p className="text-subtitle text-sm">View and track the status of your customer submissions</p>
+                        <h1 className="text-base font-bold text-title tracking-tight sm:hidden">
+                            Enrollments
+                        </h1>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <Input
                             placeholder="Search by name..."
                             value={filters.name}
                             onChange={(e) => handleFilterChange('name', e.target.value)}
-                            className="w-full md:w-64 h-10 shadow-sm"
+                            className="w-40 sm:w-56 h-9 text-sm shadow-sm rounded-xl bg-white/70 dark:bg-white/[0.06] backdrop-blur-md border-border/50"
                         />
                         <Select
                             options={[
                                 { value: '', label: 'All Status' },
-                                { value: '0', label: 'Pending Review' },
+                                { value: '0', label: 'Pending' },
                                 { value: '1', label: 'Processed' },
                                 { value: '2', label: 'Rejected' }
                             ]}
                             value={filters.status}
                             onChange={(val) => handleFilterChange('status', val as string)}
-                            className="w-full md:w-48 h-10 shadow-sm"
+                            className="w-32 sm:w-40 h-9 text-sm shadow-sm rounded-xl"
                         />
+                        <ThemeToggle />
                     </div>
                 </div>
+            </header>
 
-                <div className="bg-white dark:bg-card shadow-xl shadow-gray-200/50 dark:shadow-none rounded-3xl border border-border overflow-hidden">
+            {/* ── table fills remaining height ── */}
+            <div className="relative z-10 flex-1 min-h-0 px-4 sm:px-6 lg:px-8 pb-4 pt-1">
+                <div className="h-full bg-white/80 dark:bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-border/60 overflow-hidden shadow-lg shadow-gray-200/30 dark:shadow-none flex flex-col">
                     <DataTable
                         columns={columns}
                         data={enrollments}
@@ -207,7 +219,8 @@ export function BranchEnrollmentsPage() {
                             hasNextPage: page < (meta?.totalPages || 1),
                             hasPreviousPage: page > 1
                         }}
-                        containerHeightClass="min-h-[400px]"
+                        containerHeightClass="flex-1"
+                        className="flex-1"
                     />
                 </div>
             </div>
@@ -219,84 +232,120 @@ export function BranchEnrollmentsPage() {
                 size="3xl"
             >
                 {selectedEnrollment && (
-                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border border-primary/10">
-                            <div className="flex items-center gap-4">
+                    <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* Header with name + status */}
+                        <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10">
+                            <div className="flex items-center gap-3">
                                 <div className={cn(
-                                    "w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg",
+                                    "w-11 h-11 rounded-full flex items-center justify-center font-bold text-base",
                                     selectedEnrollment.processed === 1 ? "bg-emerald-100 text-emerald-600" :
-                                    selectedEnrollment.processed === 2 ? "bg-rose-100 text-rose-600" : "bg-amber-100 text-amber-600"
+                                        selectedEnrollment.processed === 2 ? "bg-rose-100 text-rose-600" : "bg-amber-100 text-amber-600"
                                 )}>
                                     {selectedEnrollment.payload?.firstname?.[0]?.toUpperCase() || '?'}
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-black text-title">{selectedEnrollment.payload?.firstname} {selectedEnrollment.payload?.lastname}</h2>
-                                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">
+                                    <h2 className="text-lg font-bold text-title">{selectedEnrollment.payload?.firstname} {selectedEnrollment.payload?.lastname}</h2>
+                                    <p className="text-[11px] font-medium text-subtitle">
                                         Submitted on {new Date(selectedEnrollment.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
                                     </p>
                                 </div>
                             </div>
                             <div className={cn(
-                                "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm",
+                                "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
                                 selectedEnrollment.processed === 1 ? "bg-emerald-600 text-white" :
-                                selectedEnrollment.processed === 2 ? "bg-rose-600 text-white" : "bg-amber-500 text-white"
+                                    selectedEnrollment.processed === 2 ? "bg-rose-600 text-white" : "bg-amber-500 text-white"
                             )}>
                                 {selectedEnrollment.processed === 1 ? 'Processed' : selectedEnrollment.processed === 2 ? 'Rejected' : 'Pending Review'}
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="space-y-6">
-                                <section className="space-y-3">
-                                    <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                                        <UserIcon size={14} /> Personal Information
-                                    </h3>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <SummaryItem icon={UserIcon} label="Full Name" value={`${selectedEnrollment.payload?.title || ''} ${selectedEnrollment.payload?.firstname || ''} ${selectedEnrollment.payload?.lastname || ''}`} />
-                                        <SummaryItem icon={MailIcon} label="Email Address" value={selectedEnrollment.payload?.email} />
-                                        <SummaryItem icon={PhoneIcon} label="Mobile Number" value={selectedEnrollment.payload?.number || selectedEnrollment.payload?.phone || selectedEnrollment.payload?.mobile} />
-                                        <SummaryItem icon={CalendarIcon} label="Date of Birth" value={selectedEnrollment.payload?.dob} />
-                                    </div>
-                                </section>
-
-                                <section className="space-y-3">
-                                    <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                                        <IdCardIcon size={14} /> Identity Verification
-                                    </h3>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <SummaryItem icon={IdCardIcon} label="ID Type" value={selectedEnrollment.payload?.idType === 0 ? 'Driver License' : selectedEnrollment.payload?.idType === 1 ? 'Medicare' : 'Passport'} />
-                                        <SummaryItem icon={IdCardIcon} label="ID Number" value={selectedEnrollment.payload?.idnumber} />
-                                        {selectedEnrollment.payload?.licenseCardNumber && <SummaryItem icon={IdCardIcon} label="Card Number" value={selectedEnrollment.payload?.licenseCardNumber} />}
-                                    </div>
-                                </section>
+                        {/* Detail sections in 2-column grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Personal Information */}
+                            <div className="rounded-xl border border-border overflow-hidden">
+                                <div className="px-4 py-2.5 bg-primary/5 border-b border-border flex items-center gap-2">
+                                    <UserIcon size={14} className="text-primary" />
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Personal Information</h3>
+                                </div>
+                                <div className="divide-y divide-border/50">
+                                    {[
+                                        { label: 'Full Name', value: `${selectedEnrollment.payload?.title || ''} ${selectedEnrollment.payload?.firstname || ''} ${selectedEnrollment.payload?.lastname || ''}`.trim() },
+                                        { label: 'Email', value: selectedEnrollment.payload?.email },
+                                        { label: 'Mobile', value: selectedEnrollment.payload?.number || selectedEnrollment.payload?.phone || selectedEnrollment.payload?.mobile },
+                                        { label: 'Date of Birth', value: selectedEnrollment.payload?.dob },
+                                    ].map((item, i) => (
+                                        <div key={i} className="flex items-center justify-between px-4 py-2.5 gap-4">
+                                            <span className="text-xs text-subtitle font-medium shrink-0">{item.label}</span>
+                                            <span className="text-sm font-semibold text-title text-right">{item.value || '—'}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
 
-                            <div className="space-y-6">
-                                <section className="space-y-3">
-                                    <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                                        <MapPinIcon size={14} /> Service Property
-                                    </h3>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <SummaryItem icon={MapPinIcon} label="Connection Address" value={selectedEnrollment.payload?.address} />
-                                        <SummaryItem icon={IdCardIcon} label="Property Type" value={selectedEnrollment.payload?.customerType} />
-                                    </div>
-                                </section>
+                            {/* Service Property */}
+                            <div className="rounded-xl border border-border overflow-hidden">
+                                <div className="px-4 py-2.5 bg-primary/5 border-b border-border flex items-center gap-2">
+                                    <MapPinIcon size={14} className="text-primary" />
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Service Property</h3>
+                                </div>
+                                <div className="divide-y divide-border/50">
+                                    {[
+                                        { label: 'Address', value: selectedEnrollment.payload?.address },
+                                        { label: 'Type', value: selectedEnrollment.payload?.customerType },
+                                    ].map((item, i) => (
+                                        <div key={i} className="flex items-center justify-between px-4 py-2.5 gap-4">
+                                            <span className="text-xs text-subtitle font-medium shrink-0">{item.label}</span>
+                                            <span className="text-sm font-semibold text-title text-right">{item.value || '—'}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
 
-                                <section className="space-y-3">
-                                    <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                                        <CheckIcon size={14} /> Plan Details
-                                    </h3>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <SummaryItem icon={IdCardIcon} label="NMI" value={selectedEnrollment.payload?.nmi} />
-                                        <SummaryItem icon={IdCardIcon} label="Tariff Code" value={selectedEnrollment.payload?.tariffcode} />
-                                        <SummaryItem icon={CheckIcon} label="Discount" value={`${selectedEnrollment.payload?.discount}%`} />
-                                    </div>
-                                </section>
+                            {/* Identity Verification */}
+                            <div className="rounded-xl border border-border overflow-hidden">
+                                <div className="px-4 py-2.5 bg-primary/5 border-b border-border flex items-center gap-2">
+                                    <IdCardIcon size={14} className="text-primary" />
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Identity Verification</h3>
+                                </div>
+                                <div className="divide-y divide-border/50">
+                                    {[
+                                        { label: 'ID Type', value: selectedEnrollment.payload?.idType === 0 ? 'Driver License' : selectedEnrollment.payload?.idType === 1 ? 'Medicare' : 'Passport' },
+                                        { label: 'ID Number', value: selectedEnrollment.payload?.idnumber },
+                                        ...(selectedEnrollment.payload?.licenseCardNumber ? [{ label: 'Card Number', value: selectedEnrollment.payload?.licenseCardNumber }] : []),
+                                        ...(selectedEnrollment.payload?.idstate ? [{ label: 'State', value: selectedEnrollment.payload?.idstate }] : []),
+                                        ...(selectedEnrollment.payload?.idexpiary ? [{ label: 'Expiry', value: selectedEnrollment.payload?.idexpiary }] : []),
+                                    ].map((item, i) => (
+                                        <div key={i} className="flex items-center justify-between px-4 py-2.5 gap-4">
+                                            <span className="text-xs text-subtitle font-medium shrink-0">{item.label}</span>
+                                            <span className="text-sm font-semibold text-title text-right">{item.value || '—'}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Plan Details */}
+                            <div className="rounded-xl border border-border overflow-hidden">
+                                <div className="px-4 py-2.5 bg-primary/5 border-b border-border flex items-center gap-2">
+                                    <CheckIcon size={14} className="text-primary" />
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Plan Details</h3>
+                                </div>
+                                <div className="divide-y divide-border/50">
+                                    {[
+                                        { label: 'NMI', value: selectedEnrollment.payload?.nmi },
+                                        { label: 'Tariff Code', value: selectedEnrollment.payload?.tariffcode },
+                                        { label: 'Discount', value: `${selectedEnrollment.payload?.discount || 0}%` },
+                                    ].map((item, i) => (
+                                        <div key={i} className="flex items-center justify-between px-4 py-2.5 gap-4">
+                                            <span className="text-xs text-subtitle font-medium shrink-0">{item.label}</span>
+                                            <span className="text-sm font-semibold text-title text-right">{item.value || '—'}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-end pt-4">
-                            <Button onClick={() => setIsModalOpen(false)} className="px-12 rounded-2xl shadow-lg shadow-primary/20">Close</Button>
+                        <div className="flex justify-end pt-2">
+                            <Button onClick={() => setIsModalOpen(false)} className="px-10 rounded-xl shadow-lg shadow-primary/20">Close</Button>
                         </div>
                     </div>
                 )}
