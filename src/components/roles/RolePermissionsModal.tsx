@@ -205,9 +205,17 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
     const rawMenus = useMemo(() => menuData?.menus?.data || [], [menuData]);
     const menus = rawMenus;
 
-    const topLevelMenus = useMemo(() =>
-        menus.filter((m: Menu) => !m.parentUid),
-        [menus]);
+    const topLevelMenus = useMemo(() => {
+        const topLevel = menus.filter((m: Menu) => !m.parentUid);
+        
+        if (role.isIndependentUi) {
+            // If the role has an independent UI, ONLY show the menu associated with this UI
+            return topLevel.filter((m: Menu) => m.name === role.name || m.code === 'branch_portal');
+        } else {
+            // Standard roles shouldn't see independent UI menus
+            return topLevel.filter((m: Menu) => m.name !== 'Branch Portal' && m.code !== 'branch_portal');
+        }
+    }, [menus, role]);
 
     const getChildMenus = useCallback((parentUid: string) =>
         menus.filter((m: Menu) => m.parentUid === parentUid),

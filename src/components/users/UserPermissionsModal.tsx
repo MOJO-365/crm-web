@@ -17,7 +17,7 @@ import {
     FileTextIcon,
     UserSettingIcon
 } from '@/components/icons';
-import { GET_MENUS, GET_ROLE_PERMISSIONS, GET_USER_PERMISSIONS, UPSERT_USER_PERMISSION, GET_FEATURES, GET_ROLE_FEATURE_PERMISSIONS, GET_USER_FEATURE_PERMISSIONS, UPSERT_USER_FEATURE_PERMISSION } from '@/graphql';
+import { GET_MENUS, GET_ROLE_PERMISSIONS, GET_USER_PERMISSIONS, UPSERT_USER_PERMISSION, GET_FEATURES, GET_ROLE_FEATURE_PERMISSIONS, GET_USER_FEATURE_PERMISSIONS, UPSERT_USER_FEATURE_PERMISSION, GET_ROLES } from '@/graphql';
 import { cn } from '@/lib/utils';
 
 // Types
@@ -173,6 +173,11 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
         skip: !isOpen,
     });
 
+    // Fetch roles to get isIndependentUi flag
+    const { data: rolesData, loading: rolesLoading } = useQuery(GET_ROLES, {
+        skip: !isOpen,
+    });
+
     // Fetch role permissions (baseline)
     const { data: rolePermissionData, loading: roleLoading } = useQuery(GET_ROLE_PERMISSIONS, {
         variables: { roleUid: user.roleUid, limit: 1000 },
@@ -188,7 +193,7 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
     });
 
     // Combined loading state
-    const isLoading = menusLoading || roleLoading || userPermLoading;
+    const isLoading = menusLoading || roleLoading || userPermLoading || rolesLoading;
 
     // Fetch features for specific menu when selected
     const { data: featureData } = useQuery(GET_FEATURES, {
@@ -362,9 +367,17 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
 
     const menus = useMemo(() => menuData?.menus?.data || [], [menuData]);
 
-    const topLevelMenus = useMemo(() =>
-        menus.filter((m: Menu) => !m.parentUid),
-        [menus]);
+    const topLevelMenus = useMemo(() => {
+        const topLevel = menus.filter((m: Menu) => !m.parentUid);
+        
+        const currentRole = rolesData?.roles?.data?.find((r: any) => r.uid === user.roleUid);
+        
+        if (currentRole?.isIndependentUi) {
+            return topLevel.filter((m: Menu) => m.name === currentRole.name || m.code === 'branch_portal');
+        } else {
+            return topLevel.filter((m: Menu) => m.name !== 'Branch Portal' && m.code !== 'branch_portal');
+        }
+    }, [menus, rolesData, user.roleUid]);
 
     const getChildMenus = useCallback((parentUid: string) =>
         menus.filter((m: Menu) => m.parentUid === parentUid),

@@ -12,6 +12,7 @@ export const GET_ROLES = gql`
                 isActive
                 isDeleted
                 createdAt
+                isIndependentUi
             }
         }
     }

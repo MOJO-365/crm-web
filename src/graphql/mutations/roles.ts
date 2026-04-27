@@ -7,6 +7,7 @@ export const CREATE_ROLE = gql`
             name
             description
             isActive
+            isIndependentUi
             message
         }
     }
@@ -19,6 +20,7 @@ export const UPDATE_ROLE = gql`
             name
             description
             isActive
+            isIndependentUi
             message
         }
     }

@@ -20,5 +20,6 @@ export interface RolePermissionsModalProps {
     role: {
         uid: string;
         name: string;
+        isIndependentUi?: boolean;
     };
 }

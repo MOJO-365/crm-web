@@ -39,6 +39,7 @@ export interface UserInfo {
     createdAt: string;
     accessibleMenus: AccessibleMenu[];
     accessibleFeatures: AccessibleFeature[];
+    isIndependentUi: boolean;
 }
 
 interface AuthState {

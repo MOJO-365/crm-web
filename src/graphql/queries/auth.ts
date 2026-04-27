@@ -35,6 +35,7 @@ export const GET_ME = gql`
                 featureName
                 isEnabled
             }
+            isIndependentUi
         }
     }
 `;

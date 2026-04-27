@@ -128,6 +128,7 @@ export const LEAD_FIELDS = gql`
         country
         nmi
         fullAddress
+        referralName
         isActive
         isDeleted
         createdAt

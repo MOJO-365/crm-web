@@ -2,7 +2,7 @@
 import { useEffect, Suspense } from 'react';
 import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider, Outlet, useSearchParams } from 'react-router-dom';
 import { ProtectedRoute, RequirePermission } from '@/components/auth';
-import { MainLayout } from '@/components/layout';
+import { DynamicLayout } from '@/components/layout';
 import { lazyWithRetry, clearLazyRetryFlag } from '@/lib/lazy-with-retry';
 
 // Lazy load pages for code splitting
@@ -34,6 +34,10 @@ const MasterDataPage = lazyWithRetry(() => import('@/pages/master/MasterDataPage
 const LeadsPage = lazyWithRetry(() => import('@/pages/leads/LeadsPage'));
 const BatteryMasterPage = lazyWithRetry(() => import('@/pages/master/BatteryMasterPage').then(m => ({ default: m.BatteryMasterPage })));
 const InverterMasterPage = lazyWithRetry(() => import('@/pages/master/InverterMasterPage').then(m => ({ default: m.InverterMasterPage })));
+const BranchDashboardPage = lazyWithRetry(() => import('@/pages/branch/BranchDashboardPage').then(m => ({ default: m.BranchDashboardPage })));
+const BranchCustomerFormPage = lazyWithRetry(() => import('@/pages/branch/BranchCustomerFormPage').then(m => ({ default: m.BranchCustomerFormPage })));
+const BranchEnrollmentsPage = lazyWithRetry(() => import('@/pages/branch/BranchEnrollmentsPage').then(m => ({ default: m.BranchEnrollmentsPage })));
+
 
 
 // Loading fallback component
@@ -50,9 +54,9 @@ const RootRouteHandler = () => {
     }
     return (
         <ProtectedRoute>
-            <MainLayout>
+            <DynamicLayout>
                 <DashboardPage />
-            </MainLayout>
+            </DynamicLayout>
         </ProtectedRoute>
     );
 };
@@ -72,9 +76,15 @@ const router = createBrowserRouter(
             {/* Root handler for Offer Page (public) vs Dashboard (protected) */}
             <Route path="/" element={<RootRouteHandler />} />
 
-            {/* Other protected routes - single ProtectedRoute wrapper with MainLayout */}
-            <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+            {/* Other protected routes - single ProtectedRoute wrapper with DynamicLayout */}
+            <Route element={<ProtectedRoute><DynamicLayout /></ProtectedRoute>}>
                 {/* Dashboard route is now handled by RootRouteHandler at '/' */}
+
+                {/* Branch routes */}
+                <Route path="/branch-portal" element={<BranchDashboardPage />} />
+                <Route path="/branch-portal/enroll" element={<BranchCustomerFormPage />} />
+                <Route path="/branch-portal/enrollments" element={<BranchEnrollmentsPage />} />
+
 
                 {/* Routes with specific menu permissions */}
                 <Route path="/leads" element={<RequirePermission menuCode="leads"><LeadsPage /></RequirePermission>} />
