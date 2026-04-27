@@ -148,33 +148,38 @@ export function BranchEnrollmentsPage() {
         }
     ];
 
-    const actions = (
-        <div className="flex items-center gap-2 p-1 bg-gray-100/50 dark:bg-white/[0.04] rounded-xl border border-border/40">
-            <Input
-                placeholder="Search name..."
-                value={filters.name}
-                onChange={(e) => handleFilterChange('name', e.target.value)}
-                className="w-40 sm:w-56 h-8 text-xs border-none bg-transparent shadow-none focus-visible:ring-0"
-            />
-            <div className="w-px h-4 bg-border/60" />
-            <Select
-                options={[
-                    { value: '', label: 'All Status' },
-                    { value: '0', label: 'Pending' },
-                    { value: '1', label: 'Processed' },
-                    { value: '2', label: 'Rejected' }
-                ]}
-                value={filters.status}
-                onChange={(val) => handleFilterChange('status', val as string)}
-                className="w-32 sm:w-40 h-8 text-xs border-none bg-transparent shadow-none focus:ring-0"
-            />
-        </div>
-    );
+
 
     return (
-        <BranchLayout title="My Enrollments" actions={actions}>
+        <BranchLayout title="My Enrollments">
             <div className="flex-1 flex flex-col px-4 sm:px-6 lg:px-8 py-6 min-h-0">
                 <div className="flex-1 bg-white dark:bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-border/50 shadow-sm overflow-hidden flex flex-col">
+                    {/* Filters Row */}
+                    <div className="px-6 py-4 border-b border-border/40 bg-gray-50/30 dark:bg-white/[0.01] flex items-center justify-between">
+                        <div className="flex items-center gap-2 p-1 bg-white dark:bg-white/[0.05] rounded-xl border border-border/60 shadow-sm">
+                            <Input
+                                placeholder="Search name..."
+                                value={filters.name}
+                                onChange={(e) => handleFilterChange('name', e.target.value)}
+                                className="w-48 sm:w-64 h-9 text-sm border-none bg-transparent shadow-none focus-visible:ring-0"
+                            />
+                            <div className="w-px h-5 bg-border/60" />
+                            <Select
+                                options={[
+                                    { value: '', label: 'All Status' },
+                                    { value: '0', label: 'Pending Review' },
+                                    { value: '1', label: 'Processed' },
+                                    { value: '2', label: 'Rejected' }
+                                ]}
+                                value={filters.status}
+                                onChange={(val) => handleFilterChange('status', val as string)}
+                                className="w-36 sm:w-48 h-9 text-sm border-none bg-transparent shadow-none focus:ring-0"
+                            />
+                        </div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-subtitle opacity-50">
+                            Total: {meta?.totalRecords || 0}
+                        </div>
+                    </div>
                     <DataTable
                         columns={columns}
                         data={enrollments}

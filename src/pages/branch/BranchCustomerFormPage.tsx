@@ -264,23 +264,6 @@ export function BranchCustomerFormPage() {
             >
                 Cancel
             </Button>
-            {currentStep === STEPS.length ? (
-                <Button
-                    onClick={handleSubmit}
-                    isLoading={isSubmitting}
-                    className="shadow-lg shadow-primary/20 px-6 rounded-xl"
-                    leftIcon={<CheckCircleIcon size={18} />}
-                >
-                    Submit Enrollment
-                </Button>
-            ) : (
-                <Button
-                    onClick={handleNext}
-                    className="px-8 rounded-xl shadow-md shadow-primary/10"
-                >
-                    Next Step
-                </Button>
-            )}
         </div>
     );
 
@@ -288,25 +271,7 @@ export function BranchCustomerFormPage() {
         <BranchLayout title="New Enrollment" actions={actions}>
             <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="max-w-4xl mx-auto">
-                    {/* Stepper */}
-                    <div className="mb-8 sm:mb-10">
-                        <div className="flex items-center justify-between relative">
-                            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-200 dark:bg-accent -translate-y-1/2 z-0" />
-                            <div className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 z-0 transition-all duration-500" style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }} />
-                            {STEPS.map((step) => {
-                                const isCompleted = currentStep > step.id;
-                                const isActive = currentStep === step.id;
-                                return (
-                                    <div key={step.id} className="relative z-10 flex flex-col items-center">
-                                        <button onClick={() => step.id < currentStep && setCurrentStep(step.id)} disabled={step.id >= currentStep} className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 border-2 ${isCompleted ? 'bg-primary border-primary text-white' : isActive ? 'bg-white dark:bg-card border-primary text-primary shadow-lg scale-110' : 'bg-white dark:bg-card border-gray-200 dark:border-accent text-subtitle'}`}>
-                                            {isCompleted ? <CheckCircleIcon size={18} /> : step.icon}
-                                        </button>
-                                        <span className={`absolute -bottom-6 text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${isActive ? 'text-primary' : 'text-subtitle'}`}>{step.title}</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+
 
                     <div className="bg-white dark:bg-white/[0.03] backdrop-blur-xl rounded-[2rem] border border-border/50 shadow-sm flex flex-col min-h-[500px] relative">
                         <div className="flex-1 p-6 sm:p-8 lg:p-10">
