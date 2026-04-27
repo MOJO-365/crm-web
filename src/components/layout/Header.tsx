@@ -50,6 +50,8 @@ const pathMap: Record<string, string> = {
     audit_logs: '/audit-logs',
 };
 
+import logo from '@/assets/main-logo-dark-1.png';
+
 export function Header({ className, toggleSidebar }: HeaderProps) {
     const accessibleMenus = useAccessibleMenus();
     const user = useUser();
@@ -146,24 +148,20 @@ export function Header({ className, toggleSidebar }: HeaderProps) {
             className
         )}>
             {/* Sidebar Toggle (Hamburger) */}
-            <button
-                onClick={toggleSidebar}
-                className="hidden md:flex p-2 mr-2 -ml-2 rounded-md hover:bg-accent text-muted-foreground transition-colors"
-                title="Toggle Sidebar"
-            >
-                <MenuIcon size={20} />
-            </button>
+            <div className="flex items-center gap-4">
+                <button
+                    onClick={toggleSidebar}
+                    className="hidden md:flex p-2 -ml-2 rounded-md hover:bg-accent text-muted-foreground transition-colors"
+                    title="Toggle Sidebar"
+                >
+                    <MenuIcon size={20} />
+                </button>
 
-            {/* Better Implementation of Logo Visibility
-            <div className={cn(
-                "items-center mr-4",
-                // Mobile: Always visible
-                "flex md:hidden",
-                // Desktop: Visible ONLY if collapsed
-                isSidebarCollapsed && "md:flex"
-            )}>
-                <img src={logo} alt="Logo" className="h-8" />
-            </div> */}
+                {/* GEE Logo */}
+                <div className="flex items-center">
+                    <img src={logo} alt="GEE Energy" className="h-6 dark:invert" />
+                </div>
+            </div>
 
 
 
