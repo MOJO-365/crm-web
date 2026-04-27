@@ -2919,7 +2919,7 @@ export function CustomersPage() {
                                                                         </div>
                                                                     </div>
 
-                                                                    {hasFiT && (
+                                                                    {hasFiT && selectedCustomerDetails.solarDetails?.hassolar === 1 && (
                                                                         <div className="space-y-4 min-w-[180px] flex-1">
                                                                             <div className="flex items-center gap-2 text-teal-500 dark:text-teal-400">
                                                                                 <ZapIcon size={16} />
@@ -2937,8 +2937,9 @@ export function CustomersPage() {
                                                                                         const isVppActive = selectedCustomerDetails.vppDetails?.vpp === 1;
                                                                                         const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
 
+                                                                                        if (!hasSolar) return false;
                                                                                         if (rate.type === 'fit') return !isVppActive;
-                                                                                        return isVppActive || !hasSolar;
+                                                                                        return isVppActive;
                                                                                     })
                                                                                     .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
                                                                                     .map((rate, idx) => (

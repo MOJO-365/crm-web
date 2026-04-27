@@ -407,7 +407,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                     )}
                 </div>
 
-                {hasFiT && (
+                {hasFiT && hasSolar && (
                     <div className="space-y-2 min-w-[180px] flex-1">
                         <div className="flex items-center gap-2 text-teal-500 dark:text-teal-400 mb-2">
                             <ZapIcon size={14} />
@@ -423,9 +423,10 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                             .filter(rate => {
                                 const numericValue = parseFloat(String(rate.value || 0));
                                 if (numericValue <= 0) return false;
+                                if (!hasSolar) return false;
                                 if (rate.type === 'fit') return !vpp;
                                 if (rate.type === 'dynamic') return true;
-                                return vpp || !hasSolar;
+                                return vpp;
                             })
                             .sort((a, b) => (parseFloat(String(a.value || 0)) ?? 0) - (parseFloat(String(b.value || 0)) ?? 0))
                             .map((rate, idx) => {

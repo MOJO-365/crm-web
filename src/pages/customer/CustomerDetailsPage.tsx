@@ -3794,7 +3794,7 @@ export function CustomerDetailsPage() {
                                                             </div>
 
                                                             {/* Column 3: Solar FiT */}
-                                                            {hasFiT && (
+                                                            {hasFiT && selectedCustomerDetails.solarDetails?.hassolar === 1 && (
                                                                 <div className="space-y-4 min-w-[180px] flex-1">
                                                                     <div className="flex items-center gap-2 text-teal-500 dark:text-teal-400">
                                                                         <ZapIcon size={16} />
@@ -3814,8 +3814,9 @@ export function CustomerDetailsPage() {
                                                                                 const isVppActive = selectedCustomerDetails.vppDetails?.vpp === 1;
                                                                                 const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
 
+                                                                                if (!hasSolar) return false;
                                                                                 if (rate.type === 'fit') return !isVppActive;
-                                                                                return isVppActive || !hasSolar;
+                                                                                return isVppActive;
                                                                             })
                                                                             .sort((a, b) => (parseFloat(String(a.value || 0)) ?? 0) - (parseFloat(String(b.value || 0)) ?? 0))
                                                                             .map((rate: any, idx) => {

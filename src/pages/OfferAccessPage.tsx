@@ -1205,8 +1205,9 @@ export const OfferAccessPage = () => {
                                     if (numericValue <= 0) return false;
                                     const isVppActive = customerData.vppDetails?.vpp === 1;
                                     const hasSolar = customerData.solarDetails?.hassolar === 1;
+                                    if (!hasSolar) return false;
                                     if (rate.type === 'fit') return !isVppActive;
-                                    return (rate.type === 'fitPeak' || rate.type === 'fitCritical' || rate.type === 'fitVpp' || rate.type === 'dynamic') ? (isVppActive || !hasSolar || rate.type === 'dynamic') : true;
+                                    return (rate.type === 'fitPeak' || rate.type === 'fitCritical' || rate.type === 'fitVpp' || rate.type === 'dynamic') ? (isVppActive || rate.type === 'dynamic') : true;
                                 })
                                 .sort((a, b) => (parseFloat(String(a.value || 0)) ?? 0) - (parseFloat(String(b.value || 0)) ?? 0))
                                 .map((rate: any) => ({
@@ -1275,7 +1276,7 @@ export const OfferAccessPage = () => {
                                         </div>
                                     )}
 
-                                    {renderRatesColumn(solarFitRates, "Solar FiT", "teal", ZapIcon)}
+                                    {customerData.solarDetails?.hassolar === 1 && renderRatesColumn(solarFitRates, "Solar FiT", "teal", ZapIcon)}
 
                                     {extraChargeRates.length > 0 && renderRatesColumn(
                                         extraChargeRates,
