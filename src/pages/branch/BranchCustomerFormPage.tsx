@@ -373,7 +373,7 @@ export function BranchCustomerFormPage() {
                 discount: Number(formData.discount),
                 ownership_status: Number(formData.ownership_status)
             };
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/web/create-customer`, payload, {
+            await axios.post(`/api/web/create-customer`, payload, {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Web-Token': import.meta.env.VITE_WEB_TOKEN
