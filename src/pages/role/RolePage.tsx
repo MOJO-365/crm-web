@@ -21,6 +21,7 @@ interface Role {
     isActive: boolean;
     isDeleted: boolean;
     createdAt: string;
+    isIndependentUi?: boolean;
 }
 
 interface RolesResponse {
@@ -55,7 +56,8 @@ export function RolePage() {
     const [formData, setFormData] = useState({
         name: '',
         description: '',
-        isActive: true
+        isActive: true,
+        isIndependentUi: false
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -161,7 +163,7 @@ export function RolePage() {
     const handleAddRole = () => {
         setModalMode('create');
         setEditingRole(null);
-        setFormData({ name: '', description: '', isActive: true });
+        setFormData({ name: '', description: '', isActive: true, isIndependentUi: false });
         setErrors({});
         setRoleModalOpen(true);
     };
@@ -172,7 +174,8 @@ export function RolePage() {
         setFormData({
             name: role.name,
             description: role.description || '',
-            isActive: role.isActive
+            isActive: role.isActive,
+            isIndependentUi: role.isIndependentUi || false
         });
         setErrors({});
         setRoleModalOpen(true);
@@ -202,6 +205,7 @@ export function RolePage() {
                         input: {
                             name: capitalizedName,
                             description: formData.description,
+                            isIndependentUi: formData.isIndependentUi
                         }
                     }
                 });
@@ -216,7 +220,8 @@ export function RolePage() {
                         input: {
                             name: capitalizedName,
                             description: formData.description,
-                            isActive: formData.isActive
+                            isActive: formData.isActive,
+                            isIndependentUi: formData.isIndependentUi
                         }
                     }
                 });
@@ -516,8 +521,8 @@ export function RolePage() {
                             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                         />
                     </div>
-                    {modalMode === 'edit' && (
-                        <div className="flex items-center gap-2 pt-2">
+                    <div className="flex flex-col gap-3 pt-2">
+                        <div className="flex items-center gap-2">
                             <input
                                 type="checkbox"
                                 id="isActive"
@@ -527,7 +532,20 @@ export function RolePage() {
                             />
                             <label htmlFor="isActive" className="text-sm font-medium">Active</label>
                         </div>
-                    )}
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="isIndependentUi"
+                                checked={formData.isIndependentUi}
+                                onChange={(e) => setFormData(prev => ({ ...prev, isIndependentUi: e.target.checked }))}
+                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <label htmlFor="isIndependentUi" className="text-sm font-medium flex items-center gap-2">
+                                Independent UI Role
+                                <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-md font-bold uppercase tracking-wider">Independent</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </Modal>
 
@@ -595,6 +613,7 @@ export function RolePage() {
                     role={{
                         uid: selectedRoleForPermissions.uid,
                         name: selectedRoleForPermissions.name,
+                        isIndependentUi: selectedRoleForPermissions.isIndependentUi,
                     }}
                 />
             )}
