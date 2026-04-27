@@ -157,8 +157,8 @@ export function Header({ className, toggleSidebar }: HeaderProps) {
                     <MenuIcon size={20} />
                 </button>
 
-                {/* GEE Logo */}
-                <div className="flex items-center">
+                {/* GEE Logo - hidden on desktop as it is redundant with sidebar logo */}
+                <div className="flex items-center md:hidden">
                     <img src={logo} alt="GEE Energy" className="h-6 dark:invert" />
                 </div>
             </div>
