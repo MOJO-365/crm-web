@@ -583,6 +583,7 @@ export const CustomerFormPage = () => {
     const [duplicateErrors, setDuplicateErrors] = useState<{ address?: string; nmi?: string }>({});
     const [addressSearch, setAddressSearch] = useState('');
     const [isNmiLookupLoading, setIsNmiLookupLoading] = useState(false);
+    const [isAbrLookupLoading, setIsAbrLookupLoading] = useState(false);
     const [nmiOptions, setNmiOptions] = useState<any[]>([]);
     const [isNmiModalOpen, setIsNmiModalOpen] = useState(false);
     const [selectedNmiForTariff, setSelectedNmiForTariff] = useState<any | null>(null);
@@ -1212,6 +1213,48 @@ export const CustomerFormPage = () => {
             toast.error('Failed to lookup NMI');
         } finally {
             setIsNmiLookupLoading(false);
+        }
+    };
+    
+    const handleAbrLookup = async () => {
+        if (!formData.abn?.trim()) {
+            toast.error('Please enter an ABN first');
+            return;
+        }
+
+        try {
+            setIsAbrLookupLoading(true);
+            
+            // Construct the URL with query parameters
+            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+            const webToken = import.meta.env.VITE_WEB_TOKEN || 'GSYNC_WEB_v1_0tuu903stcif2kzsx7t8fyy';
+            const abnClean = formData.abn.replace(/\s+/g, '');
+            
+            const response = await fetch(`${baseUrl}/web/abr-lookup?abn=${abnClean}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Web-Token': webToken
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.data) {
+                const entity = data.data;
+                setFormData(prev => ({
+                    ...prev,
+                    businessName: entity.name || prev.businessName,
+                }));
+                toast.success('Business details updated from ABR');
+            } else {
+                toast.error(data.message || 'ABN not found');
+            }
+        } catch (error) {
+            console.error('❌ ABR Lookup Error:', error);
+            toast.error('Failed to lookup ABN');
+        } finally {
+            setIsAbrLookupLoading(false);
         }
     };
 
@@ -2132,8 +2175,29 @@ export const CustomerFormPage = () => {
                                                         <label htmlFor="showName" className="text-sm cursor-pointer select-none">Show Name in Offer</label>
                                                     </div>
                                                 </div>
+                                                <Input 
+                                                    label="ABN" 
+                                                    required 
+                                                    error={errors.abn} 
+                                                    placeholder="e.g. 12 345 678 901" 
+                                                    value={formData.abn} 
+                                                    onChange={(e) => updateField('abn', e.target.value)} 
+                                                    rightIcon={
+                                                        formData.abn?.trim()?.length >= 11 ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleAbrLookup}
+                                                                disabled={isAbrLookupLoading}
+                                                                className="text-xs bg-primary/10 text-primary hover:bg-primary/20 px-2 py-1 rounded-md flex items-center gap-1 transition-colors disabled:opacity-50"
+                                                                title="Lookup Business Name from ABR"
+                                                            >
+                                                                {isAbrLookupLoading ? <SpinnerIcon className="animate-spin" size={12} /> : <SearchIcon size={12} />}
+                                                                Lookup
+                                                            </button>
+                                                        ) : undefined
+                                                    }
+                                                />
                                                 <Input label="Business Name" required error={errors.businessName} placeholder="Registered business name" value={formData.businessName} onChange={(e) => updateField('businessName', e.target.value)} />
-                                                <Input label="ABN" required error={errors.abn} placeholder="e.g. 12 345 678 901" value={formData.abn} onChange={(e) => updateField('abn', e.target.value)} />
                                             </div>
                                         )}
                                     </div>
