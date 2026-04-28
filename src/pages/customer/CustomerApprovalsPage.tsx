@@ -361,7 +361,7 @@ export function CustomerApprovalsPage() {
                         )}>
                             Tariff
                         </span>
-                        {filters.tariff && <div className="w-1 h-1 rounded-full bg-primary" />}
+                        {filters.tariff ? <div className="w-1 h-1 rounded-full bg-primary" /> : "-"}
                     </div>
                     <Input
                         value={filters.tariff}
