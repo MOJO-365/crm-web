@@ -1282,9 +1282,18 @@ export function RatesPage() {
                                 'Base FIT': 'fitVpp', 'VPP Orchestration': 'vppOrcharge'
                             };
 
+                            const GST_FIELDS = new Set([
+                                'Anytime', 'Peak', 'Shoulder', 'Off-Peak',
+                                'Supply Charge', 'CL1 Supply', 'CL1 Usage',
+                                'CL2 Supply', 'CL2 Usage', 'Demand',
+                                'Demand(OP)', 'Demand(P)', 'Demand(S)',
+                                'VPP Orchestration'
+                            ]);
+
                             Object.entries(priceFieldMap).forEach(([excelKey, objKey]) => {
                                 if (row[excelKey] !== undefined) {
-                                    (offer as any)[objKey] = parseFloat(String(row[excelKey])) || 0;
+                                    const val = parseFloat(String(row[excelKey])) || 0;
+                                    (offer as any)[objKey] = GST_FIELDS.has(excelKey) ? Number((val / 1.1).toFixed(6)) : val;
                                 }
                             });
 
@@ -1294,7 +1303,13 @@ export function RatesPage() {
                                     if (!offer.dynamicRates) offer.dynamicRates = [];
                                     const dr = offer.dynamicRates.find(r => String(r.name || '').toLowerCase() === String(key).trim().toLowerCase());
                                     if (dr) {
-                                        dr.value = String(row[key] ?? '').trim();
+                                        const rawVal = String(row[key] ?? '').trim();
+                                        const num = parseFloat(rawVal);
+                                        if (!isNaN(num)) {
+                                            dr.value = String(Number((num / 1.1).toFixed(6)));
+                                        } else {
+                                            dr.value = rawVal;
+                                        }
                                     }
                                 }
                             });
@@ -1377,9 +1392,18 @@ export function RatesPage() {
                             'Base FIT': 'fitVpp', 'VPP Orchestration': 'vppOrcharge'
                         };
 
+                        const GST_FIELDS = new Set([
+                            'Anytime', 'Peak', 'Shoulder', 'Off-Peak',
+                            'Supply Charge', 'CL1 Supply', 'CL1 Usage',
+                            'CL2 Supply', 'CL2 Usage', 'Demand',
+                            'Demand(OP)', 'Demand(P)', 'Demand(S)',
+                            'VPP Orchestration'
+                        ]);
+
                         Object.entries(priceFieldMap).forEach(([excelKey, objKey]) => {
                             if (row[excelKey] !== undefined) {
-                                (offer as any)[objKey] = parseFloat(String(row[excelKey])) || 0;
+                                const val = parseFloat(String(row[excelKey])) || 0;
+                                (offer as any)[objKey] = GST_FIELDS.has(excelKey) ? Number((val / 1.1).toFixed(6)) : val;
                             }
                         });
 
@@ -1387,10 +1411,17 @@ export function RatesPage() {
                         Object.keys(row).forEach(key => {
                             if (!standardFields.has(key)) {
                                 if (!offer.dynamicRates) offer.dynamicRates = [];
+                                const rawVal = String(row[key] ?? '');
+                                const num = parseFloat(rawVal);
+                                let finalVal = rawVal;
+                                if (!isNaN(num)) {
+                                    finalVal = String(Number((num / 1.1).toFixed(6)));
+                                }
+
                                 offer.dynamicRates.push({
                                     id: uuidv4(),
                                     name: key,
-                                    value: String(row[key] ?? ''),
+                                    value: finalVal,
                                     unitId: '', // Default unit
                                     type: 'charges'
                                 });
@@ -1428,13 +1459,14 @@ export function RatesPage() {
         };
         reader.readAsBinaryString(file);
     };
+    const getRateValue = useCallback((val: any, inclusive: boolean) => {
+        if (val === undefined || val === null || val === '') return '-';
+        const num = parseFloat(String(val));
+        if (isNaN(num)) return val;
+        return inclusive ? Number((num * 1.1).toFixed(6)) : num;
+    }, []);
+
     const columns: Column<RatePlan>[] = useMemo(() => {
-        const getRateValue = (val: any, inclusive: boolean) => {
-            if (val === undefined || val === null || val === '') return '-';
-            const num = parseFloat(String(val));
-            if (isNaN(num)) return val;
-            return inclusive ? Number((num * 1.1).toFixed(6)) : num;
-        };
 
         const renderRate = (val: any) => {
             if (val === undefined || val === null || val === '') return '-';
@@ -1926,31 +1958,31 @@ export function RatesPage() {
                 });
 
                 if (offer) {
-                    row['Anytime'] = offer.anytime;
-                    row['Peak'] = offer.peak;
-                    row['Shoulder'] = offer.shoulder;
-                    row['Off-Peak'] = offer.offPeak;
-                    row['Supply Charge'] = offer.supplyCharge;
-                    row['CL1 Supply'] = offer.cl1Supply;
-                    row['CL1 Usage'] = offer.cl1Usage;
-                    row['CL2 Supply'] = offer.cl2Supply;
-                    row['CL2 Usage'] = offer.cl2Usage;
-                    row['Demand'] = offer.demand;
-                    row['Demand(OP)'] = offer.demandOp;
-                    row['Demand(P)'] = offer.demandP;
-                    row['Demand(S)'] = offer.demandS;
+                    row['Anytime'] = getRateValue(offer.anytime, true);
+                    row['Peak'] = getRateValue(offer.peak, true);
+                    row['Shoulder'] = getRateValue(offer.shoulder, true);
+                    row['Off-Peak'] = getRateValue(offer.offPeak, true);
+                    row['Supply Charge'] = getRateValue(offer.supplyCharge, true);
+                    row['CL1 Supply'] = getRateValue(offer.cl1Supply, true);
+                    row['CL1 Usage'] = getRateValue(offer.cl1Usage, true);
+                    row['CL2 Supply'] = getRateValue(offer.cl2Supply, true);
+                    row['CL2 Usage'] = getRateValue(offer.cl2Usage, true);
+                    row['Demand'] = getRateValue(offer.demand, true);
+                    row['Demand(OP)'] = getRateValue(offer.demandOp, true);
+                    row['Demand(P)'] = getRateValue(offer.demandP, true);
+                    row['Demand(S)'] = getRateValue(offer.demandS, true);
                     row['FIT'] = offer.fit;
                     row['Premium FIT'] = offer.fitPeak;
                     row['Critical FIT'] = offer.fitCritical;
                     row['Base FIT'] = offer.fitVpp;
-                    row['VPP Orchestration'] = offer.vppOrcharge;
+                    row['VPP Orchestration'] = getRateValue(offer.vppOrcharge, true);
 
                     // Add dynamic rates
                     offer.dynamicRates?.forEach(dr => {
                         if (dr.name) {
                             // Find the case-insensitive header name used in the dynamicFields set
                             const headerName = dynamicFields.find(h => h.toLowerCase() === dr.name.toLowerCase()) || dr.name;
-                            row[headerName] = dr.value || 0;
+                            row[headerName] = getRateValue(dr.value, true);
                         }
                     });
                 }
@@ -1966,13 +1998,13 @@ export function RatesPage() {
             XLSX.utils.book_append_sheet(workbook, worksheet, "Rates");
 
             const date = new Date().toISOString().split('T')[0];
-            XLSX.writeFile(workbook, `Rates_Export_${date}.xlsx`);
+            XLSX.writeFile(workbook, `Rates_Export_${date}_Incl_GST.xlsx`);
             toast.update(toastId, { render: "Excel export successful", type: "success", isLoading: false, autoClose: 2000 });
         } catch (error: any) {
             console.error("Export failed:", error);
             toast.update(toastId, { render: "Excel export failed", type: "error", isLoading: false, autoClose: 3000 });
         }
-    }, [allRatePlans, client, debouncedSearchCode, stateFilter, dnspFilter, typeFilter]);
+    }, [allRatePlans, client, debouncedSearchCode, stateFilter, dnspFilter, typeFilter, isGSTInclusive, getRateValue]);
 
 
 
