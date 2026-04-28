@@ -254,18 +254,7 @@ export function BranchCustomerFormPage() {
     //     return unit ? `/${unit}` : '';
     // };
 
-    const actions = (
-        <div className="flex items-center gap-3">
-            <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/branch-portal')}
-                className="text-subtitle font-bold hover:text-title hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl"
-            >
-                Cancel
-            </Button>
-        </div>
-    );
+    const actions = null;
 
     return (
         <BranchLayout title="New Enrollment" actions={actions}>
@@ -443,7 +432,7 @@ export function BranchCustomerFormPage() {
                             )}
                         </div>
 
-                        <div className="px-6 sm:px-8 py-6 bg-gray-50/50 dark:bg-white/[0.02] border-t border-border/40 flex items-center justify-between sticky bottom-0 z-20 backdrop-blur-md">
+                        <div className="px-6 sm:px-8 py-6 bg-white/80 dark:bg-white/[0.02] border-t border-border/40 flex items-center justify-between sticky bottom-0 z-20 backdrop-blur-md rounded-b-[2rem]">
                             <Button
                                 variant="ghost"
                                 onClick={handleBack}
