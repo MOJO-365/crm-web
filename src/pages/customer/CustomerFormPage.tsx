@@ -1215,7 +1215,7 @@ export const CustomerFormPage = () => {
             setIsNmiLookupLoading(false);
         }
     };
-    
+
     const handleAbrLookup = async () => {
         if (!formData.abn?.trim()) {
             toast.error('Please enter an ABN first');
@@ -1224,13 +1224,11 @@ export const CustomerFormPage = () => {
 
         try {
             setIsAbrLookupLoading(true);
-            
-            // Construct the URL with query parameters
-            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
             const webToken = import.meta.env.VITE_WEB_TOKEN || 'GSYNC_WEB_v1_0tuu903stcif2kzsx7t8fyy';
             const abnClean = formData.abn.replace(/\s+/g, '');
-            
-            const response = await fetch(`${baseUrl}/web/abr-lookup?abn=${abnClean}`, {
+
+            const response = await fetch(`/api/web/abr-lookup?abn=${abnClean}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2175,13 +2173,13 @@ export const CustomerFormPage = () => {
                                                         <label htmlFor="showName" className="text-sm cursor-pointer select-none">Show Name in Offer</label>
                                                     </div>
                                                 </div>
-                                                <Input 
-                                                    label="ABN" 
-                                                    required 
-                                                    error={errors.abn} 
-                                                    placeholder="e.g. 12 345 678 901" 
-                                                    value={formData.abn} 
-                                                    onChange={(e) => updateField('abn', e.target.value)} 
+                                                <Input
+                                                    label="ABN"
+                                                    required
+                                                    error={errors.abn}
+                                                    placeholder="e.g. 12 345 678 901"
+                                                    value={formData.abn}
+                                                    onChange={(e) => updateField('abn', e.target.value)}
                                                     rightIcon={
                                                         formData.abn?.trim()?.length >= 11 ? (
                                                             <button
