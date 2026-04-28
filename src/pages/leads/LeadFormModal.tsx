@@ -198,7 +198,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
         }));
 
         // Ensure current user is always in the list to prevent UID showing as pre-filled
-        if (currentUserUid && !options.find(o => o.value === currentUserUid)) {
+        if (currentUserUid && !options.find((o: any) => o.value === currentUserUid)) {
             options.unshift({
                 value: currentUserUid,
                 label: currentUserName || 'Me'
