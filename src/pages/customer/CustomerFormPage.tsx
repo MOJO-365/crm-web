@@ -23,7 +23,8 @@ import {
     GET_NEXT_CUSTOMER_ID,
     PREVIEW_SYSTEM_TEMPLATE,
     UPDATE_LEAD,
-    GET_USERS
+    GET_USERS,
+    CREATE_CUSTOMER_NOTE
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
@@ -549,6 +550,8 @@ export const CustomerFormPage = () => {
     const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [prefillLeadUid, setPrefillLeadUid] = useState<string | null>(null);
+    const [prefillNotes, setPrefillNotes] = useState<string>('');
+
 
     // Step state
     const [currentStep, setCurrentStep] = useState<0 | 1 | 2 | 3 | 4>(0);
@@ -676,6 +679,10 @@ export const CustomerFormPage = () => {
                 nmi: prefill.nmi || prev.nmi,
             }));
 
+            if (prefill.notes) {
+                setPrefillNotes(prefill.notes);
+            }
+
             if (prefill.fullAddress) {
                 setAddressSearch(prefill.fullAddress);
             }
@@ -743,6 +750,7 @@ export const CustomerFormPage = () => {
     const [createCustomer] = useMutation(CREATE_CUSTOMER);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
     const [updateLead] = useMutation(UPDATE_LEAD);
+    const [createCustomerNote] = useMutation(CREATE_CUSTOMER_NOTE);
 
     // Get customer's rate version for historic rates lookup
     const customerRateVersion = customerData?.customer?.rateVersion;
@@ -1721,7 +1729,22 @@ export const CustomerFormPage = () => {
                         console.log('[Lead Conversion] Successfully updated lead status:', prefillLeadUid);
                     } catch (leadUpdateErr) {
                         console.error('[Lead Conversion] Failed to update lead status:', leadUpdateErr);
-                        // Don't show toast error here to not confuse the user, as the customer was created successfully
+                    }
+                }
+
+                // If there are prefilled notes from the lead, add them as a customer note
+                if (prefillNotes && savedCustomer?.uid) {
+                    try {
+                        await createCustomerNote({
+                            variables: {
+                                customerUid: savedCustomer.uid,
+                                message: prefillNotes,
+                                type: 'General'
+                            }
+                        });
+                        console.log('[Lead Conversion] Successfully transferred lead notes to customer:', savedCustomer.uid);
+                    } catch (noteErr) {
+                        console.error('[Lead Conversion] Failed to create note from lead:', noteErr);
                     }
                 }
             }
