@@ -623,7 +623,7 @@ export const CustomerFormPage = () => {
         }));
 
         // Ensure current user is always in the list to prevent UID showing as pre-filled
-        if (user?.uid && !options.find(o => o.value === user.uid)) {
+        if (user?.uid && !options.find((o: any) => o.value === user.uid)) {
             options.unshift({
                 value: user.uid,
                 label: user.name || 'Me'
