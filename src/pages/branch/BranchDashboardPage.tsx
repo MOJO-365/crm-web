@@ -10,9 +10,11 @@ import {
     ClockIcon,
     TrendingUpIcon,
     CheckCircleIcon,
-    UserSettingIcon
+    UserSettingIcon,
+    UsersIcon
 } from '@/components/icons';
 import { GET_WEB_ENROLLMENTS } from '@/graphql/queries/customers';
+import { GET_USERS } from '@/graphql/queries/users';
 import { cn } from '@/lib/utils';
 import { BranchLayout } from './BranchLayout';
 
@@ -60,7 +62,7 @@ function ActionCard({
             className={cn(
                 'group relative flex flex-col items-start text-left w-full h-full',
                 'rounded-2xl border border-border/50 bg-white dark:bg-white/[0.04] shadow-sm',
-                'p-6 sm:p-8 transition-all duration-300 hover:shadow-md hover:border-primary/30',
+                'p-5 sm:p-6 transition-all duration-300 hover:shadow-md hover:border-primary/30',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                 'overflow-hidden cursor-pointer'
             )}
@@ -72,10 +74,10 @@ function ActionCard({
                 {icon}
             </div>
 
-            <h3 className="text-xl font-bold text-title mb-2 tracking-tight group-hover:text-primary transition-colors">
+            <h3 className="text-lg font-bold text-title mb-1 tracking-tight group-hover:text-primary transition-colors">
                 {title}
             </h3>
-            <p className="text-sm text-subtitle leading-relaxed mb-6 flex-1">
+            <p className="text-xs text-subtitle leading-relaxed mb-4 flex-1">
                 {description}
             </p>
 
@@ -102,15 +104,15 @@ function DashStat({
     loading?: boolean;
 }) {
     return (
-        <div className="flex flex-col p-4 rounded-2xl bg-white dark:bg-white/[0.04] border border-border/50 shadow-sm">
-            <div className={cn('flex items-center justify-center w-8 h-8 rounded-lg mb-3 text-white', color)}>
+        <div className="flex flex-col p-3.5 rounded-2xl bg-white dark:bg-white/[0.04] border border-border/50 shadow-sm">
+            <div className={cn('flex items-center justify-center w-7 h-7 rounded-lg mb-2 text-white', color)}>
                 {icon}
             </div>
             <div className="flex flex-col">
                 {loading ? (
-                    <div className="h-6 w-10 bg-gray-100 dark:bg-white/10 animate-pulse rounded mb-1" />
+                    <div className="h-5 w-10 bg-gray-100 dark:bg-white/10 animate-pulse rounded mb-1" />
                 ) : (
-                    <span className="text-xl font-bold text-title leading-none mb-1">
+                    <span className="text-lg font-bold text-title leading-none mb-1">
                         {value}
                     </span>
                 )}
@@ -148,7 +150,8 @@ export function BranchDashboardPage() {
             page: 1,
             limit: 5,
             processed: 0, // Only show pending in the "Recent Submissions" list
-            searchPortal: user?.name || 'Branch Portal'
+            branchTenant: user?.branchTenant || undefined,
+            searchPortal: !user?.branchTenant ? (user?.name || 'Branch Portal') : undefined
         },
         skip: !user
     });
@@ -158,7 +161,8 @@ export function BranchDashboardPage() {
             page: 1,
             limit: 1,
             processed: 0,
-            searchPortal: user?.name || 'Branch Portal'
+            branchTenant: user?.branchTenant || undefined,
+            searchPortal: !user?.branchTenant ? (user?.name || 'Branch Portal') : undefined
         },
         skip: !user
     });
@@ -168,15 +172,26 @@ export function BranchDashboardPage() {
             page: 1,
             limit: 1,
             processed: 1,
-            searchPortal: user?.name || 'Branch Portal'
+            branchTenant: user?.branchTenant || undefined,
+            searchPortal: !user?.branchTenant ? (user?.name || 'Branch Portal') : undefined
         },
         skip: !user
+    });
+
+    const { data: staffData } = useQuery(GET_USERS, {
+        variables: {
+            page: 1,
+            limit: 1,
+            status: 'ACTIVE'
+        },
+        skip: !user || user?.isMaster !== 1
     });
 
     const stats = {
         total: statsData?.webEnrollments?.meta?.totalRecords || 0,
         pending: pendingData?.webEnrollments?.meta?.totalRecords || 0,
         processed: processedData?.webEnrollments?.meta?.totalRecords || 0,
+        staff: Math.max(0, (staffData?.users?.meta?.totalRecords || 0) - 1), // Subtract 1 to exclude the master themselves
     };
 
     /* ─── render ─────────────────────────────────── */
@@ -188,25 +203,28 @@ export function BranchDashboardPage() {
 
     return (
         <BranchLayout footer={footer}>
-            <div className="px-4 sm:px-6 lg:px-8 pt-8 pb-12 w-full">
+            <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-10 w-full">
                 {/* Hero Section */}
-                <section className="mb-10">
-                    <p className="text-sm font-bold text-primary uppercase tracking-widest mb-1">
+                <section className="mb-8">
+                    <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-1">
                         {formattedDate}
                     </p>
-                    <h1 className="text-4xl font-bold text-title tracking-tight mb-2">
+                    <h1 className="text-3xl font-bold text-title tracking-tight mb-1">
                         {greeting}, <span className="text-primary">{user?.name}</span>
                     </h1>
-                    <p className="text-subtitle max-w-2xl">
+                    <p className="text-xs text-subtitle max-w-2xl">
                         Welcome back to your branch dashboard. Monitor submissions and manage new customer enrollments.
                     </p>
                 </section>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     {/* Left side: Stats & Cards */}
-                    <div className="lg:col-span-8 space-y-8">
+                    <div className="lg:col-span-8 space-y-6">
                         {/* Stats Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className={cn(
+                            "grid gap-4",
+                            user?.isMaster === 1 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"
+                        )}>
                             <DashStat
                                 icon={<TrendingUpIcon size={18} />}
                                 label="Submissions"
@@ -228,6 +246,15 @@ export function BranchDashboardPage() {
                                 color="bg-emerald-500 shadow-emerald-500/20"
                                 loading={statsLoading}
                             />
+                            {user?.isMaster === 1 && (
+                                <DashStat
+                                    icon={<UsersIcon size={18} />}
+                                    label="Total Staff"
+                                    value={stats.staff}
+                                    color="bg-indigo-500 shadow-indigo-500/20"
+                                    loading={statsLoading}
+                                />
+                            )}
                         </div>
 
                         {/* Action Cards */}
@@ -268,12 +295,12 @@ export function BranchDashboardPage() {
 
                     {/* Right side: Recent Activity */}
                     <div className="lg:col-span-4">
-                        <div className="bg-white dark:bg-white/[0.04] rounded-2xl border border-border/50 shadow-sm h-full overflow-hidden flex flex-col">
+                        <div className="bg-white dark:bg-white/[0.04] rounded-2xl border border-border/50 shadow-sm overflow-hidden flex flex-col">
                             <div className="p-5 border-b border-border/40 flex items-center justify-between">
                                 <h2 className="font-bold text-title tracking-tight">Recent Submissions</h2>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            <div className="p-4 space-y-3">
                                 {statsLoading ? (
                                     [1, 2, 3, 4].map(i => (
                                         <div key={i} className="h-14 bg-gray-100 dark:bg-white/5 animate-pulse rounded-xl" />
@@ -297,6 +324,9 @@ export function BranchDashboardPage() {
                                                     <p className="text-sm font-bold text-title truncate">{name}</p>
                                                     <p className="text-[10px] text-subtitle font-medium uppercase tracking-wider truncate">
                                                         {payload.nmi || 'No NMI'} • {new Date(item.createdAt).toLocaleDateString()}
+                                                        {user?.isMaster === 1 && payload.portalname && (
+                                                            <> • <span className="text-primary font-bold">{payload.portalname}</span></>
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>

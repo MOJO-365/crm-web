@@ -1439,8 +1439,8 @@ export const GET_NEXT_CUSTOMER_ID = gql`
     }
 `;
 export const GET_WEB_ENROLLMENTS = gql`
-    query GetWebEnrollments($page: Int, $limit: Int, $search: String, $processed: Int, $searchName: String, $searchEmail: String, $searchMobile: String, $searchNmi: String, $searchTariff: String, $searchAddress: String, $searchPortal: String, $searchVpp: Int) {
-        webEnrollments(page: $page, limit: $limit, search: $search, processed: $processed, searchName: $searchName, searchEmail: $searchEmail, searchMobile: $searchMobile, searchNmi: $searchNmi, searchTariff: $searchTariff, searchAddress: $searchAddress, searchPortal: $searchPortal, searchVpp: $searchVpp) {
+    query GetWebEnrollments($page: Int, $limit: Int, $search: String, $processed: Int, $searchName: String, $searchEmail: String, $searchMobile: String, $searchNmi: String, $searchTariff: String, $searchAddress: String, $searchPortal: String, $searchVpp: Int, $branchTenant: String) {
+        webEnrollments(page: $page, limit: $limit, search: $search, processed: $processed, searchName: $searchName, searchEmail: $searchEmail, searchMobile: $searchMobile, searchNmi: $searchNmi, searchTariff: $searchTariff, searchAddress: $searchAddress, searchPortal: $searchPortal, searchVpp: $searchVpp, branchTenant: $branchTenant) {
             data {
                 id
                 uid
