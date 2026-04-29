@@ -57,19 +57,37 @@ interface UsersResponse {
     };
 }
 
-// Role badge colors
+// Role badge color palette
+const ROLE_PALETTE = [
+    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+    'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+    'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+    'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+    'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+    'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+    'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-400',
+];
+
 const getRoleBadgeClass = (role: string) => {
-    const roleLower = role?.toLowerCase() || '';
+    if (!role) return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+    
+    const roleLower = role.toLowerCase();
+    // Maintain fixed blue for core admin roles
     if (roleLower.includes('master') || roleLower.includes('admin')) {
-        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+        return ROLE_PALETTE[0];
     }
-    if (roleLower.includes('retention')) {
-        return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
+
+    // Dynamic color selection based on string hash
+    let hash = 0;
+    for (let i = 0; i < role.length; i++) {
+        hash = role.charCodeAt(i) + ((hash << 5) - hash);
     }
-    if (roleLower.includes('manager')) {
-        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
-    }
-    return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+    
+    const index = Math.abs(hash) % ROLE_PALETTE.length;
+    return ROLE_PALETTE[index];
 };
 
 export function UsersPage() {
@@ -150,7 +168,11 @@ export function UsersPage() {
     const filterRoleOptions = [
         { value: '', label: 'All Roles' },
         ...roles
-            .filter((r: Role) => !r.isDeleted && (r.isVisibleInLists !== false || r.uid === roleFilter))
+            .filter((r: Role) => {
+                if (r.isDeleted) return false;
+                if (!currentUser?.isIndependentUi && r.name === 'Branch Staff') return false;
+                return true;
+            })
             .map((r: Role) => ({ value: r.uid, label: r.name }))
     ];
 
@@ -160,11 +182,17 @@ export function UsersPage() {
 
     const roleDropdownOptions = roles
         .filter((r: Role) => {
-            if (!r.isDeleted && (r.isVisibleInLists !== false || r.uid === formData.roleUid)) {
+            if (!r.isDeleted) {
                 // If current user is in independent UI, only show roles that are also independent
                 if (currentUser?.isIndependentUi) {
                     return (r as any).isIndependentUi;
                 }
+                
+                // For main CRM users, don't show "Branch Staff" role
+                if (r.name === 'Branch Staff') {
+                    return false;
+                }
+
                 return true;
             }
             return false;
