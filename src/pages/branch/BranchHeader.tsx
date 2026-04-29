@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOutIcon, ChevronDownIcon, UserIcon } from '@/components/icons';
-import { Button } from '@/components/ui/Button';
+import { LogOutIcon, ChevronDownIcon } from '@/components/icons';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useAuthStore } from '@/stores/useAuthStore';
 import logo from '@/assets/main-logo-dark-1.png';
@@ -75,7 +74,7 @@ export const BranchHeader: React.FC<BranchHeaderProps> = ({ title, actions }) =>
                                 >
                                     <div className="w-9 h-9 rounded-full border-2 border-[#86a73c] bg-[#f2f6e9] dark:bg-[#86a73c]/10 flex items-center justify-center transition-all group-hover:shadow-sm">
                                         <span className="text-sm font-bold text-[#86a73c]">
-                                            {getInitials(user.name)}
+                                            {getInitials(user.name || '')}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
