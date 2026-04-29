@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
 import { GET_WEB_ENROLLMENTS } from '@/graphql/queries/customers';
+import { GET_USERS } from '@/graphql/queries/users';
 import { Input } from '@/components/ui/Input';
 
 import { Button } from '@/components/ui/Button';
@@ -34,11 +35,13 @@ interface WebEnrollmentsResponse {
 interface SearchFilters {
     name: string;
     status: string;
+    portal: string;
 }
 
 const INITIAL_FILTERS: SearchFilters = {
     name: '',
-    status: ''
+    status: '',
+    portal: ''
 };
 
 export function BranchEnrollmentsPage() {
@@ -59,13 +62,32 @@ export function BranchEnrollmentsPage() {
         return () => clearTimeout(timer);
     }, [filters]);
 
+    // Fetch staff members for the "Submitted By" filter
+    const { data: staffData } = useQuery(GET_USERS, {
+        variables: {
+            page: 1,
+            limit: 100,
+            status: 'ACTIVE'
+        },
+        skip: !user || user?.isMaster !== 1
+    });
+
+    const staffOptions = useMemo(() => {
+        if (!staffData?.users?.data) return [];
+        return staffData.users.data.map((u: any) => ({
+            value: u.name,
+            label: u.name
+        }));
+    }, [staffData]);
+
     const { data, loading } = useQuery<WebEnrollmentsResponse>(GET_WEB_ENROLLMENTS, {
         variables: {
             page,
             limit,
             searchName: debouncedFilters.name || undefined,
             processed: debouncedFilters.status !== '' ? parseInt(debouncedFilters.status) : undefined,
-            searchPortal: user?.name || 'Branch Portal'
+            branchTenant: user?.branchTenant || undefined,
+            searchPortal: debouncedFilters.portal || (!user?.branchTenant ? (user?.name || 'Branch Portal') : undefined)
         },
         fetchPolicy: 'network-only',
         skip: !user || !GET_WEB_ENROLLMENTS
@@ -84,69 +106,92 @@ export function BranchEnrollmentsPage() {
         setFilters(prev => ({ ...prev, [key]: value }));
     };
 
-    const columns: Column<WebEnrollment>[] = [
-        {
-            key: 'createdAt',
-            header: 'Date Submitted',
-            render: (row) => <span className="text-sm text-subtitle">{new Date(row.createdAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-        },
-        {
-            key: 'name',
-            header: 'Customer Name',
-            render: (row) => {
-                const { title, firstname, lastname } = row.payload || {};
-                const fullName = [title, firstname, lastname].filter(v => v && typeof v !== 'object').join(' ');
-                return <span className="font-semibold text-title">{fullName || '-'}</span>;
+    const columns: Column<WebEnrollment>[] = useMemo(() => {
+        const baseColumns: Column<WebEnrollment>[] = [
+            {
+                key: 'createdAt',
+                header: 'Date Submitted',
+                render: (row) => <span className="text-sm text-subtitle">{new Date(row.createdAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+            },
+            {
+                key: 'name',
+                header: 'Customer Name',
+                render: (row) => {
+                    const { title, firstname, lastname } = row.payload || {};
+                    const fullName = [title, firstname, lastname].filter(v => v && typeof v !== 'object').join(' ');
+                    return <span className="font-semibold text-title">{fullName || '-'}</span>;
+                }
+            },
+            {
+                key: 'email',
+                header: 'Email Address',
+                render: (row) => <span className="text-sm text-subtitle">{row.payload?.email || '-'}</span>
+            },
+            {
+                key: 'nmi',
+                header: 'NMI',
+                render: (row) => <span className="text-xs font-mono font-bold bg-primary/5 text-primary px-2.5 py-1 rounded-lg border border-primary/10">{row.payload?.nmi || '-'}</span>
+            },
+            {
+                key: 'isVpp',
+                header: 'VPP',
+                render: (row) => row.payload?.isVpp ? (
+                    <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] uppercase tracking-wider">
+                        <ZapIcon size={12} fill="currentColor" />
+                        Enrolled
+                    </div>
+                ) : (
+                    <span className="text-[10px] font-bold text-subtitle uppercase tracking-wider opacity-40">Standard</span>
+                )
             }
-        },
-        {
-            key: 'email',
-            header: 'Email Address',
-            render: (row) => <span className="text-sm text-subtitle">{row.payload?.email || '-'}</span>
-        },
-        {
-            key: 'nmi',
-            header: 'NMI',
-            render: (row) => <span className="text-xs font-mono font-bold bg-primary/5 text-primary px-2.5 py-1 rounded-lg border border-primary/10">{row.payload?.nmi || '-'}</span>
-        },
-        {
-            key: 'isVpp',
-            header: 'VPP',
-            render: (row) => row.payload?.isVpp ? (
-                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] uppercase tracking-wider">
-                    <ZapIcon size={12} fill="currentColor" />
-                    Enrolled
-                </div>
-            ) : (
-                <span className="text-[10px] font-bold text-subtitle uppercase tracking-wider opacity-40">Standard</span>
-            )
-        },
-        {
-            key: 'status',
-            header: 'Status',
-            render: (row) => (
-                <div className={cn(
-                    "inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                    row.processed === 1
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                        : row.processed === 2
-                            ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                )}>
-                    {row.processed === 1 ? 'Processed' : row.processed === 2 ? 'Rejected' : 'Pending Review'}
-                </div>
-            )
-        },
-        {
-            key: 'actions',
-            header: '',
-            render: (row) => (
-                <Button variant="ghost" size="icon" onClick={() => handleView(row)} className="hover:bg-primary/10 text-primary">
-                    <EyeIcon size={18} />
-                </Button>
-            )
+        ];
+
+        // Add "Submitted By" column for Master accounts
+        if (user?.isMaster === 1) {
+            baseColumns.push({
+                key: 'portalname',
+                header: 'Submitted By',
+                render: (row) => (
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                            <UserIcon size={12} />
+                        </div>
+                        <span className="text-xs font-semibold text-subtitle">{row.payload?.portalname || 'System'}</span>
+                    </div>
+                )
+            });
         }
-    ];
+
+        baseColumns.push(
+            {
+                key: 'status',
+                header: 'Status',
+                render: (row) => (
+                    <div className={cn(
+                        "inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                        row.processed === 1
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            : row.processed === 2
+                                ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+                                : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    )}>
+                        {row.processed === 1 ? 'Processed' : row.processed === 2 ? 'Rejected' : 'Pending Review'}
+                    </div>
+                )
+            },
+            {
+                key: 'actions',
+                header: '',
+                render: (row) => (
+                    <Button variant="ghost" size="icon" onClick={() => handleView(row)} className="hover:bg-primary/10 text-primary">
+                        <EyeIcon size={18} />
+                    </Button>
+                )
+            }
+        );
+
+        return baseColumns;
+    }, [user?.isMaster, handleView]);
 
 
 
@@ -175,6 +220,20 @@ export function BranchEnrollmentsPage() {
                                 onChange={(val) => handleFilterChange('status', val as string)}
                                 className="w-36 sm:w-48 h-9 text-sm border-none bg-transparent shadow-none focus:ring-0"
                             />
+                            {user?.isMaster === 1 && (
+                                <>
+                                    <div className="w-px h-5 bg-border/60" />
+                                    <Select
+                                        options={[
+                                            { value: '', label: 'All Staff' },
+                                            ...staffOptions
+                                        ]}
+                                        value={filters.portal}
+                                        onChange={(val) => handleFilterChange('portal', val as string)}
+                                        className="w-36 sm:w-48 h-9 text-sm border-none bg-transparent shadow-none focus:ring-0"
+                                    />
+                                </>
+                            )}
                         </div>
                         <div className="text-[10px] font-black uppercase tracking-widest text-subtitle opacity-50">
                             Total: {meta?.totalRecords || 0}
@@ -226,10 +285,18 @@ export function BranchEnrollmentsPage() {
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-bold text-title tracking-tight">{selectedEnrollment.payload?.firstname} {selectedEnrollment.payload?.lastname}</h2>
-                                    <p className="text-xs font-medium text-subtitle flex items-center gap-2 mt-1">
-                                        <ClockIcon size={12} className="opacity-50" />
-                                        Submitted {new Date(selectedEnrollment.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                    </p>
+                                    <div className="flex items-center gap-3 mt-1">
+                                        <p className="text-xs font-medium text-subtitle flex items-center gap-2">
+                                            <ClockIcon size={12} className="opacity-50" />
+                                            Submitted {new Date(selectedEnrollment.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                        </p>
+                                        {user?.isMaster === 1 && selectedEnrollment.payload?.portalname && (
+                                            <p className="text-xs font-bold text-primary flex items-center gap-2">
+                                                <UserIcon size={12} className="opacity-50" />
+                                                By {selectedEnrollment.payload?.portalname}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             <div className={cn(

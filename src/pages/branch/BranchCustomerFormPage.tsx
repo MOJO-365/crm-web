@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@apollo/client';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
@@ -17,6 +18,7 @@ import {
     InfoIcon,
 } from '@/components/icons';
 import { useUser } from '@/stores/useAuthStore';
+import { GET_USERS } from '@/graphql/queries/users';
 import LocationAutocomplete from '../LocationAutocomplete';
 import { TITLE_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -68,6 +70,18 @@ export function BranchCustomerFormPage() {
         { id: 3, title: 'Identity', icon: <IdCardIcon size={18} /> },
         { id: 4, title: 'Confirm', icon: <CheckCircleIcon size={18} /> }
     ];
+
+    // Fetch Master Account name for the portal field
+    const { data: masterData } = useQuery(GET_USERS, {
+        variables: {
+            page: 1,
+            limit: 1,
+            topLevelOnly: true
+        },
+        skip: !user || !user?.branchTenant
+    });
+
+    const masterName = masterData?.users?.data?.[0]?.name;
 
     const [formData, setFormData] = useState({
         title: '',
@@ -221,7 +235,7 @@ export function BranchCustomerFormPage() {
                 lastname: capitalize(formData.lastname),
                 number: `+61${formData.number.replace(/\D/g, '')}`,
                 phone: `+61${formData.number.replace(/\D/g, '')}`,
-                portalname: user?.name || 'Branch Portal',
+                portalname: masterName || user?.name || 'Branch Portal',
                 branchTenant: user?.branchTenant,
                 isVpp: Number(formData.isVpp),
                 ownership_status: Number(formData.ownership_status)

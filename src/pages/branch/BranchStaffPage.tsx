@@ -118,7 +118,7 @@ export function BranchStaffPage() {
     // Update allUsers when data changes
     useEffect(() => {
         if (data?.users?.data) {
-            let fetchedUsers = data.users.data;
+            let fetchedUsers = data.users.data.filter(u => u.uid !== currentUser?.uid);
             if (page === 1) {
                 setAllUsers(fetchedUsers);
             } else {
