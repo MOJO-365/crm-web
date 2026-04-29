@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
 import { GET_WEB_ENROLLMENTS } from '@/graphql/queries/customers';
-import { GET_USERS } from '@/graphql/queries/users';
 import { Input } from '@/components/ui/Input';
 
 import { Button } from '@/components/ui/Button';
@@ -62,23 +61,7 @@ export function BranchEnrollmentsPage() {
         return () => clearTimeout(timer);
     }, [filters]);
 
-    // Fetch staff members for the "Submitted By" filter
-    const { data: staffData } = useQuery(GET_USERS, {
-        variables: {
-            page: 1,
-            limit: 100,
-            status: 'ACTIVE'
-        },
-        skip: !user || user?.isMaster !== 1
-    });
 
-    const staffOptions = useMemo(() => {
-        if (!staffData?.users?.data) return [];
-        return staffData.users.data.map((u: any) => ({
-            value: u.name,
-            label: u.name
-        }));
-    }, [staffData]);
 
     const { data, loading } = useQuery<WebEnrollmentsResponse>(GET_WEB_ENROLLMENTS, {
         variables: {
@@ -220,20 +203,6 @@ export function BranchEnrollmentsPage() {
                                 onChange={(val) => handleFilterChange('status', val as string)}
                                 className="w-36 sm:w-48 h-9 text-sm border-none bg-transparent shadow-none focus:ring-0"
                             />
-                            {user?.isMaster === 1 && (
-                                <>
-                                    <div className="w-px h-5 bg-border/60" />
-                                    <Select
-                                        options={[
-                                            { value: '', label: 'All Staff' },
-                                            ...staffOptions
-                                        ]}
-                                        value={filters.portal}
-                                        onChange={(val) => handleFilterChange('portal', val as string)}
-                                        className="w-36 sm:w-48 h-9 text-sm border-none bg-transparent shadow-none focus:ring-0"
-                                    />
-                                </>
-                            )}
                         </div>
                         <div className="text-[10px] font-black uppercase tracking-widest text-subtitle opacity-50">
                             Total: {meta?.totalRecords || 0}

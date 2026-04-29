@@ -182,7 +182,8 @@ export function BranchDashboardPage() {
         variables: {
             page: 1,
             limit: 1,
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            onlyVisibleRoles: true
         },
         skip: !user || user?.isMaster !== 1
     });
