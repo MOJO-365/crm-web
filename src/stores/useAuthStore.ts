@@ -41,6 +41,7 @@ export interface UserInfo {
     accessibleFeatures: AccessibleFeature[];
     isIndependentUi: boolean;
     isMaster: number;
+    branchTenant?: string | null;
 }
 
 interface AuthState {
