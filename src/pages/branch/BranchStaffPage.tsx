@@ -234,7 +234,8 @@ export function BranchStaffPage() {
                         input: {
                             ...formData,
                             isMaster: 0, // Staff added by branch is always staff
-                            isAllowedWithoutIp: 1
+                            isAllowedWithoutIp: 1,
+                            branchTenant: currentUser?.branchTenant || undefined,
                         }
                     }
                 });
