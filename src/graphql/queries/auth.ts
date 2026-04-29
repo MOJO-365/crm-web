@@ -37,6 +37,7 @@ export const GET_ME = gql`
             }
             isIndependentUi
             isMaster
+            branchTenant
         }
     }
 `;
