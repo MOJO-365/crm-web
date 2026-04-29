@@ -9,7 +9,6 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { DataTable, type Column, Modal } from '@/components/common';
 import {
     PlusIcon, PencilIcon, TrashIcon, ShieldCheckIcon,
-    // EyeIcon, EyeOffIcon, CopyIcon,
     RefreshCwIcon, ShieldIcon, UnlockedIcon
 } from '@/components/icons';
 import { Switch } from '@/components/ui/Switch';
@@ -34,6 +33,9 @@ interface User {
     createdAt: string;
     ipAddress?: string;
     isAllowedWithoutIp: number;
+    isMaster?: number;
+    branchTenant?: string;
+    branchStaff?: User[];
 }
 
 interface Role {
@@ -104,6 +106,7 @@ export function UsersPage() {
         roleUid: '',
         ipAddress: '',
         isAllowedWithoutIp: 1, // Default to true (Allowed)
+        isMaster: 0, // Default to 0 (No)
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -132,7 +135,8 @@ export function UsersPage() {
             limit,
             status: statusFilter === 'ALL' ? undefined : statusFilter,
             search: debouncedSearch || undefined,
-            roleUid: roleFilter || undefined // Pass roleUid if selected
+            roleUid: roleFilter || undefined,
+            topLevelOnly: true
         },
         fetchPolicy: 'network-only',
         notifyOnNetworkStatusChange: true,
@@ -155,7 +159,16 @@ export function UsersPage() {
     // For now, let's keep it simple: if roleFilter is empty string, it shows placeholder "Role" and filters by nothing (which means all).
 
     const roleDropdownOptions = roles
-        .filter((r: Role) => !r.isDeleted && (r.isVisibleInLists !== false || r.uid === formData.roleUid))
+        .filter((r: Role) => {
+            if (!r.isDeleted && (r.isVisibleInLists !== false || r.uid === formData.roleUid)) {
+                // If current user is in independent UI, only show roles that are also independent
+                if (currentUser?.isIndependentUi) {
+                    return (r as any).isIndependentUi;
+                }
+                return true;
+            }
+            return false;
+        })
         .map((r: Role) => ({ value: r.uid, label: r.name }));
 
     const [createUser] = useMutation(CREATE_USER);
@@ -276,6 +289,7 @@ export function UsersPage() {
             roleUid: '',
             ipAddress: '',
             isAllowedWithoutIp: 1,
+            isMaster: 0,
         });
         setErrors({});
         setUserModalOpen(true);
@@ -299,6 +313,7 @@ export function UsersPage() {
             roleUid: user.roleUid || '',
             ipAddress: user.ipAddress || '',
             isAllowedWithoutIp: user.isAllowedWithoutIp ?? 1,
+            isMaster: (user as any).isMaster || 0,
         });
         setErrors({});
         setUserModalOpen(true);
@@ -337,6 +352,7 @@ export function UsersPage() {
                             roleUid: formData.roleUid,
                             ipAddress: formData.ipAddress || null,
                             isAllowedWithoutIp: formData.isAllowedWithoutIp,
+                            isMaster: formData.isMaster,
                         }
                     }
                 });
@@ -351,6 +367,7 @@ export function UsersPage() {
                     role_uid: formData.roleUid,
                     ipAddress: formData.ipAddress || null,
                     isAllowedWithoutIp: formData.isAllowedWithoutIp,
+                    isMaster: formData.isMaster,
                 };
 
                 // Only update password if it has changed from the original (hash)
@@ -462,9 +479,6 @@ export function UsersPage() {
         //                 </button>
         //             </Tooltip>
         //         </div> // Close div
-        //     ),
-        // },
-        //         </div>
         //     ),
         // },
         {
@@ -597,6 +611,97 @@ export function UsersPage() {
         });
     }
 
+    const renderExpandedRow = (user: User) => {
+        if (!user.isMaster || !user.branchStaff?.length) return (
+            <div className="flex flex-col items-center justify-center py-6 text-muted-foreground italic text-xs">
+                <ShieldIcon size={24} className="mb-2 opacity-20" />
+                No staff members found for this branch.
+            </div>
+        );
+
+        return (
+            <div className="bg-white dark:bg-slate-950 rounded-xl border border-border shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+                <div className="px-4 py-3 bg-muted/30 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-primary/10 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                        </div>
+                        <span className="text-[10px] font-bold text-title uppercase tracking-wider">Branch Staff Members: <span className="text-primary">{user.name}</span></span>
+                    </div>
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full">
+                        Total Staff: {user.branchStaff.length}
+                    </span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                        <thead className="bg-muted/10 text-muted-foreground font-bold uppercase tracking-widest text-[9px]">
+                            <tr>
+                                <th className="px-4 py-3">Name</th>
+                                <th className="px-4 py-3">Email</th>
+                                <th className="px-4 py-3">Role</th>
+                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3">Created On</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                            {user.branchStaff.map((staff) => (
+                                <tr key={staff.uid} className="hover:bg-muted/20 transition-colors">
+                                    <td className="px-4 py-3 font-bold text-title">{staff.name}</td>
+                                    <td className="px-4 py-3 text-subtitle">{staff.email}</td>
+                                    <td className="px-4 py-3">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium capitalize ${getRoleBadgeClass(staff.roleName)}`}>
+                                            {staff.roleName}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (!userPermissions.canEdit) return;
+                                                    const newStatus = staff.status === 'ACTIVE' ? 0 : 1;
+                                                    try {
+                                                        await updateUser({
+                                                            variables: {
+                                                                uid: staff.uid,
+                                                                input: { status: newStatus }
+                                                            }
+                                                        });
+                                                        refetch();
+                                                        toast.success(`${staff.name} is now ${newStatus === 1 ? 'Active' : 'Inactive'}`);
+                                                    } catch (err) {
+                                                        toast.error('Failed to update staff status');
+                                                    }
+                                                }}
+                                                disabled={!userPermissions.canEdit}
+                                                className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${staff.status === 'ACTIVE' ? 'bg-primary' : 'bg-gray-300'
+                                                    } ${!userPermissions.canEdit ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                                            >
+                                                <span
+                                                    className={`inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition-transform ${staff.status === 'ACTIVE' ? 'translate-x-4' : 'translate-x-0.5'
+                                                        }`}
+                                                />
+                                            </button>
+                                            <span className={`font-medium ${staff.status === 'ACTIVE' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                {staff.status}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-muted-foreground">{formatDateTime(staff.createdAt)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6">
             {/* Page Header */}
@@ -605,7 +710,7 @@ export function UsersPage() {
                     <h1 className="text-2xl font-bold text-foreground">User Management</h1>
                     <p className="text-muted-foreground">Manage user roles, access, and permissions</p>
                 </div>
-                {userPermissions.canCreate && (
+                {userPermissions.canCreate && (!currentUser?.isIndependentUi || currentUser?.isMaster) && (
                     <Button
                         leftIcon={<PlusIcon size={16} />}
                         onClick={handleAddUser}
@@ -664,6 +769,8 @@ export function UsersPage() {
                     error={error?.message}
                     emptyMessage='No users found. Click "Add User" to create one.'
                     loadingMessage="Loading users..."
+                    renderExpandedRow={renderExpandedRow}
+                    isExpandable={(user) => Boolean(user.isMaster && user.branchStaff?.length)}
                     infiniteScroll
                     hasMore={hasMore}
                     isLoadingMore={isLoadingMore}
@@ -899,6 +1006,16 @@ export function UsersPage() {
                                     </p>
                                 </div>
                             )}
+                            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-gray-50 dark:bg-gray-900/50">
+                                <div>
+                                    <p className="text-sm font-medium">Branch Master</p>
+                                    <p className="text-xs text-muted-foreground">If enabled, this user will be able to manage other users in this branch.</p>
+                                </div>
+                                <Switch
+                                    checked={formData.isMaster === 1}
+                                    onChange={(checked: boolean) => setFormData(prev => ({ ...prev, isMaster: checked ? 1 : 0 }))}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>

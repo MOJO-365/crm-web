@@ -222,6 +222,7 @@ export function BranchCustomerFormPage() {
                 number: `+61${formData.number.replace(/\D/g, '')}`,
                 phone: `+61${formData.number.replace(/\D/g, '')}`,
                 portalname: user?.name || 'Branch Portal',
+                branchTenant: user?.branchTenant,
                 isVpp: Number(formData.isVpp),
                 ownership_status: Number(formData.ownership_status)
             };

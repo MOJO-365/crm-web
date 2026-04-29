@@ -40,6 +40,7 @@ export interface UserInfo {
     accessibleMenus: AccessibleMenu[];
     accessibleFeatures: AccessibleFeature[];
     isIndependentUi: boolean;
+    isMaster: number;
 }
 
 interface AuthState {

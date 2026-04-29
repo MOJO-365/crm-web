@@ -9,7 +9,8 @@ import {
     ChevronRightIcon,
     ClockIcon,
     TrendingUpIcon,
-    CheckCircleIcon
+    CheckCircleIcon,
+    UserSettingIcon
 } from '@/components/icons';
 import { GET_WEB_ENROLLMENTS } from '@/graphql/queries/customers';
 import { cn } from '@/lib/utils';
@@ -250,6 +251,18 @@ export function BranchDashboardPage() {
                                 buttonLabel="View All Submissions"
                                 onClick={() => navigate('/branch-portal/enrollments')}
                             />
+
+                            {user?.isMaster === 1 && (
+                                <ActionCard
+                                    id="card-staff-management"
+                                    title="Staff Management"
+                                    description="Manage your branch staff accounts, roles and permissions."
+                                    icon={<UserSettingIcon size={24} />}
+                                    accentColor="bg-amber-600"
+                                    buttonLabel="Manage Team"
+                                    onClick={() => navigate('/branch-portal/staff')}
+                                />
+                            )}
                         </div>
                     </div>
 

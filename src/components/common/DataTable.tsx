@@ -76,6 +76,10 @@ export interface DataTableProps<T> {
     isSelectingAll?: boolean;
     /** Pagination configuration */
     pagination?: PaginationProps;
+    /** Optional function to render content for an expanded row */
+    renderExpandedRow?: (row: T) => ReactNode;
+    /** Optional function to determine if a row can be expanded */
+    isExpandable?: (row: T) => boolean;
 }
 
 // ============================================================
@@ -105,6 +109,8 @@ export function DataTable<T>({
     totalFilteredCount,
     isSelectingAll = false,
     pagination,
+    renderExpandedRow,
+    isExpandable,
 }: DataTableProps<T>) {
     // Determine the height class to use
     // If containerHeightClass is provided, use it. Otherwise use maxHeightClass.
@@ -113,6 +119,16 @@ export function DataTable<T>({
     const colSpan = columns.length + (enableSelection ? 1 : 0);
     const [isScrolledHorizontally, setIsScrolledHorizontally] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
+    const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+    const toggleRow = (key: string) => {
+        setExpandedKeys(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
 
     // Handle scroll to load more and track horizontal scroll
     const handleScroll = useCallback(() => {
@@ -220,6 +236,7 @@ export function DataTable<T>({
                 <table className="w-full relative border-separate border-spacing-0">
                     <thead className="sticky top-0 z-20 bg-background">
                         <tr className="border-b border-border shadow-sm">
+
                             {enableSelection && (
                                 <th className="sticky left-0 z-30 w-[40px] px-3 py-3 text-left bg-background border-b border-border">
                                     <div className="flex items-center gap-2">
@@ -303,76 +320,115 @@ export function DataTable<T>({
                                 {data.map((row, rowIndex) => {
                                     const key = rowKey(row);
                                     const isSelected = selectedRowKeys.includes(key);
+                                    const isExpanded = expandedKeys.has(key);
+                                    const canExpand = renderExpandedRow && (isExpandable ? isExpandable(row) : true);
 
                                     return (
-                                        <tr
-                                            key={key}
-                                            className={cn(
-                                                "bg-background hover:bg-muted group",
-                                                isSelected && "bg-muted/30",
-                                                rowClassName?.(row)
-                                            )}
-                                        >
-                                            {enableSelection && (
-                                                <td className="sticky left-0 z-10 w-[40px] px-3 py-3 bg-local align-top">
-                                                    {/* bg-local might not be enough to hide content under sticky, needs background color matching row */}
-                                                    <div className={cn(
-                                                        "absolute inset-0",
-                                                        isSelected ? "bg-slate-50 dark:bg-slate-900" : "bg-background group-hover:bg-muted",
-                                                        rowClassName?.(row)
-                                                    )} aria-hidden="true" />
-                                                    <div className="relative">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={(e) => handleSelectRow(key, e.target.checked)}
-                                                            className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
-                                                        />
-                                                    </div>
-                                                </td>
-                                            )}
-                                            {columns.map((col, colIndex) => {
-                                                const isSticky = col.sticky === true || col.sticky === 'left';
-                                                const isRightSticky = col.sticky === 'right';
-                                                // Find if this is the last sticky column
-                                                const isLastSticky = isSticky && !columns.slice(colIndex + 1).some(c => c.sticky === true || c.sticky === 'left');
-                                                // sticky offset needs to account for selection column if present
-                                                const baseOffset = col.stickyOffset ?? 0;
-                                                const stickyLeft = enableSelection && isSticky ? baseOffset + 40 : baseOffset;
-
-                                                const stickyStyles: React.CSSProperties = isSticky ? {
-                                                    position: 'sticky',
-                                                    left: stickyLeft,
-                                                    zIndex: 10,
-                                                } : isRightSticky ? {
-                                                    position: 'sticky',
-                                                    right: 0,
-                                                    zIndex: 10,
-                                                } : {};
-
-                                                return (
-                                                    <td
-                                                        key={col.key}
-                                                        className={cn(
-                                                            "px-3 py-3 text-sm transition-colors overflow-hidden",
-                                                            col.width,
-                                                            // For sticky columns, we need to manually match the row's background color
-                                                            // to prevent transparency issues when scrolling
-                                                            (isSticky || isRightSticky) && (
-                                                                isSelected
-                                                                    ? "bg-slate-50 dark:bg-slate-900" // Use solid light background for selected sticky cells
-                                                                    : cn("bg-background group-hover:bg-muted", rowClassName?.(row))
-                                                            ),
-                                                            isLastSticky && isScrolledHorizontally && "shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]",
-                                                            isRightSticky && canScrollRight && "shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]"
-                                                        )}
-                                                        style={stickyStyles}
-                                                    >
-                                                        {col.render(row, rowIndex)}
+                                        <div key={`row-group-${key}`} className="contents">
+                                            <tr
+                                                key={key}
+                                                className={cn(
+                                                    "bg-background hover:bg-muted group transition-colors",
+                                                    isSelected && "bg-muted/30",
+                                                    isExpanded && "bg-muted/10",
+                                                    canExpand && "cursor-pointer",
+                                                    rowClassName?.(row)
+                                                )}
+                                                onClick={canExpand ? () => toggleRow(key) : undefined}
+                                            >
+                                                {enableSelection && (
+                                                    <td className="sticky left-0 z-10 w-[40px] px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
+                                                        <div className={cn(
+                                                            "absolute inset-0",
+                                                            isSelected ? "bg-slate-50 dark:bg-slate-900" : "bg-background group-hover:bg-muted",
+                                                            rowClassName?.(row)
+                                                        )} aria-hidden="true" />
+                                                        <div className="relative">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSelected}
+                                                                onChange={(e) => handleSelectRow(key, e.target.checked)}
+                                                                className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                                                            />
+                                                        </div>
                                                     </td>
-                                                );
-                                            })}
-                                        </tr>
+                                                )}
+                                                {columns.map((col, colIndex) => {
+                                                    const isSticky = col.sticky === true || col.sticky === 'left';
+                                                    const isRightSticky = col.sticky === 'right';
+                                                    const isLastSticky = isSticky && !columns.slice(colIndex + 1).some(c => c.sticky === true || c.sticky === 'left');
+                                                    const baseOffset = col.stickyOffset ?? 0;
+                                                    let stickyLeft = baseOffset;
+                                                    if (enableSelection) stickyLeft += 40;
+
+                                                    const stickyStyles: React.CSSProperties = isSticky ? {
+                                                        position: 'sticky',
+                                                        left: stickyLeft,
+                                                        zIndex: 10,
+                                                    } : isRightSticky ? {
+                                                        position: 'sticky',
+                                                        right: 0,
+                                                        zIndex: 10,
+                                                    } : {};
+
+                                                    const isFirstCol = colIndex === 0;
+
+                                                    return (
+                                                        <td
+                                                            key={col.key}
+                                                            className={cn(
+                                                                "px-3 py-3 text-sm transition-colors overflow-hidden",
+                                                                col.width,
+                                                                (isSticky || isRightSticky) && (
+                                                                    isSelected
+                                                                        ? "bg-slate-50 dark:bg-slate-900"
+                                                                        : cn("bg-background group-hover:bg-muted", rowClassName?.(row))
+                                                                ),
+                                                                isLastSticky && isScrolledHorizontally && "shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]",
+                                                                isRightSticky && canScrollRight && "shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]"
+                                                            )}
+                                                            style={stickyStyles}
+                                                        >
+                                                            {isFirstCol && canExpand ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={cn(
+                                                                        "inline-flex items-center justify-center w-5 h-5 rounded-md transition-all duration-200",
+                                                                        isExpanded
+                                                                            ? "bg-primary/15 text-primary"
+                                                                            : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                                                                    )}>
+                                                                        <svg
+                                                                            xmlns="http://www.w3.org/2000/svg"
+                                                                            width="12"
+                                                                            height="12"
+                                                                            viewBox="0 0 24 24"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            strokeWidth="2.5"
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            className={cn("transition-transform duration-200", isExpanded ? "rotate-90" : "rotate-0")}
+                                                                        >
+                                                                            <polyline points="9 6 15 12 9 18"></polyline>
+                                                                        </svg>
+                                                                    </span>
+                                                                    {col.render(row, rowIndex)}
+                                                                </div>
+                                                            ) : col.render(row, rowIndex)}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                            {isExpanded && renderExpandedRow && (
+                                                <tr key={`${key}-expanded`} className="bg-muted/5 animate-in slide-in-from-top-1 duration-200">
+                                                    <td colSpan={colSpan} className="px-6 py-4 border-b border-border">
+                                                        <div className="w-full" onClick={(e) => e.stopPropagation()}>
+                                                            {renderExpandedRow(row)}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </div>
                                     );
                                 })}
                                 {/* Loading more indicator - ONLY for infinite scroll */}
