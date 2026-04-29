@@ -37,6 +37,7 @@ const InverterMasterPage = lazyWithRetry(() => import('@/pages/master/InverterMa
 const BranchDashboardPage = lazyWithRetry(() => import('@/pages/branch/BranchDashboardPage').then(m => ({ default: m.BranchDashboardPage })));
 const BranchCustomerFormPage = lazyWithRetry(() => import('@/pages/branch/BranchCustomerFormPage').then(m => ({ default: m.BranchCustomerFormPage })));
 const BranchEnrollmentsPage = lazyWithRetry(() => import('@/pages/branch/BranchEnrollmentsPage').then(m => ({ default: m.BranchEnrollmentsPage })));
+const BranchStaffPage = lazyWithRetry(() => import('@/pages/branch/BranchStaffPage').then(m => ({ default: m.BranchStaffPage })));
 
 
 
@@ -84,6 +85,7 @@ const router = createBrowserRouter(
                 <Route path="/branch-portal" element={<BranchDashboardPage />} />
                 <Route path="/branch-portal/enroll" element={<BranchCustomerFormPage />} />
                 <Route path="/branch-portal/enrollments" element={<BranchEnrollmentsPage />} />
+                <Route path="/branch-portal/staff" element={<BranchStaffPage />} />
 
 
                 {/* Routes with specific menu permissions */}

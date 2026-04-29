@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import logo from '@/assets/main-logo-dark-1.png';
-import { useAccessibleMenus } from '@/stores/useAuthStore';
+import { useAccessibleMenus, useUser } from '@/stores/useAuthStore';
 import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon } from '@/components/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
 
@@ -139,6 +139,7 @@ const Portal = ({ children }: { children: React.ReactNode }) => {
 
 export function Sidebar({ className, isOpen = true }: SidebarProps) {
     const accessibleMenus = useAccessibleMenus();
+    const user = useUser();
     const location = useLocation();
 
     // Track expanded parent menus
@@ -156,7 +157,17 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
         return a.menuName.localeCompare(b.menuName);
     });
 
-    const rootMenus = sortedMenus.filter(m => !m.parentUid && m.menuCode !== 'dashboard');
+    const rootMenus = sortedMenus.filter(m => {
+        if (m.parentUid || m.menuCode === 'dashboard') return false;
+
+        // Hide User Management for non-masters in independent UI
+        if (user?.isIndependentUi && !user?.isMaster) {
+            if (m.menuCode === 'user_management' || m.menuCode === 'users' || m.menuCode === 'roles') {
+                return false;
+            }
+        }
+        return true;
+    });
     const getChildren = (parentUid: string) => sortedMenus.filter(m => m.parentUid === parentUid);
 
     // Auto-expand parent if child is active
@@ -235,12 +246,12 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
 
             {/* Navigation */}
             <nav className={cn(
-                "flex-1 overflow-y-auto py-4 space-y-1",
+                "flex-1 overflow-y-auto py-4 space-y-1 custom-scrollbar",
                 isOpen ? "px-3" : "px-2 w-full flex flex-col items-center"
             )}>
                 {/* Dashboard - Always visible */}
                 <NavLink
-                    to="/"
+                    to={user?.isIndependentUi ? "/branch-portal" : "/"}
                     end
                 >
                     {({ isActive }) => (
@@ -271,7 +282,10 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
 
                     // Simple item (Leaf or simplified group)
                     if (!hasSubMenus) {
-                        const path = pathMap[effectiveMenu.menuCode] || `/${effectiveMenu.menuCode}`;
+                        let path = pathMap[effectiveMenu.menuCode] || `/${effectiveMenu.menuCode}`;
+                        if (user?.isIndependentUi && effectiveMenu.menuCode === 'users') {
+                            path = '/branch-portal/staff';
+                        }
                         return (
                             <NavLink
                                 key={effectiveMenu.menuUid}
@@ -345,7 +359,10 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                                             </div>
                                             <div className="p-1 flex flex-col gap-0.5">
                                                 {children.map(child => {
-                                                    const childPath = pathMap[child.menuCode] || `/${child.menuCode}`;
+                                                    let childPath = pathMap[child.menuCode] || `/${child.menuCode}`;
+                                                    if (user?.isIndependentUi && child.menuCode === 'users') {
+                                                        childPath = '/branch-portal/staff';
+                                                    }
                                                     const ChildIcon = iconMap[child.menuCode];
                                                     return (
                                                         <NavLink
@@ -417,7 +434,10 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                             {isExpanded && (
                                 <div className="space-y-1">
                                     {children.map(child => {
-                                        const childPath = pathMap[child.menuCode] || `/${child.menuCode}`;
+                                        let childPath = pathMap[child.menuCode] || `/${child.menuCode}`;
+                                        if (user?.isIndependentUi && child.menuCode === 'users') {
+                                            childPath = '/branch-portal/staff';
+                                        }
                                         const ChildIcon = iconMap[child.menuCode];
                                         return (
                                             <NavLink

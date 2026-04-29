@@ -45,6 +45,7 @@ export const USER_FIELDS = gql`
         createdAt
         ipAddress
         isAllowedWithoutIp
+        isMaster
         message
     }
 `;
