@@ -122,6 +122,7 @@ export function RatesPage() {
     // Add Rate Modal State
     const [addModalOpen, setAddModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const isSubmittingRef = useRef(false); // Ref-based guard for preventing multiple calls
 
     const initialFormState = {
@@ -264,12 +265,15 @@ export function RatesPage() {
     };
 
     const handleCreateSnapshot = async () => {
+        if (isSaving || isSnapshotting || isUpdating) return;
+
         // Collect all local changes
         if (!hasLocalChanges && !hasUnsavedChanges) {
             toast.info('No changes to save');
             return;
         }
 
+        setIsSaving(true);
         try {
             // 1. Creations
             const createdPlans = Array.from(localCreatedUids)
@@ -404,6 +408,8 @@ export function RatesPage() {
         } catch (error: any) {
             console.error('Failed to save changes:', error);
             toast.error(error.message || 'Failed to save changes');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -609,6 +615,33 @@ export function RatesPage() {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [hasLocalChanges]);
 
+    // Local Search/Filter Logic
+    const displayRatePlans = useMemo(() => {
+        // If there are no local changes, we can just show the list as it comes from server/allRatePlans
+        if (!hasLocalChanges) return allRatePlans;
+
+        // If there ARE local changes, we must filter locally to avoid "losing" 
+        // unsaved edits that the server doesn't know about yet.
+        const searchStr = debouncedSearchCode.toLowerCase();
+
+        return allRatePlans.filter(plan => {
+            // Apply current filters
+            if (stateFilter && plan.state !== stateFilter) return false;
+            if (dnspFilter && String(plan.dnsp) !== dnspFilter) return false;
+            if (typeFilter && String(plan.type) !== typeFilter) return false;
+
+            // Apply search
+            if (!searchStr) return true;
+
+            const codes = Array.isArray(plan.codes) ? plan.codes : [plan.codes];
+            const codesMatch = codes.some(c => String(c).toLowerCase().includes(searchStr));
+            const otherMatch = String(plan.tariff || '').toLowerCase().includes(searchStr) ||
+                String(plan.planId || '').toLowerCase().includes(searchStr);
+
+            return codesMatch || otherMatch;
+        });
+    }, [allRatePlans, hasLocalChanges, debouncedSearchCode, stateFilter, dnspFilter, typeFilter]);
+
 
     const changedRatePlanUids = useMemo(() => new Set(changesData?.hasRatesChanges?.changedRatePlanUids || []), [changesData]);
 
@@ -727,26 +760,43 @@ export function RatesPage() {
     }, [oldRecordsMap, localOriginals]);
     useEffect(() => {
         if (data?.ratePlans?.data) {
-            const newData = data.ratePlans.data;
-            const currentPage = data.ratePlans.meta?.currentPage || 1;
+            const serverData = data.ratePlans.data;
+            const meta = data.ratePlans.meta;
+            const currentPage = meta?.currentPage || 1;
 
-            if (currentPage === 1) {
-                // Fresh load or filter change - replace all data
-                setAllRatePlans(newData);
-            } else {
-                // Pagination - append new data avoiding duplicates
-                setAllRatePlans(prev => {
-                    const existingIds = new Set(prev.map(r => r.uid));
-                    const newRatePlans = newData.filter(r => !existingIds.has(r.uid));
-                    if (newRatePlans.length > 0) {
-                        return [...prev, ...newRatePlans];
-                    }
-                    return prev;
-                });
-            }
+            setAllRatePlans(prev => {
+                // 1. Identify all records that have local (unsaved) changes in our current memory
+                const localWorkingPlans = prev.filter(p =>
+                    localModifiedUids.has(p.uid) ||
+                    localCreatedUids.has(p.uid) ||
+                    localDeletedUids.has(p.uid) ||
+                    localRestoredUids.has(p.uid)
+                );
+
+                if (currentPage === 1) {
+                    // NEW SEARCH/FILTER RESULT
+                    // We merge server results with our local modifications
+                    const merged = serverData.map(serverPlan => {
+                        const local = localWorkingPlans.find(p => p.uid === serverPlan.uid);
+                        return local || serverPlan;
+                    });
+
+                    // IMPORTANT: We must NOT discard our other local changes that aren't in the current server results.
+                    // If we discard them from allRatePlans, they are lost forever.
+                    // The 'displayRatePlans' useMemo handles filtering what the user actually sees.
+                    const otherLocalPlans = localWorkingPlans.filter(l => !merged.some(m => m.uid === l.uid));
+
+                    return [...otherLocalPlans, ...merged];
+                } else {
+                    // PAGINATION - Append new data avoiding duplicates
+                    const existingUids = new Set(prev.map(r => r.uid));
+                    const newUniquePlans = serverData.filter(r => !existingUids.has(r.uid));
+                    return [...prev, ...newUniquePlans];
+                }
+            });
             setIsLoadingMore(false);
         }
-    }, [data]);
+    }, [data, localModifiedUids, localCreatedUids, localDeletedUids, localRestoredUids]);
 
     // Handle load more
     const handleLoadMore = () => {
@@ -1481,7 +1531,9 @@ export function RatesPage() {
         if (val === undefined || val === null || val === '') return '-';
         const num = parseFloat(String(val));
         if (isNaN(num)) return val;
-        return inclusive ? Number((num * 1.1).toFixed(6)) : num;
+        // Round to 4 decimal places for both exclusive and inclusive
+        const result = inclusive ? num * 1.1 : num;
+        return Number(result.toFixed(4));
     }, []);
 
     const columns: Column<RatePlan>[] = useMemo(() => {
@@ -1559,6 +1611,12 @@ export function RatesPage() {
                 },
             },
             {
+                key: 'tariff',
+                header: 'Tariff Code',
+                width: 'w-[90px]',
+                render: (row: RatePlan) => <span className="font-medium text-foreground">{row.tariff || '-'}</span>,
+            },
+            {
                 key: 'dnsp',
                 header: 'DNSP',
                 width: 'w-[100px]',
@@ -1588,7 +1646,7 @@ export function RatesPage() {
                 width: 'w-[72px]',
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_anytime') ? `Old: ${displayRate(getOldValue(row, 'offer_anytime'))}` : null}>
-                        <div className={`py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_anytime') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-orange-200 text-orange-950 dark:bg-orange-900/20 dark:text-orange-400'}`}>
+                        <div className={`py-1 px-2 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_anytime') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-orange-200 text-orange-950 dark:bg-orange-900/20 dark:text-orange-400'}`}>
                             {renderRate(row.offers?.[0]?.anytime)}
                         </div>
                     </Tooltip>
@@ -1745,7 +1803,7 @@ export function RatesPage() {
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_fit') ? `Old: ${getOldValue(row, 'offer_fit')}` : null}>
                         <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fit') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
-                            {row.offers?.[0]?.fit || '-'}
+                            {getRateValue(row.offers?.[0]?.fit, false)}
                         </div>
                     </Tooltip>
                 ),
@@ -1757,7 +1815,7 @@ export function RatesPage() {
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitPeak') ? `Old: ${getOldValue(row, 'offer_fitPeak')}` : null}>
                         <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitPeak') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
-                            {row.offers?.[0]?.fitPeak || '-'}
+                            {getRateValue(row.offers?.[0]?.fitPeak, false)}
                         </div>
                     </Tooltip>
                 ),
@@ -1769,7 +1827,7 @@ export function RatesPage() {
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitCritical') ? `Old: ${getOldValue(row, 'offer_fitCritical')}` : null}>
                         <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitCritical') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
-                            {row.offers?.[0]?.fitCritical || '-'}
+                            {getRateValue(row.offers?.[0]?.fitCritical, false)}
                         </div>
                     </Tooltip>
                 ),
@@ -1781,7 +1839,7 @@ export function RatesPage() {
                 render: (row: RatePlan) => (
                     <Tooltip fullWidth content={isFieldChanged(row, 'offer_fitVpp') ? `Old: ${getOldValue(row, 'offer_fitVpp')}` : null}>
                         <div className={`px-2 py-1 rounded font-bold text-xs w-full text-center ${isFieldChanged(row, 'offer_fitVpp') ? 'bg-orange-800 text-white border border-orange-500 font-bold' : 'bg-teal-100 text-teal-950 dark:bg-teal-900/20 dark:text-teal-300'}`}>
-                            {row.offers?.[0]?.fitVpp || '-'}
+                            {getRateValue(row.offers?.[0]?.fitVpp, false)}
                         </div>
                     </Tooltip>
                 ),
@@ -1834,12 +1892,7 @@ export function RatesPage() {
                     );
                 },
             },
-            {
-                key: 'tariff',
-                header: 'Tariff Code',
-                width: 'w-[90px]',
-                render: (row: RatePlan) => <span className="font-medium text-foreground">{row.tariff || '-'}</span>,
-            },
+
             {
                 key: 'planId',
                 header: 'Plan ID',
@@ -2219,8 +2272,8 @@ export function RatesPage() {
                                 <Button
                                     variant={(hasUnsavedChanges || hasLocalChanges) ? "default" : "outline"}
                                     onClick={handleCreateSnapshot}
-                                    isLoading={isSnapshotting || isUpdating}
-                                    disabled={(!hasUnsavedChanges && !hasLocalChanges) || isSnapshotting || isUpdating}
+                                    isLoading={isSnapshotting || isUpdating || isSaving}
+                                    disabled={(!hasUnsavedChanges && !hasLocalChanges) || isSnapshotting || isUpdating || isSaving}
                                     className={cn(
                                         "px-4 gap-2 transition-all duration-300",
                                         (hasUnsavedChanges || hasLocalChanges)
@@ -2270,13 +2323,13 @@ export function RatesPage() {
 
                 <DataTable
                     columns={columns}
-                    data={allRatePlans}
-                    loading={loading}
+                    data={displayRatePlans}
+                    loading={loading && allRatePlans.length === 0} // Only show full loading if we have no data
                     error={error?.message}
                     rowKey={(row) => row.uid}
                     emptyMessage="No rate plans found."
                     loadingMessage="Loading rates..."
-                    infiniteScroll
+                    infiniteScroll={!hasLocalChanges} // Disable infinite scroll if searching locally
                     hasMore={hasMore}
                     isLoadingMore={isLoadingMore}
                     onLoadMore={handleLoadMore}
