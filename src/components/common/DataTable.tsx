@@ -238,7 +238,7 @@ export function DataTable<T>({
                         <tr className="border-b border-border shadow-sm">
 
                             {enableSelection && (
-                                <th className="sticky left-0 z-30 w-[40px] px-3 py-3 text-left bg-background border-b border-border">
+                                <th className="sticky left-0 z-30 w-[40px] px-3 py-3 text-left bg-background border-b border-border align-top">
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="checkbox"
@@ -343,12 +343,12 @@ export function DataTable<T>({
                                                             isSelected ? "bg-slate-50 dark:bg-slate-900" : "bg-background group-hover:bg-muted",
                                                             rowClassName?.(row)
                                                         )} aria-hidden="true" />
-                                                        <div className="relative">
+                                                        <div className="relative pt-[1px]">
                                                             <input
                                                                 type="checkbox"
                                                                 checked={isSelected}
                                                                 onChange={(e) => handleSelectRow(key, e.target.checked)}
-                                                                className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                                                                className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4 block"
                                                             />
                                                         </div>
                                                     </td>
@@ -377,7 +377,7 @@ export function DataTable<T>({
                                                         <td
                                                             key={col.key}
                                                             className={cn(
-                                                                "px-3 py-3 text-sm transition-colors overflow-hidden",
+                                                                "px-3 py-3 text-sm transition-colors overflow-hidden align-top",
                                                                 col.width,
                                                                 (isSticky || isRightSticky) && (
                                                                     isSelected
