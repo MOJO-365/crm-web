@@ -113,7 +113,7 @@ export function RatesPage() {
     const [page, setPage] = useState(1);
     const [allRatePlans, setAllRatePlans] = useState<RatePlan[]>([]);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const limit = 20;
+    const limit = 1000;
 
     // Permissions
     const canCreate = useAuthStore((state) => state.canCreateInMenu('rates'));
@@ -1183,6 +1183,7 @@ export function RatesPage() {
                 let modifiedCount = 0;
                 let createdCount = 0;
                 let ignoredCount = 0;
+                let duplicateCount = 0;
 
                 const newModifiedUids = new Set(localModifiedUids);
                 const newCreatedUids = new Set(localCreatedUids);
@@ -1198,20 +1199,25 @@ export function RatesPage() {
                     'SYSTEM_ID (DO NOT EDIT)'
                 ]);
 
+                const processedUids = new Set<string>(); // Track records handled in this file to avoid double-counting
+
                 jsonData.forEach(row => {
                     const systemId = String(row['SYSTEM_ID (DO NOT EDIT)'] || '').trim();
 
                     // Match with UI state OR Server state
-                    // 1. Try matching by SYSTEM_ID
-                    let uiPlan = updatedPlans.find(p => String(p.id) === systemId && systemId !== '' && systemId !== '0');
-                    let serverPlan = serverPlans.find((p: any) => String(p.id) === systemId && systemId !== '' && systemId !== '0');
+                    // 1. Try matching by SYSTEM_ID (checks both id and uid for maximum reliability)
+                    let uiPlan = updatedPlans.find(p => (String(p.id) === systemId || p.uid === systemId) && systemId !== '' && systemId !== '0');
+                    let serverPlan = serverPlans.find((p: any) => (String(p.id) === systemId || p.uid === systemId) && systemId !== '' && systemId !== '0');
 
-                    // 2. Fallback: Match by attributes (Code + State + DNSP + Type) if ID is missing or not found
-                    if (!uiPlan && !serverPlan) {
+                    // 2. Fallback: Match by attributes (Code + State + DNSP + Type) ONLY if ID is missing or not found
+                    if (!uiPlan && !serverPlan && (systemId === '' || systemId === '0')) {
                         const excelCodes = String(row['Codes'] || '').split(',').map(s => s.trim()).sort().join(',');
                         const excelState = String(row['State'] || '').trim();
                         const excelDnspLabel = String(row['DNSP'] || '').trim().toLowerCase();
                         const excelTypeLabel = String(row['Type'] || '').trim().toLowerCase();
+
+                        const excelTariff = String(row['Tariff Code'] || row['Tariff'] || '').trim().toLowerCase();
+                        const excelPlanId = String(row['Plan ID'] || '').trim().toLowerCase();
 
                         const findByAttr = (list: RatePlan[]) => list.find(p => {
                             const pCodes = (Array.isArray(p.codes) ? p.codes : []).map(s => s.trim()).sort().join(',');
@@ -1224,6 +1230,10 @@ export function RatesPage() {
                             const pTypeLabel = String(RATE_TYPE_MAP[p.type] || '').toLowerCase();
                             if (pTypeLabel !== excelTypeLabel) return false;
 
+                            // Match by Tariff Code and Plan ID if they exist in Excel to distinguish similar records
+                            if (excelTariff && String(p.tariff || '').trim().toLowerCase() !== excelTariff) return false;
+                            if (excelPlanId && String(p.planId || '').trim().toLowerCase() !== excelPlanId) return false;
+
                             return true;
                         });
 
@@ -1234,6 +1244,14 @@ export function RatesPage() {
                     const basePlan = uiPlan || serverPlan;
 
                     if (basePlan) {
+                        // CRITICAL: Avoid double-processing the same record if it appears multiple times in Excel
+                        if (processedUids.has(basePlan.uid)) {
+                            console.warn(`[Import] Skipping duplicate row in Excel for record: ${basePlan.codes} (Tariff: ${basePlan.tariff}, State: ${basePlan.state})`);
+                            duplicateCount++;
+                            return;
+                        }
+                        processedUids.add(basePlan.uid);
+
                         // POTENTIAL UPDATE - Create imported version of the plan
                         const importedPlan: RatePlan = JSON.parse(JSON.stringify(basePlan));
 
@@ -1343,7 +1361,7 @@ export function RatesPage() {
                         const newUid = uuidv4();
                         const newPlan: RatePlan = {
                             uid: newUid,
-                            id: '0',
+                            id: newUid, // Use UID as temporary ID so it can be re-exported/matched before DB save
                             codes: String(row['Codes'] || '').split(',').map(s => s.trim()),
                             planId: '',
                             dnsp: DNSP_OPTIONS.find(opt => opt.label.toLowerCase() === String(row['DNSP'] || '').trim().toLowerCase())?.value || '0',
@@ -1440,7 +1458,7 @@ export function RatesPage() {
                 setLocalOriginals(newOriginals);
 
                 toast.update(toastId, {
-                    render: `Import complete: ${modifiedCount} updated, ${createdCount} new, ${ignoredCount} records ignored (no changes).`,
+                    render: `Import complete: ${modifiedCount} updated, ${createdCount} new, ${ignoredCount} ignored (no changes)${duplicateCount > 0 ? `, ${duplicateCount} duplicate rows skipped` : ''}.`,
                     type: "success",
                     isLoading: false,
                     autoClose: 4000
@@ -1987,8 +2005,8 @@ export function RatesPage() {
                     });
                 }
 
-                // Move ID to the end and rename to deter editing
-                row['SYSTEM_ID (DO NOT EDIT)'] = plan.id;
+                // Use UID for ID column as it's more reliable for tracking unsaved local changes
+                row['SYSTEM_ID (DO NOT EDIT)'] = plan.uid;
 
                 return row;
             });

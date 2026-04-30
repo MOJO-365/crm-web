@@ -312,6 +312,8 @@ export function BranchEnrollmentsPage() {
                                         { label: 'Customer Type', value: selectedEnrollment.payload?.customerType },
                                         { label: 'Ownership', value: selectedEnrollment.payload?.ownership_status === 0 ? 'Owns' : 'Rents' },
                                         { label: 'VPP Participation', value: selectedEnrollment.payload?.isVpp ? 'Enrolled' : 'Standard' },
+                                        ...(selectedEnrollment.payload?.streetSuffix ? [{ label: 'Street Suffix', value: selectedEnrollment.payload.streetSuffix }] : []),
+                                        ...(selectedEnrollment.payload?.deliveryPointIdentifier ? [{ label: 'DPID', value: selectedEnrollment.payload.deliveryPointIdentifier }] : []),
                                     ].map((item, i) => (
                                         <div key={i} className="flex items-center justify-between px-3 py-2.5 gap-4">
                                             <span className="text-[11px] text-subtitle font-bold uppercase tracking-wider opacity-60 shrink-0">{item.label}</span>
@@ -357,6 +359,9 @@ export function BranchEnrollmentsPage() {
                                         { label: 'NMI', value: selectedEnrollment.payload?.nmi },
                                         { label: 'Tariff Code', value: selectedEnrollment.payload?.tariffcode },
                                         { label: 'Discount Applied', value: `${selectedEnrollment.payload?.discount || 0}%` },
+                                        ...(selectedEnrollment.payload?.abn ? [{ label: 'ABN', value: selectedEnrollment.payload.abn }] : []),
+                                        ...(selectedEnrollment.payload?.businessName ? [{ label: 'Business', value: selectedEnrollment.payload.businessName }] : []),
+                                        ...(selectedEnrollment.payload?.legalEntityName ? [{ label: 'Legal Name', value: selectedEnrollment.payload.legalEntityName }] : []),
                                     ].map((item, i) => (
                                         <div key={i} className="flex items-center justify-between px-3 py-2.5 gap-4">
                                             <span className="text-[11px] text-subtitle font-bold uppercase tracking-wider opacity-60 shrink-0">{item.label}</span>

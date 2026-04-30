@@ -916,16 +916,19 @@ export const CustomerFormPage = () => {
 
             // Prefill address search field
             if (c.address) {
-                const fullAddress = [
-                    c.address.unitNumber ? `${c.address.unitNumber}/` : '',
-                    c.address.streetNumber,
-                    c.address.streetName,
-                    c.address.streetType,
-                    c.address.suburb,
-                    c.address.state,
-                    c.address.postcode
-                ].filter(Boolean).join(' ').trim();
-                setAddressSearch(fullAddress);
+                if (c.address.fullAddress) {
+                    setAddressSearch(c.address.fullAddress);
+                } else {
+                    setAddressSearch([
+                        c.address.unitNumber ? `Unit ${c.address.unitNumber}` : '',
+                        c.address.streetNumber,
+                        c.address.streetName,
+                        c.address.streetType,
+                        c.address.suburb,
+                        c.address.state,
+                        c.address.postcode
+                    ].filter(Boolean).join(', ').trim());
+                }
             }
 
             if (c.tariffCode && ratePlans.length > 0) {
