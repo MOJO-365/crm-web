@@ -106,6 +106,7 @@ interface CustomerDetails {
     firstName: string;
     lastName: string;
     businessName?: string;
+    legalName?: string;
     abn?: string;
     email?: string;
     number?: string;
@@ -3451,6 +3452,12 @@ export function CustomerDetailsPage() {
                                             <div className="space-y-1">
                                                 <label className="text-xs text-muted-foreground uppercase font-semibold">Business</label>
                                                 <p className="font-medium">{selectedCustomerDetails.businessName}</p>
+                                            </div>
+                                        )}
+                                        {selectedCustomerDetails.legalName && (
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">Legal Name</label>
+                                                <p className="font-medium">{selectedCustomerDetails.legalName}</p>
                                             </div>
                                         )}
                                         {selectedCustomerDetails.abn && (

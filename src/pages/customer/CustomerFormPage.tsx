@@ -3040,6 +3040,9 @@ export const CustomerFormPage = () => {
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Type:</span> <span className="capitalize font-medium">{formData.propertyType === 1 ? 'Commercial' : 'Residential'}</span></p>
                                                     {formData.propertyType === 1 && (
                                                         <>
+                                                            {formData.legalName && (
+                                                                <p className="flex justify-between"><span className="text-muted-foreground">Legal Name:</span> <span className="font-medium">{formData.legalName}</span></p>
+                                                            )}
                                                             <p className="flex justify-between"><span className="text-muted-foreground">Business:</span> <span className="font-medium">{formData.businessName}</span></p>
                                                             <p className="flex justify-between"><span className="text-muted-foreground">ABN:</span> <span className="font-medium">{formData.abn}</span></p>
                                                             <p className="flex justify-between"><span className="text-muted-foreground">Show as Business:</span> <span className="font-medium text-xs bg-muted px-1.5 py-0.5 rounded">{formData.showAsBusinessName ? 'Yes' : 'No'}</span></p>
