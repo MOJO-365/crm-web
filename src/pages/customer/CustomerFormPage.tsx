@@ -123,6 +123,7 @@ const initialFormData: CustomerFormData = {
     dob: '',
     propertyType: 0,
     businessName: '',
+    legalName: '',
     abn: '',
     showAsBusinessName: false,
     showName: true,
@@ -846,6 +847,7 @@ export const CustomerFormPage = () => {
                 dob: c.dob ? formatSydneyTime(c.dob, 'YYYY-MM-DD') : '',
                 propertyType: c.propertyType || 0,
                 businessName: c.businessName || '',
+                legalName: c.legalName || '',
                 assignedToUid: c.assignedToUid || undefined,
                 abn: c.abn || '',
                 showAsBusinessName: c.showAsBusinessName || false,
@@ -1245,7 +1247,8 @@ export const CustomerFormPage = () => {
                 const entity = data.data;
                 setFormData(prev => ({
                     ...prev,
-                    businessName: entity.name || prev.businessName,
+                    legalName: entity.legalName || prev.legalName,
+                    businessName: entity.businessName || prev.businessName,
                 }));
                 toast.success('Business details updated from ABR');
             } else {
@@ -1620,6 +1623,7 @@ export const CustomerFormPage = () => {
                     formData.firstName !== (c.firstName || ''),
                     formData.lastName !== (c.lastName || ''),
                     formData.businessName !== (c.businessName || ''),
+                    formData.legalName !== (c.legalName || ''),
                     formData.abn !== (c.abn || ''),
                     normalisePhone(formData.phone) !== normalisePhone(c.number || ''),
 
@@ -1677,6 +1681,7 @@ export const CustomerFormPage = () => {
                 firstName: formData.firstName,
                 lastName: formData.lastName,
                 businessName: formData.businessName,
+                legalName: formData.legalName,
                 abn: formData.abn,
                 showAsBusinessName: formData.showAsBusinessName,
                 showName: formData.showName,
@@ -2197,6 +2202,13 @@ export const CustomerFormPage = () => {
                                                             </button>
                                                         ) : undefined
                                                     }
+                                                />
+                                                <Input
+                                                    label="Legal Name"
+                                                    error={errors.legalName}
+                                                    placeholder="Legal entity name"
+                                                    value={formData.legalName}
+                                                    onChange={(e) => updateField('legalName', e.target.value)}
                                                 />
                                                 <Input label="Business Name" required error={errors.businessName} placeholder="Registered business name" value={formData.businessName} onChange={(e) => updateField('businessName', e.target.value)} />
                                             </div>
