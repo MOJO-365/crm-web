@@ -14,6 +14,7 @@ export interface CustomerFormData {
     propertyType: number; // 0 = residential, 1 = commercial
     businessName: string;
     abn: string;
+    legalName: string;
     showAsBusinessName: boolean;
     showName?: boolean;
 

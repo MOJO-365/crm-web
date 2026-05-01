@@ -13,6 +13,7 @@ const CUSTOMER_FULL_RESPONSE = `
     firstName
     lastName
     businessName
+    legalName
     abn
     showAsBusinessName
     showName

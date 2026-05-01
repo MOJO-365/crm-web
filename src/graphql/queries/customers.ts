@@ -16,6 +16,7 @@ export const GET_CUSTOMERS = gql`
                 firstName
                 lastName
                 businessName
+                legalName
                 abn
                 number
                 dob
@@ -241,6 +242,7 @@ export const GET_CUSTOMERS_LIST = gql`
                 firstName
                 lastName
                 businessName
+                legalName
                 abn
                 number
                 dob
@@ -427,6 +429,7 @@ export const GET_CUSTOMERS_CURSOR = gql`
                 title
                 firstName
                 lastName
+                legalName
                 number
                 propertyType
                 tariffCode
@@ -490,6 +493,7 @@ export const GET_CUSTOMER_BY_ID = gql`
             firstName
             lastName
             businessName
+            legalName
             abn
             showAsBusinessName
             showName
@@ -662,6 +666,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             firstName
             lastName
             businessName
+            legalName
             abn
             showAsBusinessName
             showName
