@@ -67,6 +67,8 @@ interface Customer {
     };
     riskStatus?: string;
     assignedToUser?: { uid: string; name: string; email: string };
+    createdByUser?: { uid: string; name: string };
+    leadUid?: string;
     isDeleted?: boolean;
 }
 
@@ -100,6 +102,7 @@ interface SearchFilters {
     msatConnected: string;
     riskStatus: string;
     assignedTo: string;
+    createdBy: string;
 }
 const CUSTOMERS_FILTER_KEY = 'customers_search_filters';
 
@@ -118,6 +121,7 @@ const INITIAL_FILTERS: SearchFilters = {
     msatConnected: '',
     riskStatus: '',
     assignedTo: '',
+    createdBy: '',
 };
 
 export function CustomersPage() {
@@ -225,6 +229,7 @@ export function CustomersPage() {
             searchMsatConnected: debouncedFilters.msatConnected !== '' ? parseInt(debouncedFilters.msatConnected) : undefined,
             searchRiskStatus: debouncedFilters.riskStatus || undefined,
             searchAssignedTo: debouncedFilters.assignedTo || undefined,
+            searchCreatedBy: debouncedFilters.createdBy || undefined,
             includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : 'false',
         },
         fetchPolicy: 'network-only',

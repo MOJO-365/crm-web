@@ -35,7 +35,7 @@ const LeadsPage = lazyWithRetry(() => import('@/pages/leads/LeadsPage'));
 const BatteryMasterPage = lazyWithRetry(() => import('@/pages/master/BatteryMasterPage').then(m => ({ default: m.BatteryMasterPage })));
 const InverterMasterPage = lazyWithRetry(() => import('@/pages/master/InverterMasterPage').then(m => ({ default: m.InverterMasterPage })));
 const BranchDashboardPage = lazyWithRetry(() => import('@/pages/branch/BranchDashboardPage').then(m => ({ default: m.BranchDashboardPage })));
-const BranchCustomerFormPage = lazyWithRetry(() => import('@/pages/branch/BranchCustomerFormPage').then(m => ({ default: m.BranchCustomerFormPage })));
+const BranchLeadFormPage = lazyWithRetry(() => import('@/pages/branch/BranchLeadFormPage').then(m => ({ default: m.BranchLeadFormPage })));
 const BranchEnrollmentsPage = lazyWithRetry(() => import('@/pages/branch/BranchEnrollmentsPage').then(m => ({ default: m.BranchEnrollmentsPage })));
 const BranchStaffPage = lazyWithRetry(() => import('@/pages/branch/BranchStaffPage').then(m => ({ default: m.BranchStaffPage })));
 
@@ -83,7 +83,7 @@ const router = createBrowserRouter(
 
                 {/* Branch routes */}
                 <Route path="/branch-portal" element={<BranchDashboardPage />} />
-                <Route path="/branch-portal/enroll" element={<BranchCustomerFormPage />} />
+                <Route path="/branch-portal/enroll" element={<BranchLeadFormPage />} />
                 <Route path="/branch-portal/enrollments" element={<BranchEnrollmentsPage />} />
                 <Route path="/branch-portal/staff" element={<BranchStaffPage />} />
 

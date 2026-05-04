@@ -146,6 +146,7 @@ const CUSTOMER_FULL_RESPONSE = `
         name
         email
     }
+    leadUid
     message
 `;
 

@@ -47,6 +47,7 @@ export const CUSTOMER_STATUS_MAP: Record<number, { label: string; color: string 
     3: { label: 'Signed', color: '#10B981' },
     4: { label: 'Frozen', color: '#6366F1' },
     5: { label: 'Not Interested', color: '#EF4444' },
+    6: { label: 'Moved On', color: '#4B4F57' },
 };
 
 export const CUSTOMER_STATUS_OPTIONS = Object.entries(CUSTOMER_STATUS_MAP).map(([k, v]) => ({
@@ -86,7 +87,6 @@ export const USER_FILTER_STATUS_OPTIONS = [
     ...USER_STATUS_OPTIONS,
 ];
 
-// DNSP (Distributors)
 // DNSP (Distributors)
 export const DNSP_MAP: Record<string, string> = {
     '0': 'Ausgrid',

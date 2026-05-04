@@ -3,8 +3,8 @@
 import { gql } from '@apollo/client';
 
 export const GET_USERS = gql`
-    query GetUsers($page: Int, $limit: Int, $status: String, $search: String, $roleUid: String, $onlyVisibleRoles: Boolean, $topLevelOnly: Boolean) {
-        users(page: $page, limit: $limit, status: $status, search: $search, roleUid: $roleUid, onlyVisibleRoles: $onlyVisibleRoles, topLevelOnly: $topLevelOnly) {
+    query GetUsers($page: Int, $limit: Int, $status: String, $search: String, $roleUid: String, $onlyVisibleRoles: Boolean, $topLevelOnly: Boolean, $branchTenant: String) {
+        users(page: $page, limit: $limit, status: $status, search: $search, roleUid: $roleUid, onlyVisibleRoles: $onlyVisibleRoles, topLevelOnly: $topLevelOnly, branchTenant: $branchTenant) {
             meta {
                 totalRecords
                 currentPage
@@ -14,7 +14,6 @@ export const GET_USERS = gql`
             data {
                 uid
                 email
-                password
                 name
                 number
                 tenant
@@ -24,17 +23,8 @@ export const GET_USERS = gql`
                 isActive
                 isDeleted
                 createdAt
-                ipAddress
-                isAllowedWithoutIp
                 isMaster
                 branchTenant
-                branchStaff {
-                    uid
-                    name
-                    email
-                    roleName
-                    status
-                }
             }
         }
     }

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@apollo/client';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -110,6 +110,36 @@ export function BranchCustomerFormPage() {
         postcode: '',
         isVpp: 0
     });
+
+    const location = useLocation();
+    const [leadUid, setLeadUid] = useState<string | null>(null);
+
+    // Handle pre-fill from lead
+    useEffect(() => {
+        const state = location.state as any;
+        if (state?.prefillData) {
+            const prefill = state.prefillData;
+            if (prefill.uid) setLeadUid(prefill.uid);
+            
+            setFormData(prev => ({
+                ...prev,
+                title: prefill.title || prev.title,
+                firstname: prefill.firstname || prev.firstname,
+                lastname: prefill.lastname || prev.lastname,
+                email: prefill.email || prev.email,
+                number: prefill.number ? prefill.number.replace('+61', '') : prev.number,
+                address: prefill.fullAddress || prev.address,
+                unitNumber: prefill.unitnumber || prev.unitNumber,
+                houseNumber: prefill.housenumber || prev.houseNumber,
+                streetNumber: prefill.streetnumber || prev.streetNumber,
+                streetName: prefill.streetname || prev.streetName,
+                streetType: prefill.streettype || prev.streetType,
+                suburb: prefill.suburb || prev.suburb,
+                state: prefill.state || prev.state,
+                postcode: prefill.postcode || prev.postcode,
+            }));
+        }
+    }, [location.state]);
 
     const eighteenYearsAgo = useMemo(() => {
         const d = new Date();
@@ -238,7 +268,8 @@ export function BranchCustomerFormPage() {
                 portalname: masterName || user?.name || 'Branch Portal',
                 branchTenant: user?.branchTenant,
                 isVpp: Number(formData.isVpp),
-                ownership_status: Number(formData.ownership_status)
+                ownership_status: Number(formData.ownership_status),
+                leadUid: leadUid || undefined
             };
             await axios.post(`/api/web/create-customer`, payload, {
                 headers: {

@@ -22,7 +22,6 @@ import {
     GET_ACTIVE_BONUSES,
     GET_NEXT_CUSTOMER_ID,
     PREVIEW_SYSTEM_TEMPLATE,
-    UPDATE_LEAD,
     GET_USERS,
     CREATE_CUSTOMER_NOTE
 } from '@/graphql';
@@ -751,7 +750,6 @@ export const CustomerFormPage = () => {
     const [checkNmiExists] = useLazyQuery(CHECK_NMI_EXISTS);
     const [createCustomer] = useMutation(CREATE_CUSTOMER);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
-    const [updateLead] = useMutation(UPDATE_LEAD);
     const [createCustomerNote] = useMutation(CREATE_CUSTOMER_NOTE);
 
     // Get customer's rate version for historic rates lookup
@@ -1753,7 +1751,8 @@ export const CustomerFormPage = () => {
                 customerId: isEditMode ? undefined : generatedCustomerId,
                 triggerWelcomeEmail: (isEditMode && !isUpdateOnly) ? (finalStatus === 2) : undefined,
                 triggerUpdateEmail: (isEditMode && !isUpdateOnly) ? (significantChanges || true) : undefined,
-                selectedBonuses: formData.selectedBonuses
+                selectedBonuses: formData.selectedBonuses,
+                leadUid: prefillLeadUid || undefined
             };
 
             let savedCustomer;
@@ -1766,20 +1765,7 @@ export const CustomerFormPage = () => {
                 savedCustomer = data?.createCustomer;
                 toast.success(savedCustomer?.message || 'Customer created successfully');
 
-                // If this customer was created from a lead, mark the lead as converted
-                if (prefillLeadUid) {
-                    try {
-                        await updateLead({
-                            variables: {
-                                uid: prefillLeadUid,
-                                input: { isCustomerNow: true }
-                            }
-                        });
-                        console.log('[Lead Conversion] Successfully updated lead status:', prefillLeadUid);
-                    } catch (leadUpdateErr) {
-                        console.error('[Lead Conversion] Failed to update lead status:', leadUpdateErr);
-                    }
-                }
+                // Lead conversion is now handled in the backend resolver via leadUid input
 
                 // If there are prefilled notes from the lead, add them as a customer note
                 if (prefillNotes && savedCustomer?.uid) {

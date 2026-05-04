@@ -46,6 +46,7 @@ export const USER_FIELDS = gql`
         ipAddress
         isAllowedWithoutIp
         isMaster
+        branchTenant
         message
     }
 `;
@@ -138,6 +139,16 @@ export const LEAD_FIELDS = gql`
         assignedToUser {
             uid
             name
+        }
+        createdByUser {
+            uid
+            name
+        }
+        branchTenant
+        customerUid
+        isCustomerNow
+        customer {
+            status
         }
     }
 `;
