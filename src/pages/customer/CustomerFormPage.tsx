@@ -2472,20 +2472,24 @@ export const CustomerFormPage = () => {
                                                     onChange={setAddressSearch}
                                                     onSelect={(place) => {
                                                         setAddressSearch(place.address);
-                                                        const newAddressData = {
-                                                            unitNumber: place.unitNumber || '',
-                                                            houseNumber: place.houseNumber || '',
-                                                            buildingName: place.buildingName || '',
-                                                            floorLevelNumber: place.floorLevelNumber || '',
-                                                            streetNumber: place.streetNumber || '',
-                                                            streetName: place.streetName || '',
-                                                            streetType: place.streetType || '',
-                                                            suburb: place.suburb || '',
-                                                            state: place.state || '',
-                                                            postcode: place.postcode || '',
-                                                            country: place.country || 'Australia',
-                                                        };
-                                                        setFormData(prev => ({ ...prev, ...newAddressData }));
+                                                    const unitNumber = place.unitNumber || '';
+                                                    const streetNumber = place.streetNumber || '';
+                                                    const houseNumber = place.houseNumber || '';
+
+                                                    const newAddressData = {
+                                                        unitNumber,
+                                                        houseNumber: (houseNumber === streetNumber || houseNumber === unitNumber) ? '' : houseNumber,
+                                                        buildingName: place.buildingName || '',
+                                                        floorLevelNumber: place.floorLevelNumber || '',
+                                                        streetNumber,
+                                                        streetName: place.streetName || '',
+                                                        streetType: place.streetType || '',
+                                                        suburb: place.suburb || '',
+                                                        state: place.state || '',
+                                                        postcode: place.postcode || '',
+                                                        country: place.country || 'Australia',
+                                                    };
+                                                    setFormData(prev => ({ ...prev, ...newAddressData }));
                                                         // Immediately check for duplicate address
                                                         checkAddressDuplicate(newAddressData);
                                                     }}
