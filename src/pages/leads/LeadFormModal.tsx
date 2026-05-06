@@ -89,7 +89,12 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 source: lead.source || '',
                 notes: lead.notes || '',
                 unitnumber: (lead.unitnumber || '').toString().trim().replace(/^(unit|unit\s+)/i, ''),
-                housenumber: lead.housenumber || '',
+                housenumber: (() => {
+                    const hn = (lead.housenumber || '').toString().trim();
+                    const sn = (lead.streetnumber || '').toString().trim();
+                    const unit = (lead.unitnumber || '').toString().trim().replace(/^(unit|unit\s+)/i, '');
+                    return (hn === sn || hn === unit) ? '' : hn;
+                })(),
                 buildingname: lead.buildingname || '',
                 floorlevelnumber: lead.floorlevelnumber || '',
                 streetnumber: lead.streetnumber || '',
