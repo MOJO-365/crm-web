@@ -197,7 +197,7 @@ export default function LocationAutocomplete({
                 }
             } else {
                 // Plain number like "5" — treat as unit number
-                unitNumber = rawSubpremise;
+                unitNumber = rawSubpremise.replace(/^(unit|unit\s+)/i, '');
             }
         }
 
