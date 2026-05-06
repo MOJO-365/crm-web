@@ -88,7 +88,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 number: (lead.number || '').replace(/\D/g, '').replace(/^0/, '').substring(0, 9),
                 source: lead.source || '',
                 notes: lead.notes || '',
-                unitnumber: lead.unitnumber || '',
+                unitnumber: (lead.unitnumber || '').toString().trim().replace(/^(unit|unit\s+)/i, ''),
                 housenumber: lead.housenumber || '',
                 buildingname: lead.buildingname || '',
                 floorlevelnumber: lead.floorlevelnumber || '',

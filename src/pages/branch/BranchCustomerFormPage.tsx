@@ -129,7 +129,7 @@ export function BranchCustomerFormPage() {
                 email: prefill.email || prev.email,
                 number: prefill.number ? prefill.number.replace('+61', '') : prev.number,
                 address: prefill.fullAddress || prev.address,
-                unitNumber: prefill.unitnumber || prev.unitNumber,
+                unitNumber: (prefill.unitnumber || prev.unitNumber)?.toString().trim().replace(/^(unit|unit\s+)/i, '') || '',
                 houseNumber: prefill.housenumber || prev.houseNumber,
                 streetNumber: prefill.streetnumber || prev.streetNumber,
                 streetName: prefill.streetname || prev.streetName,
