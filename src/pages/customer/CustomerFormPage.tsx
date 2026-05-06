@@ -669,7 +669,7 @@ export const CustomerFormPage = () => {
                 lastName: prefill.lastname || prev.lastName,
                 email: prefill.email || prev.email,
                 phone: denormalisePhone(prefill.number || prev.phone),
-                unitNumber: prefill.unitnumber || prev.unitNumber,
+                unitNumber: (prefill.unitnumber || prev.unitNumber)?.toString().trim().replace(/^(unit|unit\s+)/i, '') || '',
                 streetNumber: prefill.streetnumber || prev.streetNumber,
                 streetName: prefill.streetname || prev.streetName,
                 streetType: prefill.streettype || prev.streetType,
