@@ -484,12 +484,16 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                         zIndexClass="z-[10001]"
                                         onSelect={(place) => {
                                             setAddressSearch(place.address);
+                                            const unitnumber = place.unitNumber || '';
+                                            const streetnumber = place.streetNumber || '';
+                                            const housenumber = place.houseNumber || '';
+                                            
                                             const newAddressData = {
-                                                unitnumber: place.unitNumber || '',
-                                                housenumber: place.houseNumber || '',
+                                                unitnumber,
+                                                housenumber: (housenumber === streetnumber || housenumber === unitnumber) ? '' : housenumber,
                                                 buildingname: place.buildingName || '',
                                                 floorlevelnumber: place.floorLevelNumber || '',
-                                                streetnumber: place.streetNumber || '',
+                                                streetnumber,
                                                 streetname: place.streetName || '',
                                                 streettype: place.streetType || '',
                                                 suburb: place.suburb || '',

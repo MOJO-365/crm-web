@@ -151,13 +151,17 @@ export function BranchLeadFormPage() {
 
     const handleAddressSelect = (place: any) => {
         setAddressSearch(place.fullAddress || place.address);
+        const unitnumber = place.unitNumber || '';
+        const streetnumber = place.streetNumber || '';
+        const housenumber = place.houseNumber || '';
+
         setFormData(prev => ({
             ...prev,
-            unitnumber: place.unitNumber || '',
-            housenumber: place.houseNumber || '',
+            unitnumber,
+            housenumber: (housenumber === streetnumber || housenumber === unitnumber) ? '' : housenumber,
             buildingname: place.buildingName || '',
             floorlevelnumber: place.floorLevelNumber || '',
-            streetnumber: place.streetNumber || '',
+            streetnumber,
             streetname: place.streetName || '',
             streettype: place.streetType || '',
             suburb: place.suburb || '',

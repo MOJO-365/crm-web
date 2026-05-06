@@ -173,12 +173,16 @@ export function BranchCustomerFormPage() {
     };
 
     const handleAddressSelect = (addressData: any) => {
+        const unitNumber = addressData.unitNumber || '';
+        const streetNumber = addressData.streetNumber || '';
+        const houseNumber = addressData.houseNumber || '';
+
         setFormData(prev => ({
             ...prev,
             address: addressData.fullAddress || addressData.address,
-            unitNumber: addressData.unitNumber || '',
-            houseNumber: addressData.houseNumber || addressData.streetNumber || '',
-            streetNumber: addressData.streetNumber || addressData.houseNumber || '',
+            unitNumber,
+            houseNumber: (houseNumber === streetNumber || houseNumber === unitNumber) ? '' : houseNumber,
+            streetNumber,
             streetName: addressData.streetName || '',
             streetType: addressData.streetType || '',
             suburb: addressData.suburb || '',

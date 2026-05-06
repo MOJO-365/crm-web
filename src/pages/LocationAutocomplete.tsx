@@ -203,17 +203,42 @@ export default function LocationAutocomplete({
 
         // Building name: use premise component, or fall back to place.name for establishments
         let buildingName = premiseFromComponents;
+        
+        // If buildingName is just a number and matches streetNumber, it's not a building name
+        if (buildingName && streetNumber && buildingName.trim() === streetNumber.trim()) {
+            buildingName = '';
+        }
+
         if (!buildingName && place.name) {
             // Check if the place name is NOT just the street address (e.g., "Eureka Tower" vs "7 Riverside Quay")
             const placeTypes = place.types || [];
             const isEstablishment = placeTypes.some(t =>
-                ['premise', 'establishment', 'point_of_interest', 'shopping_mall', 'lodging', 'real_estate_agency'].includes(t)
-            );
+                ['establishment', 'point_of_interest', 'shopping_mall', 'lodging', 'real_estate_agency', 'hospital', 'university', 'school'].includes(t)
+            ) && !placeTypes.includes('street_address') && !placeTypes.includes('route');
+
             if (isEstablishment) {
                 buildingName = place.name;
             } else if (place.name && place.formatted_address && !place.formatted_address.startsWith(place.name)) {
                 // The name is different from the formatted address start — likely a building name
                 buildingName = place.name;
+            }
+        }
+
+        // Final sanity check: if buildingName is still just the street name or address, clear it
+        if (buildingName) {
+            const lowerBuilding = buildingName.toLowerCase().trim();
+            const lowerStreet = streetName.toLowerCase().trim();
+            const lowerFull = (place.formatted_address || '').toLowerCase().trim();
+            
+            // If it matches street name exactly, or it's just the start of the address (like "123 Main St")
+            // or if it contains the street name and number and looks like an address
+            const isAddressLike = 
+                lowerBuilding === lowerStreet || 
+                lowerFull.startsWith(lowerBuilding) && (lowerBuilding.includes(lowerStreet) || /^\d+/.test(lowerBuilding)) ||
+                (streetNumber && lowerBuilding.includes(streetNumber.toLowerCase()) && lowerBuilding.includes(lowerStreet));
+
+            if (isAddressLike) {
+                buildingName = '';
             }
         }
 
