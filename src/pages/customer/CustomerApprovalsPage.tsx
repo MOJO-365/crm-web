@@ -737,7 +737,7 @@ export function CustomerApprovalsPage() {
                                             <span className="text-muted-foreground">Issue State</span>
                                             <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idstate)}</span>
                                             <span className="text-muted-foreground">Card Number</span>
-                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idcardnumber || selectedEnrollment.payload.licenseCardNumber || selectedEnrollment.payload.cardnumber)}</span>
+                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idcardnumber || selectedEnrollment.payload.licenseCardNumber || selectedEnrollment.payload.license_card_number || selectedEnrollment.payload.cardnumber || selectedEnrollment.payload.cardNumber)}</span>
                                         </>
                                     )}
 
