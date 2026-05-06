@@ -93,6 +93,7 @@ export const DNSP_MAP: Record<string, string> = {
     '1': 'Endeavour',
     '2': 'Essential',
     '3': 'Energex',
+    '4': 'Ergon - East'
 };
 
 export const DNSP_OPTIONS = [
@@ -100,6 +101,7 @@ export const DNSP_OPTIONS = [
     { value: '1', label: 'Endeavour' },
     { value: '2', label: 'Essential' },
     { value: '3', label: 'Energex' },
+    { value: '4', label: 'Ergon - East' },
 ];
 export const DISCOUNT_OPTIONS = [0, 5, 7, 10, 13, 15].map(i => ({
     value: i.toString(),
@@ -193,6 +195,7 @@ export const DNSP_LABELS: Record<number, string> = {
     1: 'Endeavour',
     2: 'Essential',
     3: 'Energex',
+    4: 'Ergon - East',
 };
 
 // --- Options Helpers (derived from labels) ---
