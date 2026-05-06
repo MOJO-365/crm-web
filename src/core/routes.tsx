@@ -38,6 +38,7 @@ const BranchDashboardPage = lazyWithRetry(() => import('@/pages/branch/BranchDas
 const BranchLeadFormPage = lazyWithRetry(() => import('@/pages/branch/BranchLeadFormPage').then(m => ({ default: m.BranchLeadFormPage })));
 const BranchEnrollmentsPage = lazyWithRetry(() => import('@/pages/branch/BranchEnrollmentsPage').then(m => ({ default: m.BranchEnrollmentsPage })));
 const BranchStaffPage = lazyWithRetry(() => import('@/pages/branch/BranchStaffPage').then(m => ({ default: m.BranchStaffPage })));
+const CustomerViewPage = lazyWithRetry(() => import('@/pages/customer-view/CustomerViewPage').then(m => ({ default: m.CustomerViewPage })));
 
 
 
@@ -73,6 +74,7 @@ const router = createBrowserRouter(
         <Route element={<LayoutWithSuspense />}>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/customer-view/:uid" element={<CustomerViewPage />} />
 
             {/* Root handler for Offer Page (public) vs Dashboard (protected) */}
             <Route path="/" element={<RootRouteHandler />} />

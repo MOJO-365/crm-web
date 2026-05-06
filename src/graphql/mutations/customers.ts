@@ -158,6 +158,14 @@ export const CREATE_CUSTOMER = gql`
     }
 `;
 
+export const CREATE_PDRS_CUSTOMER = gql`
+    mutation CreatePdrsCustomer($input: CreateCustomerInput!) {
+        createPdrsCustomer(input: $input) {
+            ${CUSTOMER_FULL_RESPONSE}
+        }
+    }
+`;
+
 export const UPDATE_CUSTOMER = gql`
     mutation UpdateCustomer($uid: String!, $input: UpdateCustomerInput!) {
         updateCustomer(uid: $uid, input: $input) {

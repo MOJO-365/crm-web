@@ -590,9 +590,9 @@ export function CustomerApprovalsPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Web Enrollments</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Customer Approvals</h1>
                     <p className="text-muted-foreground">
-                        Review and approve pending web enrollments from the public interface.
+                        Review and approve pending customer approvals.
                     </p>
                 </div>
             </div>
@@ -601,7 +601,7 @@ export function CustomerApprovalsPage() {
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
                         <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            Total Web Enrollments: <span className="text-foreground font-bold">{meta?.totalRecords || 0}</span>
+                            Total Customer Approvals: <span className="text-foreground font-bold">{meta?.totalRecords || 0}</span>
                         </p>
                         {isFiltered && (
                             <Button
