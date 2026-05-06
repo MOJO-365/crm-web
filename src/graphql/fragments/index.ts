@@ -121,6 +121,9 @@ export const LEAD_FIELDS = gql`
         source
         notes
         unitnumber
+        housenumber
+        buildingname
+        floorlevelnumber
         streetnumber
         streetname
         streettype
