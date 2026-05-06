@@ -25,6 +25,7 @@ interface Lead {
     notes?: string;
     fullAddress?: string;
     isCustomerNow: boolean;
+    customerUid?: string;
     referralName?: string;
     createdAt: string;
     assignedTo?: string;
@@ -421,6 +422,35 @@ export default function LeadsPage() {
         //         </div>
         //     ),
         // },
+        {
+            key: 'isCustomerNow',
+            header: (
+                <div className="flex flex-col gap-1 items-start">
+                    <div className="h-7 flex items-center">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</span>
+                    </div>
+                </div>
+            ),
+            render: (row) => (
+                <div className="flex flex-col gap-1">
+                    {row.isCustomerNow ? (
+                        <>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 uppercase w-fit">Onboarded</span>
+                            {row.customerUid && (
+                                <button
+                                    onClick={() => navigate(`/customers/${row.customerUid}`)}
+                                    className="text-[10px] text-primary hover:underline font-medium text-left"
+                                >
+                                    View Customer
+                                </button>
+                            )}
+                        </>
+                    ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase w-fit">Pending</span>
+                    )}
+                </div>
+            ),
+        },
         {
             key: 'actions',
             header: (

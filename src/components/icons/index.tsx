@@ -1651,3 +1651,21 @@ export const TrendingUpIcon = ({ size = 18, className, ...props }: IconProps) =>
     </svg>
 );
 
+export const TagIcon = ({ size = 18, className, ...props }: IconProps) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn(className)}
+        {...props}
+    >
+        <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2z" />
+        <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+);

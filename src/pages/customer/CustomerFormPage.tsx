@@ -22,7 +22,6 @@ import {
     GET_ACTIVE_BONUSES,
     GET_NEXT_CUSTOMER_ID,
     PREVIEW_SYSTEM_TEMPLATE,
-    UPDATE_LEAD,
     GET_USERS,
     CREATE_CUSTOMER_NOTE
 } from '@/graphql';
@@ -751,7 +750,6 @@ export const CustomerFormPage = () => {
     const [checkNmiExists] = useLazyQuery(CHECK_NMI_EXISTS);
     const [createCustomer] = useMutation(CREATE_CUSTOMER);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
-    const [updateLead] = useMutation(UPDATE_LEAD);
     const [createCustomerNote] = useMutation(CREATE_CUSTOMER_NOTE);
 
     // Get customer's rate version for historic rates lookup
@@ -1071,8 +1069,62 @@ export const CustomerFormPage = () => {
         }
     };
 
-    const autoSelectTariff = (selectedTariff: string) => {
+    const autoSelectTariff = (selectedTariff: string, nmiItem?: any) => {
         if (!selectedTariff || !tariffOptions?.length) return;
+
+        // Custom matching logic based on NMI register data
+        if (nmiItem) {
+            const registers = [
+                ...(nmiItem.registers || []),
+                ...(nmiItem.meters?.flatMap((m: any) => m.registers || []) || [])
+            ];
+
+            // Only look at registers matching the current tariff code if multiple exist
+            const relevantRegisters = registers.filter((r: any) => r.tariffCode === selectedTariff);
+            
+            const hasCL1Interval = relevantRegisters.some((r: any) => r.networkAdditionalInfo === "Controlled load 1 Interval");
+            const hasCL2Interval = relevantRegisters.some((r: any) => r.networkAdditionalInfo === "Controlled load 2 Interval");
+            const hasTOUSeasonal = relevantRegisters.some((r: any) => r.networkAdditionalInfo === "TOU seasonal interval");
+
+            let targetTariffName = "";
+            if (hasCL1Interval) targetTariffName = "TOU with CL1";
+            else if (hasCL2Interval) targetTariffName = "TOU with CL2";
+            else if (hasTOUSeasonal) targetTariffName = "TOU";
+
+            let matchedRatePlan = null;
+            const currentState = (formData.state || nmiItem?.address?.state || '').toLowerCase();
+
+            if (targetTariffName) {
+                matchedRatePlan = ratePlans.find(rp => 
+                    rp.tariff === targetTariffName && 
+                    rp.state?.toLowerCase() === currentState &&
+                    (formData.vpp ? rp.vpp === 1 : rp.vpp !== 1)
+                );
+            }
+
+            // Fallback: If controlledLoad is true and there is additional info, match rate with non-zero CL usage
+            if (!matchedRatePlan && (nmiItem?.controlledLoad?.hasControlledLoad || relevantRegisters.some((r: any) => r.controlledLoad))) {
+                const hasAnyAdditionalInfo = relevantRegisters.some((r: any) => r.networkAdditionalInfo);
+                if (hasAnyAdditionalInfo) {
+                    matchedRatePlan = ratePlans.find(rp => {
+                        if (rp.state?.toLowerCase() !== currentState) return false;
+                        if (formData.vpp ? rp.vpp !== 1 : rp.vpp === 1) return false;
+                        
+                        const activeOffer = rp.offers?.find((o: any) => !o.isDeleted && o.isActive !== false);
+                        if (!activeOffer) return false;
+                        
+                        return (parseFloat(String(activeOffer.cl1Usage || 0)) > 0 || parseFloat(String(activeOffer.cl2Usage || 0)) > 0);
+                    });
+                }
+            }
+
+            if (matchedRatePlan) {
+                console.log('✅ Custom tariff matched via NMI data:', matchedRatePlan.tariff);
+                updateField('tariffCode', matchedRatePlan.codes);
+                handleTariffChange(matchedRatePlan.codes);
+                return;
+            }
+        }
 
         const s = selectedTariff.toLowerCase().trim();
         const sNoPrefix = s.startsWith('vpp ') ? s.substring(4) : s;
@@ -1184,7 +1236,7 @@ export const CustomerFormPage = () => {
                 // ✅ Auto tariff match (use primary tariff or first found)
                 const tariff = allTariffs[0] as string;
                 if (tariff) {
-                    autoSelectTariff(tariff);
+                    autoSelectTariff(tariff, item);
                 }
 
                 // ✅ Auto property type mapping
@@ -1216,6 +1268,75 @@ export const CustomerFormPage = () => {
         } catch (error) {
             console.error('❌ Error fetching NMI:', error);
             toast.error('Failed to lookup NMI');
+        } finally {
+            setIsNmiLookupLoading(false);
+        }
+    };
+
+    const handleNmiTariffLookup = async () => {
+        if (!formData.nmi || formData.nmi.length < 10) {
+            toast.error('Please enter a valid NMI first');
+            return;
+        }
+
+        try {
+            setIsNmiLookupLoading(true);
+
+            const webToken = import.meta.env.VITE_WEB_TOKEN || 'GSYNC_WEB_v1_0tuu903stcif2kzsx7t8fyy';
+            const body = {
+                nmi: formData.nmi,
+                address: addressSearch,
+                deliveryPointIdentifier: null,
+                flatOrUnitNumber: formData.unitNumber || null,
+                houseNumber: formData.houseNumber || formData.streetNumber || null,
+                postcode: formData.postcode,
+                state: formData.state,
+                streetName: formData.streetName,
+                streetSuffix: null,
+                streetType: formData.streetType,
+                suburb: formData.suburb
+            };
+
+            const response = await fetch(`/api/web/nmi-tariff`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Web-Token': webToken
+                },
+                body: JSON.stringify(body)
+            });
+
+            const data = await response.json();
+
+            if (data.tariffCode) {
+                updateField('tariffCode', data.tariffCode);
+                handleTariffChange(data.tariffCode);
+
+                if (data.customerType === 'RESIDENTIAL') {
+                    updateField('propertyType', 0);
+                } else if (data.customerType === 'BUSINESS' || data.customerType === 'COMMERCIAL') {
+                    updateField('propertyType', 1);
+                }
+
+                if (data.address && !addressSearch) {
+                    setAddressSearch(data.address);
+                    updateField('unitNumber', data.flatOrUnitNumber || '');
+                    updateField('houseNumber', data.houseNumber || '');
+                    updateField('streetNumber', data.houseNumber || '');
+                    updateField('streetName', data.streetName || '');
+                    updateField('streetType', data.streetType || '');
+                    updateField('suburb', data.suburb || '');
+                    updateField('state', data.state || '');
+                    updateField('postcode', data.postcode || '');
+                }
+
+                toast.success(`Tariff ${data.tariffCode} resolved successfully`);
+            } else {
+                toast.error(data.error?.message || 'Failed to resolve tariff for this NMI');
+            }
+        } catch (error) {
+            console.error('❌ NMI Tariff Lookup Error:', error);
+            toast.error('Failed to lookup NMI tariff');
         } finally {
             setIsNmiLookupLoading(false);
         }
@@ -1753,7 +1874,8 @@ export const CustomerFormPage = () => {
                 customerId: isEditMode ? undefined : generatedCustomerId,
                 triggerWelcomeEmail: (isEditMode && !isUpdateOnly) ? (finalStatus === 2) : undefined,
                 triggerUpdateEmail: (isEditMode && !isUpdateOnly) ? (significantChanges || true) : undefined,
-                selectedBonuses: formData.selectedBonuses
+                selectedBonuses: formData.selectedBonuses,
+                leadUid: prefillLeadUid || undefined
             };
 
             let savedCustomer;
@@ -1766,20 +1888,7 @@ export const CustomerFormPage = () => {
                 savedCustomer = data?.createCustomer;
                 toast.success(savedCustomer?.message || 'Customer created successfully');
 
-                // If this customer was created from a lead, mark the lead as converted
-                if (prefillLeadUid) {
-                    try {
-                        await updateLead({
-                            variables: {
-                                uid: prefillLeadUid,
-                                input: { isCustomerNow: true }
-                            }
-                        });
-                        console.log('[Lead Conversion] Successfully updated lead status:', prefillLeadUid);
-                    } catch (leadUpdateErr) {
-                        console.error('[Lead Conversion] Failed to update lead status:', leadUpdateErr);
-                    }
-                }
+                // Lead conversion is now handled in the backend resolver via leadUid input
 
                 // If there are prefilled notes from the lead, add them as a customer note
                 if (prefillNotes && savedCustomer?.uid) {
@@ -2398,7 +2507,18 @@ export const CustomerFormPage = () => {
                                                 maxLength={11}
                                                 placeholder="1234567890"
                                                 rightIcon={
-                                                    (formData.streetType && formData.suburb && (formData.houseNumber || formData.streetNumber) && formData.state && formData.postcode && formData.streetName) ? (
+                                                    formData.nmi?.length >= 10 ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleNmiTariffLookup}
+                                                            disabled={isNmiLookupLoading}
+                                                            className="text-xs bg-primary/10 text-primary hover:bg-primary/20 px-2 py-1 rounded-md flex items-center gap-1 transition-colors disabled:opacity-50"
+                                                            title="Resolve Tariff for this NMI"
+                                                        >
+                                                            {isNmiLookupLoading ? <SpinnerIcon className="animate-spin" size={12} /> : <SearchIcon size={12} />}
+                                                            Resolve
+                                                        </button>
+                                                    ) : (formData.streetType && formData.suburb && (formData.houseNumber || formData.streetNumber) && formData.state && formData.postcode && formData.streetName) ? (
                                                         <button
                                                             type="button"
                                                             onClick={handleNmiLookup}
@@ -3367,7 +3487,7 @@ export const CustomerFormPage = () => {
                                                             const item = selectedNmiForTariff;
                                                             updateField('nmi', item.nmi);
                                                             checkNmiDuplicate(item.nmi);
-                                                            autoSelectTariff(t);
+                                                            autoSelectTariff(t, item);
 
                                                             if (item.customerType === 'RESIDENTIAL') {
                                                                 updateField('propertyType', 0);

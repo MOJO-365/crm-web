@@ -7,4 +7,5 @@ export { ServerErrorPage } from './ServerErrorPage';
 export { ForbiddenPage } from './ForbiddenPage';
 export { AuditLogsPage } from './logs/AuditLogsPage';
 export { EmailLogsPage } from './email/EmailLogsPage';
+export { CustomerViewPage } from './customer-view/CustomerViewPage';
 

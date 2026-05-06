@@ -48,6 +48,11 @@ export function EmailSendPage() {
 
     const automatedEvents: AutomatedEvent[] = [
         {
+            type: 'CUSTOMER_DRAFT',
+            label: 'Customer Draft Saved',
+            description: 'Sent automatically when a customer application is saved as a draft',
+        },
+        {
             type: 'CUSTOMER_CREATED',
             label: 'Customer Created (Welcome Email)',
             description: 'Sent automatically when a new customer is created in the system',

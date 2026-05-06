@@ -454,11 +454,12 @@ export function DataTable<T>({
                     {/* Left: Showing X-Y of Z */}
                     <div className="text-sm text-muted-foreground font-medium">
                         {(() => {
-                            const start = (pagination.currentPage - 1) * pagination.pageSize + 1;
-                            const end = Math.min(pagination.currentPage * pagination.pageSize, pagination.totalCount);
+                            const total = pagination.totalCount;
+                            const start = total === 0 ? 0 : (pagination.currentPage - 1) * pagination.pageSize + 1;
+                            const end = Math.min(pagination.currentPage * pagination.pageSize, total);
                             return (
                                 <span className="flex items-center gap-1">
-                                    Showing <span className="text-foreground font-bold">{start}-{end}</span> of <span className="text-foreground font-bold">{pagination.totalCount}</span> customers
+                                    Showing <span className="text-foreground font-bold">{start}-{end}</span> of <span className="text-foreground font-bold">{total}</span> records
                                 </span>
                             );
                         })()}

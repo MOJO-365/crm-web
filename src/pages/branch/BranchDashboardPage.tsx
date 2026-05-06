@@ -13,7 +13,7 @@ import {
     UserSettingIcon,
     UsersIcon
 } from '@/components/icons';
-import { GET_WEB_ENROLLMENTS } from '@/graphql/queries/customers';
+import { GET_LEADS } from '@/graphql/queries/leads';
 import { GET_USERS } from '@/graphql/queries/users';
 import { cn } from '@/lib/utils';
 import { BranchLayout } from './BranchLayout';
@@ -132,6 +132,12 @@ export function BranchDashboardPage() {
     const navigate = useNavigate();
     const now = useCurrentTime();
 
+    console.log('--- BRANCH DASHBOARD DEBUG ---');
+    console.log('User UID:', user?.uid);
+    console.log('Is Master:', user?.isMaster);
+    console.log('Branch Tenant:', user?.branchTenant);
+    console.log('------------------------------');
+
     const greeting = useMemo(() => getGreeting(), [now]);
     const formattedDate = useMemo(
         () =>
@@ -144,36 +150,42 @@ export function BranchDashboardPage() {
         [now],
     );
 
-    // Fetch stats - focusing Recent Submissions on Pending Approvals only
-    const { data: statsData, loading: statsLoading } = useQuery(GET_WEB_ENROLLMENTS, {
+    // Filter logic: Master sees everything in branch, staff sees only their own
+    const leadFilter = useMemo(() => {
+        if (!user) return {};
+        if (user.isMaster === 1) {
+            return { branchTenant: user.branchTenant };
+        }
+        return { searchCreatedBy: user.uid };
+    }, [user]);
+
+    // Fetch stats - focusing on leads
+    const { data: statsData, loading: statsLoading } = useQuery(GET_LEADS, {
         variables: {
             page: 1,
             limit: 5,
-            processed: 0, // Only show pending in the "Recent Submissions" list
-            branchTenant: user?.branchTenant || undefined,
-            searchPortal: !user?.branchTenant ? (user?.name || 'Branch Portal') : undefined
+            ...leadFilter,
+            isCustomerNow: false
         },
         skip: !user
     });
 
-    const { data: pendingData } = useQuery(GET_WEB_ENROLLMENTS, {
+    const { data: pendingData } = useQuery(GET_LEADS, {
         variables: {
             page: 1,
             limit: 1,
-            processed: 0,
-            branchTenant: user?.branchTenant || undefined,
-            searchPortal: !user?.branchTenant ? (user?.name || 'Branch Portal') : undefined
+            ...leadFilter,
+            isCustomerNow: false
         },
         skip: !user
     });
 
-    const { data: processedData } = useQuery(GET_WEB_ENROLLMENTS, {
+    const { data: processedData } = useQuery(GET_LEADS, {
         variables: {
             page: 1,
             limit: 1,
-            processed: 1,
-            branchTenant: user?.branchTenant || undefined,
-            searchPortal: !user?.branchTenant ? (user?.name || 'Branch Portal') : undefined
+            ...leadFilter,
+            isCustomerNow: true // Count those that became customers as processed
         },
         skip: !user
     });
@@ -189,10 +201,10 @@ export function BranchDashboardPage() {
     });
 
     const stats = {
-        total: statsData?.webEnrollments?.meta?.totalRecords || 0,
-        pending: pendingData?.webEnrollments?.meta?.totalRecords || 0,
-        processed: processedData?.webEnrollments?.meta?.totalRecords || 0,
-        staff: Math.max(0, (staffData?.users?.meta?.totalRecords || 0) - 1), // Subtract 1 to exclude the master themselves
+        total: (statsData?.leads?.meta?.totalRecords || 0) + (processedData?.leads?.meta?.totalRecords || 0),
+        pending: pendingData?.leads?.meta?.totalRecords || 0,
+        processed: processedData?.leads?.meta?.totalRecords || 0,
+        staff: Math.max(0, (staffData?.users?.meta?.totalRecords || 0) - 1),
     };
 
     /* ─── render ─────────────────────────────────── */
@@ -263,7 +275,7 @@ export function BranchDashboardPage() {
                             <ActionCard
                                 id="card-new-enrollment"
                                 title="New Enrollment"
-                                description="Start a fresh application. Real-time NMI lookup and rate calculation."
+                                description="Start a fresh application. Capture lead details to be reviewed in CRM."
                                 icon={<PlusIcon size={24} />}
                                 accentColor="bg-primary"
                                 buttonLabel="Start Application"
@@ -306,27 +318,26 @@ export function BranchDashboardPage() {
                                     [1, 2, 3, 4].map(i => (
                                         <div key={i} className="h-14 bg-gray-100 dark:bg-white/5 animate-pulse rounded-xl" />
                                     ))
-                                ) : statsData?.webEnrollments?.data?.length > 0 ? (
-                                    statsData.webEnrollments.data.map((item: any) => {
-                                        const payload = typeof item.payload === 'string' ? JSON.parse(item.payload || '{}') : (item.payload || {});
-                                        const name = `${payload.firstname || ''} ${payload.lastname || ''}`.trim() || 'New Enrollment';
+                                ) : statsData?.leads?.data?.length > 0 ? (
+                                    statsData.leads.data.map((item: any) => {
+                                        const name = `${item.firstname || ''} ${item.lastname || ''}`.trim() || 'New Lead';
 
                                         return (
                                             <div
                                                 key={item.uid}
                                                 className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-border/50"
-                                                onClick={() => navigate(`/branch-portal/enrollments?search=${payload.firstname || ''}`)}
+                                                onClick={() => navigate(`/branch-portal/enrollments?search=${item.firstname || ''}`)}
                                             >
                                                 <div className={cn(
                                                     'w-2 h-2 rounded-full shrink-0',
-                                                    item.processed === 1 ? 'bg-emerald-500' : item.processed === 2 ? 'bg-rose-500' : 'bg-amber-500'
+                                                    item.isCustomerNow ? 'bg-emerald-500' : 'bg-amber-500'
                                                 )} />
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-bold text-title truncate">{name}</p>
                                                     <p className="text-[10px] text-subtitle font-medium uppercase tracking-wider truncate">
-                                                        {payload.nmi || 'No NMI'} • {new Date(item.createdAt).toLocaleDateString()}
-                                                        {user?.isMaster === 1 && payload.portalname && (
-                                                            <> • <span className="text-primary font-bold">{payload.portalname}</span></>
+                                                        {item.nmi || 'No NMI'} • {new Date(item.createdAt).toLocaleDateString()}
+                                                        {user?.isMaster === 1 && item.createdByUser?.name && (
+                                                            <span className="ml-1 opacity-60">• By {item.createdByUser.name}</span>
                                                         )}
                                                     </p>
                                                 </div>

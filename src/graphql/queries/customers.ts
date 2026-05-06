@@ -44,6 +44,7 @@ export const GET_CUSTOMERS = gql`
                 createdAt
                 offerEmailSentAt
                 updatedAt
+                leadUid
                 selectedBonuses
                 previousBill {
                     id
@@ -269,6 +270,7 @@ export const GET_CUSTOMERS_LIST = gql`
                 isDeleted
                 createdAt
                 updatedAt
+                leadUid
                 previousBill {
                     id
                     filename
@@ -436,6 +438,7 @@ export const GET_CUSTOMERS_CURSOR = gql`
                 status
                 utilmateStatus
                 riskStatus
+                leadUid
                 msatDetails {
                   msatConnected
                 }
@@ -463,6 +466,11 @@ export const GET_CUSTOMERS_CURSOR = gql`
                     email
                 }
                 isDeleted
+                createdBy
+                createdByUser {
+                    uid
+                    name
+                }
             }
             pageInfo {
                 hasNextPage

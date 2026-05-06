@@ -146,12 +146,21 @@ const CUSTOMER_FULL_RESPONSE = `
         name
         email
     }
+    leadUid
     message
 `;
 
 export const CREATE_CUSTOMER = gql`
     mutation CreateCustomer($input: CreateCustomerInput!) {
         createCustomer(input: $input) {
+            ${CUSTOMER_FULL_RESPONSE}
+        }
+    }
+`;
+
+export const CREATE_PDRS_CUSTOMER = gql`
+    mutation CreatePdrsCustomer($input: CreateCustomerInput!) {
+        createPdrsCustomer(input: $input) {
             ${CUSTOMER_FULL_RESPONSE}
         }
     }
