@@ -5,7 +5,7 @@ import { GET_WEB_ENROLLMENT_BY_UID } from '@/graphql/queries/customers';
 import { GET_RATE_PLAN_BY_CODE } from '@/graphql/queries/rates';
 import { UPDATE_WEB_ENROLLMENT_CONSENT } from '@/graphql/mutations/customers';
 import { MailIcon, PhoneIcon, ActivityIcon, CheckIcon, ZapIcon, InfoIcon, ChevronLeftIcon, UserIcon, MapPinIcon, HashIcon } from '@/components/icons';
-import { ID_TYPE_MAP, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
+import { ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { getData as getCountries } from 'country-list';
 import MainLogo from '@/assets/main-logo-dark-1.png';
 import { Button, Input, Select, DatePicker } from '@/components/ui';
@@ -600,8 +600,6 @@ export const CustomerViewPage: React.FC = () => {
         setIdFormInit(true);
     }
     const idType = Number(idForm.idType || (payload.idType ?? 0));
-    const idLabel = ID_TYPE_MAP[idType] || 'ID';
-    const inputCls = "w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all placeholder:text-gray-400";
 
     return (
         <div className="h-screen flex flex-col bg-white overflow-hidden font-sans">
