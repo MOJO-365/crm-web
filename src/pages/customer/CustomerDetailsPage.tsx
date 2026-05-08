@@ -2451,7 +2451,7 @@ export function CustomerDetailsPage() {
     const handleGenerateCredentials = async (customerId: string) => {
         setIsGeneratingCredentials(true);
         try {
-            const response = await secondaryApiAxios.post(`/api/v1/utilmate/user/generate-credentials/${customerId}`);
+            const response = await secondaryApiAxios.post(`/v1/utilmate/user/generate-credentials/${customerId}`);
             const password = response.data;
 
             toast.success('Credentials generated successfully');
