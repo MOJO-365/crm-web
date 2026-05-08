@@ -47,6 +47,9 @@ export const GET_CUSTOMERS = gql`
                 leadUid
                 portalName
                 selectedBonuses
+                isConsentRead
+            medicareIrn
+            medicareCardType
                 previousBill {
                     id
                     filename
@@ -271,6 +274,9 @@ export const GET_CUSTOMERS_LIST = gql`
                 isDeleted
                 leadUid
                 portalName
+                isConsentRead
+            medicareIrn
+            medicareCardType
                 previousBill {
                     id
                     filename
@@ -496,6 +502,9 @@ export const GET_CUSTOMER_BY_ID = gql`
                 email
             }
             selectedBonuses
+            isConsentRead
+            medicareIrn
+            medicareCardType
             customerId
             email
             title
@@ -670,6 +679,9 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
     query GetCustomerGeneralDetails($uid: String!) {
         customer(uid: $uid) {
             uid
+            isConsentRead
+            medicareIrn
+            medicareCardType
             customerId
             email
             title
@@ -1464,6 +1476,8 @@ export const GET_WEB_ENROLLMENTS = gql`
                 payload
                 processed
                 isConsentRead
+            medicareIrn
+            medicareCardType
                 createdAt
             }
             meta {
@@ -1482,6 +1496,8 @@ export const GET_WEB_ENROLLMENT_BY_UID = gql`
             uid
             payload
             isConsentRead
+            medicareIrn
+            medicareCardType
             createdAt
         }
     }

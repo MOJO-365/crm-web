@@ -58,6 +58,8 @@ const CUSTOMER_FULL_RESPONSE = `
         mimeType
         size
     }
+    medicareIrn
+    medicareCardType
     createdAt
     updatedAt
     enrollmentDetails {
@@ -76,6 +78,9 @@ const CUSTOMER_FULL_RESPONSE = `
         licenseNumber
         licenseState
         licenseExpiry
+        licenseCardNumber
+        medicareCardType
+        medicareIrn
     }
     address {
         id

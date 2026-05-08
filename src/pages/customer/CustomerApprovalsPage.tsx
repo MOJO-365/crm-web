@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
 import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, GET_USERS, GET_ROLES, SEND_OFFER_EMAIL, SEND_PDRS_CONSENT_EMAIL } from '@/graphql';
@@ -7,7 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Select } from '@/components/ui/Select';
-import { XIcon, EyeIcon, CheckIcon, AlertCircleIcon, SendIcon, UserIcon } from '@/components/icons';
+import { XIcon, EyeIcon, CheckIcon, AlertCircleIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-toastify';
 import React from 'react';
@@ -57,7 +56,6 @@ const INITIAL_FILTERS: SearchFilters = {
 };
 
 export function CustomerApprovalsPage() {
-    const navigate = useNavigate();
     const [filters, setFilters] = useState<SearchFilters>(INITIAL_FILTERS);
     const [debouncedFilters, setDebouncedFilters] = useState<SearchFilters>(INITIAL_FILTERS);
     const [page, setPage] = useState(1);
@@ -150,7 +148,7 @@ export function CustomerApprovalsPage() {
             if (isSendingEmail && data.approveWebEnrollment?.uid) {
                 const enrollment = enrollments.find(e => e.uid === approvingUid);
                 const isPdrs = enrollment?.payload?.portalname === 'PDRS' || enrollment?.payload?.portalName === 'PDRS';
-                
+
                 if (isPdrs) {
                     sendPdrsConsentEmail({ variables: { customerUid: data.approveWebEnrollment.uid } });
                     toast.success('Customer approved and PDRS consent email triggered!');
@@ -576,22 +574,6 @@ export function CustomerApprovalsPage() {
                             <EyeIcon size={16} />
                         </Button>
                     </Tooltip>
-                    <Tooltip content="Edit & Fix">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors"
-                            onClick={() => navigate('/customers/new', { 
-                                state: { 
-                                    prefillData: row.payload,
-                                    fromApprovals: true,
-                                    approvalUid: row.uid
-                                } 
-                            })}
-                        >
-                            <UserIcon size={16} />
-                        </Button>
-                    </Tooltip>
                     {row.processed === 0 && (
                         <>
                             <Tooltip content="Approve & Integrate">
@@ -845,20 +827,6 @@ export function CustomerApprovalsPage() {
                             <div className="flex gap-2">
                                 <Button
                                     variant="outline"
-                                    className="text-primary hover:bg-primary/5 border-primary/20"
-                                    leftIcon={<UserIcon size={16} />}
-                                    onClick={() => navigate('/customers/new', { 
-                                        state: { 
-                                            prefillData: selectedEnrollment.payload,
-                                            fromApprovals: true,
-                                            approvalUid: selectedEnrollment.uid
-                                        } 
-                                    })}
-                                >
-                                    Edit & Fix
-                                </Button>
-                                <Button
-                                    variant="outline"
                                     className="text-destructive hover:bg-destructive/10"
                                     onClick={() => handleReject(selectedEnrollment!)}
                                     isLoading={rejectingUid === selectedEnrollment.uid}
@@ -867,25 +835,7 @@ export function CustomerApprovalsPage() {
                                 >
                                     Reject
                                 </Button>
-                                <Button
-                                    variant="outline"
-                                    className="text-primary hover:bg-primary/5 border-primary/20"
-                                    leftIcon={<SendIcon size={16} />}
-                                    onClick={() => handleApprove(selectedEnrollment!, true)}
-                                    isLoading={approvingUid === selectedEnrollment.uid && isSendingEmail}
-                                    loadingText="Sending..."
-                                    disabled={approvingUid === selectedEnrollment.uid && !isSendingEmail || rejectingUid === selectedEnrollment.uid}
-                                >
-                                    {selectedEnrollment?.payload?.portalname === 'PDRS' || selectedEnrollment?.payload?.portalName === 'PDRS' ? 'Send PDRS Email' : 'Send Email'}
-                                </Button>
-                                <Button
-                                    onClick={() => handleApprove(selectedEnrollment!, false)}
-                                    isLoading={approvingUid === selectedEnrollment.uid && !isSendingEmail}
-                                    loadingText="Integrating..."
-                                    disabled={approvingUid === selectedEnrollment.uid && isSendingEmail || rejectingUid === selectedEnrollment.uid}
-                                >
-                                    Approve & Integrate
-                                </Button>
+
                             </div>
                         )}
                     </div>
