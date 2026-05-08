@@ -153,3 +153,41 @@ export const GET_MEASUREMENT_UNITS = gql`
         }
     }
 `;
+
+export const GET_RATE_PLAN_BY_CODE = gql`
+    query GetRatePlanByCode($code: String!) {
+        ratePlanByCode(code: $code) {
+            uid
+            codes
+            planId
+            dnsp
+            state
+            tariff
+            type
+            offers {
+                uid
+                offerName
+                anytime
+                cl1Supply
+                cl1Usage
+                cl2Supply
+                cl2Usage
+                demand
+                demandOp
+                demandP
+                demandS
+                fit
+                fitPeak
+                fitCritical
+                fitVpp
+                offPeak
+                peak
+                shoulder
+                supplyCharge
+                vppOrcharge
+                dynamicRates
+                priceUnits
+            }
+        }
+    }
+`;

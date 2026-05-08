@@ -352,8 +352,24 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
             onClose={onClose}
             title={isEditMode ? 'Edit Lead' : 'Create New Lead'}
             size="3xl"
+            footer={
+                <div className="flex justify-end gap-3">
+                    <Button type="button" variant="ghost" onClick={onClose} disabled={creating || updating} className="text-muted-foreground hover:text-foreground">
+                        Cancel
+                    </Button>
+                    <Button 
+                        type="submit" 
+                        form="lead-form"
+                        className="px-8 bg-[#5c8a1d] hover:bg-[#4a6f17] text-white rounded-md h-10 font-medium" 
+                        isLoading={creating || updating} 
+                        disabled={creating || updating}
+                    >
+                        {isEditMode ? 'Update Lead' : 'Create Lead'}
+                    </Button>
+                </div>
+            }
         >
-            <form onSubmit={handleSubmit} className="space-y-6 pt-2">
+            <form id="lead-form" onSubmit={handleSubmit} className="space-y-6 pt-2">
                 {loading && isEditMode ? (
                     <div className="py-12 text-center text-muted-foreground flex flex-col items-center gap-3">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -628,12 +644,6 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                             />
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-4 border-t border-border">
-                            <Button type="button" variant="ghost" onClick={onClose} disabled={creating || updating} className="text-muted-foreground hover:text-foreground">Cancel</Button>
-                            <Button type="submit" className="px-8 bg-[#5c8a1d] hover:bg-[#4a6f17] text-white rounded-md h-10 font-medium" isLoading={creating || updating} disabled={creating || updating}>
-                                {isEditMode ? 'Update Lead' : 'Create Lead'}
-                            </Button>
-                        </div>
                     </>
                 )}
             </form>

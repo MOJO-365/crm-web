@@ -74,7 +74,7 @@ const router = createBrowserRouter(
         <Route element={<LayoutWithSuspense />}>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/customer-view/:uid" element={<CustomerViewPage />} />
+            <Route path="/account-enrollment/:uid" element={<CustomerViewPage />} />
 
             {/* Root handler for Offer Page (public) vs Dashboard (protected) */}
             <Route path="/" element={<RootRouteHandler />} />

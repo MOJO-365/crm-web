@@ -85,9 +85,9 @@ const EMAIL_FOOTER_TEMPLATE = `
                       </a>
                     </td>
                     <td>
-                      <a href="mailto:support@geeenergy.com.au" style="display:inline-flex; align-items:center; text-decoration:none; color:#333; font-size:14px; font-weight:600;">
+                      <a href="mailto:info@gee.com.au" style="display:inline-flex; align-items:center; text-decoration:none; color:#333; font-size:14px; font-weight:600;">
                         <span style="display:inline-block; width:32px; height:32px; background:#eaf3de; border-radius:50%; text-align:center; line-height:32px; margin-right:8px; font-size:16px;">&#9993;</span>
-                        support@geeenergy.com.au
+                        info@gee.com.au
                       </a>
                     </td>
                   </tr>

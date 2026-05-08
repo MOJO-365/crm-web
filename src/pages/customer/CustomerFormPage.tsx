@@ -23,7 +23,9 @@ import {
     GET_NEXT_CUSTOMER_ID,
     PREVIEW_SYSTEM_TEMPLATE,
     GET_USERS,
-    CREATE_CUSTOMER_NOTE
+    CREATE_CUSTOMER_NOTE,
+    MARK_WEB_ENROLLMENT_PROCESSED,
+    SEND_PDRS_CONSENT_EMAIL
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
@@ -537,13 +539,11 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
 };
 
 // ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
 export const CustomerFormPage = () => {
     const { uid } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const { prefillData, fromApprovals, approvalUid } = (location.state as any) || {};
     const isEditMode = !!uid && uid !== 'new';
 
     // Form state
@@ -751,6 +751,15 @@ export const CustomerFormPage = () => {
     const [createCustomer] = useMutation(CREATE_CUSTOMER);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
     const [createCustomerNote] = useMutation(CREATE_CUSTOMER_NOTE);
+    const [markEnrollmentProcessed] = useMutation(MARK_WEB_ENROLLMENT_PROCESSED);
+    const [sendPdrsConsentEmail] = useMutation(SEND_PDRS_CONSENT_EMAIL);
+
+    const isPdrs = useMemo(() => {
+        if (isEditMode) {
+            return customerData?.customer?.portalName === 'PEERLESSGROUP';
+        }
+        return (prefillData?.portalname === 'PEERLESSGROUP' || prefillData?.portalName === 'PEERLESSGROUP');
+    }, [prefillData, customerData, isEditMode]);
 
     // Get customer's rate version for historic rates lookup
     const customerRateVersion = customerData?.customer?.rateVersion;
@@ -1081,7 +1090,7 @@ export const CustomerFormPage = () => {
 
             // Only look at registers matching the current tariff code if multiple exist
             const relevantRegisters = registers.filter((r: any) => r.tariffCode === selectedTariff);
-            
+
             const hasCL1Interval = relevantRegisters.some((r: any) => r.networkAdditionalInfo === "Controlled load 1 Interval");
             const hasCL2Interval = relevantRegisters.some((r: any) => r.networkAdditionalInfo === "Controlled load 2 Interval");
             const hasTOUSeasonal = relevantRegisters.some((r: any) => r.networkAdditionalInfo === "TOU seasonal interval");
@@ -1095,8 +1104,8 @@ export const CustomerFormPage = () => {
             const currentState = (formData.state || nmiItem?.address?.state || '').toLowerCase();
 
             if (targetTariffName) {
-                matchedRatePlan = ratePlans.find(rp => 
-                    rp.tariff === targetTariffName && 
+                matchedRatePlan = ratePlans.find(rp =>
+                    rp.tariff === targetTariffName &&
                     rp.state?.toLowerCase() === currentState &&
                     (formData.vpp ? rp.vpp === 1 : rp.vpp !== 1)
                 );
@@ -1109,10 +1118,10 @@ export const CustomerFormPage = () => {
                     matchedRatePlan = ratePlans.find(rp => {
                         if (rp.state?.toLowerCase() !== currentState) return false;
                         if (formData.vpp ? rp.vpp !== 1 : rp.vpp === 1) return false;
-                        
+
                         const activeOffer = rp.offers?.find((o: any) => !o.isDeleted && o.isActive !== false);
                         if (!activeOffer) return false;
-                        
+
                         return (parseFloat(String(activeOffer.cl1Usage || 0)) > 0 || parseFloat(String(activeOffer.cl2Usage || 0)) > 0);
                     });
                 }
@@ -1907,6 +1916,17 @@ export const CustomerFormPage = () => {
                 }
             }
 
+            // Trigger PDRS email if applicable (only on update as requested)
+            if (isEditMode && !isUpdateOnly && isPdrs && savedCustomer?.uid && finalStatus === 2) {
+                try {
+                    await sendPdrsConsentEmail({ variables: { customerUid: savedCustomer.uid } });
+                    toast.success('PDRS consent email sent successfully');
+                } catch (emailErr) {
+                    console.error('[PDRS] Failed to send consent email:', emailErr);
+                    toast.error('Customer saved but PDRS email failed to send');
+                }
+            }
+
             // Clear customer cache to ensure fresh data on customers page
             apolloClient.cache.evict({ fieldName: 'customers' });
             apolloClient.cache.evict({ fieldName: 'customersCursor' });
@@ -1914,6 +1934,22 @@ export const CustomerFormPage = () => {
 
             // Handle redirection
             const customerUid = savedCustomer?.uid || uid;
+
+            // If we came from approvals, mark the enrollment as processed
+            if (fromApprovals && approvalUid) {
+                try {
+                    await markEnrollmentProcessed({ variables: { uid: approvalUid } });
+                    console.log('[Approvals] Marked web enrollment as processed:', approvalUid);
+                } catch (err) {
+                    console.error('[Approvals] Failed to mark enrollment as processed:', err);
+                }
+            }
+
+            if (fromApprovals) {
+                navigate('/customers/approvals');
+                return;
+            }
+
             if (finalStatus === 2 && customerUid) {
                 // Redirect to details page if an offer was sent
                 navigate(`/customers/${customerUid}`);
@@ -2024,6 +2060,28 @@ export const CustomerFormPage = () => {
         }
     };
 
+    const handlePreviewPdrsConsent = async () => {
+        setIsLoadingEmailPreview(true);
+        setPreviewStep('email');
+        setPreviewModalOpen(true);
+        try {
+            const { data } = await fetchSystemTemplate({
+                variables: { eventType: 'CUSTOMER_DRAFT' },
+                fetchPolicy: 'network-only'
+            });
+            if (data?.previewSystemTemplate) {
+                setEmailPreview(data.previewSystemTemplate);
+            } else {
+                toast.error('Could not load PDRS consent template');
+            }
+        } catch (error) {
+            console.error('Failed to fetch PDRS consent preview:', error);
+            toast.error('Failed to load PDRS consent preview');
+        } finally {
+            setIsLoadingEmailPreview(false);
+        }
+    };
+
     const handleNextToEmailPreview = async () => {
         setIsLoadingEmailPreview(true);
         try {
@@ -2046,9 +2104,9 @@ export const CustomerFormPage = () => {
         }
     };
 
-    const handleBackToOfferPreview = () => {
-        setPreviewStep('offer');
-    };
+    // const handleBackToOfferPreview = () => {
+    //     setPreviewStep('offer');
+    // };
 
     const handleDownloadPreview = async () => {
         if (!previewData) return;
@@ -2472,24 +2530,24 @@ export const CustomerFormPage = () => {
                                                     onChange={setAddressSearch}
                                                     onSelect={(place) => {
                                                         setAddressSearch(place.address);
-                                                    const unitNumber = place.unitNumber || '';
-                                                    const streetNumber = place.streetNumber || '';
-                                                    const houseNumber = place.houseNumber || '';
+                                                        const unitNumber = place.unitNumber || '';
+                                                        const streetNumber = place.streetNumber || '';
+                                                        const houseNumber = place.houseNumber || '';
 
-                                                    const newAddressData = {
-                                                        unitNumber,
-                                                        houseNumber: (houseNumber === streetNumber || houseNumber === unitNumber) ? '' : houseNumber,
-                                                        buildingName: place.buildingName || '',
-                                                        floorLevelNumber: place.floorLevelNumber || '',
-                                                        streetNumber,
-                                                        streetName: place.streetName || '',
-                                                        streetType: place.streetType || '',
-                                                        suburb: place.suburb || '',
-                                                        state: place.state || '',
-                                                        postcode: place.postcode || '',
-                                                        country: place.country || 'Australia',
-                                                    };
-                                                    setFormData(prev => ({ ...prev, ...newAddressData }));
+                                                        const newAddressData = {
+                                                            unitNumber,
+                                                            houseNumber: (houseNumber === streetNumber || houseNumber === unitNumber) ? '' : houseNumber,
+                                                            buildingName: place.buildingName || '',
+                                                            floorLevelNumber: place.floorLevelNumber || '',
+                                                            streetNumber,
+                                                            streetName: place.streetName || '',
+                                                            streetType: place.streetType || '',
+                                                            suburb: place.suburb || '',
+                                                            state: place.state || '',
+                                                            postcode: place.postcode || '',
+                                                            country: place.country || 'Australia',
+                                                        };
+                                                        setFormData(prev => ({ ...prev, ...newAddressData }));
                                                         // Immediately check for duplicate address
                                                         checkAddressDuplicate(newAddressData);
                                                     }}
@@ -3367,12 +3425,14 @@ export const CustomerFormPage = () => {
                                         )}
                                         <Button
                                             type="button"
-                                            onClick={() => handlePreviewOffer(uid || 'new')}
-                                            isLoading={submittingStatus === 1}
+                                            onClick={() => (isPdrs && isEditMode) ? handlePreviewPdrsConsent() : handlePreviewOffer(uid || 'new')}
+                                            isLoading={submittingStatus === 1 || isLoadingEmailPreview}
                                             disabled={submittingStatus !== null}
                                             loadingText="Saving..."
                                         >
-                                            {isEditMode ? 'Update & Send Email' : 'Create Customer & Send Email'}
+                                            {isPdrs && isEditMode
+                                                ? 'Update & Send PDRS Email'
+                                                : (isEditMode ? 'Update & Send Email' : 'Create Customer & Send Email')}
                                         </Button>
                                     </>
                                 )}
@@ -3594,7 +3654,7 @@ export const CustomerFormPage = () => {
                         setIsLoadingPreview(false);
                         setPreviewStep('offer');
                     }}
-                    title={previewStep === 'offer' ? "Offer Preview" : "Email Preview"}
+                    title={previewStep === 'offer' ? "Offer Preview" : ((isPdrs && isEditMode) ? "PDRS Consent Preview" : "Email Preview")}
                     size="full"
                 >
                     {previewStep === 'offer' ? (
@@ -3704,12 +3764,12 @@ export const CustomerFormPage = () => {
                             </>
                         ) : (
                             <>
-                                <Button
+                                {/* <Button
                                     variant="outline"
                                     onClick={handleBackToOfferPreview}
                                 >
                                     Back to Offer
-                                </Button>
+                                </Button> */}
                                 <Button
                                     variant="outline"
                                     onClick={() => {
@@ -3722,10 +3782,18 @@ export const CustomerFormPage = () => {
                                 </Button>
                                 <Button
                                     className="bg-neutral-900 text-white hover:bg-neutral-800"
-                                    onClick={() => {
-                                        setPreviewModalOpen(false);
-                                        setPreviewStep('offer');
-                                        handleSubmit(1);
+                                    isLoading={submittingStatus !== null}
+                                    onClick={async () => {
+                                        if (isPdrs && isEditMode) {
+                                            // For PDRS, keep modal open until process finishes
+                                            await handleSubmit(customerData?.customer?.status || 2);
+                                            setPreviewModalOpen(false);
+                                            setPreviewStep('offer');
+                                        } else {
+                                            setPreviewModalOpen(false);
+                                            setPreviewStep('offer');
+                                            handleSubmit(1);
+                                        }
                                     }}
                                 >
                                     Confirm & Send

@@ -319,3 +319,24 @@ export const ASSIGN_CUSTOMER = gql`
         }
     }
 `;
+
+export const UPDATE_WEB_ENROLLMENT_CONSENT = gql`
+    mutation UpdateWebEnrollmentConsent($uid: String!, $isRead: Boolean!) {
+        updateWebEnrollmentConsent(uid: $uid, isRead: $isRead)
+    }
+`;
+
+export const MARK_WEB_ENROLLMENT_PROCESSED = gql`
+    mutation MarkWebEnrollmentProcessed($uid: String!) {
+        markWebEnrollmentProcessed(uid: $uid)
+    }
+`;
+
+export const SEND_PDRS_CONSENT_EMAIL = gql`
+    mutation SendPdrsConsentEmail($customerUid: String!) {
+        sendPdrsConsentEmail(customerUid: $customerUid) {
+            success
+            message
+        }
+    }
+`;
