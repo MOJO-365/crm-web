@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
-import { GET_WEB_ENROLLMENT_BY_UID } from '@/graphql/queries/customers';
+import { GET_WEB_ENROLLMENT_BY_UID, GET_CUSTOMER_BY_ID } from '@/graphql/queries/customers';
 import { GET_RATE_PLAN_BY_CODE } from '@/graphql/queries/rates';
-import { UPDATE_WEB_ENROLLMENT_CONSENT } from '@/graphql/mutations/customers';
-import { MailIcon, PhoneIcon, ActivityIcon, CheckIcon, ZapIcon, InfoIcon, ChevronLeftIcon, UserIcon, MapPinIcon, HashIcon } from '@/components/icons';
+import { UPDATE_WEB_ENROLLMENT_CONSENT, UPDATE_CUSTOMER } from '@/graphql/mutations/customers';
+import { MailIcon, PhoneIcon, ActivityIcon, CheckIcon, ZapIcon, InfoIcon, ChevronLeftIcon, UserIcon, MapPinIcon } from '@/components/icons';
 import { ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { getData as getCountries } from 'country-list';
 import MainLogo from '@/assets/main-logo-dark-1.png';
@@ -17,6 +18,7 @@ export const CustomerViewPage: React.FC = () => {
     const [step, setStep] = useState<'consent' | 'rates' | 'review' | 'idcheck'>('consent');
     const [idConfirmed, setIdConfirmed] = useState(false);
     const [isChecked, setIsChecked] = useState(false);
+    const [isNominationConfirmed, setIsNominationConfirmed] = useState(false);
     const [idForm, setIdForm] = useState({
         idType: '',
         idnumber: '',
@@ -24,7 +26,6 @@ export const CustomerViewPage: React.FC = () => {
         idexpiary: '',
         idstate: '',
         idcountry: '',
-        connectionDate: '',
         medicareCardType: '0',
         medicareIrn: '',
         // Property details (editable in review step)
@@ -39,22 +40,30 @@ export const CustomerViewPage: React.FC = () => {
         phone: '',
         title: '',
         dob: '',
+        connectionDate: '',
     });
     const [idFormInit, setIdFormInit] = useState(false);
 
     const { data: enrollmentData, loading: enrollmentLoading, error: enrollmentError } = useQuery(GET_WEB_ENROLLMENT_BY_UID, {
         variables: { uid },
         skip: !uid,
-        onCompleted: (data) => {
-            if (data?.webEnrollmentByUid?.isConsentRead) {
-                setIsChecked(true);
-            }
-        }
     });
+
+    const { data: customerData } = useQuery(GET_CUSTOMER_BY_ID, {
+        variables: { uid },
+        skip: !uid,
+    });
+
+    useEffect(() => {
+        if (customerData?.customer?.isConsentRead !== undefined) {
+            setIsChecked(!!customerData.customer.isConsentRead);
+        }
+    }, [customerData]);
 
     const enrollment = enrollmentData?.webEnrollmentByUid;
     const payload = enrollment?.payload || {};
     const tariffCode = payload.tariffCode || payload.tariffcode || "EA025";
+    const customerIdDisplay = customerData?.customer?.customerId || customerData?.customer?.id || payload?.customerId || payload?.customer_id || 'Pending';
 
     const { data: ratesData, loading: ratesLoading } = useQuery(GET_RATE_PLAN_BY_CODE, {
         variables: { code: tariffCode },
@@ -62,6 +71,7 @@ export const CustomerViewPage: React.FC = () => {
     });
 
     const [updateConsent] = useMutation(UPDATE_WEB_ENROLLMENT_CONSENT);
+    const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
 
     const handleToggleConsent = async (checked: boolean) => {
         setIsChecked(checked);
@@ -79,6 +89,43 @@ export const CustomerViewPage: React.FC = () => {
     const handleNext = () => {
         if (isChecked) {
             setStep('rates');
+        }
+    };
+
+    const handleFinishEnrollment = async () => {
+        if (!uid || !idConfirmed) return;
+
+        try {
+            await updateCustomer({
+                variables: {
+                    uid,
+                    input: {
+                        enrollmentDetails: {
+                            idtype: parseInt(idForm.idType),
+                            idnumber: idForm.idnumber,
+                            idstate: idForm.idstate,
+                            idcountry: idForm.idcountry,
+                            idexpiry: idForm.idexpiary,
+                            licenseCardNumber: idForm.licenseCardNumber,
+                            medicareCardType: idForm.medicareCardType,
+                            medicareIrn: idForm.medicareIrn,
+                            connectiondate: idForm.connectionDate,
+                        },
+                        // Also update top-level customer fields if they were edited in review (optional)
+                        dob: idForm.dob,
+                        medicareIrn: idForm.medicareIrn,
+                        medicareCardType: idForm.medicareCardType,
+                        status: 1, // Mark as Submitted/Processing
+                        triggerWelcomeEmail: false,
+                        triggerUpdateEmail: false,
+                    }
+                }
+            });
+            toast.success('Application submitted successfully!');
+            // Redirect or show success state
+        } catch (err) {
+            console.error('Failed to finish enrollment', err);
+            toast.error('Failed to submit application. Please try again.');
         }
     };
 
@@ -114,7 +161,7 @@ export const CustomerViewPage: React.FC = () => {
         return (
             <div className="h-screen flex flex-col bg-white overflow-hidden font-sans">
                 {/* Header Section - Fixed */}
-                <header className="flex-none bg-white border-b border-slate-100 py-6 px-4 flex justify-center items-center z-10 shadow-sm">
+                <header className="flex-none bg-white border-b border-slate-100 py-6 px-4 flex justify-center items-center z-10 shadow-sm relative">
                     <img src={MainLogo} alt="GEE Energy" className="h-10 md:h-12" />
                 </header>
 
@@ -205,372 +252,435 @@ export const CustomerViewPage: React.FC = () => {
 
     if (step === 'rates') {
         return (
-        <div className="h-screen flex flex-col bg-white overflow-hidden font-sans">
-            {/* Same Header as Consent */}
-            <header className="flex-none bg-white border-b border-slate-100 py-6 px-4 flex justify-center items-center z-10 shadow-sm">
-                <img src={MainLogo} alt="GEE Energy" className="h-10 md:h-12" />
-            </header>
+            <div className="h-screen flex flex-col bg-white overflow-hidden font-sans">
+                {/* Same Header as Consent */}
+                <header className="flex-none bg-white border-b border-slate-100 py-6 px-4 flex justify-center items-center z-10 shadow-sm relative">
+                    <img src={MainLogo} alt="GEE Energy" className="h-10 md:h-12" />
 
-            {/* Scrollable Content */}
-            <main className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/30">
-                <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 space-y-6">
-                    {/* Back + Title */}
-                    <div className="flex items-center justify-between">
-                        <button
-                            onClick={() => setStep('consent')}
-                            className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                        >
-                            <ChevronLeftIcon className="w-4 h-4" />
-                            Back
-                        </button>
-                        <h1 className="text-lg font-bold text-foreground">Your Energy Rates</h1>
-                        <div className="w-12"></div>
-                    </div>
+                </header>
 
-                    {ratesLoading ? (
-                        <div className="bg-card rounded-xl shadow-sm border border-border p-12 flex flex-col items-center justify-center">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
-                            <p className="text-sm text-muted-foreground font-medium">Loading your plan details...</p>
+                {/* Scrollable Content */}
+                <main className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/30">
+                    <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 space-y-6">
+                        {/* Back + Title */}
+                        <div className="flex items-center justify-between">
+                            <button
+                                onClick={() => setStep('consent')}
+                                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                            >
+                                <ChevronLeftIcon className="w-4 h-4" />
+                                Back
+                            </button>
+                            <h1 className="text-lg font-bold text-foreground">Your Energy Rates</h1>
+                            <div className="w-12"></div>
                         </div>
-                    ) : mainOffer ? (
-                        <>
-                            {/* Tariff Info */}
-                            <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-5">
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                    <div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">Tariff Code</div>
-                                        <div className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">{tariffCode}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">Plan</div>
-                                        <div className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">{ratePlan?.tariff || '—'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">State</div>
-                                        <div className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">{ratePlan?.state || 'NSW'}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">Type</div>
-                                        <div className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">{ratePlan?.type === 1 ? 'Business' : 'Residential'}</div>
-                                    </div>
-                                </div>
+
+                        {ratesLoading ? (
+                            <div className="bg-card rounded-xl shadow-sm border border-border p-12 flex flex-col items-center justify-center">
+                                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
+                                <p className="text-sm text-muted-foreground font-medium">Loading your plan details...</p>
                             </div>
-
-                            {/* Rates Card */}
-                            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-                                <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 px-5 py-4 border-b border-border">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
-                                            <ZapIcon size={18} className="text-white" />
+                        ) : mainOffer ? (
+                            <>
+                                {/* Tariff Info */}
+                                <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-5">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                        <div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">Tariff Code</div>
+                                            <div className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">{tariffCode}</div>
                                         </div>
-                                        <h3 className="text-sm font-semibold text-foreground">Usage & Supply Charges</h3>
+                                        <div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">Plan</div>
+                                            <div className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">{ratePlan?.tariff || '—'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">State</div>
+                                            <div className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">{ratePlan?.state || 'NSW'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">Type</div>
+                                            <div className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">{ratePlan?.type === 1 ? 'Business' : 'Residential'}</div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="p-5">
-                                    <div className="flex flex-wrap gap-x-10 gap-y-8">
-                                        {/* Energy Rates */}
-                                        {(() => {
-                                            const rates = [
-                                                mainOffer.anytime > 0 && { label: 'Anytime', value: mainOffer.anytime, color: 'orange' },
-                                                mainOffer.peak > 0 && { label: 'Peak', value: mainOffer.peak, color: 'blue' },
-                                                mainOffer.shoulder > 0 && { label: 'Shoulder', value: mainOffer.shoulder, color: 'blue' },
-                                                mainOffer.offPeak > 0 && { label: 'Off-Peak', value: mainOffer.offPeak, color: 'blue' },
-                                            ].filter(Boolean) as { label: string; value: number; color: string }[];
-                                            if (!rates.length) return null;
-                                            const cls: Record<string, string> = {
-                                                blue: "bg-blue-50 border-blue-200 text-blue-600",
-                                                orange: "bg-orange-50 border-orange-200 text-orange-600",
-                                            };
-                                            return (
+                                {/* Rates Card */}
+                                <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 px-5 py-4 border-b border-border">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
+                                                <ZapIcon size={18} className="text-white" />
+                                            </div>
+                                            <h3 className="text-sm font-semibold text-foreground">Usage & Supply Charges</h3>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-5">
+                                        <div className="flex flex-wrap gap-x-10 gap-y-8">
+                                            {/* Energy Rates */}
+                                            {(() => {
+                                                const rates = [
+                                                    mainOffer.anytime > 0 && { label: 'Anytime', value: mainOffer.anytime, color: 'orange' },
+                                                    mainOffer.peak > 0 && { label: 'Peak', value: mainOffer.peak, color: 'blue' },
+                                                    mainOffer.shoulder > 0 && { label: 'Shoulder', value: mainOffer.shoulder, color: 'blue' },
+                                                    mainOffer.offPeak > 0 && { label: 'Off-Peak', value: mainOffer.offPeak, color: 'blue' },
+                                                ].filter(Boolean) as { label: string; value: number; color: string }[];
+                                                if (!rates.length) return null;
+                                                const cls: Record<string, string> = {
+                                                    blue: "bg-blue-50 border-blue-200 text-blue-600",
+                                                    orange: "bg-orange-50 border-orange-200 text-orange-600",
+                                                };
+                                                return (
+                                                    <div className="space-y-3 min-w-[180px] flex-1">
+                                                        <div className="flex items-center gap-2 text-blue-500">
+                                                            <ActivityIcon size={15} />
+                                                            <h4 className="text-xs font-bold uppercase tracking-wide">Energy Rates</h4>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            {rates.map((r, i) => (
+                                                                <div key={i} className={`${cls[r.color]} border rounded-lg p-2.5 text-center transition-all hover:shadow-sm`}>
+                                                                    <div className="font-bold text-sm">${r.value.toFixed(4)}/kWh</div>
+                                                                    <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">{r.label}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* Supply */}
+                                            <div className="space-y-3 min-w-[180px] flex-1">
+                                                <div className="flex items-center gap-2 text-purple-500">
+                                                    <ActivityIcon size={15} />
+                                                    <h4 className="text-xs font-bold uppercase tracking-wide">Supply Charges</h4>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="bg-purple-50 border-purple-200 text-purple-600 border rounded-lg p-2.5 text-center transition-all hover:shadow-sm">
+                                                        <div className="font-bold text-sm">${mainOffer.supplyCharge.toFixed(4)}/day</div>
+                                                        <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">Supply</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Controlled Load */}
+                                            {(mainOffer.cl1Usage > 0 || mainOffer.cl2Usage > 0) && (
                                                 <div className="space-y-3 min-w-[180px] flex-1">
-                                                    <div className="flex items-center gap-2 text-blue-500">
+                                                    <div className="flex items-center gap-2 text-green-500">
                                                         <ActivityIcon size={15} />
-                                                        <h4 className="text-xs font-bold uppercase tracking-wide">Energy Rates</h4>
+                                                        <h4 className="text-xs font-bold uppercase tracking-wide">Controlled Load</h4>
                                                     </div>
                                                     <div className="space-y-2">
-                                                        {rates.map((r, i) => (
-                                                            <div key={i} className={`${cls[r.color]} border rounded-lg p-2.5 text-center transition-all hover:shadow-sm`}>
-                                                                <div className="font-bold text-sm">${r.value.toFixed(4)}/kWh</div>
-                                                                <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">{r.label}</div>
+                                                        {mainOffer.cl1Usage > 0 && (
+                                                            <div className="bg-green-50 border-green-200 text-green-600 border rounded-lg p-2.5 text-center transition-all hover:shadow-sm">
+                                                                <div className="font-bold text-sm">${mainOffer.cl1Usage.toFixed(4)}/kWh</div>
+                                                                <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">CL1 Usage</div>
                                                             </div>
-                                                        ))}
+                                                        )}
+                                                        {mainOffer.cl2Usage > 0 && (
+                                                            <div className="bg-green-50 border-green-200 text-green-600 border rounded-lg p-2.5 text-center transition-all hover:shadow-sm">
+                                                                <div className="font-bold text-sm">${mainOffer.cl2Usage.toFixed(4)}/kWh</div>
+                                                                <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">CL2 Usage</div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
-                                            );
-                                        })()}
+                                            )}
 
-                                        {/* Supply */}
-                                        <div className="space-y-3 min-w-[180px] flex-1">
-                                            <div className="flex items-center gap-2 text-purple-500">
-                                                <ActivityIcon size={15} />
-                                                <h4 className="text-xs font-bold uppercase tracking-wide">Supply Charges</h4>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <div className="bg-purple-50 border-purple-200 text-purple-600 border rounded-lg p-2.5 text-center transition-all hover:shadow-sm">
-                                                    <div className="font-bold text-sm">${mainOffer.supplyCharge.toFixed(4)}/day</div>
-                                                    <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">Supply</div>
+                                            {/* Solar FiT */}
+                                            {mainOffer.fit > 0 && (
+                                                <div className="space-y-3 min-w-[180px] flex-1">
+                                                    <div className="flex items-center gap-2 text-teal-500">
+                                                        <ZapIcon size={15} />
+                                                        <h4 className="text-xs font-bold uppercase tracking-wide">Solar FiT</h4>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <div className="bg-teal-50 border-teal-200 text-teal-600 border rounded-lg p-2.5 text-center transition-all hover:shadow-sm">
+                                                            <div className="font-bold text-sm">${mainOffer.fit.toFixed(4)}/kWh</div>
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">Feed-in</div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
+                                    </div>
 
-                                        {/* Controlled Load */}
-                                        {(mainOffer.cl1Usage > 0 || mainOffer.cl2Usage > 0) && (
-                                            <div className="space-y-3 min-w-[180px] flex-1">
-                                                <div className="flex items-center gap-2 text-green-500">
-                                                    <ActivityIcon size={15} />
-                                                    <h4 className="text-xs font-bold uppercase tracking-wide">Controlled Load</h4>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    {mainOffer.cl1Usage > 0 && (
-                                                        <div className="bg-green-50 border-green-200 text-green-600 border rounded-lg p-2.5 text-center transition-all hover:shadow-sm">
-                                                            <div className="font-bold text-sm">${mainOffer.cl1Usage.toFixed(4)}/kWh</div>
-                                                            <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">CL1 Usage</div>
-                                                        </div>
-                                                    )}
-                                                    {mainOffer.cl2Usage > 0 && (
-                                                        <div className="bg-green-50 border-green-200 text-green-600 border rounded-lg p-2.5 text-center transition-all hover:shadow-sm">
-                                                            <div className="font-bold text-sm">${mainOffer.cl2Usage.toFixed(4)}/kWh</div>
-                                                            <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">CL2 Usage</div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Solar FiT */}
-                                        {mainOffer.fit > 0 && (
-                                            <div className="space-y-3 min-w-[180px] flex-1">
-                                                <div className="flex items-center gap-2 text-teal-500">
-                                                    <ZapIcon size={15} />
-                                                    <h4 className="text-xs font-bold uppercase tracking-wide">Solar FiT</h4>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <div className="bg-teal-50 border-teal-200 text-teal-600 border rounded-lg p-2.5 text-center transition-all hover:shadow-sm">
-                                                        <div className="font-bold text-sm">${mainOffer.fit.toFixed(4)}/kWh</div>
-                                                        <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">Feed-in</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
+                                    <div className="px-5 py-3 bg-muted/50 border-t border-border">
+                                        <p className="text-xs text-muted-foreground">
+                                            All rates are inclusive of GST. Controlled load rates apply to separately metered appliances.
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div className="px-5 py-3 bg-muted/50 border-t border-border">
-                                    <p className="text-xs text-muted-foreground">
-                                        All rates are inclusive of GST. Controlled load rates apply to separately metered appliances.
+                                {/* VPP Terms Link */}
+                                <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex items-center gap-3">
+                                    <InfoIcon className="w-5 h-5 text-blue-500 flex-none" />
+                                    <p className="text-sm font-medium text-blue-800 leading-relaxed">
+                                        Please review the <a href="https://gee.com.au/virtual-power-plant-customer-charter-terms-and-conditions-v1.2" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-900 transition-colors">Virtual Power Plant Customer Charter Terms and Conditions</a> which apply to this plan.
                                     </p>
                                 </div>
+                            </>
+                        ) : (
+                            <div className="bg-card rounded-xl shadow-sm border border-border p-12 text-center">
+                                <InfoIcon className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                                <h2 className="text-lg font-bold text-foreground mb-1">No Rates Available</h2>
+                                <p className="text-sm text-muted-foreground">No details for tariff: <span className="font-bold text-foreground">{tariffCode}</span></p>
                             </div>
-                        </>
-                    ) : (
-                        <div className="bg-card rounded-xl shadow-sm border border-border p-12 text-center">
-                            <InfoIcon className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-                            <h2 className="text-lg font-bold text-foreground mb-1">No Rates Available</h2>
-                            <p className="text-sm text-muted-foreground">No details for tariff: <span className="font-bold text-foreground">{tariffCode}</span></p>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Footer */}
-                    <div className="text-center pt-2 pb-4">
-                        <p className="text-xs text-muted-foreground mb-3">Need help?</p>
-                        <div className="flex justify-center gap-3">
-                            <a href="tel:1300707042" className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground font-medium hover:shadow-sm transition-all">
-                                <PhoneIcon size={14} className="text-green-500" />
-                                1300 707 042
-                            </a>
-                            <a href="mailto:customerservice@gee.com.au" className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground font-medium hover:shadow-sm transition-all">
-                                <MailIcon size={14} className="text-green-500" />
-                                Email
-                            </a>
+                        {/* Footer */}
+                        <div className="text-center pt-2 pb-4">
+                            <p className="text-xs text-muted-foreground mb-3">Need help?</p>
+                            <div className="flex justify-center gap-3">
+                                <a href="tel:1300707042" className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground font-medium hover:shadow-sm transition-all">
+                                    <PhoneIcon size={14} className="text-green-500" />
+                                    1300 707 042
+                                </a>
+                                <a href="mailto:customerservice@gee.com.au" className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground font-medium hover:shadow-sm transition-all">
+                                    <MailIcon size={14} className="text-green-500" />
+                                    Email
+                                </a>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </main>
+                </main>
 
-            {/* Fixed Footer */}
-            {mainOffer && (
-                <footer className="flex-none bg-white border-t border-slate-100 px-4 py-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
-                    <div className="max-w-3xl mx-auto">
-                        <Button
-                            fullWidth
-                            size="lg"
-                            className="h-14 text-lg font-bold rounded-2xl transition-all duration-300 shadow-lg shadow-primary/20"
-                            onClick={() => setStep('review')}
-                        >
-                            Review Your Details
-                        </Button>
-                    </div>
-                </footer>
-            )}
-        </div>
-    );
+                {/* Fixed Footer */}
+                {mainOffer && (
+                    <footer className="flex-none bg-white border-t border-slate-100 px-4 py-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+                        <div className="max-w-3xl mx-auto">
+                            <Button
+                                fullWidth
+                                size="lg"
+                                className="h-14 text-lg font-bold rounded-2xl transition-all duration-300 shadow-lg shadow-primary/20"
+                                onClick={() => setStep('idcheck')}
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </footer>
+                )}
+            </div>
+        );
     }
 
     // === STEP 3: REVIEW ===
     if (step === 'review') {
         return (
-        <div className="h-screen flex flex-col bg-white overflow-hidden font-sans">
-            <header className="flex-none bg-white border-b border-slate-100 py-6 px-4 flex justify-center items-center z-10 shadow-sm">
-                <img src={MainLogo} alt="GEE Energy" className="h-10 md:h-12" />
-            </header>
+            <div className="h-screen flex flex-col bg-white overflow-hidden font-sans">
+                <header className="flex-none bg-white border-b border-slate-100 py-6 px-4 flex justify-center items-center z-10 shadow-sm relative">
+                    <img src={MainLogo} alt="GEE Energy" className="h-10 md:h-12" />
+                </header>
 
-            <main className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/30">
-                <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 space-y-6">
-                    {/* Back + Title */}
-                    <div className="flex items-center justify-between">
-                        <button
-                            onClick={() => setStep('rates')}
-                            className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                        >
-                            <ChevronLeftIcon className="w-4 h-4" />
-                            Back
-                        </button>
-                        <h1 className="text-lg font-bold text-foreground">Review Your Details</h1>
-                        <div className="w-12"></div>
-                    </div>
-
-                    {/* Cards Grid - 2 per row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Personal Info */}
-                        <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-5">
-                            <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                                <UserIcon size={16} className="text-blue-500" />
-                                Personal Information
-                            </h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Title</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.title || '—'}</div>
-                                </div>
-                                <div className="hidden md:block"></div>
-                                <div>
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">First Name</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.firstname || '—'}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Last Name</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.lastname || '—'}</div>
-                                </div>
-                                <div className="col-span-2">
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Date of Birth</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.dob || '—'}</div>
-                                </div>
-                                <div className="col-span-2">
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Email</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5 truncate">{payload.email || '—'}</div>
-                                </div>
-                                <div className="col-span-2">
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Phone</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.number || payload.phone || '—'}</div>
-                                </div>
+                <main className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/30">
+                    <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 space-y-6">
+                        {/* Back + Title */}
+                        <div className="flex items-center justify-between">
+                            <button
+                                onClick={() => setStep('idcheck')}
+                                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                            >
+                                <ChevronLeftIcon className="w-4 h-4" />
+                                Back
+                            </button>
+                            <div className="flex flex-col items-center">
+                                <h1 className="text-lg font-bold text-foreground">Review Your Details</h1>
+                                <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full mt-1">
+                                    Customer ID: {customerIdDisplay}
+                                </span>
                             </div>
+                            <div className="w-12"></div>
                         </div>
 
-                        {/* Property Details */}
-                        <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-5">
-                            <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                                <MapPinIcon size={16} className="text-emerald-500" />
-                                Property Details
-                            </h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="col-span-2">
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Address</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.address || '—'}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">NMI</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.nmi || '—'}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">State</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.stateOrTerritory || payload.jurisdictionCode || '—'}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Postcode</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.postcode || '—'}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Connection Date</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.connectionDate || payload.connection_date || '—'}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Tariff Code</div>
-                                    <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.tariffcode || payload.tariffCode || payload.tariff_code || payload.tariff || '—'}</div>
-                                </div>
-                            </div>
-                        </div>
+                        {/* Consolidated Summary Card */}
+                        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
 
-
-                        {/* Installer Details */}
-                        {payload.createdBy && (
-                            <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-5">
-                                <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                                    <InfoIcon size={16} className="text-amber-500" />
-                                    Installer Details
+                            {/* Personal Info */}
+                            <div className="p-5 sm:p-8 hover:bg-slate-50/50 transition-colors">
+                                <h3 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-3">
+                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg shrink-0">
+                                        <UserIcon size={16} />
+                                    </div>
+                                    Personal Information
                                 </h3>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
                                     <div>
-                                        <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Company</div>
-                                        <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.createdBy.company_name || '—'}</div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">First Name</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.firstname || '—'}</div>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Contact</div>
-                                        <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.createdBy.first_name} {payload.createdBy.last_name}</div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Last Name</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.lastname || '—'}</div>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Email</div>
-                                        <div className="text-sm font-semibold text-gray-900 mt-0.5 truncate">{payload.createdBy.email || '—'}</div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Date of Birth</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{idForm.dob || payload.dob || '—'}</div>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">ABN</div>
-                                        <div className="text-sm font-semibold text-gray-900 mt-0.5">{payload.createdBy.abn || '—'}</div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Phone</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.number || payload.phone || '—'}</div>
+                                    </div>
+                                    <div className="sm:col-span-2 md:col-span-4">
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Email</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1 truncate">{payload.email || '—'}</div>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Property Details */}
+                            <div className="p-5 sm:p-8 hover:bg-slate-50/50 transition-colors">
+                                <h3 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg shrink-0">
+                                        <MapPinIcon size={16} />
+                                    </div>
+                                    Property Details
+                                </h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Address</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.address || '—'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">NMI</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.nmi || '—'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Identity & Connection Details */}
+                            <div className="p-5 sm:p-8 hover:bg-slate-50/50 transition-colors">
+                                <h3 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-3">
+                                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg shrink-0">
+                                        <ActivityIcon size={16} />
+                                    </div>
+                                    Identity & Connection
+                                </h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                                    <div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Connection Date</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{idForm.connectionDate || '—'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">ID Type</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">
+                                            {ID_TYPE_OPTIONS.find(o => o.value === idForm.idType)?.label || '—'}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">
+                                            {idForm.idType === '1' ? 'Medicare Number' : 'ID Number'}
+                                        </div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{idForm.idnumber || '—'}</div>
+                                    </div>
+                                    {idForm.idType === '0' && (
+                                        <div>
+                                            <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Card Number</div>
+                                            <div className="text-sm font-semibold text-slate-900 mt-1">{idForm.licenseCardNumber || '—'}</div>
+                                        </div>
+                                    )}
+                                    {idForm.idType === '1' && (
+                                        <div>
+                                            <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">IRN</div>
+                                            <div className="text-sm font-semibold text-slate-900 mt-1">{idForm.medicareIrn || '—'}</div>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Expiry Date</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{idForm.idexpiary || '—'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">State/Country</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{idForm.idstate || idForm.idcountry || '—'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Installer Details */}
+                            {payload.createdBy && (
+                                <div className="p-5 sm:p-8 hover:bg-slate-50/50 transition-colors">
+                                    <h3 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-3">
+                                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
+                                            <InfoIcon size={16} />
+                                        </div>
+                                        Installer Details
+                                    </h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                                        <div>
+                                            <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Company</div>
+                                            <div className="text-sm font-semibold text-slate-900 mt-1">{payload.createdBy.company_name || '—'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Contact</div>
+                                            <div className="text-sm font-semibold text-slate-900 mt-1">{payload.createdBy.first_name} {payload.createdBy.last_name}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">ABN</div>
+                                            <div className="text-sm font-semibold text-slate-900 mt-1">{payload.createdBy.abn || '—'}</div>
+                                        </div>
+                                        <div className="sm:col-span-2 md:col-span-4">
+                                            <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Email</div>
+                                            <div className="text-sm font-semibold text-slate-900 mt-1 truncate">{payload.createdBy.email || '—'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+
+                        {/* PDRS Badge */}
+                        {payload.isPdrs && (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+                                <CheckIcon className="w-5 h-5 text-emerald-600" />
+                                <p className="text-sm font-medium text-emerald-800">This enrollment was submitted via the PDRS portal ({payload.portalname || 'Portal'}).</p>
                             </div>
                         )}
-                    </div>
 
-                    {/* PDRS Badge */}
-                    {payload.isPdrs && (
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
-                            <CheckIcon className="w-5 h-5 text-emerald-600" />
-                            <p className="text-sm font-medium text-emerald-800">This enrollment was submitted via the PDRS portal ({payload.portalname || 'Portal'}).</p>
-                        </div>
-                    )}
-
-                    {/* Footer */}
-                    <div className="text-center pt-2 pb-4">
-                        <p className="text-xs text-muted-foreground mb-3">Need help?</p>
-                        <div className="flex justify-center gap-3">
-                            <a href="tel:1300707042" className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground font-medium hover:shadow-sm transition-all">
-                                <PhoneIcon size={14} className="text-green-500" />
-                                1300 707 042
-                            </a>
-                            <a href="mailto:customerservice@gee.com.au" className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground font-medium hover:shadow-sm transition-all">
-                                <MailIcon size={14} className="text-green-500" />
-                                Email
-                            </a>
+                        {/* Footer */}
+                        <div className="text-center pt-2 pb-4">
+                            <p className="text-xs text-muted-foreground mb-3">Need help?</p>
+                            <div className="flex justify-center gap-3">
+                                <a href="tel:1300707042" className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground font-medium hover:shadow-sm transition-all">
+                                    <PhoneIcon size={14} className="text-green-500" />
+                                    1300 707 042
+                                </a>
+                                <a href="mailto:customerservice@gee.com.au" className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground font-medium hover:shadow-sm transition-all">
+                                    <MailIcon size={14} className="text-green-500" />
+                                    Email
+                                </a>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </main>
+                </main>
 
-            {/* Fixed Footer - Next to ID Check */}
-            <footer className="flex-none bg-white border-t border-slate-100 px-4 py-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
-                <div className="max-w-6xl mx-auto">
-                    <Button
-                        fullWidth
-                        size="lg"
-                        className="h-14 text-lg font-bold rounded-2xl transition-all duration-300 shadow-lg shadow-primary/20"
-                        onClick={() => setStep('idcheck')}
-                    >
-                        Next
-                    </Button>
-                </div>
-            </footer>
-        </div>
-    );
+                {/* Fixed Footer - Final Step */}
+                <footer className="flex-none bg-white border-t border-slate-100 px-4 py-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+                    <div className="max-w-6xl mx-auto flex flex-col gap-4">
+                        <label className="flex items-center justify-center gap-3 cursor-pointer group mb-1">
+                            <div className="relative flex items-center shrink-0">
+                                <input
+                                    type="checkbox"
+                                    className="peer h-5 w-5 cursor-pointer appearance-none rounded border border-slate-300 checked:bg-primary checked:border-primary transition-all shadow-sm hover:border-primary"
+                                    checked={isNominationConfirmed}
+                                    onChange={(e) => setIsNominationConfirmed(e.target.checked)}
+                                />
+                                <CheckIcon className="absolute w-3.5 h-3.5 pointer-events-none hidden peer-checked:block text-white left-[3px]" />
+                            </div>
+                            <span className="text-sm font-medium text-slate-700 select-none">
+                                I have read and agree to the <a href="/onboarding/BESS2 and Nomination Form.pdf" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-semibold" onClick={(e) => e.stopPropagation()}>Nomination Form</a>
+                            </span>
+                        </label>
+                        <Button
+                            fullWidth
+                            size="lg"
+                            className={`h-14 text-lg font-bold rounded-2xl transition-all duration-300 ${isNominationConfirmed ? 'shadow-lg shadow-primary/20' : 'opacity-50 grayscale'}`}
+                            disabled={!isNominationConfirmed}
+                            onClick={handleFinishEnrollment}
+                        >
+                            Finish Enrollment
+                        </Button>
+                    </div>
+                </footer>
+            </div>
+        );
     }
 
     // === STEP 4: QUICK ID CHECK ===
@@ -583,7 +693,6 @@ export const CustomerViewPage: React.FC = () => {
             idexpiary: payload.idexpiary || '',
             idstate: payload.idstate || 'NSW',
             idcountry: payload.idcountry || 'Australia',
-            connectionDate: payload.connectionDate || payload.connection_date || '',
             medicareCardType: String(payload.medicareCardType ?? '0'),
             medicareIrn: payload.medicareIrn || '',
             address: payload.address || '',
@@ -596,6 +705,7 @@ export const CustomerViewPage: React.FC = () => {
             phone: payload.number || payload.phone || '',
             title: payload.title || '',
             dob: payload.dob || '',
+            connectionDate: payload.connectionDate || payload.connectiondate || '',
         });
         setIdFormInit(true);
     }
@@ -612,19 +722,32 @@ export const CustomerViewPage: React.FC = () => {
                     {/* Back + Title */}
                     <div className="mb-8 text-center md:text-left">
                         <button
-                            onClick={() => setStep('review')}
+                            onClick={() => setStep('rates')}
                             className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 mb-4"
                         >
                             <ChevronLeftIcon className="w-4 h-4" />
                             Back
                         </button>
-                        <h1 className="text-2xl font-bold text-gray-900">Quick ID Check</h1>
-                        <p className="text-sm text-gray-500 mt-1">We'll verify your details in a few seconds</p>
+                        <h1 className="text-2xl font-bold text-gray-900">Finalize Your Enrollment</h1>
+                        <p className="text-sm text-gray-500 mt-1">Confirm your connection date and verify your identity</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                         {/* LEFT COLUMN: FORM */}
                         <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <DatePicker
+                                    label="Date of Birth"
+                                    value={idForm.dob}
+                                    onChange={(date) => setIdForm(f => ({ ...f, dob: date ? date.toISOString().split('T')[0] : '' }))}
+                                />
+                                <DatePicker
+                                    label="Connection Date"
+                                    value={idForm.connectionDate}
+                                    onChange={(date) => setIdForm(f => ({ ...f, connectionDate: date ? date.toISOString().split('T')[0] : '' }))}
+                                />
+                            </div>
+
                             <Select
                                 label="ID Type"
                                 options={ID_TYPE_OPTIONS}
@@ -681,7 +804,7 @@ export const CustomerViewPage: React.FC = () => {
                                         onChange={(e) => setIdForm(f => ({ ...f, idnumber: e.target.value }))}
                                     />
                                     <Input
-                                        label="IRN (1-9)"
+                                        label="IRN"
                                         placeholder="Enter IRN"
                                         value={idForm.medicareIrn}
                                         onChange={(e) => setIdForm(f => ({ ...f, medicareIrn: e.target.value }))}
@@ -717,14 +840,6 @@ export const CustomerViewPage: React.FC = () => {
                                 </div>
                             )}
 
-                            <div className="pt-4 border-t border-gray-100">
-                                <DatePicker
-                                    label="Connection Date"
-                                    value={idForm.connectionDate}
-                                    onChange={(date) => setIdForm(f => ({ ...f, connectionDate: date ? date.toISOString().split('T')[0] : '' }))}
-                                />
-                            </div>
-
                             {/* Confirmation Checkbox */}
                             <label className="flex items-start gap-3 cursor-pointer group pt-2">
                                 <div className="relative flex items-center mt-0.5">
@@ -749,94 +864,66 @@ export const CustomerViewPage: React.FC = () => {
                                     {/* Physical Licence Guide */}
                                     <div>
                                         <h3 className="text-sm font-bold text-gray-900 mb-3">Physical Licence</h3>
-                                        <div className="bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-200 rounded-2xl p-6 relative shadow-sm">
-                                            <div className="text-xs font-bold text-blue-800 text-center mb-4">{idForm.idstate || 'New South Wales'}</div>
-                                            <div className="flex gap-4">
-                                                <div className="flex-1 space-y-2.5">
-                                                    <div className="h-2.5 bg-blue-300/50 rounded w-3/4"></div>
-                                                    <div className="h-2.5 bg-blue-300/50 rounded w-1/2"></div>
-                                                    <div className="h-2.5 bg-blue-300/50 rounded w-2/3"></div>
-                                                    <div className="mt-4 border-2 border-dashed border-red-400 rounded-lg px-3 py-1.5 inline-block">
-                                                        <span className="text-xs font-bold text-red-600">Licence number</span>
-                                                    </div>
-                                                </div>
-                                                <div className="w-20 h-24 bg-blue-200/60 rounded-xl flex items-center justify-center">
-                                                    <UserIcon size={32} className="text-blue-400" />
-                                                </div>
-                                            </div>
-                                            <div className="absolute top-4 right-4 border-2 border-dashed border-red-400 rounded-lg px-3 py-1.5 bg-white/50 backdrop-blur-sm">
-                                                <span className="text-xs font-bold text-red-600">Card number</span>
-                                            </div>
+                                        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm max-w-[260px]">
+                                            <img
+                                                src={`/Document Images/${(idForm.idstate || 'NSW').toLowerCase()}-licence${['NT', 'SA', 'TAS', 'VIC', 'WA'].includes(idForm.idstate) ? '-front' : idForm.idstate === 'QLD' ? '' : idForm.idstate === 'ACT' ? '' : ''}${idForm.idstate === 'QLD' ? '' : ''}.png`.replace('QLD-licence', 'qld-licenc').replace('TAS-licence', 'tas-licenc').replace('VIC-licence', 'vic-licence')}
+                                                alt="Physical Licence Guide"
+                                                className="w-full h-auto object-contain"
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = '/Document Images/nsw-licence.png';
+                                                }}
+                                            />
                                         </div>
                                     </div>
 
-                                    {/* Digital Licence Guide */}
-                                    <div>
-                                        <h3 className="text-sm font-bold text-gray-900 mb-3">Digital Licence</h3>
-                                        <div className="bg-white border border-gray-200 rounded-2xl p-6 relative shadow-sm max-w-sm mx-auto">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <span className="text-sm text-gray-400">&lt;</span>
-                                                <span className="text-sm font-bold text-gray-700">{idForm.idstate || 'NSW'} Driver Licence</span>
-                                                <span className="text-sm text-gray-400">⋮</span>
-                                            </div>
-                                            <div className="h-2 bg-amber-400 rounded-full mb-6"></div>
-                                            <div className="flex flex-col items-center mb-6">
-                                                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                                    <UserIcon size={32} className="text-gray-400" />
-                                                </div>
-                                                <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center">
-                                                    <HashIcon size={24} className="text-gray-400" />
-                                                </div>
-                                            </div>
-                                            <div className="mb-6">
-                                                <div className="border-2 border-dashed border-red-400 rounded-lg px-3 py-1.5 inline-block mb-3">
-                                                    <span className="text-xs font-bold text-red-600">Licence number</span>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <div className="h-2.5 bg-gray-100 rounded w-1/2"></div>
-                                                    <div className="h-2.5 bg-gray-100 rounded w-2/3"></div>
-                                                </div>
-                                            </div>
-                                            <div className="bg-amber-400 rounded-xl px-4 py-2.5 inline-block">
-                                                <div className="border-2 border-dashed border-red-400 rounded-lg px-3 py-1 bg-white/50 backdrop-blur-sm">
-                                                    <span className="text-xs font-bold text-red-600">Card number</span>
-                                                </div>
+                                    {/* Digital Licence Guide (NSW and QLD only) */}
+                                    {['NSW', 'QLD'].includes(idForm.idstate) && (
+                                        <div>
+                                            <h3 className="text-sm font-bold text-gray-900 mb-3">Digital Licence</h3>
+                                            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm max-w-[220px]">
+                                                <img
+                                                    src={`/Document Images/${idForm.idstate.toLowerCase()}-digital-licence${idForm.idstate === 'QLD' ? '-front' : ''}.png`}
+                                                    alt="Digital Licence Guide"
+                                                    className="w-full h-auto object-contain"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).parentElement!.style.display = 'none';
+                                                    }}
+                                                />
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
 
                             {idType === 2 && (
                                 <div>
-                                    <h3 className="text-sm font-bold text-gray-900 mb-3">Passport Details</h3>
-                                    <div className="bg-gradient-to-br from-gray-100 to-gray-50 border border-gray-200 rounded-2xl p-6 shadow-sm">
-                                        <div className="flex gap-6">
-                                            <div className="flex-1 space-y-3">
-                                                <div className="h-3 bg-gray-300/50 rounded w-1/2 mb-2"></div>
-                                                <div className="h-3 bg-gray-300/50 rounded w-2/3 mb-2"></div>
-                                                <div className="h-3 bg-gray-300/50 rounded w-1/3 mb-4"></div>
-                                                <div className="h-3 bg-gray-300/50 rounded w-3/4"></div>
-                                            </div>
-                                            <div className="w-24 h-32 bg-gray-200/60 rounded-xl flex items-center justify-center">
-                                                <UserIcon size={40} className="text-gray-400" />
-                                            </div>
-                                        </div>
-                                        <div className="mt-6 flex justify-end">
-                                            <div className="border-2 border-dashed border-red-400 rounded-lg px-4 py-2 bg-white/50 backdrop-blur-sm">
-                                                <span className="text-xs font-bold text-red-600">Document no.</span>
-                                            </div>
+                                    <h3 className="text-sm font-bold text-gray-900 mb-3">Passport Guide</h3>
+                                    <div className="bg-gray-100 border border-gray-200 rounded-2xl p-8 flex items-center justify-center">
+                                        <div className="text-center">
+                                            <UserIcon size={48} className="text-gray-400 mx-auto mb-4" />
+                                            <p className="text-sm text-gray-600">Ensure the passport number and expiry date match your document exactly.</p>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
                             {idType === 1 && (
-                                <div className="bg-green-50 border border-green-100 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
-                                    <div className="w-48 h-32 bg-white border-4 border-green-500 rounded-xl shadow-inner mb-4 flex items-center justify-center">
-                                        <span className="text-green-600 font-bold text-xl">MEDICARE</span>
+                                <div className="space-y-6">
+                                    <h3 className="text-sm font-bold text-gray-900 mb-3">Medicare Card Guide</h3>
+                                    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm max-w-[320px]">
+                                        <img
+                                            src={
+                                                idForm.medicareCardType === '0' ? '/Document Images/standard-mdicare-card.png' :
+                                                    idForm.medicareCardType === '1' ? '/Document Images/interim-medicar-card.png' :
+                                                        '/Document Images/reciprocal-healthcare-card.png'
+                                            }
+                                            alt="Medicare Card Guide"
+                                            className="w-full h-auto object-contain"
+                                        />
                                     </div>
-                                    <p className="text-sm text-green-700">Ensure all 10 digits and your IRN are entered correctly.</p>
+                                    <p className="text-xs text-gray-500 leading-relaxed">
+                                        Note: Ensure your 10-digit Medicare number and IRN (position on card) are entered correctly.
+                                    </p>
                                 </div>
                             )}
                         </div>
@@ -852,8 +939,9 @@ export const CustomerViewPage: React.FC = () => {
                         size="lg"
                         className={`h-14 text-lg font-bold rounded-2xl transition-all duration-300 ${idConfirmed ? 'shadow-lg shadow-primary/20' : ''}`}
                         disabled={!idConfirmed}
+                        onClick={() => setStep('review')}
                     >
-                        Finish Enrollment
+                        Review Your Details
                     </Button>
                 </div>
             </footer>
