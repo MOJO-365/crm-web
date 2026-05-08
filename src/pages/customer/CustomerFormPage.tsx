@@ -163,6 +163,7 @@ const initialFormData: CustomerFormData = {
     licenseExpiry: '',
     licenseCardNumber: '',
     medicareCardType: 0,
+    medicareIrn: '',
     concession: false,
     lifeSupport: false,
     additionalDocument: null,
@@ -893,6 +894,7 @@ export const CustomerFormPage = () => {
                 licenseExpiry: c.enrollmentDetails?.licenseExpiry ? formatSydneyTime(c.enrollmentDetails.licenseExpiry, 'YYYY-MM-DD') : '',
                 licenseCardNumber: c.enrollmentDetails?.licenseCardNumber || '',
                 medicareCardType: c.enrollmentDetails?.medicareCardType || 0,
+                medicareIrn: c.enrollmentDetails?.medicareIrn || '',
                 concession: c.enrollmentDetails?.concession === 1,
                 lifeSupport: c.enrollmentDetails?.lifesupport === 1,
                 billingPreference: c.enrollmentDetails?.billingpreference || 0,
@@ -1793,6 +1795,8 @@ export const CustomerFormPage = () => {
                     formData.idNumber !== (c.enrollmentDetails?.idnumber || ''),
                     formData.idState !== (c.enrollmentDetails?.idstate || ''),
                     formData.licenseNumber !== (c.enrollmentDetails?.licenseNumber || ''),
+                    formData.medicareIrn !== (c.enrollmentDetails?.medicareIrn || ''),
+                    formData.medicareCardType !== (c.enrollmentDetails?.medicareCardType || 0),
                     (formData.concession ? 1 : 0) !== (c.enrollmentDetails?.concession || 0),
                     (formData.lifeSupport ? 1 : 0) !== (c.enrollmentDetails?.lifesupport || 0),
 
@@ -1846,7 +1850,8 @@ export const CustomerFormPage = () => {
                     licenseState: formData.licenseState,
                     licenseExpiry: formData.licenseExpiry || null,
                     licenseCardNumber: formData.licenseCardNumber,
-                    medicareCardType: formData.medicareCardType,
+                    medicareCardType: String(formData.medicareCardType),
+                    medicareIrn: formData.medicareIrn,
                 },
                 address: {
                     unitNumber: formData.unitNumber || undefined,
@@ -2870,16 +2875,19 @@ export const CustomerFormPage = () => {
                                             )}
 
                                             {formData.idType === 1 && (
-                                                <Select
-                                                    label="Medicare Card Type"
-                                                    options={[
-                                                        { value: '0', label: 'Standard (Green)' },
-                                                        { value: '1', label: 'Interim (Blue)' },
-                                                        { value: '2', label: 'Reciprocal (Yellow)' }
-                                                    ]}
-                                                    value={formData.medicareCardType?.toString() || '0'}
-                                                    onChange={(val) => updateField('medicareCardType', parseInt(val as string))}
-                                                />
+                                                <>
+                                                    <Select
+                                                        label="Medicare Card Type"
+                                                        options={[
+                                                            { value: '0', label: 'Standard (Green)' },
+                                                            { value: '1', label: 'Interim (Blue)' },
+                                                            { value: '2', label: 'Reciprocal (Yellow)' }
+                                                        ]}
+                                                        value={formData.medicareCardType?.toString() || '0'}
+                                                        onChange={(val) => updateField('medicareCardType', parseInt(val as string))}
+                                                    />
+                                                    <Input label="Medicare IRN" placeholder="Enter individual reference number" value={formData.medicareIrn} onChange={(e) => updateField('medicareIrn', e.target.value)} />
+                                                </>
                                             )}
                                             {formData.idType === 2 ? (
                                                 <Select
