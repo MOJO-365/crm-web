@@ -49,8 +49,9 @@ export function EmailSendPage() {
     const automatedEvents: AutomatedEvent[] = [
         {
             type: 'CUSTOMER_DRAFT',
-            label: 'Customer Draft Saved',
-            description: 'Sent automatically when a customer application is saved as a draft',
+            label: 'PDRS Consent',
+            description: 'Sent automatically when a PDRS enrollment is saved/submitted, including the Nomination Form',
+            attachments: ['BESS2 and Nomination Form.pdf']
         },
         {
             type: 'CUSTOMER_CREATED',

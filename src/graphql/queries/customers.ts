@@ -45,6 +45,7 @@ export const GET_CUSTOMERS = gql`
                 offerEmailSentAt
                 updatedAt
                 leadUid
+                portalName
                 selectedBonuses
                 previousBill {
                     id
@@ -268,9 +269,8 @@ export const GET_CUSTOMERS_LIST = gql`
                 previousCustomerUid
                 isActive
                 isDeleted
-                createdAt
-                updatedAt
                 leadUid
+                portalName
                 previousBill {
                     id
                     filename
@@ -439,6 +439,7 @@ export const GET_CUSTOMERS_CURSOR = gql`
                 utilmateStatus
                 riskStatus
                 leadUid
+                portalName
                 msatDetails {
                   msatConnected
                 }
@@ -533,6 +534,7 @@ export const GET_CUSTOMER_BY_ID = gql`
             createdAt
             offerEmailSentAt
             updatedAt
+            portalName
             address {
                 id
                 customerUid
@@ -706,6 +708,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             createdAt
             offerEmailSentAt
             updatedAt
+            portalName
             address {
                 id
                 customerUid
@@ -1451,6 +1454,7 @@ export const GET_NEXT_CUSTOMER_ID = gql`
         getNextCustomerId
     }
 `;
+
 export const GET_WEB_ENROLLMENTS = gql`
     query GetWebEnrollments($page: Int, $limit: Int, $search: String, $processed: Int, $searchName: String, $searchEmail: String, $searchMobile: String, $searchNmi: String, $searchTariff: String, $searchAddress: String, $searchPortal: String, $searchVpp: Int, $branchTenant: String) {
         webEnrollments(page: $page, limit: $limit, search: $search, processed: $processed, searchName: $searchName, searchEmail: $searchEmail, searchMobile: $searchMobile, searchNmi: $searchNmi, searchTariff: $searchTariff, searchAddress: $searchAddress, searchPortal: $searchPortal, searchVpp: $searchVpp, branchTenant: $branchTenant) {
@@ -1459,6 +1463,7 @@ export const GET_WEB_ENROLLMENTS = gql`
                 uid
                 payload
                 processed
+                isConsentRead
                 createdAt
             }
             meta {
@@ -1470,3 +1475,15 @@ export const GET_WEB_ENROLLMENTS = gql`
         }
     }
 `;
+
+export const GET_WEB_ENROLLMENT_BY_UID = gql`
+    query GetWebEnrollmentByUid($uid: String!) {
+        webEnrollmentByUid(uid: $uid) {
+            uid
+            payload
+            isConsentRead
+            createdAt
+        }
+    }
+`;
+

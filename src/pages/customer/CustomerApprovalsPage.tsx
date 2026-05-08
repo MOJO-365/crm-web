@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
-import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, GET_USERS, GET_ROLES } from '@/graphql';
+import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, GET_USERS, GET_ROLES, SEND_OFFER_EMAIL, SEND_PDRS_CONSENT_EMAIL } from '@/graphql';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Select } from '@/components/ui/Select';
-import { XIcon, EyeIcon, CheckIcon, AlertCircleIcon } from '@/components/icons';
+import { XIcon, EyeIcon, CheckIcon, AlertCircleIcon, SendIcon, UserIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-toastify';
 import React from 'react';
@@ -56,6 +57,7 @@ const INITIAL_FILTERS: SearchFilters = {
 };
 
 export function CustomerApprovalsPage() {
+    const navigate = useNavigate();
     const [filters, setFilters] = useState<SearchFilters>(INITIAL_FILTERS);
     const [debouncedFilters, setDebouncedFilters] = useState<SearchFilters>(INITIAL_FILTERS);
     const [page, setPage] = useState(1);
@@ -66,6 +68,7 @@ export function CustomerApprovalsPage() {
     const [approvingUid, setApprovingUid] = useState<string | null>(null);
     const [rejectingUid, setRejectingUid] = useState<string | null>(null);
     const [enrollmentToReject, setEnrollmentToReject] = useState<WebEnrollment | null>(null);
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
 
     // Debounce filters
     useEffect(() => {
@@ -124,16 +127,49 @@ export function CustomerApprovalsPage() {
     const enrollments = data?.webEnrollments?.data || [];
     const meta = data?.webEnrollments?.meta;
 
-    const [approveMutation, { loading: approving }] = useMutation(APPROVE_WEB_ENROLLMENT, {
+    const [sendOfferEmail] = useMutation(SEND_OFFER_EMAIL, {
         onCompleted: () => {
-            toast.success('Customer approved and integrated successfully!');
+            toast.success('Offer email sent successfully!');
+        },
+        onError: (error) => {
+            toast.error(`Failed to send email: ${error.message}`);
+        }
+    });
+
+    const [sendPdrsConsentEmail] = useMutation(SEND_PDRS_CONSENT_EMAIL, {
+        onCompleted: () => {
+            toast.success('PDRS consent email sent successfully!');
+        },
+        onError: (error) => {
+            toast.error(`Failed to send PDRS email: ${error.message}`);
+        }
+    });
+
+    const [approveMutation, { loading: approving }] = useMutation(APPROVE_WEB_ENROLLMENT, {
+        onCompleted: (data) => {
+            if (isSendingEmail && data.approveWebEnrollment?.uid) {
+                const enrollment = enrollments.find(e => e.uid === approvingUid);
+                const isPdrs = enrollment?.payload?.portalname === 'PDRS' || enrollment?.payload?.portalName === 'PDRS';
+                
+                if (isPdrs) {
+                    sendPdrsConsentEmail({ variables: { customerUid: data.approveWebEnrollment.uid } });
+                    toast.success('Customer approved and PDRS consent email triggered!');
+                } else {
+                    sendOfferEmail({ variables: { customerUid: data.approveWebEnrollment.uid } });
+                    toast.success('Customer approved and offer email triggered!');
+                }
+            } else {
+                toast.success('Customer approved and integrated successfully!');
+            }
             refetch();
             setIsModalOpen(false);
             setApprovingUid(null);
+            setIsSendingEmail(false);
         },
         onError: (error) => {
             toast.error(`Approval failed: ${error.message}`);
             setApprovingUid(null);
+            setIsSendingEmail(false);
         }
     });
 
@@ -157,9 +193,10 @@ export function CustomerApprovalsPage() {
         setIsModalOpen(true);
     };
 
-    const handleApprove = (enrollment: WebEnrollment) => {
+    const handleApprove = (enrollment: WebEnrollment, sendEmail: boolean = false) => {
         if (approving || rejecting) return;
         setApprovingUid(enrollment.uid);
+        setIsSendingEmail(sendEmail);
         approveMutation({ variables: { uid: enrollment.uid } });
     };
 
@@ -361,7 +398,7 @@ export function CustomerApprovalsPage() {
                         )}>
                             Tariff
                         </span>
-                        {filters.tariff ? <div className="w-1 h-1 rounded-full bg-primary" /> : "-"}
+                        {filters.tariff && <div className="w-1 h-1 rounded-full bg-primary" />}
                     </div>
                     <Input
                         value={filters.tariff}
@@ -385,7 +422,7 @@ export function CustomerApprovalsPage() {
                 </div>
             ),
             render: (row) => {
-                const tariff = renderPayloadField(row.payload?.tariffcode);
+                const tariff = renderPayloadField(row.payload?.tariffcode || row.payload?.tariffCode || row.payload?.tariff_code || row.payload?.tariff);
                 return (
                     tariff !== '-' ? (
                         <span className="inline-flex px-1.5 py-0.5 bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 rounded text-xs font-medium border border-purple-100 dark:border-purple-800">
@@ -537,6 +574,22 @@ export function CustomerApprovalsPage() {
                             onClick={() => handleView(row)}
                         >
                             <EyeIcon size={16} />
+                        </Button>
+                    </Tooltip>
+                    <Tooltip content="Edit & Fix">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors"
+                            onClick={() => navigate('/customers/new', { 
+                                state: { 
+                                    prefillData: row.payload,
+                                    fromApprovals: true,
+                                    approvalUid: row.uid
+                                } 
+                            })}
+                        >
+                            <UserIcon size={16} />
                         </Button>
                     </Tooltip>
                     {row.processed === 0 && (
@@ -691,8 +744,10 @@ export function CustomerApprovalsPage() {
                                     <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.nmi)}</span>
                                     <span className="text-muted-foreground">Tariff Code</span>
                                     <span className="font-medium">
-                                        {selectedEnrollment.payload.tariffcode ? (
-                                            <span className="inline-flex px-2 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 rounded text-xs font-medium">{renderPayloadField(selectedEnrollment.payload.tariffcode)}</span>
+                                        {(selectedEnrollment.payload.tariffcode || selectedEnrollment.payload.tariffCode || selectedEnrollment.payload.tariff_code || selectedEnrollment.payload.tariff) ? (
+                                            <span className="inline-flex px-2 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 rounded text-xs font-medium">
+                                                {renderPayloadField(selectedEnrollment.payload.tariffcode || selectedEnrollment.payload.tariffCode || selectedEnrollment.payload.tariff_code || selectedEnrollment.payload.tariff)}
+                                            </span>
                                         ) : '-'}
                                     </span>
                                     <span className="text-muted-foreground">Ownership Status</span>
@@ -790,19 +845,44 @@ export function CustomerApprovalsPage() {
                             <div className="flex gap-2">
                                 <Button
                                     variant="outline"
+                                    className="text-primary hover:bg-primary/5 border-primary/20"
+                                    leftIcon={<UserIcon size={16} />}
+                                    onClick={() => navigate('/customers/new', { 
+                                        state: { 
+                                            prefillData: selectedEnrollment.payload,
+                                            fromApprovals: true,
+                                            approvalUid: selectedEnrollment.uid
+                                        } 
+                                    })}
+                                >
+                                    Edit & Fix
+                                </Button>
+                                <Button
+                                    variant="outline"
                                     className="text-destructive hover:bg-destructive/10"
                                     onClick={() => handleReject(selectedEnrollment!)}
                                     isLoading={rejectingUid === selectedEnrollment.uid}
                                     loadingText="Rejecting..."
                                     disabled={approvingUid === selectedEnrollment.uid}
                                 >
-                                    Reject Enrollment
+                                    Reject
                                 </Button>
                                 <Button
-                                    onClick={() => handleApprove(selectedEnrollment!)}
-                                    isLoading={approvingUid === selectedEnrollment.uid}
+                                    variant="outline"
+                                    className="text-primary hover:bg-primary/5 border-primary/20"
+                                    leftIcon={<SendIcon size={16} />}
+                                    onClick={() => handleApprove(selectedEnrollment!, true)}
+                                    isLoading={approvingUid === selectedEnrollment.uid && isSendingEmail}
+                                    loadingText="Sending..."
+                                    disabled={approvingUid === selectedEnrollment.uid && !isSendingEmail || rejectingUid === selectedEnrollment.uid}
+                                >
+                                    {selectedEnrollment?.payload?.portalname === 'PDRS' || selectedEnrollment?.payload?.portalName === 'PDRS' ? 'Send PDRS Email' : 'Send Email'}
+                                </Button>
+                                <Button
+                                    onClick={() => handleApprove(selectedEnrollment!, false)}
+                                    isLoading={approvingUid === selectedEnrollment.uid && !isSendingEmail}
                                     loadingText="Integrating..."
-                                    disabled={rejectingUid === selectedEnrollment.uid}
+                                    disabled={approvingUid === selectedEnrollment.uid && isSendingEmail || rejectingUid === selectedEnrollment.uid}
                                 >
                                     Approve & Integrate
                                 </Button>
