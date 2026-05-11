@@ -461,7 +461,7 @@ export function CustomerApprovalsPage() {
             ),
             render: (row) => (
                 <div className="flex justify-center">
-                    {(row.payload?.isVpp === 1 || row.payload?.isVpp === '1') ? (
+                    {(row.payload?.isVpp === 1 || row.payload?.isVpp === '1' || row.payload?.isVpp === true || row.payload?.isVpp === 'true') ? (
                         <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-1">
                             <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
                         </div>
@@ -744,7 +744,7 @@ export function CustomerApprovalsPage() {
                                     </span>
                                     <span className="text-muted-foreground">VPP Participation</span>
                                     <span className="font-medium">
-                                        {selectedEnrollment.payload.isVpp === 1 || selectedEnrollment.payload.isVpp === '1' ? (
+                                        {selectedEnrollment.payload.isVpp === 1 || selectedEnrollment.payload.isVpp === '1' || selectedEnrollment.payload.isVpp === true || selectedEnrollment.payload.isVpp === 'true' ? (
                                             <span className="inline-flex items-center gap-1.5 text-green-600 font-bold uppercase text-[10px]">
                                                 <CheckIcon size={14} /> YES
                                             </span>
@@ -758,6 +758,10 @@ export function CustomerApprovalsPage() {
                             </div>
 
                             {/* Identification */}
+                            {(selectedEnrollment.payload.idType === 0 || 
+                              selectedEnrollment.payload.idType === 1 || 
+                              selectedEnrollment.payload.idType === 2 || 
+                              (selectedEnrollment.payload.idnumber && selectedEnrollment.payload.idnumber !== '-')) && (
                             <div className="space-y-3 bg-muted/30 p-4 rounded-lg border">
                                 <h3 className="font-semibold text-sm border-b pb-2">Identification Identity</h3>
                                 <div className="grid grid-cols-2 gap-y-2 text-sm">
@@ -814,6 +818,7 @@ export function CustomerApprovalsPage() {
                                     )}
                                 </div>
                             </div>
+                            )}
                         </div>
                     ) : (
                         <div className="text-center p-8 text-muted-foreground">No payload data available for this enrollment.</div>
