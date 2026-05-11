@@ -54,6 +54,12 @@ export function EmailSendPage() {
             attachments: ['BESS2 and Nomination Form.pdf']
         },
         {
+            type: 'PDRS_SALE_CONFIRMED',
+            label: 'Sales Order Confirmation',
+            description: 'Sent automatically when a PDRS enrollment is finished, including the BESS2 and Nomination Form',
+            attachments: ['BESS2 and Nomination Form.pdf']
+        },
+        {
             type: 'CUSTOMER_CREATED',
             label: 'Customer Created (Welcome Email)',
             description: 'Sent automatically when a new customer is created in the system',

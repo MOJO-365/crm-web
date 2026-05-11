@@ -48,6 +48,8 @@ export const CUSTOMER_STATUS_MAP: Record<number, { label: string; color: string 
     4: { label: 'Frozen', color: '#6366F1' },
     5: { label: 'Not Interested', color: '#EF4444' },
     6: { label: 'Moved On', color: '#4B4F57' },
+    7: { label: 'Consent Pending', color: '#8B5CF6' },
+    8: { label: 'Consent Signed', color: '#059669' },
 };
 
 export const CUSTOMER_STATUS_OPTIONS = Object.entries(CUSTOMER_STATUS_MAP).map(([k, v]) => ({

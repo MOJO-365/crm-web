@@ -43,6 +43,7 @@ export const CustomerViewPage: React.FC = () => {
         connectionDate: '',
     });
     const [idFormInit, setIdFormInit] = useState(false);
+    const [isFinished, setIsFinished] = useState(false);
 
     const { data: enrollmentData, loading: enrollmentLoading, error: enrollmentError } = useQuery(GET_WEB_ENROLLMENT_BY_UID, {
         variables: { uid },
@@ -101,7 +102,7 @@ export const CustomerViewPage: React.FC = () => {
                     uid,
                     input: {
                         enrollmentDetails: {
-                            idtype: parseInt(idForm.idType),
+                            idtype: idForm.idType !== '' ? parseInt(idForm.idType) : null,
                             idnumber: idForm.idnumber,
                             idstate: idForm.idstate,
                             idcountry: idForm.idcountry,
@@ -115,14 +116,15 @@ export const CustomerViewPage: React.FC = () => {
                         dob: idForm.dob,
                         medicareIrn: idForm.medicareIrn,
                         medicareCardType: idForm.medicareCardType,
-                        status: 1, // Mark as Submitted/Processing
+                        status: 8, // Mark as Consent Signed (per constants.ts)
+                        isEnrollmentFinished: 1,
                         triggerWelcomeEmail: false,
                         triggerUpdateEmail: false,
                     }
                 }
             });
+            setIsFinished(true);
             toast.success('Application submitted successfully!');
-            // Redirect or show success state
         } catch (err) {
             console.error('Failed to finish enrollment', err);
             toast.error('Failed to submit application. Please try again.');
@@ -148,6 +150,67 @@ export const CustomerViewPage: React.FC = () => {
                     <p className="text-slate-600 mb-6">We couldn't find the application details you're looking for. Please check the link or contact our support team.</p>
                     <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-xl">
                         Support: <a href="tel:1300707042" className="text-primary font-semibold">1300 707 042</a>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isFinished || enrollment.isEnrollmentFinished === 1 || customerData?.customer?.status === 8) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[#fcfcfd] p-6 font-sans">
+                {/* Elegant subtle background */}
+                <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] -z-10 opacity-50" />
+                
+                <div className="max-w-md w-full relative">
+                    {/* Decorative Ring */}
+                    <div className="absolute -top-12 -left-12 w-24 h-24 bg-primary/5 rounded-full blur-2xl" />
+                    <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl" />
+
+                    <div className="bg-white rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.08)] border border-slate-100 p-10 text-center relative overflow-hidden">
+                        <div className="relative z-10">
+                            {/* Icon Wrapper */}
+                            <div className="w-24 h-24 bg-emerald-50 rounded-[2rem] flex items-center justify-center mx-auto mb-10 shadow-sm border border-emerald-100/50">
+                                <CheckIcon className="w-12 h-12 text-emerald-500" />
+                            </div>
+
+                            <h2 className="text-4xl font-bold text-slate-900 mb-4 tracking-tight">All set!</h2>
+                            <p className="text-slate-500 mb-12 text-lg leading-relaxed">
+                                Your application has been received and is currently being processed.
+                            </p>
+
+                            {/* Status Card */}
+                            <div className="bg-slate-50 rounded-3xl p-8 mb-10 border border-slate-100">
+                                <div className="space-y-6">
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Application Reference</p>
+                                        <p className="text-3xl font-black text-slate-900 tracking-tighter">{customerIdDisplay}</p>
+                                    </div>
+                                    
+                                    <div className="h-px bg-slate-200/60 w-12 mx-auto" />
+
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Current Status</p>
+                                        <div className="inline-flex items-center gap-2 px-6 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
+                                            <div className="w-2 h-2 bg-amber-500 rounded-full" />
+                                            <span className="text-sm font-bold text-slate-700">Connection In Progress</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <button 
+                                    onClick={() => window.close()}
+                                    className="w-full py-5 bg-slate-900 text-white font-bold rounded-[1.5rem] hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-2"
+                                >
+                                    Done
+                                </button>
+                                <p className="text-xs text-slate-400 font-medium">
+                                    You can safely close this window now.
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -505,11 +568,11 @@ export const CustomerViewPage: React.FC = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
                                     <div>
                                         <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">First Name</div>
-                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.firstname || '—'}</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.firstname || payload.firstName || '—'}</div>
                                     </div>
                                     <div>
                                         <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Last Name</div>
-                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.lastname || '—'}</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.lastname || payload.lastName || '—'}</div>
                                     </div>
                                     <div>
                                         <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Date of Birth</div>
@@ -517,7 +580,7 @@ export const CustomerViewPage: React.FC = () => {
                                     </div>
                                     <div>
                                         <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Phone</div>
-                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.number || payload.phone || '—'}</div>
+                                        <div className="text-sm font-semibold text-slate-900 mt-1">{payload.number || payload.phone || payload.mobile || '—'}</div>
                                     </div>
                                     <div className="sm:col-span-2 md:col-span-4">
                                         <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Email</div>
@@ -685,27 +748,27 @@ export const CustomerViewPage: React.FC = () => {
 
     // === STEP 4: QUICK ID CHECK ===
     // Initialize form from payload once
-    if (!idFormInit && payload) {
+    if (!idFormInit && payload && Object.keys(payload).length > 0) {
         setIdForm({
-            idType: String(payload.idType ?? '0'),
-            idnumber: payload.idnumber || '',
-            licenseCardNumber: payload.licenseCardNumber || '',
-            idexpiary: payload.idexpiary || '',
-            idstate: payload.idstate || 'NSW',
-            idcountry: payload.idcountry || 'Australia',
-            medicareCardType: String(payload.medicareCardType ?? '0'),
-            medicareIrn: payload.medicareIrn || '',
+            idType: String(payload.idType ?? payload.idtype ?? '0'),
+            idnumber: payload.idnumber || payload.idNumber || payload.license_number || payload.licenseNumber || payload.licence_number || payload.licenceNumber || '',
+            licenseCardNumber: payload.licenseCardNumber || payload.license_card_number || payload.idcardnumber || payload.cardnumber || payload.cardNumber || '',
+            idexpiary: payload.idexpiary || payload.idexpiry || payload.id_expiry || payload.license_expiry || payload.licenseExpiry || payload.expiry_date || '',
+            idstate: payload.idstate || payload.idState || payload.license_state || payload.licenseState || payload.state || 'NSW',
+            idcountry: payload.idcountry || payload.idCountry || payload.country || 'Australia',
+            medicareCardType: String(payload.medicareCardType ?? payload.medicare_card_type ?? '0'),
+            medicareIrn: payload.medicareIrn || payload.medicare_irn || '',
             address: payload.address || '',
             nmi: payload.nmi || '',
             state: payload.stateOrTerritory || payload.jurisdictionCode || payload.state || 'NSW',
             postcode: payload.postcode || '',
-            firstName: payload.firstname || '',
-            lastName: payload.lastname || '',
+            firstName: payload.firstname || payload.firstName || '',
+            lastName: payload.lastname || payload.lastName || '',
             email: payload.email || '',
-            phone: payload.number || payload.phone || '',
+            phone: payload.number || payload.phone || payload.mobile || '',
             title: payload.title || '',
             dob: payload.dob || '',
-            connectionDate: payload.connectionDate || payload.connectiondate || '',
+            connectionDate: payload.connectionDate || payload.connectiondate || payload.connection_date || '',
         });
         setIdFormInit(true);
     }

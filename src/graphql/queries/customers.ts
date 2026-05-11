@@ -629,6 +629,9 @@ export const GET_CUSTOMER_BY_ID = gql`
                 licenseNumber
                 licenseState
                 licenseExpiry
+                licenseCardNumber
+                medicareCardType
+                medicareIrn
             }
             debitDetails {
                 optIn
@@ -805,6 +808,9 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 licenseNumber
                 licenseState
                 licenseExpiry
+                licenseCardNumber
+                medicareCardType
+                medicareIrn
             }
             debitDetails {
                 optIn
@@ -1478,6 +1484,7 @@ export const GET_WEB_ENROLLMENTS = gql`
                 isConsentRead
             medicareIrn
             medicareCardType
+            isEnrollmentFinished
                 createdAt
             }
             meta {
@@ -1498,6 +1505,7 @@ export const GET_WEB_ENROLLMENT_BY_UID = gql`
             isConsentRead
             medicareIrn
             medicareCardType
+            isEnrollmentFinished
             createdAt
         }
     }
