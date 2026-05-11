@@ -152,6 +152,7 @@ interface CustomerDetails {
         licenseExpiry?: string;
         licenseCardNumber?: string;
         medicareCardType?: number;
+        medicareIrn?: string;
     };
     ratePlan?: {
         uid?: string;
@@ -3523,6 +3524,12 @@ export function CustomerDetailsPage() {
                                                     {selectedCustomerDetails.enrollmentDetails?.licenseExpiry ? formatSydneyTime(selectedCustomerDetails.enrollmentDetails.licenseExpiry, 'DD/MM/YYYY') : '-'}
                                                 </p>
                                             </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">License Card Number</label>
+                                                <p className="font-medium">
+                                                    {selectedCustomerDetails.enrollmentDetails?.licenseCardNumber || '-'}
+                                                </p>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-border/50">
@@ -3547,22 +3554,21 @@ export function CustomerDetailsPage() {
                                                 </p>
                                             </div>
 
-                                            {selectedCustomerDetails.enrollmentDetails?.idtype === 0 && (
-                                                <div className="space-y-1">
-                                                    <label className="text-xs text-muted-foreground uppercase font-semibold">License Card Number</label>
-                                                    <p className="font-medium">
-                                                        {selectedCustomerDetails.enrollmentDetails?.licenseCardNumber || '-'}
-                                                    </p>
-                                                </div>
-                                            )}
-
                                             {selectedCustomerDetails.enrollmentDetails?.idtype === 1 && (
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-muted-foreground uppercase font-semibold">Medicare Card Type</label>
                                                     <p className="font-medium">
-                                                        {selectedCustomerDetails.enrollmentDetails?.medicareCardType === 0 ? 'Standard (Green)' :
-                                                            selectedCustomerDetails.enrollmentDetails?.medicareCardType === 1 ? 'Interim (Blue)' :
-                                                                selectedCustomerDetails.enrollmentDetails?.medicareCardType === 2 ? 'Reciprocal (Yellow)' : '-'}
+                                                        {Number(selectedCustomerDetails.enrollmentDetails?.medicareCardType) === 0 ? 'Standard (Green)' :
+                                                            Number(selectedCustomerDetails.enrollmentDetails?.medicareCardType) === 1 ? 'Interim (Blue)' :
+                                                                Number(selectedCustomerDetails.enrollmentDetails?.medicareCardType) === 2 ? 'Reciprocal (Yellow)' : '-'}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {selectedCustomerDetails.enrollmentDetails?.idtype === 1 && (
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-muted-foreground uppercase font-semibold">Medicare IRN</label>
+                                                    <p className="font-medium">
+                                                        {selectedCustomerDetails.enrollmentDetails?.medicareIrn || '-'}
                                                     </p>
                                                 </div>
                                             )}

@@ -152,6 +152,7 @@ const CUSTOMER_FULL_RESPONSE = `
         email
     }
     leadUid
+    isEnrollmentFinished
     message
 `;
 

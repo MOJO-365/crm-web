@@ -1575,7 +1575,7 @@ export const CustomerFormPage = () => {
             formData.firstName?.trim() &&
             formData.lastName?.trim() &&
             formData.email?.trim() &&
-            formData.connectionDate
+            (isPdrs || formData.connectionDate)
         );
     }, [formData]);
 
@@ -1620,6 +1620,11 @@ export const CustomerFormPage = () => {
             finalStatus = customerData.customer.status;
         } else if (targetStatus === 1 && phoneVerified) {
             finalStatus = 2;
+        }
+
+        // If PDRS and sending email (not update only), set to Consent Pending (7)
+        if (isPdrs && isEditMode && !isUpdateOnly) {
+            finalStatus = 7;
         }
 
         // Temporarily disable dirty check to allow navigation
@@ -1886,8 +1891,8 @@ export const CustomerFormPage = () => {
                 licenseDocument: formData.licenseDocument?.uid,
                 rateVersion: activeVersionForLookup || activeRateVersion,
                 customerId: isEditMode ? undefined : generatedCustomerId,
-                triggerWelcomeEmail: (isEditMode && !isUpdateOnly) ? (finalStatus === 2) : undefined,
-                triggerUpdateEmail: (isEditMode && !isUpdateOnly) ? (significantChanges || true) : undefined,
+                triggerWelcomeEmail: (isEditMode && !isUpdateOnly && !isPdrs) ? (finalStatus === 2) : undefined,
+                triggerUpdateEmail: (isEditMode && !isUpdateOnly && !isPdrs) ? (significantChanges || true) : undefined,
                 selectedBonuses: formData.selectedBonuses,
                 leadUid: prefillLeadUid || undefined
             };
@@ -1922,7 +1927,7 @@ export const CustomerFormPage = () => {
             }
 
             // Trigger PDRS email if applicable (only on update as requested)
-            if (isEditMode && !isUpdateOnly && isPdrs && savedCustomer?.uid && finalStatus === 2) {
+            if (isEditMode && !isUpdateOnly && isPdrs && savedCustomer?.uid && finalStatus === 7) {
                 try {
                     await sendPdrsConsentEmail({ variables: { customerUid: savedCustomer.uid } });
                     toast.success('PDRS consent email sent successfully');
@@ -1938,7 +1943,6 @@ export const CustomerFormPage = () => {
             apolloClient.cache.gc();
 
             // Handle redirection
-            const customerUid = savedCustomer?.uid || uid;
 
             // If we came from approvals, mark the enrollment as processed
             if (fromApprovals && approvalUid) {
@@ -1955,13 +1959,7 @@ export const CustomerFormPage = () => {
                 return;
             }
 
-            if (finalStatus === 2 && customerUid) {
-                // Redirect to details page if an offer was sent
-                navigate(`/customers/${customerUid}`);
-            } else {
-                // Otherwise redirect back to the list (for drafts)
-                navigate('/customers');
-            }
+            navigate('/customers');
         } catch (err: any) {
             console.error('Failed to save customer:', err);
             toast.error(err.message || 'Failed to save customer');
@@ -2090,13 +2088,31 @@ export const CustomerFormPage = () => {
     const handleNextToEmailPreview = async () => {
         setIsLoadingEmailPreview(true);
         try {
-            const eventType = isEditMode ? 'CUSTOMER_UPDATED' : 'CUSTOMER_CREATED';
+            const prefill = (location.state as any)?.prefillData;
+            const eventType = isPdrs ? 'CUSTOMER_DRAFT' : (isEditMode ? 'CUSTOMER_UPDATED' : 'CUSTOMER_CREATED');
+            
             const { data } = await fetchSystemTemplate({
                 variables: { eventType },
                 fetchPolicy: 'network-only'
             });
+            
             if (data?.previewSystemTemplate) {
-                setEmailPreview(data.previewSystemTemplate);
+                let preview = { ...data.previewSystemTemplate };
+                
+                // Replace placeholders for a more realistic preview
+                const companyName = prefill?.createdBy?.company_name || prefill?.companyName || 'Installer PTY LTD';
+                const firstName = formData.firstName || '[[FIRST_NAME]]';
+                const lastName = formData.lastName || '[[LAST_NAME]]';
+                
+                if (preview.body) {
+                    preview.body = preview.body
+                        .replace(/\[\[COMPANY_NAME\]\]/g, companyName)
+                        .replace(/\[\[REFERRER_NAME\]\]/g, companyName)
+                        .replace(/\[\[FIRST_NAME\]\]/g, firstName)
+                        .replace(/\[\[LAST_NAME\]\]/g, lastName);
+                }
+                
+                setEmailPreview(preview);
                 setPreviewStep('email');
             } else {
                 toast.error('Could not load email template');
@@ -2808,7 +2824,7 @@ export const CustomerFormPage = () => {
                                         <div className="p-4 rounded-lg border border-border bg-muted/30 space-y-4">
                                             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Enrollment</h3>
                                             <Select label="Sale Type" options={SALE_TYPE_OPTIONS} value={formData.saleType.toString()} onChange={(val) => updateField('saleType', parseInt(val as string))} />
-                                            <DatePicker label="Connection Date" required value={formData.connectionDate} onChange={(date) => updateField('connectionDate', date)} />
+                                            <DatePicker label="Connection Date" required={!isPdrs} value={formData.connectionDate} onChange={(date) => updateField('connectionDate', date)} />
                                             <Select label="Billing Preference" options={BILLING_PREF_OPTIONS} value={formData.billingPreference.toString()} onChange={(val) => updateField('billingPreference', parseInt(val as string))} />
 
                                             <Field label="Previous Bill">
