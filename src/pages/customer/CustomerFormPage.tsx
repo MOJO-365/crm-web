@@ -389,10 +389,23 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                             <div className="flex items-center gap-2 text-amber-500 dark:text-amber-400 mb-2 mt-4">
                                 <ActivityIcon size={14} />
                                 <span className="text-xs font-bold uppercase tracking-wide">VPP Orchestration Charges</span>
+                                {discount > 0 && (
+                                    <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-500 text-white rounded-md uppercase tracking-tighter">Discount Applied</span>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                    <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">${parseFloat(String(offer.vppOrcharge || '0')).toFixed(4)}{formatUnit('vppOrcharge', 'day')}</div>
+                                    <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">
+                                        <div className="flex flex-col items-center">
+                                            <span>${calculateDiscountedRate(parseFloat(String(offer.vppOrcharge || '0')), discount).toFixed(4)}{formatUnit('vppOrcharge', 'day')}</span>
+                                            {discount > 0 && (
+                                                <div className="flex items-center gap-1.5 leading-none mt-0.5">
+                                                    <span className="text-[10px] font-medium line-through opacity-40">${parseFloat(String(offer.vppOrcharge || '0')).toFixed(4)}</span>
+                                                    <span className="px-1 py-0.5 text-[8px] font-black bg-amber-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                     <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">Orchestration</div>
                                 </div>
                                 {parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any, id: number) => {
@@ -401,7 +414,17 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                                     const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
                                     return (
                                         <div key={id} className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                            <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">${price.toFixed(4)}/{unit.startsWith('/') ? unit.substring(1) : unit}</div>
+                                            <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">
+                                                <div className="flex flex-col items-center">
+                                                    <span>${price.toFixed(4)}/{unit.startsWith('/') ? unit.substring(1) : unit}</span>
+                                                    {r.applyDiscount && discount > 0 && (
+                                                        <div className="flex items-center gap-1.5 leading-none mt-0.5">
+                                                            <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
+                                                            <span className="px-1 py-0.5 text-[8px] font-black bg-amber-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                             <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">{r.name}</div>
                                         </div>
                                     );
@@ -1432,6 +1455,19 @@ export const CustomerFormPage = () => {
         }
     };
 
+    // Clear tariff code if it doesn't match available options for current state/vpp
+    useEffect(() => {
+        // Only run if we have rate plans loaded (to avoid clearing on initial mount while loading)
+        // AND we have a state selected (since tariffOptions depends on state)
+        if (ratePlans.length > 0 && formData.state && formData.tariffCode) {
+            const exists = tariffOptions.some(opt => opt.value === formData.tariffCode);
+            if (!exists) {
+                updateField('tariffCode', '');
+                setSelectedRatePlan(null);
+            }
+        }
+    }, [tariffOptions, ratePlans.length, formData.state, formData.vpp, formData.tariffCode]);
+
     const [touched, setTouched] = useState<Record<string, boolean>>({});
 
     // Field-level validation
@@ -2073,7 +2109,23 @@ export const CustomerFormPage = () => {
                 fetchPolicy: 'network-only'
             });
             if (data?.previewSystemTemplate) {
-                setEmailPreview(data.previewSystemTemplate);
+                let preview = { ...data.previewSystemTemplate };
+                
+                // Replace placeholders for a more realistic preview
+                const prefill = (location.state as any)?.prefillData;
+                const companyName = prefill?.createdBy?.company_name || prefill?.createdBy?.companyName || prefill?.companyName || prefill?.company_name || prefill?.portalname || prefill?.portalName || (isEditMode ? customerData?.customer?.portalName : null) || '[[COMPANY_NAME]]';
+                const firstName = formData.firstName || '[[FIRST_NAME]]';
+                const lastName = formData.lastName || '[[LAST_NAME]]';
+                
+                if (preview.body) {
+                    preview.body = preview.body
+                        .replace(/\[\[COMPANY_NAME\]\]/g, companyName)
+                        .replace(/\[\[REFERRER_NAME\]\]/g, companyName)
+                        .replace(/\[\[FIRST_NAME\]\]/g, firstName)
+                        .replace(/\[\[LAST_NAME\]\]/g, lastName);
+                }
+                
+                setEmailPreview(preview);
             } else {
                 toast.error('Could not load PDRS consent template');
             }
@@ -2100,7 +2152,7 @@ export const CustomerFormPage = () => {
                 let preview = { ...data.previewSystemTemplate };
                 
                 // Replace placeholders for a more realistic preview
-                const companyName = prefill?.createdBy?.company_name || prefill?.companyName || 'Installer PTY LTD';
+                const companyName = prefill?.createdBy?.company_name || prefill?.createdBy?.companyName || prefill?.companyName || prefill?.company_name || prefill?.portalname || prefill?.portalName || (isEditMode ? customerData?.customer?.portalName : null) || '[[COMPANY_NAME]]';
                 const firstName = formData.firstName || '[[FIRST_NAME]]';
                 const lastName = formData.lastName || '[[LAST_NAME]]';
                 
