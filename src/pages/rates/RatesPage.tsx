@@ -1361,7 +1361,7 @@ export function RatesPage() {
                             Object.entries(priceFieldMap).forEach(([excelKey, objKey]) => {
                                 if (row[excelKey] !== undefined) {
                                     const val = parseFloat(String(row[excelKey])) || 0;
-                                    (offer as any)[objKey] = GST_FIELDS.has(excelKey) ? Number((val / 1.1).toFixed(6)) : val;
+                                    (offer as any)[objKey] = GST_FIELDS.has(excelKey) ? Number((val / 1.1).toFixed(4)) : Number(val.toFixed(4));
                                 }
                             });
 
@@ -1374,7 +1374,7 @@ export function RatesPage() {
                                         const rawVal = String(row[key] ?? '').trim();
                                         const num = parseFloat(rawVal);
                                         if (!isNaN(num)) {
-                                            dr.value = String(Number((num / 1.1).toFixed(6)));
+                                            dr.value = String(Number((num / 1.1).toFixed(4)));
                                         } else {
                                             dr.value = rawVal;
                                         }
@@ -1471,7 +1471,7 @@ export function RatesPage() {
                         Object.entries(priceFieldMap).forEach(([excelKey, objKey]) => {
                             if (row[excelKey] !== undefined) {
                                 const val = parseFloat(String(row[excelKey])) || 0;
-                                (offer as any)[objKey] = GST_FIELDS.has(excelKey) ? Number((val / 1.1).toFixed(6)) : val;
+                                (offer as any)[objKey] = GST_FIELDS.has(excelKey) ? Number((val / 1.1).toFixed(4)) : Number(val.toFixed(4));
                             }
                         });
 
@@ -1483,7 +1483,7 @@ export function RatesPage() {
                                 const num = parseFloat(rawVal);
                                 let finalVal = rawVal;
                                 if (!isNaN(num)) {
-                                    finalVal = String(Number((num / 1.1).toFixed(6)));
+                                    finalVal = String(Number((num / 1.1).toFixed(4)));
                                 }
 
                                 offer.dynamicRates.push({
