@@ -98,6 +98,11 @@ export function EmailSendPage() {
             type: 'VPP_CERTIFICATE_SENT',
             label: 'VPP Certificate Sent',
             description: 'Sent to customers when their VPP Certificate is generated',
+        },
+        {
+            type: 'VPP_PUSH_TO_GSYNC',
+            label: 'VPP Push to Gsync',
+            description: 'Sent automatically when a customer battery system is live on the Virtual Power Plant (VPP) platform',
         }
     ];
 

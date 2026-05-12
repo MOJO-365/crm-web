@@ -217,6 +217,10 @@ export const CustomerViewPage: React.FC = () => {
                     onBack={() => setStep('idcheck')}
                     onFinish={handleFinishEnrollment}
                     idTypeOptions={ID_TYPE_OPTIONS}
+                    mainOffer={mainOffer}
+                    ratePlan={ratePlan}
+                    measurementUnits={unitsData?.measurementUnits}
+                    customer={customerData?.customer}
                 />
             );
         default:
