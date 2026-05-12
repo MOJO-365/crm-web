@@ -1245,7 +1245,9 @@ export const OfferAccessPage = () => {
                                     value: price,
                                     unitId: dRate.unitId
                                 };
-                            }).map((rate: any) => ({
+                            })
+                            .filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0)
+                            .map((rate: any) => ({
                                 label: rate.label,
                                 displayValue: `$${parseFloat(String(rate.value)).toFixed(4)}${rate.unitId ? `/${unitMap?.[rate.unitId]}` : ''}`
                             }));
@@ -1258,7 +1260,9 @@ export const OfferAccessPage = () => {
                                     value: price,
                                     unitId: dRate.unitId
                                 };
-                            }).map((rate: any) => ({
+                            })
+                            .filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0)
+                            .map((rate: any) => ({
                                 label: rate.label,
                                 displayValue: `$${parseFloat(String(rate.value)).toFixed(4)}${rate.unitId ? `/${unitMap?.[rate.unitId]}` : ''}`
                             }));
@@ -1286,35 +1290,37 @@ export const OfferAccessPage = () => {
                                     };
                                 });
 
-                            return (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                    {renderRatesColumn(energyRates, "Energy Rates", "blue", Settings2Icon)}
+                            const hasCol1 = energyRates.length > 0;
+                            const hasCol2 = supplyRates.length > 0 || demandRates.length > 0 || vppCharges.length > 0;
+                            const hasCol3 = solarFitRates.length > 0 || extraFitRates.length > 0 || clRates.length > 0 || extraChargeRates.length > 0;
 
-                                    {(supplyRates.length > 0 || demandRates.length > 0 || vppCharges.length > 0) && (
+                            const activeColsCount = [hasCol1, hasCol2, hasCol3].filter(Boolean).length;
+
+                            return (
+                                <div className={cn(
+                                    "grid gap-8",
+                                    activeColsCount === 1 ? "grid-cols-1 max-w-md mx-auto" :
+                                    activeColsCount === 2 ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" :
+                                    "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+                                )}>
+                                    {hasCol1 && renderRatesColumn(energyRates, "Energy Rates", "blue", Settings2Icon)}
+
+                                    {hasCol2 && (
                                         <div className="space-y-10">
                                             {renderRatesColumn(supplyRates, "Supply Charges", "purple", PlugIcon)}
                                             {renderRatesColumn(demandRates, "Demand Charges", "rose", ActivityIcon)}
-                                            {renderRatesColumn(vppCharges, "VPP Charges", "orange", ActivityIcon)}
+                                            {renderRatesColumn(vppCharges, "VPP Charges", "amber", ActivityIcon)}
                                         </div>
                                     )}
 
-                                    {customerData.solarDetails?.hassolar === 1 && renderRatesColumn(solarFitRates, "Solar FiT", "teal", ZapIcon)}
-
-                                    {extraChargeRates.length > 0 && renderRatesColumn(
-                                        extraChargeRates,
-                                        "Extra Charges",
-                                        "indigo",
-                                        ActivityIcon
+                                    {hasCol3 && (
+                                        <div className="space-y-10">
+                                            {customerData.solarDetails?.hassolar === 1 && renderRatesColumn(solarFitRates, "Solar FiT", "teal", ZapIcon)}
+                                            {renderRatesColumn(extraFitRates, "Extra FiT", "teal", ZapIcon)}
+                                            {renderRatesColumn(clRates, "Controlled Load", "green", PlugIcon)}
+                                            {renderRatesColumn(extraChargeRates, "Extra Charges", "indigo", ActivityIcon)}
+                                        </div>
                                     )}
-
-                                    {extraFitRates.length > 0 && renderRatesColumn(
-                                        extraFitRates,
-                                        "Extra FiT",
-                                        "teal",
-                                        ZapIcon
-                                    )}
-
-                                    {renderRatesColumn(clRates, "Controlled Load", "green", PlugIcon)}
                                 </div>
                             );
                         })()}
