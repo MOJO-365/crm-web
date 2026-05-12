@@ -60,12 +60,12 @@ export const CustomerViewPage: React.FC = () => {
 
     const enrollment = enrollmentData?.webEnrollmentByUid;
     const payload = enrollment?.payload || {};
-    const tariffCode = payload.tariffCode || payload.tariffcode || "EA025";
+    const tariffCode = customerData?.customer?.tariffCode || payload.tariffCode || payload.tariffcode || "EA025";
     const customerIdDisplay = customerData?.customer?.customerId || customerData?.customer?.id || payload?.customerId || payload?.customer_id || 'Pending';
 
     const { data: ratesData, loading: ratesLoading } = useQuery(GET_RATE_PLAN_BY_CODE, {
         variables: { code: tariffCode },
-        skip: !tariffCode || step !== 'rates',
+        skip: !!customerData?.customer?.ratePlan || !tariffCode || step !== 'rates',
     });
 
     const { data: unitsData } = useQuery(GET_MEASUREMENT_UNITS, {
@@ -166,7 +166,7 @@ export const CustomerViewPage: React.FC = () => {
         return <SuccessStep customerIdDisplay={customerIdDisplay} />;
     }
 
-    const ratePlan = ratesData?.ratePlanByCode;
+    const ratePlan = customerData?.customer?.ratePlan || ratesData?.ratePlanByCode;
     const mainOffer = ratePlan?.offers?.[0];
 
     switch (step) {

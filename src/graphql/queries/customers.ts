@@ -525,6 +525,7 @@ export const GET_CUSTOMER_BY_ID = gql`
             dob
             propertyType
             tariffCode
+            ratePlanUid
             status
             discount
             signDate
@@ -1246,6 +1247,7 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
             dob
             propertyType
             tariffCode
+            ratePlanUid
             status
             discount
             signDate
