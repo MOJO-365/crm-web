@@ -1249,7 +1249,9 @@ export function CustomerDetailsPage() {
     const [freezeModalOpen, setFreezeModalOpen] = useState(false);
     // const [customerToFreeze, setCustomerToFreeze] = useState<CustomerDetails | null>(null); // Not needed since we use selectedCustomerDetails
     const [markingNotInterested, setMarkingNotInterested] = useState(false);
+    const [markingMovedOn, setMarkingMovedOn] = useState(false);
     const [notInterestedModalOpen, setNotInterestedModalOpen] = useState(false);
+    const [movedOnModalOpen, setMovedOnModalOpen] = useState(false);
     const [isHardDelete, setIsHardDelete] = useState(false);
     const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -1290,6 +1292,7 @@ export function CustomerDetailsPage() {
     const [isSendingOffer, setIsSendingOffer] = useState(false);
     const [vppConnectModalOpen, setVppConnectModalOpen] = useState(false);
     const [isSkippingVpp, setIsSkippingVpp] = useState(false);
+    const [isConnectingVpp, setIsConnectingVpp] = useState(false);
     const [utilmateConnectModalOpen, setUtilmateConnectModalOpen] = useState(false);
     const [isGeneratingCredentials, setIsGeneratingCredentials] = useState(false);
 
@@ -2107,6 +2110,30 @@ export function CustomerDetailsPage() {
 
     };
 
+    const handleMarkMovedOn = async () => {
+        if (!selectedCustomerDetails) return;
+        setMarkingMovedOn(true);
+        try {
+            await updateCustomer({
+                variables: {
+                    uid: selectedCustomerDetails.uid,
+                    input: { status: 6 }
+                }
+            });
+            toast.success('Customer marked as Moved On');
+            setSelectedCustomerDetails({
+                ...selectedCustomerDetails,
+                status: 6
+            });
+        } catch (error: any) {
+            console.error('Error marking customer as moved on:', error);
+            toast.error(error.message || 'Failed to update customer status');
+        } finally {
+            setMarkingMovedOn(false);
+            setMovedOnModalOpen(false);
+        }
+    };
+
 
 
     const handleVppToggle = async (customerUid: string, newValue: boolean) => {
@@ -2186,7 +2213,7 @@ export function CustomerDetailsPage() {
 
     const handleConfirmVppConnect = async () => {
         if (!selectedCustomerDetails) return;
-
+        setIsConnectingVpp(true);
         try {
             // Priority: Sync with secondary API first
             try {
@@ -2237,6 +2264,8 @@ export function CustomerDetailsPage() {
         } catch (error: any) {
             console.error('Error connecting VPP:', error);
             toast.error(error.message || 'Failed to connect VPP');
+        } finally {
+            setIsConnectingVpp(false);
         }
     };
 
@@ -2826,8 +2855,9 @@ export function CustomerDetailsPage() {
                                 (() => {
                                     const hasPreview = true;
                                     const hasNotInterested = selectedCustomerDetails.status !== 5;
+                                    const hasMovedOn = selectedCustomerDetails.status !== 6;
                                     const hasFreeze = selectedCustomerDetails.status === 3;
-                                    const hasActions = hasPreview || hasNotInterested || hasFreeze;
+                                    const hasActions = hasPreview || hasNotInterested || hasMovedOn || hasFreeze;
                                     if (!hasActions) return null;
                                     return (
                                         <Popover
@@ -2866,6 +2896,19 @@ export function CustomerDetailsPage() {
                                                         >
                                                             <XIcon size={15} />
                                                             {markingNotInterested ? 'Updating...' : 'Not Interested'}
+                                                        </button>
+                                                    )}
+                                                    {hasMovedOn && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setMovedOnModalOpen(true);
+                                                                setActionsMenuOpen(false);
+                                                            }}
+                                                            disabled={markingMovedOn}
+                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-900/20 transition-colors disabled:opacity-50"
+                                                        >
+                                                            <ArrowRightIcon size={15} />
+                                                            {markingMovedOn ? 'Updating...' : 'Moved On'}
                                                         </button>
                                                     )}
                                                     {hasFreeze && (
@@ -4926,6 +4969,45 @@ export function CustomerDetailsPage() {
                 </div>
             </Modal>
 
+            {/* Moved On Confirmation Modal */}
+            <Modal
+                isOpen={movedOnModalOpen}
+                onClose={() => setMovedOnModalOpen(false)}
+                title="Confirm Moved On"
+                size="sm"
+                footer={
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => setMovedOnModalOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="bg-neutral-800 hover:bg-neutral-900 text-white"
+                            onClick={handleMarkMovedOn}
+                            isLoading={markingMovedOn}
+                            loadingText="Updating..."
+                        >
+                            Confirm Moved On
+                        </Button>
+                    </>
+                }
+            >
+                <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <p className="mb-3">
+                        Are you sure you want to mark customer{' '}
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                            {selectedCustomerDetails?.firstName} {selectedCustomerDetails?.lastName}
+                        </span>{' '}
+                        as <span className="font-semibold text-neutral-800 dark:text-neutral-200">Moved On</span>?
+                    </p>
+                    <p className="text-gray-500 dark:text-gray-400">
+                        This will update the customer's status. You can change it back later if needed.
+                    </p>
+                </div>
+            </Modal>
+
             {/* VPP Connection Modal */}
             <Modal
                 isOpen={vppConnectModalOpen}
@@ -4952,6 +5034,8 @@ export function CustomerDetailsPage() {
                         <Button
                             className="bg-neutral-900 text-white hover:bg-neutral-800 shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200"
                             onClick={handleConfirmVppConnect}
+                            isLoading={isConnectingVpp}
+                            disabled={isConnectingVpp}
                             leftIcon={<ZapIcon className="w-4 h-4 text-yellow-400 fill-yellow-400" />}
                         >
                             Connect & Save

@@ -2133,8 +2133,7 @@ export const CustomerFormPage = () => {
                 let preview = { ...data.previewSystemTemplate };
 
                 // Replace placeholders for a more realistic preview
-                const prefill = (location.state as any)?.prefillData;
-                const companyName = prefill?.createdBy?.company_name || prefill?.createdBy?.companyName || prefill?.companyName || prefill?.company_name || prefill?.portalname || prefill?.portalName || (isEditMode ? customerData?.customer?.portalName : null) || '[[COMPANY_NAME]]';
+                const companyName = '[[ Company Name ]]';
                 const firstName = formData.firstName || '[[FIRST_NAME]]';
                 const lastName = formData.lastName || '[[LAST_NAME]]';
 
@@ -2161,7 +2160,6 @@ export const CustomerFormPage = () => {
     const handleNextToEmailPreview = async () => {
         setIsLoadingEmailPreview(true);
         try {
-            const prefill = (location.state as any)?.prefillData;
             const eventType = isPdrs ? 'CUSTOMER_DRAFT' : (isEditMode ? 'CUSTOMER_UPDATED' : 'CUSTOMER_CREATED');
 
             const { data } = await fetchSystemTemplate({
@@ -2173,7 +2171,7 @@ export const CustomerFormPage = () => {
                 let preview = { ...data.previewSystemTemplate };
 
                 // Replace placeholders for a more realistic preview
-                const companyName = prefill?.createdBy?.company_name || prefill?.createdBy?.companyName || prefill?.companyName || prefill?.company_name || prefill?.portalname || prefill?.portalName || (isEditMode ? customerData?.customer?.portalName : null) || '[[COMPANY_NAME]]';
+                const companyName = '[[ Company Name ]]';
                 const firstName = formData.firstName || '[[FIRST_NAME]]';
                 const lastName = formData.lastName || '[[LAST_NAME]]';
 

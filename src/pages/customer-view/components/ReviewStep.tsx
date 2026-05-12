@@ -1,5 +1,7 @@
 import React from 'react';
-import { UserIcon, MapPinIcon, ActivityIcon, InfoIcon, CheckIcon, PhoneIcon, MailIcon } from '@/components/icons';
+import { cn } from '@/lib/utils';
+import { calculateDiscountedRate } from '@/lib/rate-utils';
+import { UserIcon, MapPinIcon, ActivityIcon, InfoIcon, CheckIcon, PhoneIcon, MailIcon, ZapIcon, Settings2Icon, PlugIcon } from '@/components/icons';
 import { CustomerViewLayout } from './CustomerViewLayout';
 
 interface ReviewStepProps {
@@ -11,6 +13,10 @@ interface ReviewStepProps {
     onBack: () => void;
     onFinish: () => void;
     idTypeOptions: any[];
+    mainOffer?: any;
+    ratePlan?: any;
+    measurementUnits?: any[];
+    customer?: any;
 }
 
 export const ReviewStep: React.FC<ReviewStepProps> = ({
@@ -21,8 +27,39 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
     setIsNominationConfirmed,
     onBack,
     onFinish,
-    idTypeOptions
+    idTypeOptions,
+    mainOffer,
+    ratePlan,
+    measurementUnits,
+    customer
 }) => {
+    const unitMap = React.useMemo(() => {
+        const map: Record<string, string> = {};
+        measurementUnits?.forEach((u: any) => {
+            map[u.uid] = u.name;
+        });
+        return map;
+    }, [measurementUnits]);
+
+    const discount = parseFloat(payload?.discount || 0);
+
+    const parsedPriceUnits: Record<string, string> = typeof mainOffer?.priceUnits === 'string'
+        ? (() => { try { return JSON.parse(mainOffer.priceUnits); } catch { return {}; } })()
+        : (mainOffer?.priceUnits || {});
+
+    const parsedDynamicRates = typeof mainOffer?.dynamicRates === 'string'
+        ? (() => { try { return JSON.parse(mainOffer.dynamicRates); } catch { return []; } })()
+        : (mainOffer?.dynamicRates || []);
+
+    const formatUnit = (key: string, fallback: string) => {
+        const unitUid = parsedPriceUnits[key];
+        const unit = unitUid ? (unitMap[unitUid] || fallback) : fallback;
+        return unit ? `/${unit}` : '';
+    };
+
+    const hasCL = (mainOffer?.cl1Usage || 0) > 0 || (mainOffer?.cl2Usage || 0) > 0 || (mainOffer?.cl1Supply || 0) > 0 || (mainOffer?.cl2Supply || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'controlled_load');
+    const hasFiT = ((mainOffer?.fit || 0) > 0 || (mainOffer?.fitPeak || 0) > 0 || (mainOffer?.fitCritical || 0) > 0 || (mainOffer?.fitVpp || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit')) && customer?.solarDetails?.hassolar === 1;
+
     return (
         <CustomerViewLayout
             title="Review Your Details"
