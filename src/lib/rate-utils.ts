@@ -7,8 +7,8 @@
  */
 export const calculateDiscountedRate = (rate: number, discountPercentage: number): number => {
     if (typeof rate !== 'number' || isNaN(rate)) return 0;
-    if (!discountPercentage || isNaN(discountPercentage) || discountPercentage <= 0) return rate;
+    if (!discountPercentage || isNaN(discountPercentage) || discountPercentage <= 0) return Number(rate.toFixed(4));
 
     const discountAmount = rate * (discountPercentage / 100);
-    return rate - discountAmount;
+    return Number((rate - discountAmount).toFixed(4));
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
 import { GET_CUSTOMER_BY_CUSTOMER_ID } from '@/graphql/queries/customers';
-import { GET_MEASUREMENT_UNITS } from '@/graphql/queries/rates';
+import { GET_MEASUREMENT_UNITS, GET_RATE_PLAN_BY_CODE } from '@/graphql/queries/rates';
 import { GET_ALL_BONUSES } from '@/graphql/queries/bonus';
 import {
     UPDATE_CUSTOMER,
@@ -122,6 +122,13 @@ export const OfferAccessPage = () => {
         });
         return map;
     }, [unitsData]);
+
+    const tariffCode = customerData?.tariffCode || customerData?.ratePlan?.tariff;
+
+    const { data: ratesData, loading: ratesLoading } = useQuery(GET_RATE_PLAN_BY_CODE, {
+        variables: { code: tariffCode },
+        skip: !!customerData?.ratePlan || !tariffCode,
+    });
 
     const [fetchCustomer, { loading: fetchingCustomer }] = useLazyQuery(GET_CUSTOMER_BY_CUSTOMER_ID, {
         variables: { customerId: customerId },
@@ -1016,7 +1023,7 @@ export const OfferAccessPage = () => {
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-semibold text-foreground">Your Energy Rates</h3>
-                                    <p className="text-xs text-muted-foreground">Tariff: {customerData.tariffCode || customerData.ratePlan?.tariff || '—'}</p>
+                                    <p className="text-xs text-muted-foreground">Tariff: {customerData.tariffCode || customerData.ratePlan?.tariff || ratesData?.ratePlanByCode?.tariff || '—'}</p>
                                 </div>
                             </div>
                             {customerData.discount > 0 && (
@@ -1029,8 +1036,23 @@ export const OfferAccessPage = () => {
 
                     <div className="p-5">
                         {(() => {
-                            const activeOffer = customerData?.ratePlan?.offers?.[0];
-                            if (!activeOffer) return null;
+                            if (ratesLoading) {
+                                return (
+                                    <div className="flex items-center justify-center py-8">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                                    </div>
+                                );
+                            }
+
+                            const ratePlan = customerData?.ratePlan || ratesData?.ratePlanByCode;
+                            const activeOffer = ratePlan?.offers?.[0];
+                            if (!activeOffer) {
+                                return (
+                                    <p className="text-center text-muted-foreground py-8 text-sm">
+                                        No rate details available for this tariff.
+                                    </p>
+                                );
+                            }
 
                             const parsedDynamicRates = typeof activeOffer.dynamicRates === 'string'
                                 ? (() => { try { return JSON.parse(activeOffer.dynamicRates); } catch { return []; } })()
@@ -1075,7 +1097,7 @@ export const OfferAccessPage = () => {
                                 const classes = themeClasses[columnColor];
 
                                 return (
-                                    <div className="space-y-4 min-w-[200px] flex-1">
+                                    <div className="space-y-4">
                                         <div className={cn("flex items-center gap-2", classes.header)}>
                                             <Icon size={16} />
                                             <h4 className="text-sm font-bold uppercase tracking-wide">{label}</h4>
@@ -1215,7 +1237,7 @@ export const OfferAccessPage = () => {
                                     displayValue: `$${parseFloat(String(rate.value || '0')).toFixed(4)}${rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : '/kWh') : formatUnit(rate.type, 'kWh')}`
                                 }));
 
-                            const extraFitRates = remainingDynamicRates.filter((r: any) => r.type === 'fit' || r.type === 'extra_fit' || (!r.type && (customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1))).map((dRate: any) => {
+                            const extraFitRates = remainingDynamicRates.filter((r: any) => r.type === 'fit' || r.type === 'extra_fit' || (!r.type && (customerData.vppDetails?.vpp === 1 || ratePlan?.vpp === 1))).map((dRate: any) => {
                                 const val = parseFloat(String(dRate.value || '0'));
                                 const price = dRate.applyDiscount ? calculateDiscountedRate(val, customerData.discount ?? 0) : val;
                                 return {
@@ -1228,7 +1250,7 @@ export const OfferAccessPage = () => {
                                 displayValue: `$${parseFloat(String(rate.value)).toFixed(4)}${rate.unitId ? `/${unitMap?.[rate.unitId]}` : ''}`
                             }));
 
-                            const extraChargeRates = remainingDynamicRates.filter((r: any) => r.type === 'charges' || r.type === 'extra_charges' || (!r.type && !(customerData.vppDetails?.vpp === 1 || customerData.ratePlan?.vpp === 1))).map((dRate: any) => {
+                            const extraChargeRates = remainingDynamicRates.filter((r: any) => r.type === 'charges' || r.type === 'extra_charges' || (!r.type && !(customerData.vppDetails?.vpp === 1 || ratePlan?.vpp === 1))).map((dRate: any) => {
                                 const val = parseFloat(String(dRate.value || '0'));
                                 const price = dRate.applyDiscount ? calculateDiscountedRate(val, customerData.discount ?? 0) : val;
                                 return {
@@ -1265,11 +1287,11 @@ export const OfferAccessPage = () => {
                                 });
 
                             return (
-                                <div className="flex flex-wrap gap-x-12 gap-y-10">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                     {renderRatesColumn(energyRates, "Energy Rates", "blue", Settings2Icon)}
 
                                     {(supplyRates.length > 0 || demandRates.length > 0 || vppCharges.length > 0) && (
-                                        <div className="space-y-10 flex-1 min-w-[200px]">
+                                        <div className="space-y-10">
                                             {renderRatesColumn(supplyRates, "Supply Charges", "purple", PlugIcon)}
                                             {renderRatesColumn(demandRates, "Demand Charges", "rose", ActivityIcon)}
                                             {renderRatesColumn(vppCharges, "VPP Charges", "orange", ActivityIcon)}
