@@ -31,6 +31,24 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
             footerButtonLabel="Finish Enrollment"
             onFooterButtonClick={onFinish}
             isFooterButtonDisabled={!isNominationConfirmed}
+            footerContent={
+                <div className="py-1">
+                    <label className="flex items-center justify-center gap-4 cursor-pointer group">
+                        <div className="relative flex items-center shrink-0">
+                            <input
+                                type="checkbox"
+                                className="peer h-6 w-6 cursor-pointer appearance-none rounded-lg border-2 border-slate-200 checked:bg-primary checked:border-primary transition-all duration-200 shadow-sm hover:border-primary/50"
+                                checked={isNominationConfirmed}
+                                onChange={(e) => setIsNominationConfirmed(e.target.checked)}
+                            />
+                            <CheckIcon className="absolute w-4 h-4 pointer-events-none hidden peer-checked:block text-white left-1" />
+                        </div>
+                        <span className="text-sm md:text-base font-medium text-slate-700 select-none leading-relaxed">
+                            I have read and agree to the <a href="/onboarding/BESS2 and Nomination Form.pdf" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-bold" onClick={(e) => e.stopPropagation()}>Nomination Form</a>
+                        </span>
+                    </label>
+                </div>
+            }
         >
             <div className="space-y-6 max-w-6xl mx-auto">
                 {/* Consolidated Summary Card */}
@@ -93,13 +111,9 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
                             <div className="p-2 bg-amber-50 text-amber-600 rounded-lg shrink-0">
                                 <ActivityIcon size={16} />
                             </div>
-                            Identity & Connection
+                            Identity Details
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                            <div>
-                                <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">Connection Date</div>
-                                <div className="text-sm font-semibold text-slate-900 mt-1">{idForm.connectionDate || '—'}</div>
-                            </div>
                             <div>
                                 <div className="text-xs text-slate-500 uppercase tracking-wide font-medium">ID Type</div>
                                 <div className="text-sm font-semibold text-slate-900 mt-1">
@@ -173,38 +187,22 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
                         <p className="text-sm font-medium text-emerald-800">This enrollment was submitted via the PDRS portal ({payload.portalname || 'Portal'}).</p>
                     </div>
                 )}
-
-                <div className="mt-8 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-                    <label className="flex items-center justify-center gap-4 cursor-pointer group">
-                        <div className="relative flex items-center shrink-0">
-                            <input
-                                type="checkbox"
-                                className="peer h-6 w-6 cursor-pointer appearance-none rounded-lg border-2 border-slate-200 checked:bg-primary checked:border-primary transition-all duration-200 shadow-sm hover:border-primary/50"
-                                checked={isNominationConfirmed}
-                                onChange={(e) => setIsNominationConfirmed(e.target.checked)}
-                            />
-                            <CheckIcon className="absolute w-4 h-4 pointer-events-none hidden peer-checked:block text-white left-1" />
-                        </div>
-                        <span className="text-sm md:text-base font-medium text-slate-700 select-none leading-relaxed">
-                            I have read and agree to the <a href="/onboarding/BESS2 and Nomination Form.pdf" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-bold" onClick={(e) => e.stopPropagation()}>Nomination Form</a>
-                        </span>
-                    </label>
-                </div>
-
-                <div className="text-center pt-2 pb-4">
-                    <p className="text-xs text-muted-foreground mb-3">Need help?</p>
-                    <div className="flex justify-center gap-3">
-                        <a href="tel:1300707042" className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground font-medium hover:shadow-sm transition-all">
-                            <PhoneIcon size={14} className="text-green-500" />
+                {/* Need help Section */}
+                <div className="text-center pt-8 pb-4">
+                    <p className="text-xs text-muted-foreground mb-3 font-semibold uppercase tracking-wider">Need help?</p>
+                    <div className="flex justify-center gap-4">
+                        <a href="tel:1300707042" className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
+                            <PhoneIcon size={14} className="text-primary" />
                             1300 707 042
                         </a>
-                        <a href="mailto:customerservice@gee.com.au" className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground font-medium hover:shadow-sm transition-all">
-                            <MailIcon size={14} className="text-green-500" />
-                            Email
+                        <a href="mailto:customerservice@gee.com.au" className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
+                            <MailIcon size={14} className="text-primary" />
+                            EMAIL US
                         </a>
                     </div>
                 </div>
             </div>
         </CustomerViewLayout>
+
     );
 };

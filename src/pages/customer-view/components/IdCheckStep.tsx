@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { CheckIcon } from '@/components/icons';
 import { Input, Select, DatePicker } from '@/components/ui';
 import { CustomerViewLayout } from './CustomerViewLayout';
@@ -27,11 +27,16 @@ export const IdCheckStep: React.FC<IdCheckStepProps> = ({
     countryOptions
 }) => {
     const idType = Number(idForm.idType);
+    const eighteenYearsAgo = useMemo(() => {
+        const d = new Date();
+        d.setFullYear(d.getFullYear() - 18);
+        return d;
+    }, []);
 
     return (
         <CustomerViewLayout
             title="Finalize Your Enrollment"
-            subtitle="Confirm your connection date and verify your identity"
+            subtitle="Verify your identity"
             onBack={onBack}
             footerButtonLabel="Review Your Details"
             onFooterButtonClick={onNext}
@@ -40,16 +45,12 @@ export const IdCheckStep: React.FC<IdCheckStepProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                 {/* LEFT COLUMN: FORM */}
                 <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                         <DatePicker
                             label="Date of Birth"
                             value={idForm.dob}
                             onChange={(date) => setIdForm((f: any) => ({ ...f, dob: date ? date.toISOString().split('T')[0] : '' }))}
-                        />
-                        <DatePicker
-                            label="Connection Date"
-                            value={idForm.connectionDate}
-                            onChange={(date) => setIdForm((f: any) => ({ ...f, connectionDate: date ? date.toISOString().split('T')[0] : '' }))}
+                            maxDate={eighteenYearsAgo}
                         />
                     </div>
 

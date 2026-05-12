@@ -70,6 +70,8 @@ interface Customer {
     createdByUser?: { uid: string; name: string };
     leadUid?: string;
     isDeleted?: boolean;
+    pdrsEmailSent?: number;
+    pdrsEmailSentAt?: string;
 }
 
 interface PageInfo {
@@ -909,6 +911,50 @@ export function CustomersPage() {
                 </div>
             ),
             render: (row) => <StatusField type="dnsp" value={row.ratePlan?.dnsp} mode="badge" />,
+        },
+        {
+            key: 'pdrsEmailSent',
+            header: (
+                <div className="flex flex-col gap-1 items-start">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            PDRS Email
+                        </span>
+                    </div>
+                </div>
+            ),
+            width: 'w-[100px]',
+            render: (row: Customer) => (
+                <div className="flex justify-center">
+                    {row.pdrsEmailSent === 1 ? (
+                        <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-1">
+                            <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        </div>
+                    ) : (
+                        <div className="rounded-full bg-red-100 dark:bg-red-900/30 p-1">
+                            <XIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        </div>
+                    )}
+                </div>
+            ),
+        },
+        {
+            key: 'pdrsEmailSentAt',
+            header: (
+                <div className="flex flex-col gap-1 items-start">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            PDRS Sent At
+                        </span>
+                    </div>
+                </div>
+            ),
+            width: 'w-[150px]',
+            render: (row: Customer) => (
+                <span className="text-xs text-foreground">
+                    {row.pdrsEmailSentAt ? new Date(row.pdrsEmailSentAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                </span>
+            ),
         },
         ...(showActionsColumn ? [{
             key: 'actions' as const,

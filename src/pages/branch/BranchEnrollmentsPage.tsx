@@ -340,7 +340,7 @@ export function BranchEnrollmentsPage() {
                                 "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-sm",
                                 selectedLead.isCustomerNow ? "bg-emerald-500" : "bg-amber-500"
                             )}>
-                                {selectedLead.isCustomerNow ? 'Onboarded' : 'Lead'}
+                                {selectedLead.isCustomerNow ? 'Active' : 'Lead'}
                             </div>
                         </div>
 

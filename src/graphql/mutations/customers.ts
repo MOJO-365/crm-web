@@ -22,6 +22,7 @@ const CUSTOMER_FULL_RESPONSE = `
     phoneVerifiedAt
     propertyType
     tariffCode
+    ratePlanUid
     status
     discount
     signDate

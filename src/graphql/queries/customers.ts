@@ -23,6 +23,7 @@ export const GET_CUSTOMERS = gql`
                 phoneVerifiedAt
                 propertyType
                 tariffCode
+                ratePlanUid
                 status
                 utilmateStatus
                 utilmateUpdatedAt
@@ -43,6 +44,8 @@ export const GET_CUSTOMERS = gql`
                 isDeleted
                 createdAt
                 offerEmailSentAt
+                pdrsEmailSent
+                pdrsEmailSentAt
                 updatedAt
                 leadUid
                 portalName
@@ -450,6 +453,8 @@ export const GET_CUSTOMERS_CURSOR = gql`
                   msatConnected
                 }
                 discount
+                pdrsEmailSent
+                pdrsEmailSentAt
                 ratePlan {
                     id
                     uid
@@ -544,6 +549,8 @@ export const GET_CUSTOMER_BY_ID = gql`
             offerEmailSentAt
             updatedAt
             portalName
+            pdrsEmailSent
+            pdrsEmailSentAt
             address {
                 id
                 customerUid
@@ -700,6 +707,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             dob
             propertyType
             tariffCode
+            ratePlanUid
             status
             discount
             signDate
@@ -722,6 +730,8 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             isDeleted
             createdAt
             offerEmailSentAt
+            pdrsEmailSent
+            pdrsEmailSentAt
             updatedAt
             portalName
             address {

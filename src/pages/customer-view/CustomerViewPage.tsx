@@ -43,7 +43,6 @@ export const CustomerViewPage: React.FC = () => {
         phone: '',
         title: '',
         dob: '',
-        connectionDate: '',
     });
     const [idFormInit, setIdFormInit] = useState(false);
     const [isFinished, setIsFinished] = useState(false);
@@ -105,7 +104,6 @@ export const CustomerViewPage: React.FC = () => {
                 phone: payload.number || payload.phone || payload.mobile || '',
                 title: payload.title || '',
                 dob: payload.dob || '',
-                connectionDate: payload.connectionDate || payload.connectiondate || payload.connection_date || '',
             });
             setIdFormInit(true);
         }
@@ -126,7 +124,7 @@ export const CustomerViewPage: React.FC = () => {
     };
 
     const handleFinishEnrollment = async () => {
-        if (!uid || !idConfirmed) return;
+        if (!uid || !idConfirmed || !isNominationConfirmed) return;
 
         try {
             await updateCustomer({
@@ -142,7 +140,6 @@ export const CustomerViewPage: React.FC = () => {
                             licenseCardNumber: idForm.licenseCardNumber,
                             medicareCardType: idForm.medicareCardType,
                             medicareIrn: idForm.medicareIrn,
-                            connectiondate: idForm.connectionDate,
                         },
                         dob: idForm.dob,
                         medicareIrn: idForm.medicareIrn,
