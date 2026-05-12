@@ -435,7 +435,7 @@ export default function LeadsPage() {
                 <div className="flex flex-col gap-1">
                     {row.isCustomerNow ? (
                         <>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 uppercase w-fit">Onboarded</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 uppercase w-fit">Active</span>
                             {row.customerUid && (
                                 <button
                                     onClick={() => navigate(`/customers/${row.customerUid}`)}

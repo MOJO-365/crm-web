@@ -84,6 +84,7 @@ export interface CustomerFormData {
 
     // Pricing
     tariffCode: string;
+    ratePlanUid?: string;
     creditScore?: number;
     riskStatus?: number;
     discount: number;
@@ -95,6 +96,8 @@ export interface CustomerFormData {
     additionalDocument?: CustomerDocument | null;
     selectedBonuses: string[]; // Array of bonus UIDs
     assignedToUid?: string;
+    pdrsEmailSent?: number;
+    pdrsEmailSentAt?: string;
 }
 
 export interface CustomerDocument {

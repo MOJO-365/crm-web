@@ -179,6 +179,7 @@ const initialFormData: CustomerFormData = {
     paymentFrequency: 0,
     firstDebitDate: '',
     tariffCode: '',
+    ratePlanUid: undefined,
     creditScore: undefined,
     riskStatus: undefined,
     discount: 0,
@@ -186,6 +187,8 @@ const initialFormData: CustomerFormData = {
     identityProof: null,
     selectedBonuses: [],
     assignedToUid: undefined,
+    pdrsEmailSent: 0,
+    pdrsEmailSentAt: undefined,
 };
 
 
@@ -844,8 +847,9 @@ export const CustomerFormPage = () => {
                 return stateMatch && activeMatch && vppMatch;
             })
             .map(rp => ({
-                value: rp.codes,
+                value: rp.uid, // Use UID as unique value to avoid selection ambiguity in the UI
                 label: `${rp.codes} - ${rp.tariff} (${rp.state})`,
+                codeString: rp.codes, // Preserve code string for matching logic
             }));
     }, [ratePlans, formData.state, formData.vpp]);
 
@@ -932,6 +936,7 @@ export const CustomerFormPage = () => {
                 paymentFrequency: c.debitDetails?.paymentFrequency || 0,
                 firstDebitDate: c.debitDetails?.firstDebitDate ? formatSydneyTime(c.debitDetails.firstDebitDate, 'YYYY-MM-DD') : '',
                 tariffCode: c.tariffCode || '',
+                ratePlanUid: c.ratePlanUid || c.ratePlan?.uid || undefined,
                 discount: c.discount || 0,
                 creditScore: c.creditScore,
                 riskStatus: c.riskStatus,
@@ -939,7 +944,9 @@ export const CustomerFormPage = () => {
                 identityProof: c.identityProof || null,
                 licenseDocument: c.licenseDocument || null,
                 additionalDocument: c.additionalDocument || null,
-                selectedBonuses: c.selectedBonuses || []
+                selectedBonuses: c.selectedBonuses || [],
+                pdrsEmailSent: c.pdrsEmailSent || 0,
+                pdrsEmailSentAt: c.pdrsEmailSentAt || undefined
             });
 
             if (c.phoneVerifiedAt) {
@@ -966,7 +973,10 @@ export const CustomerFormPage = () => {
             }
 
             if (c.tariffCode && ratePlans.length > 0) {
-                const rp = ratePlans.find(r => r.codes === c.tariffCode);
+                // Prefer matching by saved RatePlan UID if available, otherwise fallback to codes
+                const rp = (c.ratePlan?.uid)
+                    ? ratePlans.find((r: any) => r.uid === c.ratePlan?.uid)
+                    : ratePlans.find((r: any) => r.codes === c.tariffCode);
                 if (rp) setSelectedRatePlan(rp);
             }
 
@@ -1165,7 +1175,7 @@ export const CustomerFormPage = () => {
 
         // 1. Try exact matches first (best quality)
         let matchedTariff = tariffOptions.find((opt: any) => {
-            const v = opt.value.toLowerCase().trim();
+            const v = (opt.codeString || opt.value).toLowerCase().trim();
             const vNoPrefix = v.startsWith('vpp ') ? v.substring(4) : v;
             return v === s || vNoPrefix === sNoPrefix;
         });
@@ -1182,7 +1192,7 @@ export const CustomerFormPage = () => {
         // 3. Try "part of a list" match (e.g. "N73" inside "N73/N54")
         if (!matchedTariff) {
             matchedTariff = tariffOptions.find((opt: any) => {
-                const parts = opt.value.toLowerCase().split(/[\/\s,]+/);
+                const parts = (opt.codeString || opt.value).toLowerCase().split(/[\/\s,]+/);
                 return parts.includes(s) || parts.includes(sNoPrefix);
             });
         }
@@ -1190,13 +1200,13 @@ export const CustomerFormPage = () => {
         // 4. Fallback to broad partial match
         if (!matchedTariff) {
             matchedTariff = tariffOptions.find((opt: any) =>
-                opt?.value?.toLowerCase().includes(s) ||
+                (opt.codeString || opt.value)?.toLowerCase().includes(s) ||
                 opt?.label?.toLowerCase().includes(s)
             );
         }
 
         if (matchedTariff) {
-            updateField('tariffCode', matchedTariff.value);
+            updateField('tariffCode', matchedTariff.codeString || matchedTariff.value);
             handleTariffChange(matchedTariff.value);
         } else {
             console.warn('⚠️ No matching tariff found for:', selectedTariff);
@@ -1446,9 +1456,12 @@ export const CustomerFormPage = () => {
         finally { setOtpVerifying(false); }
     };
 
-    const handleTariffChange = (code: string) => {
-        setFormData(prev => ({ ...prev, tariffCode: code }));
-        const rp = ratePlans.find(r => r.codes === code);
+    const handleTariffChange = (uidOrCode: string) => {
+        // Try finding by UID first (preferred for uniqueness in UI), fallback to code string
+        const rp = ratePlans.find(r => r.uid === uidOrCode) || ratePlans.find(r => r.codes === uidOrCode);
+        const finalCode = rp ? rp.codes : uidOrCode;
+
+        setFormData(prev => ({ ...prev, tariffCode: finalCode, ratePlanUid: rp ? rp.uid : undefined }));
         setSelectedRatePlan(rp || null);
         if (rp) {
             setFormData(prev => ({ ...prev, discount: rp.discountPercentage || 0 }));
@@ -1460,20 +1473,23 @@ export const CustomerFormPage = () => {
         // Only run if we have rate plans loaded (to avoid clearing on initial mount while loading)
         // AND we have a state selected (since tariffOptions depends on state)
         if (ratePlans.length > 0 && formData.state && formData.tariffCode) {
-            const exists = tariffOptions.some(opt => opt.value === formData.tariffCode);
+            // Check if either the current selected UID or the current code string exists in available options
+            const exists = tariffOptions.some(opt => 
+                opt.value === selectedRatePlan?.uid || opt.codeString === formData.tariffCode
+            );
             if (!exists) {
-                updateField('tariffCode', '');
+                setFormData(prev => ({ ...prev, tariffCode: '', ratePlanUid: undefined }));
                 setSelectedRatePlan(null);
             }
         }
-    }, [tariffOptions, ratePlans.length, formData.state, formData.vpp, formData.tariffCode]);
+    }, [tariffOptions, ratePlans.length, formData.state, formData.vpp, formData.tariffCode, selectedRatePlan]);
 
     const [touched, setTouched] = useState<Record<string, boolean>>({});
 
     // Field-level validation
     const validateField = (name: string, value: any): string => {
         // Required fields
-        let isRequired = ['firstName', 'lastName', 'email', 'phone', 'streetNumber', 'streetName', 'suburb', 'postcode', 'nmi'].includes(name);
+        let isRequired = ['firstName', 'lastName', 'email', 'phone', 'streetNumber', 'streetName', 'suburb', 'postcode', 'nmi', 'connectionDate'].includes(name);
 
         // Conditional demographic requirements
         if (formData.checkCreditScore) {
@@ -1611,7 +1627,7 @@ export const CustomerFormPage = () => {
             formData.firstName?.trim() &&
             formData.lastName?.trim() &&
             formData.email?.trim() &&
-            (isPdrs || formData.connectionDate)
+            formData.connectionDate
         );
     }, [formData]);
 
@@ -1867,6 +1883,7 @@ export const CustomerFormPage = () => {
                 propertyType: formData.propertyType,
                 assignedToUid: formData.assignedToUid,
                 tariffCode: formData.tariffCode,
+                ratePlanUid: formData.ratePlanUid || selectedRatePlan?.uid || undefined,
                 discount: formData.discount,
                 status: finalStatus,
                 gender: formData.gender,
@@ -1976,6 +1993,10 @@ export const CustomerFormPage = () => {
             // Clear customer cache to ensure fresh data on customers page
             apolloClient.cache.evict({ fieldName: 'customers' });
             apolloClient.cache.evict({ fieldName: 'customersCursor' });
+            if (savedCustomer?.uid) {
+                apolloClient.cache.evict({ fieldName: 'customer', args: { uid: savedCustomer.uid } });
+                apolloClient.cache.evict({ id: `Customer:${savedCustomer.uid}` });
+            }
             apolloClient.cache.gc();
 
             // Handle redirection
@@ -2110,13 +2131,13 @@ export const CustomerFormPage = () => {
             });
             if (data?.previewSystemTemplate) {
                 let preview = { ...data.previewSystemTemplate };
-                
+
                 // Replace placeholders for a more realistic preview
                 const prefill = (location.state as any)?.prefillData;
                 const companyName = prefill?.createdBy?.company_name || prefill?.createdBy?.companyName || prefill?.companyName || prefill?.company_name || prefill?.portalname || prefill?.portalName || (isEditMode ? customerData?.customer?.portalName : null) || '[[COMPANY_NAME]]';
                 const firstName = formData.firstName || '[[FIRST_NAME]]';
                 const lastName = formData.lastName || '[[LAST_NAME]]';
-                
+
                 if (preview.body) {
                     preview.body = preview.body
                         .replace(/\[\[COMPANY_NAME\]\]/g, companyName)
@@ -2124,7 +2145,7 @@ export const CustomerFormPage = () => {
                         .replace(/\[\[FIRST_NAME\]\]/g, firstName)
                         .replace(/\[\[LAST_NAME\]\]/g, lastName);
                 }
-                
+
                 setEmailPreview(preview);
             } else {
                 toast.error('Could not load PDRS consent template');
@@ -2142,20 +2163,20 @@ export const CustomerFormPage = () => {
         try {
             const prefill = (location.state as any)?.prefillData;
             const eventType = isPdrs ? 'CUSTOMER_DRAFT' : (isEditMode ? 'CUSTOMER_UPDATED' : 'CUSTOMER_CREATED');
-            
+
             const { data } = await fetchSystemTemplate({
                 variables: { eventType },
                 fetchPolicy: 'network-only'
             });
-            
+
             if (data?.previewSystemTemplate) {
                 let preview = { ...data.previewSystemTemplate };
-                
+
                 // Replace placeholders for a more realistic preview
                 const companyName = prefill?.createdBy?.company_name || prefill?.createdBy?.companyName || prefill?.companyName || prefill?.company_name || prefill?.portalname || prefill?.portalName || (isEditMode ? customerData?.customer?.portalName : null) || '[[COMPANY_NAME]]';
                 const firstName = formData.firstName || '[[FIRST_NAME]]';
                 const lastName = formData.lastName || '[[LAST_NAME]]';
-                
+
                 if (preview.body) {
                     preview.body = preview.body
                         .replace(/\[\[COMPANY_NAME\]\]/g, companyName)
@@ -2163,7 +2184,7 @@ export const CustomerFormPage = () => {
                         .replace(/\[\[FIRST_NAME\]\]/g, firstName)
                         .replace(/\[\[LAST_NAME\]\]/g, lastName);
                 }
-                
+
                 setEmailPreview(preview);
                 setPreviewStep('email');
             } else {
@@ -2743,7 +2764,7 @@ export const CustomerFormPage = () => {
                                             label="Tariff Code"
                                             required
                                             options={tariffOptions}
-                                            value={formData.tariffCode}
+                                            value={selectedRatePlan?.uid || ''} // Use UID for uniqueness to avoid selecting multiple items with same code
                                             onChange={(val) => handleTariffChange(val as string)}
                                             placeholder="Select tariff"
                                         />                                        {/* Discount Field with Pill Selector */}
@@ -2876,7 +2897,14 @@ export const CustomerFormPage = () => {
                                         <div className="p-4 rounded-lg border border-border bg-muted/30 space-y-4">
                                             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Enrollment</h3>
                                             <Select label="Sale Type" options={SALE_TYPE_OPTIONS} value={formData.saleType.toString()} onChange={(val) => updateField('saleType', parseInt(val as string))} />
-                                            <DatePicker label="Connection Date" required={!isPdrs} value={formData.connectionDate} onChange={(date) => updateField('connectionDate', date)} />
+                                            <DatePicker
+                                                label="Connection Date"
+                                                required
+                                                error={errors.connectionDate}
+                                                value={formData.connectionDate}
+                                                onChange={(date) => updateField('connectionDate', date)}
+                                                onBlur={() => handleBlur('connectionDate')}
+                                            />
                                             <Select label="Billing Preference" options={BILLING_PREF_OPTIONS} value={formData.billingPreference.toString()} onChange={(val) => updateField('billingPreference', parseInt(val as string))} />
 
                                             <Field label="Previous Bill">

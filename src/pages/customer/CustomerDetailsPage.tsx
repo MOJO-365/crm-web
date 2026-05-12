@@ -126,10 +126,13 @@ interface CustomerDetails {
     isCreditScoreFetched?: number;
     discount?: number;
     tariffCode?: string;
+    ratePlanUid?: string;
     signDate?: string;
     signedPdfPath?: string;
     emailSent?: number;
     offerEmailSentAt?: string;
+    pdrsEmailSent?: number;
+    pdrsEmailSentAt?: string;
     emailLogCount?: number;
     phoneVerifiedAt?: string;
     isActive?: boolean;
@@ -2415,6 +2418,7 @@ export function CustomerDetailsPage() {
 
             const now = new Date().toISOString();
             const input: any = {
+                status: 9,
                 utilmateStatus: 1,
                 utilmateDetails: {
                     siteIdentifier: utilmateForm.siteIdentifier || undefined,
@@ -2437,6 +2441,7 @@ export function CustomerDetailsPage() {
 
             setSelectedCustomerDetails({
                 ...selectedCustomerDetails,
+                status: 9,
                 utilmateDetails: {
                     ...selectedCustomerDetails.utilmateDetails,
                     ...input.utilmateDetails
@@ -2929,8 +2934,8 @@ export function CustomerDetailsPage() {
                                     ...(selectedCustomerDetails.checkCreditScore === 1 ? [
                                         { label: 'Credit score', date: null, completed: selectedCustomerDetails.isCreditScoreFetched === 1, step: 0 },
                                     ] : []),
-                                    { label: 'Offer sent', date: selectedCustomerDetails.offerEmailSentAt, completed: !!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.emailSent === 1, step: 1, isLoading: isSendingOffer },
-                                    { label: 'Signed by customer', date: selectedCustomerDetails.signDate, completed: !!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2, showReminder: !!selectedCustomerDetails.offerEmailSentAt, step: 2 },
+                                    { label: 'Offer sent', date: selectedCustomerDetails.pdrsEmailSentAt || selectedCustomerDetails.offerEmailSentAt, completed: !!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.emailSent === 1 || selectedCustomerDetails.pdrsEmailSent === 1 || !!selectedCustomerDetails.pdrsEmailSentAt, step: 1, isLoading: isSendingOffer },
+                                    { label: 'Signed by customer', date: selectedCustomerDetails.signDate, completed: !!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2, showReminder: !!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.pdrsEmailSent === 1 || !!selectedCustomerDetails.pdrsEmailSentAt, step: 2 },
                                     ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
                                         {
                                             label: 'Push to Gsync',
@@ -3097,7 +3102,7 @@ export function CustomerDetailsPage() {
                                                 </button>
                                             )}
 
-                                            {item.step === 0 && (showManualOfferButton || (selectedCustomerDetails.isCreditScoreFetched === 1 && selectedCustomerDetails.riskStatus !== undefined && (riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus)?.manualOffer === 1))) && !selectedCustomerDetails.offerEmailSentAt && (
+                                            {item.step === 0 && (showManualOfferButton || (selectedCustomerDetails.isCreditScoreFetched === 1 && selectedCustomerDetails.riskStatus !== undefined && (riskStatuses.find((rs: any) => rs.uid === selectedCustomerDetails.riskStatus)?.manualOffer === 1))) && !selectedCustomerDetails.offerEmailSentAt && !selectedCustomerDetails.pdrsEmailSentAt && (
                                                 <button
                                                     onClick={() => handleManualSendOffer(selectedCustomerDetails.uid)}
                                                     disabled={isSendingOffer || selectedCustomerDetails.isDeleted}
