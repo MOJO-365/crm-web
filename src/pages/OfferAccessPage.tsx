@@ -1336,7 +1336,9 @@ export const OfferAccessPage = () => {
                                 <div className="text-left w-full sm:w-auto">
                                     <h3 className="text-sm font-semibold text-foreground">Verify your mobile number</h3>
                                     <div className="flex items-center gap-2 mt-1">
-                                        <p className="text-sm text-muted-foreground">We will send a 6 digit code to +61 {customerData.number}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            We will send a 6 digit code to {customerData.number?.startsWith('+') ? customerData.number : customerData.number?.startsWith('61') ? `+${customerData.number}` : `+61 ${customerData.number}`}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 w-full sm:w-auto justify-end">

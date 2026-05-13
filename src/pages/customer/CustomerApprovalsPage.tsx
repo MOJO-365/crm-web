@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
-import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, GET_USERS, GET_ROLES, SEND_OFFER_EMAIL, SEND_PDRS_CONSENT_EMAIL } from '@/graphql';
+import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, SEND_OFFER_EMAIL, SEND_PDRS_CONSENT_EMAIL, GET_PEERLESS_COMPANY_NAMES } from '@/graphql';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -41,6 +41,7 @@ interface SearchFilters {
     status: string;
     portal: string;
     vpp: string;
+    companyName: string;
 }
 
 const INITIAL_FILTERS: SearchFilters = {
@@ -52,7 +53,8 @@ const INITIAL_FILTERS: SearchFilters = {
     address: '',
     status: '0', // Default to show Pending (0)
     portal: '',
-    vpp: ''
+    vpp: '',
+    companyName: ''
 };
 
 export function CustomerApprovalsPage() {
@@ -89,38 +91,32 @@ export function CustomerApprovalsPage() {
             searchAddress: debouncedFilters.address || undefined,
             searchPortal: debouncedFilters.portal || undefined,
             searchVpp: debouncedFilters.vpp !== '' ? parseInt(debouncedFilters.vpp) : undefined,
-            processed: debouncedFilters.status !== '' ? parseInt(debouncedFilters.status) : undefined
+            processed: debouncedFilters.status !== '' ? parseInt(debouncedFilters.status) : undefined,
+            searchCompanyName: debouncedFilters.companyName || undefined
         },
         fetchPolicy: 'network-only'
     });
 
-    // Fetch Branch Portal roles to get users
-    const { data: rolesData } = useQuery(GET_ROLES, {
-        variables: { limit: 100 }
+    const { data: companiesData } = useQuery(GET_PEERLESS_COMPANY_NAMES, {
+        skip: filters.portal !== 'PEERLESSGROUP',
+        fetchPolicy: 'network-only'
     });
 
-    const branchPortalRoleUid = React.useMemo(() => {
-        return rolesData?.roles?.data?.find((r: any) => r.name === 'Branch Portal')?.uid;
-    }, [rolesData]);
-
-    const { data: portalUsersData } = useQuery(GET_USERS, {
-        variables: { roleUid: branchPortalRoleUid, status: 'ACTIVE' },
-        skip: !branchPortalRoleUid
-    });
+    const companyOptions = React.useMemo(() => {
+        const list = companiesData?.peerlessCompanyNames || [];
+        return [
+            { value: '', label: 'All Companies' },
+            ...list.map((c: string) => ({ value: c, label: c }))
+        ];
+    }, [companiesData]);
 
     const portalOptions = React.useMemo(() => {
-        const options = [
+        return [
             { value: '', label: 'All Portals' },
-            { value: 'Gee Energy', label: 'Gee Energy' }
+            { value: 'Gee Energy', label: 'Gee Energy' },
+            { value: 'PEERLESSGROUP', label: 'Peer Less Group' }
         ];
-
-        const users = (portalUsersData?.users?.data || []).map((u: any) => ({
-            value: u.name,
-            label: u.name
-        }));
-
-        return [...options, ...users];
-    }, [portalUsersData]);
+    }, []);
 
     const enrollments = data?.webEnrollments?.data || [];
     const meta = data?.webEnrollments?.meta;
@@ -211,7 +207,13 @@ export function CustomerApprovalsPage() {
     };
 
     const handleFilterChange = (key: keyof SearchFilters, value: string) => {
-        setFilters(prev => ({ ...prev, [key]: value }));
+        setFilters(prev => {
+            const next = { ...prev, [key]: value };
+            if (key === 'portal' && value !== 'PEERLESSGROUP') {
+                next.companyName = '';
+            }
+            return next;
+        });
     };
 
     const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
@@ -499,14 +501,54 @@ export function CustomerApprovalsPage() {
                 </div>
             ),
             render: (row) => {
-                const portal = row.payload?.portalname;
+                const rawPortal = row.payload?.portalname || row.payload?.portalName;
+                let displayPortal = rawPortal ? String(rawPortal) : '-';
+                if (displayPortal.toUpperCase() === 'PEERLESSGROUP') {
+                    displayPortal = 'Peer Less Group';
+                } else if (displayPortal.toUpperCase().includes('GEE')) {
+                    displayPortal = 'Gee Energy';
+                }
                 return (
                     <span className="text-foreground font-medium text-xs">
-                        {portal ? portal : '-'}
+                        {displayPortal}
                     </span>
                 );
             }
         },
+        ...(filters.portal === 'PEERLESSGROUP' ? [{
+            key: 'companyname',
+            header: (
+                <div className="flex flex-col gap-1">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            filters.companyName ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Company Name
+                        </span>
+                        {filters.companyName && <div className="w-1 h-1 rounded-full bg-primary" />}
+                    </div>
+                    <Select
+                        options={companyOptions}
+                        value={filters.companyName}
+                        onChange={(val) => handleFilterChange('companyName', val as string)}
+                        placeholder="All"
+                        className={cn(
+                            "h-7 text-xs w-[140px] transition-all duration-200",
+                            filters.companyName && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                    />
+                </div>
+            ),
+            render: (row: WebEnrollment) => {
+                const name = row.payload?.createdBy?.company_name || row.payload?.createdBy?.companyName || row.payload?.companyname || row.payload?.companyName || row.payload?.company_name || row.payload?.businessName || row.payload?.businessname || row.payload?.company;
+                return (
+                    <span className="text-foreground font-medium text-xs">
+                        {name ? String(name) : '-'}
+                    </span>
+                );
+            }
+        }] : []),
         {
             key: 'status',
             header: (
