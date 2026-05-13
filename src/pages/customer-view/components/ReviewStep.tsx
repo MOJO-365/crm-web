@@ -155,9 +155,6 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
 
     const activeColsCount = [hasColumn1, hasColumn2, hasColumn3].filter(Boolean).length;
 
-    const vppDetails = customer?.vppDetails || payload?.vppDetails;
-    const isVppBonusRelevant = ((vppDetails?.vppConnected === 1 || vppDetails?.vpp === 1) && vppDetails?.vppSignupBonus === 600);
-
     return (
         <CustomerViewLayout
             title="Review Your Details"
