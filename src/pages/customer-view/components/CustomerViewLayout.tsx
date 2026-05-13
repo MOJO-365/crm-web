@@ -8,6 +8,8 @@ interface CustomerViewLayoutProps {
     footerButtonLabel?: string;
     onFooterButtonClick?: () => void;
     isFooterButtonDisabled?: boolean;
+    isFooterButtonLoading?: boolean;
+    footerButtonLoadingText?: string;
     showFooter?: boolean;
     onBack?: () => void;
     title?: string;
@@ -20,6 +22,8 @@ export const CustomerViewLayout: React.FC<CustomerViewLayoutProps> = ({
     footerButtonLabel,
     onFooterButtonClick,
     isFooterButtonDisabled,
+    isFooterButtonLoading,
+    footerButtonLoadingText,
     showFooter = true,
     onBack,
     title,
@@ -75,6 +79,8 @@ export const CustomerViewLayout: React.FC<CustomerViewLayoutProps> = ({
                                 size="lg"
                                 className={`h-14 text-lg font-bold rounded-2xl transition-all duration-300 ${!isFooterButtonDisabled ? 'shadow-lg shadow-primary/20' : ''}`}
                                 disabled={isFooterButtonDisabled}
+                                isLoading={isFooterButtonLoading}
+                                loadingText={footerButtonLoadingText || "Saving..."}
                                 onClick={onFooterButtonClick}
                             >
                                 {footerButtonLabel}

@@ -24,6 +24,11 @@ export const CustomerViewPage: React.FC = () => {
     const [idConfirmed, setIdConfirmed] = useState(false);
     const [isChecked, setIsChecked] = useState(false);
     const [isNominationConfirmed, setIsNominationConfirmed] = useState(false);
+    const [consents, setConsents] = useState({
+        infoConfirm: false,
+        creditCheck: false,
+        offerAgree: false,
+    });
     const [idForm, setIdForm] = useState({
         idType: '',
         idnumber: '',
@@ -60,6 +65,7 @@ export const CustomerViewPage: React.FC = () => {
 
     const enrollment = enrollmentData?.webEnrollmentByUid;
     const payload = enrollment?.payload || {};
+    const companyName = payload?.createdBy?.company_name || '';
     const tariffCode = customerData?.customer?.tariffCode || payload.tariffCode || payload.tariffcode || "EA025";
     const customerIdDisplay = customerData?.customer?.customerId || customerData?.customer?.id || payload?.customerId || payload?.customer_id || 'Pending';
 
@@ -74,7 +80,7 @@ export const CustomerViewPage: React.FC = () => {
 
     // Mutations
     const [updateConsent] = useMutation(UPDATE_WEB_ENROLLMENT_CONSENT);
-    const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
+    const [updateCustomer, { loading: updatingCustomer }] = useMutation(UPDATE_CUSTOMER);
 
     // Side Effects
     useEffect(() => {
@@ -124,7 +130,7 @@ export const CustomerViewPage: React.FC = () => {
     };
 
     const handleFinishEnrollment = async () => {
-        if (!uid || !idConfirmed || !isNominationConfirmed) return;
+        if (!uid || !idConfirmed || !isNominationConfirmed || !consents.infoConfirm || !consents.creditCheck) return;
 
         try {
             await updateCustomer({
@@ -176,6 +182,7 @@ export const CustomerViewPage: React.FC = () => {
                     isChecked={isChecked}
                     onToggleConsent={handleToggleConsent}
                     onNext={() => setStep('rates')}
+                    companyName={companyName}
                 />
             );
         case 'rates':
@@ -214,6 +221,8 @@ export const CustomerViewPage: React.FC = () => {
                     customerIdDisplay={customerIdDisplay}
                     isNominationConfirmed={isNominationConfirmed}
                     setIsNominationConfirmed={setIsNominationConfirmed}
+                    consents={consents}
+                    setConsents={setConsents}
                     onBack={() => setStep('idcheck')}
                     onFinish={handleFinishEnrollment}
                     idTypeOptions={ID_TYPE_OPTIONS}
@@ -221,10 +230,11 @@ export const CustomerViewPage: React.FC = () => {
                     ratePlan={ratePlan}
                     measurementUnits={unitsData?.measurementUnits}
                     customer={customerData?.customer}
+                    isSaving={updatingCustomer}
                 />
             );
         default:
-            return <ConsentStep isChecked={isChecked} onToggleConsent={handleToggleConsent} onNext={() => setStep('rates')} />;
+            return <ConsentStep isChecked={isChecked} onToggleConsent={handleToggleConsent} onNext={() => setStep('rates')} companyName={companyName} />;
     }
 };
 

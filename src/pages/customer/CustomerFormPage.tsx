@@ -1977,14 +1977,13 @@ export const CustomerFormPage = () => {
             }
 
             // Trigger PDRS email if applicable (only on update as requested)
+            // Send in background without awaiting so UI does not get stuck
             if (isEditMode && !isUpdateOnly && isPdrs && savedCustomer?.uid && finalStatus === 7) {
-                try {
-                    await sendPdrsConsentEmail({ variables: { customerUid: savedCustomer.uid } });
-                    toast.success('PDRS consent email sent successfully');
-                } catch (emailErr) {
-                    console.error('[PDRS] Failed to send consent email:', emailErr);
-                    toast.error('Customer saved but PDRS email failed to send');
-                }
+                sendPdrsConsentEmail({ variables: { customerUid: savedCustomer.uid } })
+                    .catch((emailErr) => {
+                        console.error('[PDRS] Failed to send consent email in background:', emailErr);
+                        toast.error('PDRS consent email failed to send');
+                    });
             }
 
             // Clear customer cache to ensure fresh data on customers page

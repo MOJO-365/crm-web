@@ -2581,6 +2581,7 @@ export function CustomerDetailsPage() {
             }
             toast.success('VPP Connected and details saved');
             setVppConnectModalOpen(false);
+            setTimeout(() => setEmailLogsKey((prev) => prev + 1), 1500);
 
         } catch (error: any) {
             console.error('Error connecting VPP:', error);
@@ -2594,6 +2595,21 @@ export function CustomerDetailsPage() {
         if (!selectedCustomerDetails) return;
         setIsSkippingVpp(true);
         try {
+            // Priority: Sync with secondary API first to trigger connection & email dispatch
+            try {
+                await secondaryApiAxios.post('/v1/utilmate/user/add-user-battery', {
+                    user_id: selectedCustomerDetails.customerId,
+                    battery_brand: vppForm.batteryBrand,
+                    battery_sn_number: vppForm.snNumber,
+                    check_code: vppForm.checkCode,
+                    battery_usable_capacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : 0,
+                    inverter_capacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : 0
+                });
+            } catch (secErr: any) {
+                console.error('Failed to sync with secondary API', secErr);
+                throw new Error(secErr.response?.data?.message || 'Failed to sync with secondary system. VPP not connected.');
+            }
+
             const input: any = {
                 vppDetails: {
                     vpp: 1,
@@ -2615,6 +2631,7 @@ export function CustomerDetailsPage() {
             }
             toast.success('VPP Connected (Details Skipped)');
             setVppConnectModalOpen(false);
+            setTimeout(() => setEmailLogsKey((prev) => prev + 1), 1500);
 
         } catch (error: any) {
             console.error('Error connecting VPP (Skip):', error);
