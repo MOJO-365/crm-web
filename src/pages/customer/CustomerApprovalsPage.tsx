@@ -566,7 +566,6 @@ export function CustomerApprovalsPage() {
                         options={[
                             { value: '', label: 'All' },
                             { value: '0', label: 'Pending' },
-                            { value: '1', label: 'Processed' },
                             { value: '2', label: 'Rejected' }
                         ]}
                         value={filters.status}
