@@ -40,8 +40,6 @@ const BranchEnrollmentsPage = lazyWithRetry(() => import('@/pages/branch/BranchE
 const BranchStaffPage = lazyWithRetry(() => import('@/pages/branch/BranchStaffPage').then(m => ({ default: m.BranchStaffPage })));
 const CustomerViewPage = lazyWithRetry(() => import('@/pages/customer-view/CustomerViewPage').then(m => ({ default: m.CustomerViewPage })));
 
-
-
 // Loading fallback component
 const PageLoader = () => (
     <div className="min-h-screen flex items-center justify-center">
