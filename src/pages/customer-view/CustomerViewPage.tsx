@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_WEB_ENROLLMENT_BY_UID, GET_CUSTOMER_BY_ID } from '@/graphql/queries/customers';
 import { GET_MEASUREMENT_UNITS, GET_RATE_PLAN_BY_CODE } from '@/graphql/queries/rates';
-import { UPDATE_WEB_ENROLLMENT_CONSENT, UPDATE_CUSTOMER } from '@/graphql/mutations/customers';
+import { UPDATE_WEB_ENROLLMENT_CONSENT, COMPLETE_WEB_ENROLLMENT } from '@/graphql/mutations/customers';
 import { ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { getData as getCountries } from 'country-list';
 
@@ -15,12 +15,13 @@ import { ConsentStep } from './components/ConsentStep';
 import { RatesStep } from './components/RatesStep';
 import { IdCheckStep } from './components/IdCheckStep';
 import { ReviewStep } from './components/ReviewStep';
+import { NominationStep } from './components/NominationStep';
 
 const COUNTRY_OPTIONS = getCountries().map(c => ({ value: c.name, label: c.name }));
 
 export const CustomerViewPage: React.FC = () => {
     const { uid } = useParams<{ uid: string }>();
-    const [step, setStep] = useState<'consent' | 'rates' | 'review' | 'idcheck'>('consent');
+    const [step, setStep] = useState<'consent' | 'rates' | 'nomination' | 'review' | 'idcheck'>('consent');
     const [idConfirmed, setIdConfirmed] = useState(false);
     const [isChecked, setIsChecked] = useState(false);
     const [isNominationConfirmed, setIsNominationConfirmed] = useState(false);
@@ -51,6 +52,7 @@ export const CustomerViewPage: React.FC = () => {
     });
     const [idFormInit, setIdFormInit] = useState(false);
     const [isFinished, setIsFinished] = useState(false);
+    const [consentSignatureBase64, setConsentSignatureBase64] = useState<string | null>(null);
 
     // Data Fetching
     const { data: enrollmentData, loading: enrollmentLoading, error: enrollmentError } = useQuery(GET_WEB_ENROLLMENT_BY_UID, {
@@ -80,14 +82,16 @@ export const CustomerViewPage: React.FC = () => {
 
     // Mutations
     const [updateConsent] = useMutation(UPDATE_WEB_ENROLLMENT_CONSENT);
-    const [updateCustomer, { loading: updatingCustomer }] = useMutation(UPDATE_CUSTOMER);
+    const [completeEnrollment, { loading: completingEnrollment }] = useMutation(COMPLETE_WEB_ENROLLMENT);
 
     // Side Effects
     useEffect(() => {
-        if (customerData?.customer?.isConsentRead !== undefined) {
-            setIsChecked(!!customerData.customer.isConsentRead);
+        // Read consent state from enrollment (web_enrollments) since customer isn't created until approval
+        const consentRead = enrollment?.isConsentRead ?? customerData?.customer?.isConsentRead;
+        if (consentRead !== undefined && consentRead !== null) {
+            setIsChecked(!!consentRead);
         }
-    }, [customerData]);
+    }, [enrollment, customerData]);
 
     useEffect(() => {
         if (!idFormInit && payload && Object.keys(payload).length > 0) {
@@ -133,28 +137,23 @@ export const CustomerViewPage: React.FC = () => {
         if (!uid || !idConfirmed || !isNominationConfirmed || !consents.infoConfirm || !consents.creditCheck) return;
 
         try {
-            await updateCustomer({
+            const enrollmentData = {
+                idType: idForm.idType !== '' ? parseInt(idForm.idType) : null,
+                idnumber: idForm.idnumber,
+                idstate: idForm.idstate,
+                idcountry: idForm.idcountry,
+                idexpiry: idForm.idexpiary,
+                licenseCardNumber: idForm.licenseCardNumber,
+                medicareCardType: idForm.medicareCardType,
+                medicareIrn: idForm.medicareIrn,
+                dob: idForm.dob,
+                consentSignatureBase64: consentSignatureBase64 || undefined,
+            };
+
+            await completeEnrollment({
                 variables: {
                     uid,
-                    input: {
-                        enrollmentDetails: {
-                            idtype: idForm.idType !== '' ? parseInt(idForm.idType) : null,
-                            idnumber: idForm.idnumber,
-                            idstate: idForm.idstate,
-                            idcountry: idForm.idcountry,
-                            idexpiry: idForm.idexpiary,
-                            licenseCardNumber: idForm.licenseCardNumber,
-                            medicareCardType: idForm.medicareCardType,
-                            medicareIrn: idForm.medicareIrn,
-                        },
-                        dob: idForm.dob,
-                        medicareIrn: idForm.medicareIrn,
-                        medicareCardType: idForm.medicareCardType,
-                        status: 8, // Mark as Consent Signed
-                        isEnrollmentFinished: 1,
-                        triggerWelcomeEmail: false,
-                        triggerUpdateEmail: false,
-                    }
+                    enrollmentData: JSON.stringify(enrollmentData),
                 }
             });
             setIsFinished(true);
@@ -207,10 +206,23 @@ export const CustomerViewPage: React.FC = () => {
                     idConfirmed={idConfirmed}
                     setIdConfirmed={setIdConfirmed}
                     onBack={() => setStep('rates')}
-                    onNext={() => setStep('review')}
+                    onNext={() => setStep('nomination')}
                     idTypeOptions={ID_TYPE_OPTIONS}
                     stateOptions={STATE_OPTIONS}
                     countryOptions={COUNTRY_OPTIONS}
+                />
+            );
+        case 'nomination':
+            return (
+                <NominationStep
+                    isNominationConfirmed={isNominationConfirmed}
+                    setIsNominationConfirmed={setIsNominationConfirmed}
+                    onBack={() => setStep('idcheck')}
+                    onNext={(signatureBase64: string) => {
+                        setConsentSignatureBase64(signatureBase64);
+                        setStep('review');
+                    }}
+                    signatoryName={`${idForm.firstName || payload.firstname || ''} ${idForm.lastName || payload.lastname || ''}`.trim()}
                 />
             );
         case 'review':
@@ -220,17 +232,16 @@ export const CustomerViewPage: React.FC = () => {
                     payload={payload}
                     customerIdDisplay={customerIdDisplay}
                     isNominationConfirmed={isNominationConfirmed}
-                    setIsNominationConfirmed={setIsNominationConfirmed}
                     consents={consents}
                     setConsents={setConsents}
-                    onBack={() => setStep('idcheck')}
+                    onBack={() => setStep('nomination')}
                     onFinish={handleFinishEnrollment}
                     idTypeOptions={ID_TYPE_OPTIONS}
                     mainOffer={mainOffer}
                     ratePlan={ratePlan}
                     measurementUnits={unitsData?.measurementUnits}
                     customer={customerData?.customer}
-                    isSaving={updatingCustomer}
+                    isSaving={completingEnrollment}
                 />
             );
         default:

@@ -2596,7 +2596,7 @@ export function CustomerDetailsPage() {
         setIsSkippingVpp(true);
         try {
             // Priority: Sync with secondary API first to trigger connection & email dispatch
-            try {
+            /* try {
                 await secondaryApiAxios.post('/v1/utilmate/user/add-user-battery', {
                     user_id: selectedCustomerDetails.customerId,
                     battery_brand: vppForm.batteryBrand,
@@ -2608,7 +2608,7 @@ export function CustomerDetailsPage() {
             } catch (secErr: any) {
                 console.error('Failed to sync with secondary API', secErr);
                 throw new Error(secErr.response?.data?.message || 'Failed to sync with secondary system. VPP not connected.');
-            }
+            } */
 
             const input: any = {
                 vppDetails: {
@@ -3343,7 +3343,7 @@ export function CustomerDetailsPage() {
                                             step: 3
                                         },
                                     ] : []),
-                                    { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate || (selectedCustomerDetails.vppDetails?.vpp === 1 && selectedCustomerDetails.vppDetails?.vppConnected !== 1), step: 4 },
+                                    { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate, step: 4 },
                                     { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: false, step: 5 },
                                 ].map((item: any, index) => (
                                     <div key={index} className="relative flex flex-row md:flex-col items-start md:items-center gap-3 md:gap-0 md:flex-1 w-full md:w-auto">

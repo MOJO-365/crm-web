@@ -1,7 +1,7 @@
 import React from 'react';
-import { UserIcon, MapPinIcon, ActivityIcon, InfoIcon, CheckIcon, PhoneIcon, MailIcon, ZapIcon, Settings2Icon, PlugIcon } from '@/components/icons';
+import { UserIcon, MapPinIcon, ActivityIcon, InfoIcon, CheckIcon, PhoneIcon, MailIcon, ZapIcon } from '@/components/icons';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
-import { cn, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { CustomerViewLayout } from './CustomerViewLayout';
 
 interface ReviewStepProps {
@@ -9,7 +9,6 @@ interface ReviewStepProps {
     payload: any;
     customerIdDisplay: string;
     isNominationConfirmed: boolean;
-    setIsNominationConfirmed: (confirmed: boolean) => void;
     consents?: any;
     setConsents?: (consents: any) => void;
     onBack: () => void;
@@ -27,7 +26,6 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
     payload,
     customerIdDisplay,
     isNominationConfirmed,
-    setIsNominationConfirmed,
     consents,
     setConsents,
     onBack,
@@ -39,6 +37,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
     customer,
     isSaving
 }) => {
+    const [hoveredTooltip, setHoveredTooltip] = React.useState<{ text: React.ReactNode; x: number; y: number; position: 'right' | 'left' | 'top' | 'bottom' } | null>(null);
     const unitMap = React.useMemo(() => {
         const map: Record<string, string> = {};
         measurementUnits?.forEach((u: any) => {
@@ -64,7 +63,9 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
     };
 
     const hasCL = (mainOffer?.cl1Usage || 0) > 0 || (mainOffer?.cl2Usage || 0) > 0 || (mainOffer?.cl1Supply || 0) > 0 || (mainOffer?.cl2Supply || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'controlled_load');
-    const hasFiT = ((mainOffer?.fit || 0) > 0 || (mainOffer?.fitPeak || 0) > 0 || (mainOffer?.fitCritical || 0) > 0 || (mainOffer?.fitVpp || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit')) && customer?.solarDetails?.hassolar === 1;
+    const hasFiTRates = ((mainOffer?.fit || 0) > 0 || (mainOffer?.fitPeak || 0) > 0 || (mainOffer?.fitCritical || 0) > 0 || (mainOffer?.fitVpp || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit'));
+    const hasSolar = customer?.solarDetails?.hassolar === 1;
+    const hasFiT = hasFiTRates && hasSolar;
 
     const energyRatesItems = React.useMemo(() => {
         if (!mainOffer) return [];
@@ -149,14 +150,131 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
             .filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
     }, [mainOffer, parsedDynamicRates, handledTypes]);
 
-    const hasColumn1 = energyRatesItems.length > 0;
-    const hasColumn2 = supplyChargesItems.length > 0 || demandChargesItems.length > 0 || vppChargesItems.length > 0;
-    const hasColumn3 = solarFitItems.length > 0 || extraFitItems.length > 0 || controlledLoadItems.length > 0 || extraChargesItems.length > 0;
+    const processedRateItems = React.useMemo(() => {
+        const items: Array<{ category: string; item: any; fallbackUnit: string; isUsageOverride?: boolean }> = [];
+        energyRatesItems.forEach((item: any) => items.push({ category: 'Energy Rates', item, fallbackUnit: '/kWh' }));
+        supplyChargesItems.forEach((item: any) => items.push({ category: 'Supply Charges', item, fallbackUnit: '/day' }));
+        demandChargesItems.forEach((item: any) => items.push({ category: 'Demand Charges', item, fallbackUnit: '/kVA/day' }));
+        vppChargesItems.forEach((item: any) => items.push({ category: 'VPP Charges', item, fallbackUnit: '/day' }));
+        solarFitItems.forEach((item: any) => items.push({ category: 'Solar FiT', item, fallbackUnit: '/kWh' }));
+        extraFitItems.forEach((item: any) => items.push({ category: 'Extra FiT', item, fallbackUnit: '/kWh' }));
+        controlledLoadItems.forEach((item: any) => items.push({ category: 'Controlled Load', item, fallbackUnit: item.type?.includes('usage') ? '/kWh' : '/day', isUsageOverride: item.type?.includes('usage') }));
+        extraChargesItems.forEach((item: any) => items.push({ category: 'Extra Charges', item, fallbackUnit: '' }));
 
-    const activeColsCount = [hasColumn1, hasColumn2, hasColumn3].filter(Boolean).length;
+        return items.map(({ category, item, fallbackUnit, isUsageOverride }) => {
+            const numericValue = parseFloat(String(item.value || '0'));
+
+            let applyDiscount = false;
+            if (item.applyDiscount !== undefined) {
+                applyDiscount = !!item.applyDiscount;
+            } else if (category === 'Energy Rates') {
+                applyDiscount = true;
+            } else if (category === 'Controlled Load') {
+                applyDiscount = item.type?.includes('usage') || !!isUsageOverride;
+            }
+
+            const isDiscounted = applyDiscount && discount > 0;
+            const price = isDiscounted ? calculateDiscountedRate(numericValue, discount) : numericValue;
+
+            let unit = '';
+            if (item.type === 'dynamic') {
+                unit = item.unitId ? `/${unitMap[item.unitId]}` : fallbackUnit;
+            } else {
+                const formatKey = item.type?.startsWith('demand') ? item.type : (item.type === 'vppOrcharge' ? 'vppOrcharge' : item.type);
+                unit = formatUnit(formatKey, fallbackUnit.replace('/', ''));
+                if (!unit) unit = fallbackUnit;
+            }
+            if (unit && !unit.startsWith('/')) unit = '/' + unit;
+
+            const tooltipText = (() => {
+                const lower = (item.label || item.name || '').toLowerCase();
+                if (lower.includes('discounted usage') || lower.includes('discounted rate')) return "First 10 kWh/day";
+                if (lower.includes('standard usage') || lower.includes('standard rate')) return "After 10 kWh/day";
+                if (lower.includes('premium feed-in tariff') || lower.includes('premium fit')) return "The first 10kWh exported between 5:00pm and 9:00pm";
+                if (lower.includes('critical event bonus') || lower.includes('critical event')) return "When electricity cost is more than $1/kwh at AEMO and we trigger the batteries to discharge";
+                if (lower.includes('zero evening')) return "If your grid import is effectively zero—defined as less than 0.03 kWh per hour from the grid, during the 5–8 pm evening peak every day.";
+                if (lower.includes('base fit')) {
+                    return (
+                        <div className="space-y-1.5 text-[11px] leading-normal font-sans text-left">
+                            <div className="font-bold text-slate-100 border-b border-slate-700 pb-1 mb-1.5 uppercase tracking-wider text-xs">Base FIT</div>
+                            <div className="flex flex-col gap-0.5">
+                                <div className="flex justify-between items-center gap-2">
+                                    <span className="text-slate-400 font-medium">Standard Hours:</span>
+                                    <span className="font-semibold text-slate-200">5:00pm to 9:00pm</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-0.5 border-t border-slate-800/50 pt-1">
+                                <div className="flex justify-between items-center gap-2">
+                                    <span className="text-slate-400 font-medium">Seasonal Bonus Hours:</span>
+                                    <span className="font-semibold text-slate-200 font-sans">5:00am to 8:00am</span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 italic text-right mt-0.5 font-sans">(1 March to 31 August)</span>
+                            </div>
+                        </div>
+                    );
+                }
+                return null;
+            })();
+
+            return {
+                category,
+                label: item.label || item.name,
+                numericValue,
+                isDiscounted,
+                price,
+                unit,
+                tooltipText
+            };
+        });
+    }, [energyRatesItems, supplyChargesItems, demandChargesItems, vppChargesItems, solarFitItems, extraFitItems, controlledLoadItems, extraChargesItems, discount, unitMap, parsedPriceUnits]);
+
+    const handleMouseEnterTooltip = (tooltipText: React.ReactNode, e: React.MouseEvent) => {
+        if (!tooltipText) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const tooltipWidth = 256; // w-64 is 256px
+        const padding = 16;
+        const viewportWidth = window.innerWidth;
+
+        let x = rect.right + 8;
+        let position: 'right' | 'left' | 'top' | 'bottom' = 'right';
+
+        if (x + tooltipWidth > viewportWidth - padding) {
+            const leftX = rect.left - tooltipWidth - 8;
+            if (leftX > padding) {
+                x = leftX;
+                position = 'left';
+            } else {
+                if (rect.top < 150) {
+                    position = 'bottom';
+                    x = Math.max(padding, Math.min(viewportWidth - tooltipWidth - padding, rect.left + rect.width / 2 - tooltipWidth / 2));
+                } else {
+                    position = 'top';
+                    x = Math.max(padding, Math.min(viewportWidth - tooltipWidth - padding, rect.left + rect.width / 2 - tooltipWidth / 2));
+                }
+            }
+        }
+
+        const y = position === 'top' 
+            ? rect.top - 8 
+            : position === 'bottom'
+            ? rect.bottom + 8
+            : rect.top + rect.height / 2;
+
+        setHoveredTooltip({
+            text: tooltipText,
+            x,
+            y,
+            position
+        });
+    };
+
+    const handleMouseLeaveTooltip = () => {
+        setHoveredTooltip(null);
+    };
 
     return (
-        <CustomerViewLayout
+        <>
+            <CustomerViewLayout
             title="Review Your Details"
             subtitle={`Customer ID: ${customerIdDisplay}`}
             onBack={onBack}
@@ -166,22 +284,6 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
             isFooterButtonLoading={isSaving}
             footerContent={
                 <div className="space-y-2.5 text-left max-w-2xl mx-auto px-1">
-                    {/* Existing unconditional Nomination Form checkbox */}
-                    <label className="flex items-start gap-3.5 cursor-pointer group">
-                        <div className="relative flex items-center shrink-0 mt-0.5">
-                            <input
-                                type="checkbox"
-                                className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border-2 border-slate-200 checked:bg-primary checked:border-primary transition-all duration-200 shadow-sm hover:border-primary/50"
-                                checked={isNominationConfirmed}
-                                onChange={(e) => setIsNominationConfirmed(e.target.checked)}
-                            />
-                            <CheckIcon className="absolute w-3.5 h-3.5 pointer-events-none hidden peer-checked:block text-white left-0.5 top-0.5" />
-                        </div>
-                        <span className="text-xs sm:text-sm font-medium text-slate-700 select-none leading-relaxed">
-                            I have read and agree to the <a href="/onboarding/BESS2 and Nomination Form.pdf" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-bold" onClick={(e) => e.stopPropagation()}>Nomination Form</a>
-                        </span>
-                    </label>
-
                     {/* Checkbox 1: infoConfirm */}
                     <label className="flex items-start gap-3.5 cursor-pointer group">
                         <div className="relative flex items-center shrink-0 mt-0.5">
@@ -301,267 +403,85 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
                                     </div>
                                 </div>
                             </div>
-                            <div className={cn(
-                                "grid gap-8",
-                                activeColsCount === 1 ? "grid-cols-1 max-w-md mx-auto" :
-                                activeColsCount === 2 ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" :
-                                "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-                            )}>
-                                {/* Column 1: Energy Rates */}
-                                {hasColumn1 && (
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-2 text-blue-500">
-                                            <Settings2Icon size={16} />
-                                            <h4 className="text-sm font-bold uppercase tracking-wide">Energy Rates</h4>
-                                        </div>
-                                        <div className="space-y-3">
-                                            {[...energyRatesItems]
-                                                .sort((a, b) => calculateDiscountedRate(parseFloat(String(a.value || 0)), discount) - calculateDiscountedRate(parseFloat(String(b.value || 0)), discount))
-                                                .map((r: any, i: number) => {
-                                                    const isAnytime = r.type === 'anytime';
-                                                    const numericValue = parseFloat(String(r.value || 0));
-                                                    const isDiscounted = discount > 0;
-                                                    const price = isDiscounted ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                    const unit = r.type === 'dynamic' ? (r.unitId ? `/${unitMap[r.unitId]}` : '/kWh') : formatUnit(r.type, 'kWh');
-                                                    return (
-                                                        <div key={i} className={cn(
-                                                            "border rounded-lg p-3 text-center transition-all hover:shadow-sm",
-                                                            isAnytime ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"
-                                                        )}>
-                                                            <div className="flex flex-col items-center">
-                                                                <div className={cn("font-bold text-base", isAnytime ? "text-orange-600" : "text-blue-600")}>
-                                                                    ${price.toFixed(4)}{unit}
-                                                                </div>
-                                                                {isDiscounted && (
-                                                                    <div className="flex items-center gap-1.5 leading-none mb-0.5">
-                                                                        <span className={cn("text-[10px] font-medium line-through opacity-40", isAnytime ? "text-orange-600" : "text-blue-600")}>
-                                                                            ${numericValue.toFixed(4)}
-                                                                        </span>
-                                                                        <span className={cn("px-1 py-0.5 text-[8px] font-black rounded uppercase tracking-tighter", isAnytime ? "bg-orange-500 text-white" : "bg-blue-500 text-white")}>
-                                                                            -{discount}%
-                                                                        </span>
-                                                                    </div>
-                                                                )}
+                            {/* Desktop Table View */}
+                            <div className="overflow-x-auto mt-4 rounded-xl border border-slate-200 hidden md:block">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                            <th className="px-4 py-3 font-semibold">DETAILS</th>
+                                            <th className="px-4 py-3 font-semibold">CATEGORY</th>
+                                            {discount > 0 && <th className="px-4 py-3 text-right font-semibold">Standard Rate</th>}
+                                            <th className="px-4 py-3 text-right font-semibold">{discount > 0 ? 'Discounted Rate' : 'Rate'}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                        {processedRateItems.map((rate) => (
+                                            <tr key={`${rate.category}-${rate.label}`} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-4 py-3 text-sm font-semibold text-slate-900 uppercase">
+                                                    <div className="flex items-center gap-1.5 relative group w-max">
+                                                        <span>{rate.label}</span>
+                                                        {rate.tooltipText && (
+                                                            <div 
+                                                                className="text-slate-400 cursor-help"
+                                                                onMouseEnter={(e) => handleMouseEnterTooltip(rate.tooltipText, e)}
+                                                                onMouseLeave={handleMouseLeaveTooltip}
+                                                            >
+                                                                <InfoIcon size={14} />
                                                             </div>
-                                                            <div className={cn("text-[10px] font-bold uppercase tracking-wider opacity-80", isAnytime ? "text-orange-600" : "text-blue-600")}>
-                                                                {r.label}
-                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{rate.category}</td>
+                                                {discount > 0 && (
+                                                    <td className="px-4 py-3 text-sm text-right text-slate-500 whitespace-nowrap">
+                                                        {rate.isDiscounted ? `$${rate.numericValue.toFixed(4)}${rate.unit}` : '—'}
+                                                    </td>
+                                                )}
+                                                <td className="px-4 py-3 text-sm text-right font-semibold text-slate-900 whitespace-nowrap">
+                                                    ${rate.price.toFixed(4)}{rate.unit}
+                                                    {rate.isDiscounted && <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-primary/10 text-primary rounded uppercase tracking-tighter">-{discount}%</span>}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile Card List View (No scroll) */}
+                            <div className="block md:hidden divide-y divide-slate-100 bg-white mt-4 border border-slate-200 rounded-xl overflow-hidden">
+                                {processedRateItems.map((rate) => (
+                                    <div key={`${rate.category}-${rate.label}`} className="p-4 hover:bg-slate-50/50 transition-colors space-y-2">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="space-y-1 text-left">
+                                                <div className="flex items-center gap-1.5 relative group w-max">
+                                                    <span className="text-sm font-bold text-slate-900 uppercase">{rate.label}</span>
+                                                    {rate.tooltipText && (
+                                                        <div 
+                                                            className="text-slate-400 cursor-help animate-pulse"
+                                                            onMouseEnter={(e) => handleMouseEnterTooltip(rate.tooltipText, e)}
+                                                            onMouseLeave={handleMouseLeaveTooltip}
+                                                            onClick={(e) => { e.stopPropagation(); handleMouseEnterTooltip(rate.tooltipText, e); }}
+                                                        >
+                                                            <InfoIcon size={14} />
                                                         </div>
-                                                    );
-                                                })}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Column 2: Supply, Demand, VPP Charges */}
-                                {hasColumn2 && (
-                                    <div className="space-y-6">
-                                        {/* Supply Charges */}
-                                        {supplyChargesItems.length > 0 && (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center gap-2 text-purple-500">
-                                                    <PlugIcon size={16} />
-                                                    <h4 className="text-sm font-bold uppercase tracking-wide">Supply Charges</h4>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {supplyChargesItems.map((r: any, i: number) => {
-                                                        const numericValue = parseFloat(String(r.value || '0'));
-                                                        const isDiscounted = r.applyDiscount && discount > 0;
-                                                        const price = isDiscounted ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                        const unit = r.type === 'dynamic' ? (r.unitId ? `/${unitMap[r.unitId]}` : '/day') : formatUnit(r.type, 'day');
-                                                        return (
-                                                            <div key={i} className="bg-purple-50 border-purple-200 text-purple-600 border rounded-lg p-3 text-center space-y-1">
-                                                                <div className="flex flex-col items-center">
-                                                                    <div className="font-bold text-base">${price.toFixed(4)}{unit}</div>
-                                                                    {isDiscounted && (
-                                                                        <div className="flex items-center gap-1.5 leading-none mb-0.5">
-                                                                            <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
-                                                                            <span className="px-1 py-0.5 text-[8px] font-black bg-purple-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">{r.label}</div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Demand Charges */}
-                                        {demandChargesItems.length > 0 && (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center gap-2 text-rose-500">
-                                                    <ActivityIcon size={16} />
-                                                    <h4 className="text-sm font-bold uppercase tracking-wide">Demand Charges</h4>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {demandChargesItems.map((r: any, i: number) => {
-                                                        const numericValue = parseFloat(String(r.value || '0'));
-                                                        const isDiscounted = r.applyDiscount && discount > 0;
-                                                        const price = isDiscounted ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                        const unit = r.type === 'dynamic' ? (r.unitId ? `/${unitMap[r.unitId]}` : '/kVA/day') : formatUnit(r.type.startsWith('demand') ? r.type : 'demand', 'kVA/day');
-                                                        return (
-                                                            <div key={i} className="bg-rose-50 border-rose-200 text-rose-600 border rounded-lg p-3 text-center space-y-1">
-                                                                <div className="flex flex-col items-center">
-                                                                    <div className="font-bold text-base">${price.toFixed(4)}{unit}</div>
-                                                                    {isDiscounted && (
-                                                                        <div className="flex items-center gap-1.5 leading-none mb-0.5">
-                                                                            <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
-                                                                            <span className="px-1 py-0.5 text-[8px] font-black bg-rose-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">{r.label}</div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* VPP Charges */}
-                                        {vppChargesItems.length > 0 && (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center gap-2 text-amber-500">
-                                                    <ActivityIcon size={16} />
-                                                    <h4 className="text-sm font-bold uppercase tracking-wide">VPP Charges</h4>
-                                                    {discount > 0 && (
-                                                        <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-500 text-white rounded-md uppercase tracking-tighter">Discount Applied</span>
                                                     )}
                                                 </div>
-                                                <div className="space-y-3">
-                                                    {vppChargesItems.map((r: any, i: number) => {
-                                                        const numericValue = parseFloat(String(r.value || '0'));
-                                                        const isDiscounted = r.applyDiscount && discount > 0;
-                                                        const price = isDiscounted ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                        const unit = r.type === 'dynamic' ? (r.unitId ? `/${unitMap[r.unitId]}` : '/day') : formatUnit('vppOrcharge', 'day');
-                                                        return (
-                                                            <div key={i} className="bg-amber-50 border-amber-200 text-amber-600 border rounded-lg p-3 text-center space-y-1">
-                                                                <div className="flex flex-col items-center">
-                                                                    <div className="font-bold text-base">${price.toFixed(4)}{unit}</div>
-                                                                    {isDiscounted && (
-                                                                        <div className="flex items-center gap-1.5 leading-none mb-0.5">
-                                                                            <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
-                                                                            <span className="px-1 py-0.5 text-[8px] font-black bg-amber-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">{r.label}</div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
+                                                <span className="inline-flex px-2 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-600 rounded-full">{rate.category}</span>
                                             </div>
-                                        )}
+                                            <div className="text-right space-y-0.5 shrink-0">
+                                                <div className="text-sm font-bold text-slate-900">
+                                                    ${rate.price.toFixed(4)}{rate.unit}
+                                                </div>
+                                                {rate.isDiscounted && (
+                                                    <div className="flex items-center justify-end gap-1.5 text-xs text-slate-500">
+                                                        <span className="line-through">${rate.numericValue.toFixed(4)}{rate.unit}</span>
+                                                        <span className="px-1 py-0.5 text-[9px] font-bold bg-primary/10 text-primary rounded">-{discount}%</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
-
-                                {/* Column 3: Solar FiT / Extra FiT / Controlled Load */}
-                                {hasColumn3 && (
-                                    <div className="space-y-6">
-                                        {/* Solar FiT */}
-                                        {solarFitItems.length > 0 && (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center gap-2 text-teal-500">
-                                                    <ZapIcon size={16} />
-                                                    <h4 className="text-sm font-bold uppercase tracking-wide">Solar FiT</h4>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {solarFitItems.map((r: any, i: number) => {
-                                                        const numericValue = parseFloat(String(r.value || '0'));
-                                                        const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                        const unit = r.type === 'dynamic' ? (r.unitId ? `/${unitMap[r.unitId]}` : '/kWh') : formatUnit(r.type, 'kWh');
-                                                        return (
-                                                            <div key={i} className="bg-teal-50 border-teal-200 text-teal-600 border rounded-lg p-3 text-center space-y-0.5">
-                                                                <div className="font-bold text-base">${price.toFixed(4)}{unit}</div>
-                                                                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">{r.label}</div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Extra FiT */}
-                                        {extraFitItems.length > 0 && (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center gap-2 text-teal-500">
-                                                    <ZapIcon size={16} />
-                                                    <h4 className="text-sm font-bold uppercase tracking-wide">Extra FiT</h4>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {extraFitItems.map((r: any, i: number) => {
-                                                        const val = parseFloat(String(r.value || '0'));
-                                                        const price = r.applyDiscount ? calculateDiscountedRate(val, discount) : val;
-                                                        return (
-                                                            <div key={i} className="bg-teal-50 border-teal-200 text-teal-600 border rounded-lg p-3 text-center space-y-0.5">
-                                                                <div className="font-bold text-base">${price.toFixed(4)}{r.unitId ? `/${unitMap[r.unitId]}` : ''}</div>
-                                                                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">{r.name}</div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Controlled Load */}
-                                        {controlledLoadItems.length > 0 && (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center gap-2 text-green-500">
-                                                    <PlugIcon size={16} />
-                                                    <h4 className="text-sm font-bold uppercase tracking-wide">Controlled Load</h4>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {controlledLoadItems.map((rate: any, i: number) => {
-                                                        const numericValue = parseFloat(String(rate.value || 0));
-                                                        const isUsage = rate.type?.includes('usage') || (rate.type === 'dynamic' && !(rate.unitId && unitMap[rate.unitId]?.toLowerCase().includes('day')));
-                                                        const shouldApplyDiscount = rate.type === 'dynamic' ? !!rate.applyDiscount : isUsage;
-                                                        const isDiscounted = shouldApplyDiscount && discount > 0;
-                                                        const price = isDiscounted ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                                        const unit = rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap[rate.unitId]}` : (isUsage ? '/kWh' : '/day')) : (isUsage ? '/kWh' : '/day');
-                                                        return (
-                                                            <div key={i} className="bg-green-50 border-green-200 text-green-600 border rounded-lg p-3 text-center space-y-1">
-                                                                <div className="flex flex-col items-center">
-                                                                    <div className="font-bold text-base">${price.toFixed(4)}{unit}</div>
-                                                                    {isDiscounted && (
-                                                                        <div className="flex items-center gap-1.5 leading-none mb-0.5">
-                                                                            <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
-                                                                            <span className="px-1 py-0.5 text-[8px] font-black bg-green-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">{rate.label}</div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Extra Charges */}
-                                        {extraChargesItems.length > 0 && (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center gap-2 text-indigo-500">
-                                                    <ActivityIcon size={16} />
-                                                    <h4 className="text-sm font-bold uppercase tracking-wide">Extra Charges</h4>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {extraChargesItems.map((r: any, i: number) => {
-                                                        const val = parseFloat(String(r.value || '0'));
-                                                        const price = r.applyDiscount ? calculateDiscountedRate(val, discount) : val;
-                                                        return (
-                                                            <div key={i} className="bg-indigo-50 border-indigo-200 text-indigo-600 border rounded-lg p-3 text-center space-y-0.5">
-                                                                <div className="font-bold text-base">${price.toFixed(4)}{r.unitId ? `/${unitMap[r.unitId]}` : ''}</div>
-                                                                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">{r.name}</div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                ))}
                             </div>
                         </div>
                     )}
@@ -664,6 +584,34 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
                 </div>
             </div>
         </CustomerViewLayout>
-
-    );
+        {hoveredTooltip && (
+            <div 
+                className="fixed w-64 p-2.5 bg-slate-800 text-white text-xs rounded shadow-lg z-[9999] normal-case font-normal leading-relaxed pointer-events-none"
+                style={{
+                    left: `${hoveredTooltip.x}px`,
+                    top: `${hoveredTooltip.y}px`,
+                    transform: hoveredTooltip.position === 'top' 
+                        ? 'translateY(-100%)' 
+                        : hoveredTooltip.position === 'bottom'
+                        ? 'none'
+                        : 'translateY(-50%)'
+                }}
+            >
+                {hoveredTooltip.text}
+                {hoveredTooltip.position === 'right' && (
+                    <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-y-4 border-y-transparent border-r-4 border-r-slate-800"></div>
+                )}
+                {hoveredTooltip.position === 'left' && (
+                    <div className="absolute left-full top-1/2 -translate-y-1/2 w-0 h-0 border-y-4 border-y-transparent border-l-4 border-l-slate-800"></div>
+                )}
+                {hoveredTooltip.position === 'top' && (
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-800"></div>
+                )}
+                {hoveredTooltip.position === 'bottom' && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-b-4 border-b-slate-800"></div>
+                )}
+            </div>
+        )}
+    </>
+);
 };
