@@ -131,8 +131,8 @@ export const MSAT_CONNECTED_OPTIONS = [
     { value: '0', label: 'Not Connected' },
 ];
 export const RATE_TYPE_MAP: Record<string, string> = {
-    '0': 'Business',
-    '1': 'Residential',
+    '0': 'Residential',
+    '1': 'Business',
 };
 
 export const RATE_TYPE_OPTIONS = [
