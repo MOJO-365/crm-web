@@ -333,6 +333,12 @@ export const UPDATE_WEB_ENROLLMENT_CONSENT = gql`
     }
 `;
 
+export const COMPLETE_WEB_ENROLLMENT = gql`
+    mutation CompleteWebEnrollment($uid: String!, $enrollmentData: String!) {
+        completeWebEnrollment(uid: $uid, enrollmentData: $enrollmentData)
+    }
+`;
+
 export const MARK_WEB_ENROLLMENT_PROCESSED = gql`
     mutation MarkWebEnrollmentProcessed($uid: String!) {
         markWebEnrollmentProcessed(uid: $uid)

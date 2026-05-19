@@ -103,6 +103,11 @@ export function EmailSendPage() {
             type: 'VPP_PUSH_TO_GSYNC',
             label: 'VPP Push to Gsync',
             description: 'Sent automatically when a customer battery system is live on the Virtual Power Plant (VPP) platform',
+        },
+        {
+            type: 'VERIFICATION_CODE',
+            label: 'Customer Verification',
+            description: 'Sent automatically when an external API requests a verification code for the customer',
         }
     ];
 

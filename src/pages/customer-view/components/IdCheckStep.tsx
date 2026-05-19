@@ -38,7 +38,7 @@ export const IdCheckStep: React.FC<IdCheckStepProps> = ({
             title="Finalize Your Enrollment"
             subtitle="Verify your identity"
             onBack={onBack}
-            footerButtonLabel="Review Your Details"
+            footerButtonLabel="Next"
             onFooterButtonClick={onNext}
             isFooterButtonDisabled={!idConfirmed}
         >
