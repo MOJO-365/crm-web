@@ -17,6 +17,8 @@ export interface CustomerFormData {
     legalName: string;
     showAsBusinessName: boolean;
     showName?: boolean;
+    source?: string;
+    referralName?: string;
 
     // Address
     unitNumber: string;

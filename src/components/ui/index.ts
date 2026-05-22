@@ -7,3 +7,4 @@ export { DatePicker, type DatePickerProps } from './DatePicker';
 export { HtmlEditor, type HtmlEditorProps } from './HtmlEditor';
 export { ConfirmationPopover } from './ConfirmationPopover';
 export { Popover, type PopoverProps, type PopoverPlacement } from './Popover';
+export { DateRangePicker, type DateRange, type DateRangePickerProps } from './DateRangePicker';

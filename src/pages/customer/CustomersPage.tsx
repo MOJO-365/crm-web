@@ -7,7 +7,7 @@ import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, RefreshCwIcon, CreditCardIcon
 } from '@/components/icons';
-import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES, GET_USERS } from '@/graphql';
+import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES, GET_USERS, GET_LEAD_SOURCES } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -72,6 +72,9 @@ interface Customer {
     isDeleted?: boolean;
     pdrsEmailSent?: number;
     pdrsEmailSentAt?: string;
+    portalName?: string;
+    source?: string;
+    referralName?: string;
 }
 
 interface PageInfo {
@@ -105,6 +108,7 @@ interface SearchFilters {
     riskStatus: string;
     assignedTo: string;
     createdBy: string;
+    portal: string;
 }
 const CUSTOMERS_FILTER_KEY = 'customers_search_filters';
 
@@ -124,6 +128,7 @@ const INITIAL_FILTERS: SearchFilters = {
     riskStatus: '',
     assignedTo: '',
     createdBy: '',
+    portal: '',
 };
 
 export function CustomersPage() {
@@ -187,6 +192,8 @@ export function CustomersPage() {
     const { data: rsData } = useQuery(GET_RISK_STATUSES);
     const riskStatuses = rsData?.riskStatuses || [];
 
+    const { data: sourcesData } = useQuery(GET_LEAD_SOURCES);
+
     const { data: userData } = useQuery(GET_USERS, {
         variables: { limit: 1000, status: 'ACTIVE', onlyVisibleRoles: true },
     });
@@ -196,6 +203,19 @@ export function CustomersPage() {
             label: u.name || u.email,
         }));
     }, [userData]);
+
+    const sourceFilterOptions = useMemo(() => {
+        const baseOptions = [
+            { value: '', label: 'All' },
+            { value: 'Gee Energy', label: 'Gee Energy' },
+            { value: 'PEERLESSGROUP', label: 'Peer Less Group' }
+        ];
+        const leadOptions = (sourcesData?.leadSources || []).map((s: any) => ({
+            value: s.name,
+            label: s.name
+        }));
+        return [...baseOptions, ...leadOptions];
+    }, [sourcesData]);
 
     // Debounce search and reset pagination
     useEffect(() => {
@@ -232,6 +252,7 @@ export function CustomersPage() {
             searchRiskStatus: debouncedFilters.riskStatus || undefined,
             searchAssignedTo: debouncedFilters.assignedTo || undefined,
             searchCreatedBy: debouncedFilters.createdBy || undefined,
+            searchPortal: debouncedFilters.portal || undefined,
             includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : 'false',
         },
         fetchPolicy: 'network-only',
@@ -367,6 +388,7 @@ export function CustomersPage() {
                     searchMsatConnected: debouncedFilters.msatConnected !== '' ? parseInt(debouncedFilters.msatConnected) : undefined,
                     searchRiskStatus: debouncedFilters.riskStatus || undefined,
                     searchAssignedTo: debouncedFilters.assignedTo || undefined,
+                    searchPortal: debouncedFilters.portal || undefined,
                     includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : 'false',
                 },
             });
@@ -684,6 +706,75 @@ export function CustomersPage() {
                 </div>
             ),
         },
+        {
+            key: 'portalName',
+            header: (
+                <div className="flex flex-col gap-1 items-start">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors whitespace-nowrap",
+                            searchFilters.portal ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Source
+                        </span>
+                        {searchFilters.portal && <div className="w-1 h-1 rounded-full bg-primary" />}
+                    </div>
+                    <Select
+                        options={sourceFilterOptions}
+                        value={searchFilters.portal}
+                        onChange={(val) => handleSearchChange('portal', val as string)}
+                        placeholder="All"
+                        className={cn(
+                            "h-7 text-xs w-[120px] transition-all duration-200",
+                            searchFilters.portal && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                    />
+                </div>
+            ),
+            width: 'w-[200px] min-w-[150px]',
+            render: (row) => {
+                let displayPortal = '';
+                if (row.portalName) {
+                    displayPortal = String(row.portalName);
+                    if (displayPortal.toUpperCase() === 'PEERLESSGROUP') {
+                        displayPortal = 'Peer Less Group';
+                    } else if (displayPortal.toUpperCase().includes('GEE')) {
+                        displayPortal = 'Gee Energy';
+                    }
+                }
+
+                if (displayPortal) {
+                    return (
+                        <span className="text-foreground text-xs font-medium">
+                            {displayPortal}
+                        </span>
+                    );
+                }
+
+                if (row.source) {
+                    if (row.source === 'Referral' && row.referralName) {
+                        return (
+                            <Tooltip content={`Referred by: ${row.referralName}`} position="top">
+                                <span className="text-foreground text-xs font-medium cursor-help border-b border-dashed border-muted-foreground hover:text-primary transition-colors">
+                                    Referral
+                                </span>
+                            </Tooltip>
+                        );
+                    }
+                    return (
+                        <span className="text-foreground text-xs font-medium">
+                            {row.source}
+                        </span>
+                    );
+                }
+
+                return (
+                    <span className="text-foreground text-xs font-medium">
+                        -
+                    </span>
+                );
+            },
+        },
         ...(searchFilters.status === '3' ? [
             {
                 key: 'utilmateStatus',
@@ -912,50 +1003,50 @@ export function CustomersPage() {
             ),
             render: (row) => <StatusField type="dnsp" value={row.ratePlan?.dnsp} mode="badge" />,
         },
-        {
-            key: 'pdrsEmailSent',
-            header: (
-                <div className="flex flex-col gap-1 items-start">
-                    <div className="h-7 flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            PDRS Email
-                        </span>
-                    </div>
-                </div>
-            ),
-            width: 'w-[100px]',
-            render: (row: Customer) => (
-                <div className="flex justify-center">
-                    {row.pdrsEmailSent === 1 ? (
-                        <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-1">
-                            <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        </div>
-                    ) : (
-                        <div className="rounded-full bg-red-100 dark:bg-red-900/30 p-1">
-                            <XIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
-                        </div>
-                    )}
-                </div>
-            ),
-        },
-        {
-            key: 'pdrsEmailSentAt',
-            header: (
-                <div className="flex flex-col gap-1 items-start">
-                    <div className="h-7 flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            PDRS Sent At
-                        </span>
-                    </div>
-                </div>
-            ),
-            width: 'w-[150px]',
-            render: (row: Customer) => (
-                <span className="text-xs text-foreground">
-                    {row.pdrsEmailSentAt ? new Date(row.pdrsEmailSentAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
-                </span>
-            ),
-        },
+        // {
+        //     key: 'pdrsEmailSent',
+        //     header: (
+        //         <div className="flex flex-col gap-1 items-start">
+        //             <div className="h-7 flex items-center gap-1.5">
+        //                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        //                     PDRS Email
+        //                 </span>
+        //             </div>
+        //         </div>
+        //     ),
+        //     width: 'w-[100px]',
+        //     render: (row: Customer) => (
+        //         <div className="flex justify-center">
+        //             {row.pdrsEmailSent === 1 ? (
+        //                 <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-1">
+        //                     <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+        //                 </div>
+        //             ) : (
+        //                 <div className="rounded-full bg-red-100 dark:bg-red-900/30 p-1">
+        //                     <XIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
+        //                 </div>
+        //             )}
+        //         </div>
+        //     ),
+        // },
+        // {
+        //     key: 'pdrsEmailSentAt',
+        //     header: (
+        //         <div className="flex flex-col gap-1 items-start">
+        //             <div className="h-7 flex items-center gap-1.5">
+        //                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        //                     PDRS Sent At
+        //                 </span>
+        //             </div>
+        //         </div>
+        //     ),
+        //     width: 'w-[150px]',
+        //     render: (row: Customer) => (
+        //         <span className="text-xs text-foreground">
+        //             {row.pdrsEmailSentAt ? new Date(row.pdrsEmailSentAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+        //         </span>
+        //     ),
+        // },
         ...(showActionsColumn ? [{
             key: 'actions' as const,
             header: (
