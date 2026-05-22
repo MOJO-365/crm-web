@@ -20,11 +20,12 @@ export default defineConfig({
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-apollo': ['@apollo/client', 'graphql'],
           'vendor-utils': ['axios', 'zustand'],
+          'vendor-xlsx': ['xlsx'],
         },
       },
     },
     // Increase chunk size warning limit
-    chunkSizeWarningLimit: 500,
+    chunkSizeWarningLimit: 1000,
     // Disable source maps for production
     sourcemap: false,
   },
