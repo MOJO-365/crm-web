@@ -7,6 +7,7 @@ import { secondaryApiAxios } from '@/lib/apollo';
 import { Modal, StatusField, DataTable, type Column } from '@/components/common';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { PlusIcon } from '@/components/icons';
 import { toast } from 'react-toastify';
 import { cn } from '@/lib/utils';
@@ -120,6 +121,21 @@ export function CustomerBillingPage() {
     const [currentInvoiceRecord, setCurrentInvoiceRecord] = useState<AccountRecord | null>(null);
     const [visibleRows, setVisibleRows] = useState<Set<string>>(new Set());
 
+    const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
+        const from = new Date();
+        from.setFullYear(from.getFullYear() - 1);
+        const to = new Date();
+        return { from, to };
+    });
+
+    const formatDateToYYYYMMDD = useCallback((date: Date | null) => {
+        if (!date) return '';
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }, []);
+
 
     // Fetch customer by UID if provided in query params
     const { data: customerData, loading: customerLoading } = useQuery<CustomerByIdResult>(GET_CUSTOMER_BILLING_INFO, {
@@ -135,6 +151,7 @@ export function CustomerBillingPage() {
 
     // Fetch account records when a customer is selected
     const fetchAccountRecords = useCallback(async (accountNumber: string) => {
+        if (!dateRange.from || !dateRange.to) return;
         setRecordsLoading(true);
         setRecordsError(null);
         try {
@@ -143,11 +160,14 @@ export function CustomerBillingPage() {
             // const response = {
             //     data: STATIC_ACCOUNT_RECORDS
             // }
+            const from = formatDateToYYYYMMDD(dateRange.from);
+            const to = formatDateToYYYYMMDD(dateRange.to);
+
             const response = await secondaryApiAxios.get('/v1/utilmate/user/data/records', {
                 params: {
                     account_number: accountNumber,
-                    from: '2026-01-18',
-                    to: '2026-03-06',
+                    from,
+                    to,
                 },
                 headers: {
                     'x-api-key': import.meta.env.VITE_UTILMATE_API_KEY,
@@ -159,14 +179,14 @@ export function CustomerBillingPage() {
             } else {
                 setAccountRecords([]);
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error('Failed to fetch account records:', err);
             setAccountRecords([]);
             setRecordsError(null);
         } finally {
             setRecordsLoading(false);
         }
-    }, []);
+    }, [dateRange, formatDateToYYYYMMDD]);
 
     // Initialize visibleRows from accountRecords
     useEffect(() => {
@@ -373,7 +393,9 @@ export function CustomerBillingPage() {
                         setIsLoadingPreview(false);
                         return;
                     }
-                } catch (e) { }
+                } catch {
+                    /* ignore parsing errors */
+                }
             }
 
             const blob = new Blob([response.data], { type: 'application/pdf' });
@@ -569,7 +591,7 @@ export function CustomerBillingPage() {
                 );
             }
         }
-    ], [downloadingInvoice, handlePreviewInvoice, visibleRows]);
+    ], [downloadingInvoice, handlePreviewInvoice, visibleRows, handleToggleVisibility]);
 
     const startItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
     const endItem = Math.min(currentPage * pageSize, totalCount);
@@ -753,17 +775,26 @@ export function CustomerBillingPage() {
             {
                 selectedCustomer && detail && (
                     <div className="p-2 sm:p-4 bg-background rounded-lg border border-border shadow-sm">
-                        {/* Header with Add Receipt Button */}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                        {/* Header with Add Receipt Button & Date Range Picker */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                             <h2 className="text-lg font-semibold text-foreground">Transaction List</h2>
-                            <Button
-                                size="sm"
-                                leftIcon={<PlusIcon size={16} />}
-                                onClick={() => setIsReceiptModalOpen(true)}
-                                className="rounded-full shadow-sm hover:shadow-md active:scale-95 px-5"
-                            >
-                                Add Receipt
-                            </Button>
+                            
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                                {/* Date Range Picker */}
+                                <DateRangePicker
+                                    value={dateRange}
+                                    onChange={setDateRange}
+                                />
+
+                                <Button
+                                    size="sm"
+                                    leftIcon={<PlusIcon size={16} />}
+                                    onClick={() => setIsReceiptModalOpen(true)}
+                                    className="rounded-full shadow-sm hover:shadow-md active:scale-95 px-5 shrink-0"
+                                >
+                                    Add Receipt
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Search */}

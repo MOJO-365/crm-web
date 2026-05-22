@@ -38,6 +38,7 @@ const CUSTOMER_FULL_RESPONSE = `
     employerName
     creditScore
     isCreditScoreFetched
+    isWithoutSignature
     previousBill {
         uid
         path

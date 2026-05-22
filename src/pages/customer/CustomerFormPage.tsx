@@ -50,7 +50,8 @@ import {
     MailIcon,
     CheckCircleIcon,
     SearchIcon,
-    SpinnerIcon
+    SpinnerIcon,
+    AlertCircleIcon
 } from '@/components/icons';
 import { sendVerification, checkVerification, normalisePhone, denormalisePhone } from '@/lib/twilio';
 
@@ -80,16 +81,18 @@ const Field = ({ label, required, hint, children, error }: { label: string, requ
     </div>
 );
 
-const ToggleSwitch = ({ checked, onChange }: { checked: boolean, onChange: (checked: boolean) => void }) => (
+const ToggleSwitch = ({ checked, onChange, disabled }: { checked: boolean, onChange: (checked: boolean) => void, disabled?: boolean }) => (
     <button
         type="button"
         role="switch"
         aria-checked={checked}
+        disabled={disabled}
         onClick={(e) => {
             e.stopPropagation();
+            if (disabled) return;
             onChange(!checked);
         }}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2 cursor-pointer ${checked ? 'bg-neutral-900' : 'bg-gray-300 dark:bg-gray-600'}`}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${checked ? 'bg-neutral-900' : 'bg-gray-300 dark:bg-gray-600'}`}
     >
         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
@@ -120,6 +123,8 @@ const initialFormData: CustomerFormData = {
     relationshipStatus: 0,
     enquiryAmount: '',
     checkCreditScore: true,
+    source: '',
+    referralName: '',
     employerName: '',
     dob: '',
     propertyType: 0,
@@ -600,6 +605,8 @@ export const CustomerFormPage = () => {
     const [previewStep, setPreviewStep] = useState<'offer' | 'email'>('offer');
     const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string; isCustom: boolean } | null>(null);
     const [isLoadingEmailPreview, setIsLoadingEmailPreview] = useState(false);
+    const [isWithoutSignature, setIsWithoutSignature] = useState(false);
+    const [showCreditCheckWarning, setShowCreditCheckWarning] = useState(false);
 
     const [fetchSystemTemplate] = useLazyQuery(PREVIEW_SYSTEM_TEMPLATE);
 
@@ -702,6 +709,8 @@ export const CustomerFormPage = () => {
                 postcode: prefill.postcode || prev.postcode,
                 country: prefill.country || prev.country,
                 nmi: prefill.nmi || prev.nmi,
+                source: prefill.source || prev.source,
+                referralName: prefill.referralName || prev.referralName,
             }));
 
             if (prefill.notes) {
@@ -785,6 +794,33 @@ export const CustomerFormPage = () => {
         return (prefillData?.portalname === 'PEERLESSGROUP' || prefillData?.portalName === 'PEERLESSGROUP');
     }, [prefillData, customerData, isEditMode]);
 
+    // Enforce Peerless Group defaults (VPP = true, Solar = true, VPP Bonus = $600)
+    useEffect(() => {
+        if (isPdrs) {
+            setFormData(prev => {
+                if (prev.vpp !== true || prev.hasSolar !== true || prev.vppSignupBonus !== '600') {
+                    return {
+                        ...prev,
+                        vpp: true,
+                        hasSolar: true,
+                        vppSignupBonus: '600'
+                    };
+                }
+                return prev;
+            });
+        }
+    }, [isPdrs]);
+
+    const isGeeEnergy = useMemo(() => {
+        let portal = '';
+        if (isEditMode) {
+            portal = customerData?.customer?.portalName || '';
+        } else {
+            portal = prefillData?.portalname || prefillData?.portalName || '';
+        }
+        return portal.toUpperCase().includes('GEE');
+    }, [prefillData, customerData, isEditMode]);
+
     // Get customer's rate version for historic rates lookup
     const customerRateVersion = customerData?.customer?.rateVersion;
 
@@ -802,6 +838,8 @@ export const CustomerFormPage = () => {
         fetchPolicy: 'cache-and-network'
     });
     const activeBonuses: Bonus[] = bonusesData?.activeBonuses || [];
+
+
 
 
 
@@ -877,6 +915,8 @@ export const CustomerFormPage = () => {
                 checkCreditScore: c.checkCreditScore === 1,
                 employerName: c.employerName || '',
                 dob: c.dob ? formatSydneyTime(c.dob, 'YYYY-MM-DD') : '',
+                source: c.source || '',
+                referralName: c.referralName || '',
                 propertyType: c.propertyType || 0,
                 businessName: c.businessName || '',
                 legalName: c.legalName || '',
@@ -1486,14 +1526,15 @@ export const CustomerFormPage = () => {
     // Field-level validation
     const validateField = (name: string, value: any): string => {
         // Required fields
-        let isRequired = ['firstName', 'lastName', 'email', 'phone', 'streetNumber', 'streetName', 'suburb', 'postcode', 'nmi', 'connectionDate'].includes(name);
+        let isRequired = ['firstName', 'lastName', 'email', 'phone', 'streetNumber', 'streetName', 'suburb', 'postcode', 'nmi'].includes(name);
+
+        if (name === 'referralName' && formData.source === 'Referral') {
+            isRequired = true;
+        }
 
         // Conditional demographic requirements
         if (formData.checkCreditScore) {
             const requiredFields = ['gender', 'relationshipStatus', 'enquiryAmount', 'dob', 'licenseNumber', 'licenseState', 'licenseExpiry'];
-            if (formData.idType === 0) {
-                requiredFields.push('licenseDocument');
-            }
             if (requiredFields.includes(name)) {
                 isRequired = true;
             }
@@ -1536,6 +1577,10 @@ export const CustomerFormPage = () => {
     };
 
     const updateField = (field: keyof CustomerFormData, value: any) => {
+        if (isPdrs && ['vpp', 'hasSolar', 'vppSignupBonus'].includes(field)) {
+            return;
+        }
+
         // Enforce input masking for specific fields
         let finalValue = value;
 
@@ -1623,8 +1668,7 @@ export const CustomerFormPage = () => {
         return !!(
             formData.firstName?.trim() &&
             formData.lastName?.trim() &&
-            formData.email?.trim() &&
-            formData.connectionDate
+            formData.email?.trim()
         );
     }, [formData]);
 
@@ -1660,14 +1704,14 @@ export const CustomerFormPage = () => {
 
     // Submit
     const handleSubmit = async (targetStatus: number = 1, isUpdateOnly: boolean = false) => {
-        const loadingStatus = isUpdateOnly ? 3 : targetStatus;
+        const loadingStatus = isUpdateOnly ? 3 : (isWithoutSignature ? 4 : targetStatus);
         setSubmittingStatus(loadingStatus);
 
         // If phone is verified and we are submitting as active (1), set status to 2 (Signature Pending)
         let finalStatus = targetStatus;
         if (isUpdateOnly && customerData?.customer?.status !== undefined) {
             finalStatus = customerData.customer.status;
-        } else if (targetStatus === 1 && phoneVerified) {
+        } else if (targetStatus === 1 && phoneVerified && !isWithoutSignature) {
             finalStatus = 2;
         }
 
@@ -1715,7 +1759,7 @@ export const CustomerFormPage = () => {
                     // }
 
                     const equifaxPayload = {
-                        "reportRequest": {
+                        "credit_report_request": {
                             "first-name": formData.firstName,
                             "first-given-name": formData.lastName,
                             "address": {
@@ -1866,6 +1910,8 @@ export const CustomerFormPage = () => {
             const input = {
                 title: formData.title,
                 email: formData.email,
+                source: formData.source || undefined,
+                referralName: formData.referralName || undefined,
                 firstName: formData.firstName,
                 lastName: formData.lastName,
                 businessName: formData.businessName,
@@ -1941,8 +1987,9 @@ export const CustomerFormPage = () => {
                 licenseDocument: formData.licenseDocument?.uid,
                 rateVersion: activeVersionForLookup || activeRateVersion,
                 customerId: isEditMode ? undefined : generatedCustomerId,
-                triggerWelcomeEmail: (isEditMode && !isUpdateOnly && !isPdrs) ? (finalStatus === 2) : undefined,
+                triggerWelcomeEmail: (isEditMode && !isUpdateOnly && !isPdrs) ? (finalStatus === 2 || isWithoutSignature) : undefined,
                 triggerUpdateEmail: (isEditMode && !isUpdateOnly && !isPdrs) ? (significantChanges || true) : undefined,
+                isWithoutSignature: isWithoutSignature || undefined,
                 selectedBonuses: formData.selectedBonuses,
                 leadUid: prefillLeadUid || undefined
             };
@@ -2021,7 +2068,12 @@ export const CustomerFormPage = () => {
         } finally { setSubmittingStatus(null); }
     };
 
-    const handlePreviewOffer = async (targetUid: string) => {
+    const handlePreviewOffer = async (targetUid: string, isWithoutSignatureOverride?: boolean) => {
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(previewUrl);
+        }
+        setPreviewUrl('');
+        setPreviewModalOpen(true);
         setIsLoadingPreview(true);
         try {
             const offer = selectedRatePlan?.offers?.[0];
@@ -2092,7 +2144,8 @@ export const CustomerFormPage = () => {
                 tenant: 'mojo',
                 ratePlanUid: selectedRatePlan?.uid,
                 selectedBonuses: activeBonuses.filter((b: Bonus) => formData.selectedBonuses.includes(b.uid)),
-                uid: targetUid === 'new' ? undefined : targetUid
+                uid: targetUid === 'new' ? undefined : targetUid,
+                isWithoutSignature: isWithoutSignatureOverride !== undefined ? isWithoutSignatureOverride : isWithoutSignature
             };
 
             setPreviewData(data);
@@ -2101,16 +2154,11 @@ export const CustomerFormPage = () => {
             const blob = new Blob([response.data], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
 
-            // Clean up old URL if it exists
-            if (previewUrl && previewUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(previewUrl);
-            }
-
             setPreviewUrl(url);
-            setPreviewModalOpen(true);
         } catch (err: any) {
             console.error('Failed to generate preview:', err);
             toast.error('Failed to generate offer preview');
+            setPreviewModalOpen(false);
         } finally {
             setIsLoadingPreview(false);
         }
@@ -2156,10 +2204,13 @@ export const CustomerFormPage = () => {
     const handleNextToEmailPreview = async () => {
         setIsLoadingEmailPreview(true);
         try {
-            const eventType = isPdrs ? 'CUSTOMER_DRAFT' : (isEditMode ? 'CUSTOMER_UPDATED' : 'CUSTOMER_CREATED');
+            const eventType = isPdrs ? 'CUSTOMER_DRAFT' : (isWithoutSignature ? 'AGREEMENT_SIGNED' : (isEditMode ? 'CUSTOMER_UPDATED' : 'CUSTOMER_CREATED'));
 
             const { data } = await fetchSystemTemplate({
-                variables: { eventType },
+                variables: { 
+                    eventType,
+                    isWithoutSignature: !!isWithoutSignature
+                },
                 fetchPolicy: 'network-only'
             });
 
@@ -2479,7 +2530,7 @@ export const CustomerFormPage = () => {
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm text-neutral-600 w-20 text-right">{formData.hasSolar ? 'Has Solar' : 'No Solar'}</span>
-                                                <ToggleSwitch checked={formData.hasSolar} onChange={(checked) => updateField('hasSolar', checked)} />
+                                                <ToggleSwitch checked={formData.hasSolar} onChange={(checked) => updateField('hasSolar', checked)} disabled={isPdrs} />
                                                 {/* <div className="transform transition-transform group-open:rotate-180"><ChevronRightIcon size={16} className="rotate-90" /></div> */}
                                             </div>
                                         </summary>
@@ -2514,12 +2565,13 @@ export const CustomerFormPage = () => {
                                                     updateField('vpp', checked);
                                                     if (checked) {
                                                         updateField('hasSolar', true);
+                                                        updateField('vppSignupBonus', '600');
                                                     } else {
                                                         // Clear bonuses when VPP is unchecked
                                                         updateField('vppSignupBonus', null);
                                                         updateField('selectedBonuses', []);
                                                     }
-                                                }} />
+                                                }} disabled={isPdrs} />
                                             </div>
                                         </div>
 
@@ -2540,6 +2592,7 @@ export const CustomerFormPage = () => {
                                                         type="button"
                                                         size="sm"
                                                         onClick={() => updateField('vppSignupBonus', formData.vppSignupBonus === '600' ? null : '600')}
+                                                        disabled={isPdrs}
                                                         className={cn(
                                                             "shrink-0 transition-all font-semibold shadow-sm",
                                                             formData.vppSignupBonus === '600'
@@ -2882,6 +2935,18 @@ export const CustomerFormPage = () => {
                                                     placeholder="Select User"
                                                 />
                                             )}
+
+                                            {formData.source === 'Referral' && (
+                                                <Input
+                                                    label="Referral Name"
+                                                    required
+                                                    error={errors.referralName}
+                                                    placeholder="Who referred this customer?"
+                                                    value={formData.referralName || ''}
+                                                    onChange={(e) => updateField('referralName', e.target.value)}
+                                                    onBlur={() => handleBlur('referralName')}
+                                                />
+                                            )}
                                         </div>
                                     </div>
 
@@ -2893,7 +2958,6 @@ export const CustomerFormPage = () => {
                                             <Select label="Sale Type" options={SALE_TYPE_OPTIONS} value={formData.saleType.toString()} onChange={(val) => updateField('saleType', parseInt(val as string))} />
                                             <DatePicker
                                                 label="Connection Date"
-                                                required
                                                 error={errors.connectionDate}
                                                 value={formData.connectionDate}
                                                 onChange={(date) => updateField('connectionDate', date)}
@@ -3258,7 +3322,7 @@ export const CustomerFormPage = () => {
                                                             <Select label="License State" required={formData.checkCreditScore} options={STATE_OPTIONS} value={formData.licenseState} onChange={(val) => updateField('licenseState', val as string)} onBlur={() => handleBlur('licenseState')} error={errors.licenseState} />
                                                             <DatePicker label="License Expiry" required={formData.checkCreditScore} value={formData.licenseExpiry} onChange={(date) => updateField('licenseExpiry', date)} minDate={new Date()} onBlur={() => handleBlur('licenseExpiry')} error={errors.licenseExpiry} />
 
-                                                            <Field label="Driver's License" required={formData.checkCreditScore} error={errors.licenseDocument}>
+                                                            <Field label="Driver's License" error={errors.licenseDocument}>
                                                                 <div className="space-y-2">
                                                                     <input
                                                                         type="file"
@@ -3521,9 +3585,39 @@ export const CustomerFormPage = () => {
                                                 Update Only
                                             </Button>
                                         )}
+                                        {isGeeEnergy && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="border-amber-600 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:border-amber-500 dark:text-amber-500 dark:hover:bg-amber-950/20"
+                                                onClick={() => {
+                                                    if (!formData.checkCreditScore) {
+                                                        setShowCreditCheckWarning(true);
+                                                        return;
+                                                    }
+                                                    setIsWithoutSignature(true);
+                                                    if (isPdrs && isEditMode) {
+                                                        handlePreviewPdrsConsent();
+                                                    } else {
+                                                        handlePreviewOffer(uid || 'new', true);
+                                                    }
+                                                }}
+                                                isLoading={submittingStatus === 4 || isLoadingEmailPreview}
+                                                disabled={submittingStatus !== null}
+                                            >
+                                                Send Offer without Signature
+                                            </Button>
+                                        )}
                                         <Button
                                             type="button"
-                                            onClick={() => (isPdrs && isEditMode) ? handlePreviewPdrsConsent() : handlePreviewOffer(uid || 'new')}
+                                            onClick={() => {
+                                                setIsWithoutSignature(false);
+                                                if (isPdrs && isEditMode) {
+                                                    handlePreviewPdrsConsent();
+                                                } else {
+                                                    handlePreviewOffer(uid || 'new', false);
+                                                }
+                                            }}
                                             isLoading={submittingStatus === 1 || isLoadingEmailPreview}
                                             disabled={submittingStatus !== null}
                                             loadingText="Saving..."
@@ -3695,6 +3789,50 @@ export const CustomerFormPage = () => {
                                 </div>
                             </div>
                         )}
+                    </div>
+                </Modal>
+                <Modal
+                    isOpen={showCreditCheckWarning}
+                    onClose={() => setShowCreditCheckWarning(false)}
+                    size="sm"
+                    title={
+                        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
+                            <AlertCircleIcon size={22} className="shrink-0" />
+                            <span className="font-bold text-base">Credit Score Warning</span>
+                        </div>
+                    }
+                    footer={
+                        <div className="flex justify-end gap-3 w-full">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setShowCreditCheckWarning(false)}
+                                className="border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold"
+                                onClick={() => {
+                                    setShowCreditCheckWarning(false);
+                                    setIsWithoutSignature(true);
+                                    if (isPdrs && isEditMode) {
+                                        handlePreviewPdrsConsent();
+                                    } else {
+                                        handlePreviewOffer(uid || 'new', true);
+                                    }
+                                }}
+                            >
+                                Yes, Send Offer
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="py-2 text-neutral-600 dark:text-neutral-300">
+                        <p className="text-sm leading-relaxed">
+                            Are you sure you don't want to check a credit score of customer?
+                        </p>
                     </div>
                 </Modal>
                 <Modal

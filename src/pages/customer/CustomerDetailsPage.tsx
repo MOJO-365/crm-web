@@ -124,6 +124,7 @@ interface CustomerDetails {
     employerName?: string;
     creditScore?: number;
     isCreditScoreFetched?: number;
+    isWithoutSignature?: number;
     discount?: number;
     tariffCode?: string;
     ratePlanUid?: string;
@@ -137,6 +138,8 @@ interface CustomerDetails {
     phoneVerifiedAt?: string;
     isActive?: boolean;
     isDeleted?: boolean;
+    source?: string;
+    referralName?: string;
     address?: CustomerAddress;
     riskStatus?: string;
     enrollmentDetails?: {
@@ -2862,25 +2865,28 @@ export function CustomerDetailsPage() {
         try {
             // Construct Equifax API Payload
             const equifaxPayload = {
-                "first-name": selectedCustomerDetails.firstName || '',
-                "first-given-name": selectedCustomerDetails.lastName || '',
-                "address": {
-                    "street-name": selectedCustomerDetails.address?.streetName || '',
-                    "street-type": selectedCustomerDetails.address?.streetType || '',
-                    "suburb": selectedCustomerDetails.address?.suburb || '',
-                    "state-code": selectedCustomerDetails.address?.state || ''
+                "credit_report_request": {
+                    "first-name": selectedCustomerDetails.firstName || '',
+                    "first-given-name": selectedCustomerDetails.lastName || '',
+                    "address": {
+                        "street-name": selectedCustomerDetails.address?.streetName || '',
+                        "street-type": selectedCustomerDetails.address?.streetType || '',
+                        "suburb": selectedCustomerDetails.address?.suburb || '',
+                        "state-code": selectedCustomerDetails.address?.state || ''
+                    },
+                    "gender-code": selectedCustomerDetails.gender === 0 ? 'M' : (selectedCustomerDetails.gender === 1 ? 'F' : 'O'),
+                    "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
+                    // "license-card-number": selectedCustomerDetails.enrollmentDetails?.licenseCardNumber || '',
+                    "license-state": selectedCustomerDetails.enrollmentDetails?.licenseState || '',
+                    "date-of-birth": selectedCustomerDetails.dob ? formatSydneyTime(selectedCustomerDetails.dob, 'YYYY-MM-DD') : '',
+                    "employer-name": selectedCustomerDetails.employerName || '',
+                    "account-type-code": "CC",
+                    "enquiry-amount": Math.floor(Number(selectedCustomerDetails.enquiryAmount) || 0),
+                    "relationship-code": String(selectedCustomerDetails.relationshipStatus || '1'),
+                    "client-reference": `${selectedCustomerDetails.customerId || selectedCustomerDetails.uid}-${Date.now()}`,
+                    "enquiry-client-reference": selectedCustomerDetails.number || ''
                 },
-                "gender-code": selectedCustomerDetails.gender === 0 ? 'M' : (selectedCustomerDetails.gender === 1 ? 'F' : 'O'),
-                "license-number": selectedCustomerDetails.enrollmentDetails?.licenseNumber || '',
-                // "license-card-number": selectedCustomerDetails.enrollmentDetails?.licenseCardNumber || '',
-                "license-state": selectedCustomerDetails.enrollmentDetails?.licenseState || '',
-                "date-of-birth": selectedCustomerDetails.dob ? formatSydneyTime(selectedCustomerDetails.dob, 'YYYY-MM-DD') : '',
-                "employer-name": selectedCustomerDetails.employerName || '',
-                "account-type-code": "CC",
-                "enquiry-amount": Math.floor(Number(selectedCustomerDetails.enquiryAmount) || 0),
-                "relationship-code": String(selectedCustomerDetails.relationshipStatus || '1'),
-                "client-reference": `${selectedCustomerDetails.customerId || selectedCustomerDetails.uid}-${Date.now()}`,
-                "enquiry-client-reference": selectedCustomerDetails.number || ''
+                "type": "PROD"
             };
 
             // const equifaxPayload = {
@@ -3315,8 +3321,18 @@ export function CustomerDetailsPage() {
                                     ...(selectedCustomerDetails.checkCreditScore === 1 ? [
                                         { label: 'Credit score', date: null, completed: selectedCustomerDetails.isCreditScoreFetched === 1, step: 0 },
                                     ] : []),
-                                    { label: 'Offer sent', date: selectedCustomerDetails.pdrsEmailSentAt || selectedCustomerDetails.offerEmailSentAt, completed: !!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.emailSent === 1 || selectedCustomerDetails.pdrsEmailSent === 1 || !!selectedCustomerDetails.pdrsEmailSentAt, step: 1, isLoading: isSendingOffer },
-                                    { label: 'Signed by customer', date: selectedCustomerDetails.signDate, completed: !!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2, showReminder: !!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.pdrsEmailSent === 1 || !!selectedCustomerDetails.pdrsEmailSentAt, step: 2 },
+                                    ...(selectedCustomerDetails.isWithoutSignature === 1 ? [] : [
+                                        { label: 'Offer sent', date: selectedCustomerDetails.pdrsEmailSentAt || selectedCustomerDetails.offerEmailSentAt, completed: !!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.emailSent === 1 || selectedCustomerDetails.pdrsEmailSent === 1 || !!selectedCustomerDetails.pdrsEmailSentAt, step: 1, isLoading: isSendingOffer },
+                                    ]),
+                                    {
+                                        label: selectedCustomerDetails.isWithoutSignature === 1 ? 'Offer Confirmed' : 'Signed by customer',
+                                        date: selectedCustomerDetails.isWithoutSignature === 1
+                                            ? (selectedCustomerDetails.pdrsEmailSentAt || selectedCustomerDetails.offerEmailSentAt)
+                                            : selectedCustomerDetails.signDate,
+                                        completed: (!!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2) || selectedCustomerDetails.isWithoutSignature === 1,
+                                        showReminder: (!!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.pdrsEmailSent === 1 || !!selectedCustomerDetails.pdrsEmailSentAt) && selectedCustomerDetails.isWithoutSignature !== 1,
+                                        step: 2
+                                    },
                                     ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
                                         {
                                             label: 'Push to Gsync',
@@ -3324,7 +3340,7 @@ export function CustomerDetailsPage() {
                                             date: null,
                                             completed: selectedCustomerDetails.vppDetails?.vppConnected === 1,
                                             showToggle: true,
-                                            disabled: selectedCustomerDetails.status < 3
+                                            disabled: selectedCustomerDetails.status < 3 && selectedCustomerDetails.isWithoutSignature !== 1
                                             //  || selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0
                                             ,
                                             // disabledReason: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? "VPP certificate fields are required" : undefined,
@@ -3343,7 +3359,7 @@ export function CustomerDetailsPage() {
                                             step: 3
                                         },
                                     ] : []),
-                                    { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate, step: 4 },
+                                    { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate && selectedCustomerDetails.isWithoutSignature !== 1, step: 4 },
                                     { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: false, step: 5 },
                                 ].map((item: any, index) => (
                                     <div key={index} className="relative flex flex-row md:flex-col items-start md:items-center gap-3 md:gap-0 md:flex-1 w-full md:w-auto">
@@ -3851,6 +3867,18 @@ export function CustomerDetailsPage() {
                                             <div className="space-y-1">
                                                 <label className="text-xs text-muted-foreground uppercase font-semibold">ABN</label>
                                                 <p className="font-medium">{selectedCustomerDetails.abn}</p>
+                                            </div>
+                                        )}
+                                        {selectedCustomerDetails.source && (
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">Lead Source</label>
+                                                <p className="font-medium">{selectedCustomerDetails.source}</p>
+                                            </div>
+                                        )}
+                                        {selectedCustomerDetails.source === 'Referral' && selectedCustomerDetails.referralName && (
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground uppercase font-semibold">Referral Name</label>
+                                                <p className="font-medium">{selectedCustomerDetails.referralName}</p>
                                             </div>
                                         )}
                                     </div>
