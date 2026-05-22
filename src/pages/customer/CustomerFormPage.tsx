@@ -92,7 +92,7 @@ const ToggleSwitch = ({ checked, onChange, disabled }: { checked: boolean, onCha
             if (disabled) return;
             onChange(!checked);
         }}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${checked ? 'bg-neutral-900' : 'bg-gray-300 dark:bg-gray-600'}`}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${checked ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}
     >
         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
@@ -146,7 +146,7 @@ const initialFormData: CustomerFormData = {
     country: 'Australia',
     ownershipStatus: 0,
     nmi: '',
-    hasSolar: false,
+    hasSolar: true,
     solarCapacity: '',
     inverterCapacity: '',
     vpp: false,
@@ -798,7 +798,7 @@ export const CustomerFormPage = () => {
     useEffect(() => {
         if (isPdrs) {
             setFormData(prev => {
-                if (prev.vpp !== true || prev.hasSolar !== true || prev.vppSignupBonus !== '600') {
+                if (prev.vpp !== true || prev.hasSolar !== true || (prev.vppSignupBonus ? Number(prev.vppSignupBonus) !== 600 : true)) {
                     return {
                         ...prev,
                         vpp: true,
@@ -936,12 +936,12 @@ export const CustomerFormPage = () => {
                 postcode: c.address?.postcode || '',
                 country: c.address?.country || 'Australia',
                 nmi: c.address?.nmi || '',
-                hasSolar: c.solarDetails?.hassolar === 1,
+                hasSolar: c.solarDetails?.hassolar === 1 || c.vppDetails?.vpp === 1,
                 solarCapacity: c.solarDetails?.solarcapacity?.toString() || '',
                 inverterCapacity: c.solarDetails?.invertercapacity?.toString() || '',
                 vpp: c.vppDetails?.vpp === 1,
                 vppConnected: c.vppDetails?.vppConnected === 1,
-                vppSignupBonus: c.vppDetails?.vppSignupBonus?.toString() || '',
+                vppSignupBonus: c.vppDetails?.vppSignupBonus?.toString() || (c.vppDetails?.vpp === 1 ? '600' : ''),
                 batteryBrand: c.batteryDetails?.batterybrand || '',
                 batteryCapacity: c.batteryDetails?.batterycapacity?.toString() || '',
                 snNumber: c.batteryDetails?.snnumber || '',
@@ -2591,17 +2591,17 @@ export const CustomerFormPage = () => {
                                                     <Button
                                                         type="button"
                                                         size="sm"
-                                                        onClick={() => updateField('vppSignupBonus', formData.vppSignupBonus === '600' ? null : '600')}
+                                                        onClick={() => updateField('vppSignupBonus', Number(formData.vppSignupBonus) === 600 ? null : '600')}
                                                         disabled={isPdrs}
                                                         className={cn(
                                                             "shrink-0 transition-all font-semibold shadow-sm",
-                                                            formData.vppSignupBonus === '600'
+                                                            Number(formData.vppSignupBonus) === 600
                                                                 ? "bg-primary hover:bg-primary/90 text-primary-foreground border-transparent"
                                                                 : "bg-transparent border-primary/20 text-primary hover:bg-primary/10"
                                                         )}
-                                                        variant={formData.vppSignupBonus === '600' ? 'default' : 'outline'}
+                                                        variant={Number(formData.vppSignupBonus) === 600 ? 'default' : 'outline'}
                                                     >
-                                                        {formData.vppSignupBonus === '600' ? (
+                                                        {Number(formData.vppSignupBonus) === 600 ? (
                                                             <><CheckIcon className="w-3 h-3 mr-1.5" /> Bonus Applied</>
                                                         ) : (
                                                             'Add $600 Bonus'
@@ -3494,11 +3494,11 @@ export const CustomerFormPage = () => {
                                                         {formData.snNumber && <p className="flex justify-between"><span className="text-muted-foreground">SN Number:</span> <span className="font-medium">{formData.snNumber}</span></p>}
                                                         {formData.batteryCapacity && <p className="flex justify-between"><span className="text-muted-foreground">Battery Capacity:</span> <span className="font-medium">{formData.batteryCapacity} kW</span></p>}
                                                         {formData.exportLimit && <p className="flex justify-between"><span className="text-muted-foreground">Export Limit:</span> <span className="font-medium">{formData.exportLimit} kW</span></p>}
-                                                        {(formData.vppSignupBonus === '600' || (formData.selectedBonuses && formData.selectedBonuses.length > 0)) && (
+                                                        {(Number(formData.vppSignupBonus) === 600 || (formData.selectedBonuses && formData.selectedBonuses.length > 0)) && (
                                                             <div className="flex justify-between items-start gap-2">
                                                                 <span className="text-muted-foreground shrink-0">Signup Bonus:</span>
                                                                 <div className="flex flex-col items-end">
-                                                                    {formData.vppSignupBonus === '600' && (
+                                                                    {Number(formData.vppSignupBonus) === 600 && (
                                                                         <span className="font-medium text-right text-green-600">$50 monthly bill credit for 12 months (total $600)</span>
                                                                     )}
                                                                     {formData.selectedBonuses && formData.selectedBonuses.length > 0 && (
