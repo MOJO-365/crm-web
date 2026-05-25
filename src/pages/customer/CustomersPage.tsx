@@ -737,7 +737,7 @@ export function CustomersPage() {
                 if (row.portalName) {
                     displayPortal = String(row.portalName);
                     if (displayPortal.toUpperCase() === 'PEERLESSGROUP') {
-                        displayPortal = 'Peer Less Group';
+                        displayPortal = 'PeerLessGroup';
                     } else if (displayPortal.toUpperCase().includes('GEE')) {
                         displayPortal = 'Gee Energy';
                     }
