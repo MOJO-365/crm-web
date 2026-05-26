@@ -68,6 +68,7 @@ interface Customer {
     riskStatus?: string;
     assignedToUser?: { uid: string; name: string; email: string };
     createdByUser?: { uid: string; name: string };
+    referenceId?: string;
     leadUid?: string;
     isDeleted?: boolean;
     pdrsEmailSent?: number;
@@ -744,6 +745,15 @@ export function CustomersPage() {
                 }
 
                 if (displayPortal) {
+                    if (displayPortal === 'PeerLessGroup' && row.referenceId) {
+                        return (
+                            <Tooltip content={`Ref ID: ${row.referenceId}`} position="top">
+                                <span className="text-foreground text-xs font-medium cursor-help border-b border-dashed border-muted-foreground hover:text-primary transition-colors">
+                                    {displayPortal}
+                                </span>
+                            </Tooltip>
+                        );
+                    }
                     return (
                         <span className="text-foreground text-xs font-medium">
                             {displayPortal}
