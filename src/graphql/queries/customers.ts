@@ -488,6 +488,7 @@ export const GET_CUSTOMERS_CURSOR = gql`
                     uid
                     name
                 }
+                referenceId
             }
             pageInfo {
                 hasNextPage
