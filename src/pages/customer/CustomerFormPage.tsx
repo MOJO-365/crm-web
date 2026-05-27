@@ -1782,25 +1782,28 @@ export const CustomerFormPage = () => {
                     };
 
                     const response = await secondaryApiAxios.post('/v1/equifax/user/get-credit-report', equifaxPayload);
+                    console.log(response, 'response');
 
                     let score: number | undefined;
                     let riskStatusUid: string | undefined;
 
                     // Handle various response formats
-                    if (response.data?.creditScoreData?.score?.score_masterscale) {
+                    const responseData = response?.data !== undefined ? response.data : response;
+
+                    if (responseData?.creditScoreData?.score?.score_masterscale) {
                         // Standard Equifax Nested Response
-                        score = parseInt(response.data.creditScoreData.score.score_masterscale);
-                    } else if (response.data?.creditScore) {
+                        score = parseInt(responseData.creditScoreData.score.score_masterscale);
+                    } else if (responseData?.creditScore) {
                         // Direct Object Response
-                        score = parseInt(response.data.creditScore);
-                    } else if (Array.isArray(response.data) && response.data.length >= 2) {
+                        score = parseInt(responseData.creditScore);
+                    } else if (Array.isArray(responseData) && responseData.length >= 2) {
                         // Array Response - pick the larger value as score
-                        const v1 = parseInt(response.data[0]);
-                        const v2 = parseInt(response.data[1]);
+                        const v1 = parseInt(responseData[0]);
+                        const v2 = parseInt(responseData[1]);
                         score = v1 > 100 ? v1 : v2;
-                    } else if (typeof response.data === 'string') {
+                    } else if (typeof responseData === 'string') {
                         // Text response "1 577" or similar
-                        const parts = response.data.trim().split(/\s+/);
+                        const parts = responseData.trim().split(/\s+/);
                         if (parts.length >= 2) {
                             const v1 = parseInt(parts[0]);
                             const v2 = parseInt(parts[1]);
@@ -1808,9 +1811,10 @@ export const CustomerFormPage = () => {
                         } else if (parts.length === 1 && !isNaN(parseInt(parts[0]))) {
                             score = parseInt(parts[0]);
                         }
-                    } else if (typeof response.data === 'number') {
-                        score = response.data;
+                    } else if (typeof responseData === 'number') {
+                        score = responseData;
                     }
+                    console.log(response, 'response');
 
                     // Look up risk status from the database lookup table by score range
                     if (score !== undefined && !isNaN(score)) {
@@ -2205,7 +2209,7 @@ export const CustomerFormPage = () => {
             const eventType = isPdrs ? 'CUSTOMER_DRAFT' : (isWithoutSignature ? 'AGREEMENT_SIGNED' : (isEditMode ? 'CUSTOMER_UPDATED' : 'CUSTOMER_CREATED'));
 
             const { data } = await fetchSystemTemplate({
-                variables: { 
+                variables: {
                     eventType,
                     isWithoutSignature: !!isWithoutSignature
                 },

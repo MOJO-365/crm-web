@@ -1571,7 +1571,8 @@ export function CustomerDetailsPage() {
     const [reminderSent, setReminderSent] = useState(false);
     const [freezingCustomer, setFreezingCustomer] = useState(false);
     const [freezeModalOpen, setFreezeModalOpen] = useState(false);
-    // const [customerToFreeze, setCustomerToFreeze] = useState<CustomerDetails | null>(null); // Not needed since we use selectedCustomerDetails
+    // const [customerToFreeze, setCustomerToFreeze] = useState<CustomerDetails | null>(null); 
+    // Not needed since we use selectedCustomerDetails
     const [markingNotInterested, setMarkingNotInterested] = useState(false);
     const [markingMovedOn, setMarkingMovedOn] = useState(false);
     const [notInterestedModalOpen, setNotInterestedModalOpen] = useState(false);
@@ -2954,7 +2955,7 @@ export function CustomerDetailsPage() {
             //     "enquiry-client-reference": "12344556"
             // };
             const response = await secondaryApiAxios.post('/v1/equifax/user/get-credit-report', equifaxPayload);
-            const score = response.data?.creditScoreData?.score?.score_masterscale || response.data?.creditScore;
+            const score = response;
 
             if (!score) {
                 throw new Error('No credit score returned from Equifax');
