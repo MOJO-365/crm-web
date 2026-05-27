@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PencilIcon } from '@/components/icons';
+import { PencilIcon, ChevronDownIcon } from '@/components/icons';
 import { CustomerViewLayout } from './CustomerViewLayout';
+import { apiAxios } from '@/lib/apollo';
 
 async function loadSignaturePad(): Promise<void> {
     if ((window as any).SignaturePad) return;
@@ -26,6 +27,7 @@ interface NominationStepProps {
     onBack: () => void;
     onNext: (signatureBase64: string) => void;
     signatoryName: string;
+    uid?: string;
 }
 
 export const NominationStep: React.FC<NominationStepProps> = ({
@@ -33,11 +35,16 @@ export const NominationStep: React.FC<NominationStepProps> = ({
     setIsNominationConfirmed,
     onBack,
     onNext,
-    signatoryName
+    signatoryName,
+    uid
 }) => {
     const [signatureError, setSignatureError] = useState<string | null>(null);
     const [padReady, setPadReady] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    
+    // Accordion state
+    const [isOfferExpanded, setIsOfferExpanded] = useState(false);
+    const [isNominationExpanded, setIsNominationExpanded] = useState(false);
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sigPadRef = useRef<any>(null);
@@ -135,14 +142,73 @@ export const NominationStep: React.FC<NominationStepProps> = ({
                 onFooterButtonClick={() => setIsModalOpen(true)}
                 isFooterButtonDisabled={!canProceed}
             >
-                <div className="space-y-6 max-w-4xl mx-auto">
-                    {/* PDF Preview */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-auto aspect-[1/1.414] md:aspect-auto md:h-[600px]">
-                        <iframe
-                            src="/onboarding/BESS2 and Nomination Form.pdf#view=Fit"
-                            className="w-full h-full border-0"
-                            title="Nomination Form Preview"
-                        />
+                <div className="space-y-6 max-w-4xl mx-auto w-full">
+                    <div className="flex flex-col gap-5 w-full">
+                        {/* Offer Summary Accordion */}
+                        {uid && (
+                            <div className={`bg-white rounded-2xl shadow-sm border transition-all duration-300 overflow-hidden ${isOfferExpanded ? 'border-primary/40 ring-4 ring-primary/5' : 'border-slate-200 hover:border-slate-300'}`}>
+                                <button
+                                    onClick={() => setIsOfferExpanded(!isOfferExpanded)}
+                                    className={`w-full flex items-center justify-between px-6 py-5 transition-colors ${isOfferExpanded ? 'bg-primary/5' : 'bg-white hover:bg-slate-50'}`}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${isOfferExpanded ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                        </div>
+                                        <div className="text-left">
+                                            <h3 className={`font-bold text-base transition-colors ${isOfferExpanded ? 'text-primary' : 'text-slate-800'}`}>Offer Summary</h3>
+                                            <p className="text-xs text-slate-500 mt-0.5">Review your energy rates and plan details</p>
+                                        </div>
+                                    </div>
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isOfferExpanded ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-400'}`}>
+                                        <ChevronDownIcon size={20} className={`transition-transform duration-300 ${isOfferExpanded ? 'rotate-180' : ''}`} />
+                                    </div>
+                                </button>
+                                {isOfferExpanded && (
+                                    <div className="border-t border-primary/10 bg-slate-50 p-2 sm:p-4">
+                                        <div className="rounded-xl overflow-hidden border border-slate-200 bg-white relative aspect-[1/1.414] md:aspect-auto md:h-[700px] shadow-inner">
+                                            <iframe
+                                                src={`${apiAxios.defaults.baseURL?.replace(/\/$/, '') || ''}/agreement/preview/${uid}?format=pdf#view=Fit`}
+                                                className="absolute inset-0 w-full h-full border-0"
+                                                title="Offer Summary Preview"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* PDF Preview Accordion */}
+                        <div className={`bg-white rounded-2xl shadow-sm border transition-all duration-300 overflow-hidden ${isNominationExpanded ? 'border-primary/40 ring-4 ring-primary/5' : 'border-slate-200 hover:border-slate-300'}`}>
+                            <button
+                                onClick={() => setIsNominationExpanded(!isNominationExpanded)}
+                                className={`w-full flex items-center justify-between px-6 py-5 transition-colors ${isNominationExpanded ? 'bg-primary/5' : 'bg-white hover:bg-slate-50'}`}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${isNominationExpanded ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    </div>
+                                    <div className="text-left">
+                                        <h3 className={`font-bold text-base transition-colors ${isNominationExpanded ? 'text-primary' : 'text-slate-800'}`}>Nomination Form</h3>
+                                        <p className="text-xs text-slate-500 mt-0.5">Read and agree to the nomination terms</p>
+                                    </div>
+                                </div>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isNominationExpanded ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-400'}`}>
+                                    <ChevronDownIcon size={20} className={`transition-transform duration-300 ${isNominationExpanded ? 'rotate-180' : ''}`} />
+                                </div>
+                            </button>
+                            {isNominationExpanded && (
+                                <div className="border-t border-primary/10 bg-slate-50 p-2 sm:p-4">
+                                    <div className="rounded-xl overflow-hidden border border-slate-200 bg-white relative aspect-[1/1.414] md:aspect-auto md:h-[700px] shadow-inner">
+                                        <iframe
+                                            src="/onboarding/BESS2 and Nomination Form.pdf#view=Fit"
+                                            className="absolute inset-0 w-full h-full border-0"
+                                            title="Nomination Form Preview"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Nomination Confirm Checkbox */}
