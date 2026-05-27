@@ -223,6 +223,7 @@ export const CustomerViewPage: React.FC = () => {
                         setStep('review');
                     }}
                     signatoryName={`${idForm.firstName || payload.firstname || ''} ${idForm.lastName || payload.lastname || ''}`.trim()}
+                    uid={uid}
                 />
             );
         case 'review':
