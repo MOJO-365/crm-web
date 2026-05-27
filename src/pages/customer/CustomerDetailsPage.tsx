@@ -1616,6 +1616,7 @@ export function CustomerDetailsPage() {
     const [isSendingOffer, setIsSendingOffer] = useState(false);
     const [vppConnectModalOpen, setVppConnectModalOpen] = useState(false);
     const [isSkippingVpp, setIsSkippingVpp] = useState(false);
+    const [isSkippingUtilmate, setIsSkippingUtilmate] = useState(false);
     const [isConnectingVpp, setIsConnectingVpp] = useState(false);
     const [utilmateConnectModalOpen, setUtilmateConnectModalOpen] = useState(false);
     const [isGeneratingCredentials, setIsGeneratingCredentials] = useState(false);
@@ -2821,6 +2822,50 @@ export function CustomerDetailsPage() {
         } catch (error: any) {
             console.error('Error connecting Utilmate:', error);
             toast.error(error.message || 'Failed to connect Utilmate');
+        }
+    };
+
+    const handleSkipAndConnectUtilmate = async () => {
+        if (!selectedCustomerDetails) return;
+        setIsSkippingUtilmate(true);
+        try {
+            const now = new Date().toISOString();
+            const input: any = {
+                status: 9,
+                utilmateStatus: 1,
+                utilmateDetails: {
+                    siteIdentifier: utilmateForm.siteIdentifier || undefined,
+                    accountNumber: utilmateForm.accountNumber || undefined,
+                    utilmateConnected: 1,
+                    utilmateConnectedAt: now,
+                },
+                skipStatusUpdate: true
+            };
+
+            await updateCustomer({
+                variables: {
+                    uid: selectedCustomerDetails.uid,
+                    input
+                }
+            });
+
+            toast.success('Utilmate Connected (Details Skipped)');
+            setUtilmateConnectModalOpen(false);
+
+            setSelectedCustomerDetails({
+                ...selectedCustomerDetails,
+                status: 9,
+                utilmateDetails: {
+                    ...selectedCustomerDetails.utilmateDetails,
+                    ...input.utilmateDetails
+                }
+            });
+
+        } catch (error: any) {
+            console.error('Error connecting Utilmate (Skip):', error);
+            toast.error(error.message || 'Failed to connect Utilmate');
+        } finally {
+            setIsSkippingUtilmate(false);
         }
     };
 
@@ -5223,6 +5268,15 @@ export function CustomerDetailsPage() {
                             onClick={() => setUtilmateConnectModalOpen(false)}
                         >
                             Cancel
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="mr-2 text-primary border-primary/20 hover:bg-primary/5 shadow-sm hover:shadow transition-all duration-300 group"
+                            onClick={handleSkipAndConnectUtilmate}
+                            isLoading={isSkippingUtilmate}
+                            rightIcon={<ArrowRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
+                        >
+                            Skip & Connect
                         </Button>
                         <Button
                             className="bg-neutral-900 text-white hover:bg-neutral-800"
