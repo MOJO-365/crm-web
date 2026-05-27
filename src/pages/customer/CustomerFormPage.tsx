@@ -1678,7 +1678,6 @@ export const CustomerFormPage = () => {
                 formData.licenseNumber?.trim() &&
                 formData.licenseState &&
                 formData.licenseExpiry &&
-                formData.employerName?.trim() &&
                 formData.enquiryAmount?.trim() &&
                 formData.gender !== undefined &&
                 formData.relationshipStatus !== undefined &&
