@@ -88,6 +88,7 @@ export interface CustomerFormData {
     tariffCode: string;
     ratePlanUid?: string;
     creditScore?: number;
+    isCreditScoreFetched?: boolean;
     riskStatus?: number;
     discount: number;
 

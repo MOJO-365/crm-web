@@ -796,7 +796,7 @@ export const CustomerFormPage = () => {
 
     // Enforce Peerless Group defaults (VPP = true, Solar = true, VPP Bonus = $600)
     useEffect(() => {
-        if (isPdrs) {
+        if (isPdrs && !isEditMode) {
             setFormData(prev => {
                 if (prev.vpp !== true || prev.hasSolar !== true || (prev.vppSignupBonus ? Number(prev.vppSignupBonus) !== 600 : true)) {
                     return {
@@ -809,7 +809,7 @@ export const CustomerFormPage = () => {
                 return prev;
             });
         }
-    }, [isPdrs]);
+    }, [isPdrs, isEditMode]);
 
     const isGeeEnergy = useMemo(() => {
         let portal = '';
@@ -1721,130 +1721,6 @@ export const CustomerFormPage = () => {
         // Temporarily disable dirty check to allow navigation
         setIsFormDirty(false);
         try {
-            let creditScoreData: { creditScore?: number; isCreditScoreFetched?: number; riskStatus?: string } = {};
-
-            // Credit Score Check (Only on Create)
-            if (!isEditMode && formData.checkCreditScore) {
-                try {
-
-                    // const equifaxPayload = {
-                    //     "title": "Mr",
-                    //     "first-name": "Pal",
-                    //     "first-given-name": "Patel",
-                    //     "gender": "Male",
-                    //     "address": {
-                    //         "street-number": "19",
-                    //         "street-name": "COOYAL",
-                    //         "street-type": "PL",
-                    //         "suburb": "GLENWOOD",
-                    //         "state-code": "NSW",
-                    //         "postcode": "2768",
-                    //         "country-code": "AUS"
-                    //     },
-                    //     "license-number": "DL123456",
-                    //     "gender-code": "M",
-                    //     "date-of-birth": "2003-03-19",
-                    //     "employer-name": "DATA FISH PTY LTD",
-                    //     "credit_enquirer_name": "GEE ENERGY API TEST BRANCH",
-
-                    //     "account-type-code": "CC",
-                    //     "enquiry-amount-currency": "AUD",
-                    //     "enquiry-amount": 1000,
-                    //     "relationship-code": "1",
-                    //     "client-reference": "T3D-20251209051318-ed8bc2",
-                    //     "enquiry-client-reference": "12344556",
-                    //     "enquiry-date": "2026-02-04"
-                    // }
-
-                    const equifaxPayload = {
-                        "credit_report_request": {
-                            "first-name": formData.firstName,
-                            "first-given-name": formData.lastName,
-                            "address": {
-                                "street-name": formData.streetName,
-                                "street-type": formData.streetType,
-                                "suburb": formData.suburb,
-                                "state-code": formData.state
-                            },
-                            "gender-code": formData.gender === 0 ? 'M' : (formData.gender === 1 ? 'F' : 'O'),
-                            "license-number": formData.licenseNumber,
-                            // "license-card-number": formData.licenseCardNumber,
-                            "license-state": formData.licenseState,
-                            "date-of-birth": formData.dob,
-                            "employer-name": formData.employerName,
-                            "account-type-code": "CC",
-                            "enquiry-amount": Math.floor(Number(formData.enquiryAmount) || 0),
-                            "relationship-code": String(formData.relationshipStatus || '1'),
-                            "client-reference": `REF-${Date.now()}`,
-                            "enquiry-client-reference": formData.phone || ''
-                        },
-                        "type": "PROD"
-                    };
-
-                    const response = await secondaryApiAxios.post('/v1/equifax/user/get-credit-report', equifaxPayload);
-                    console.log(response, 'response');
-
-                    let score: number | undefined;
-                    let riskStatusUid: string | undefined;
-
-                    // Handle various response formats
-                    const responseData = response?.data !== undefined ? response.data : response;
-
-                    if (responseData?.creditScoreData?.score?.score_masterscale) {
-                        // Standard Equifax Nested Response
-                        score = parseInt(responseData.creditScoreData.score.score_masterscale);
-                    } else if (responseData?.creditScore) {
-                        // Direct Object Response
-                        score = parseInt(responseData.creditScore);
-                    } else if (Array.isArray(responseData) && responseData.length >= 2) {
-                        // Array Response - pick the larger value as score
-                        const v1 = parseInt(responseData[0]);
-                        const v2 = parseInt(responseData[1]);
-                        score = v1 > 100 ? v1 : v2;
-                    } else if (typeof responseData === 'string') {
-                        // Text response "1 577" or similar
-                        const parts = responseData.trim().split(/\s+/);
-                        if (parts.length >= 2) {
-                            const v1 = parseInt(parts[0]);
-                            const v2 = parseInt(parts[1]);
-                            score = v1 > 100 ? v1 : v2;
-                        } else if (parts.length === 1 && !isNaN(parseInt(parts[0]))) {
-                            score = parseInt(parts[0]);
-                        }
-                    } else if (typeof responseData === 'number') {
-                        score = responseData;
-                    }
-                    console.log(response, 'response');
-
-                    // Look up risk status from the database lookup table by score range
-                    if (score !== undefined && !isNaN(score)) {
-                        const matched = riskStatuses.find((rs: any) => {
-                            if (rs.scoreMin === null && rs.scoreMax === null) return false; // Skip "Pending"
-                            const minOk = rs.scoreMin === null || score! >= rs.scoreMin;
-                            const maxOk = rs.scoreMax === null || score! < rs.scoreMax;
-                            return minOk && maxOk;
-                        });
-                        if (matched) {
-                            riskStatusUid = matched.uid;
-                        }
-                    }
-
-                    if (riskStatusUid) {
-                        creditScoreData = {
-                            creditScore: score,
-                            isCreditScoreFetched: 1,
-                            riskStatus: riskStatusUid
-                        };
-                        // toast.success(`Credit check passed. Score: ${score}`);
-                    }
-
-                } catch (error) {
-                    console.error('Credit check failed:', error);
-                    toast.warn('Automated credit check failed. Customer will be created with default status.');
-                    // Proceeding without aborting creation
-                }
-            }
-
             // Determine if an update email should be triggered based on significant field changes
             const hasSignificantChanges = () => {
                 if (!isEditMode || !customerData?.customer) return false;
@@ -1936,8 +1812,7 @@ export const CustomerFormPage = () => {
                 enquiryAmount: formData.enquiryAmount ? parseFloat(formData.enquiryAmount) : undefined,
                 checkCreditScore: formData.checkCreditScore ? 1 : 0,
                 employerName: formData.employerName,
-                isCreditScoreFetched: creditScoreData?.isCreditScoreFetched || 0,
-                ...creditScoreData, // Add credit score data to input (overrides if present)
+                isCreditScoreFetched: formData.isCreditScoreFetched ? 1 : 0,
                 enrollmentDetails: {
                     saletype: formData.saleType,
                     connectiondate: formData.connectionDate || null,
@@ -2022,6 +1897,92 @@ export const CustomerFormPage = () => {
                     } catch (noteErr) {
                         console.error('[Lead Conversion] Failed to create note from lead:', noteErr);
                     }
+                }
+            }
+            // Credit Score Check (After customer is created/updated)
+            if (!isEditMode && formData.checkCreditScore && !formData.isCreditScoreFetched && savedCustomer?.uid) {
+                try {
+                    const equifaxPayload = {
+                        "credit_report_request": {
+                            "first-name": formData.firstName,
+                            "first-given-name": formData.lastName,
+                            "address": {
+                                "street-name": formData.streetName,
+                                "street-type": formData.streetType,
+                                "suburb": formData.suburb,
+                                "state-code": formData.state
+                            },
+                            "gender-code": formData.gender === 0 ? 'M' : (formData.gender === 1 ? 'F' : 'O'),
+                            "license-number": formData.licenseNumber,
+                            "license-state": formData.licenseState,
+                            "date-of-birth": formData.dob,
+                            "employer-name": formData.employerName,
+                            "account-type-code": "CC",
+                            "enquiry-amount": Math.floor(Number(formData.enquiryAmount) || 0),
+                            "relationship-code": String(formData.relationshipStatus || '1'),
+                            "client-reference": savedCustomer.customerId || savedCustomer.uid,
+                            "enquiry-client-reference": formData.phone || ''
+                        },
+                        "type": "PROD" // Change to TEST if required by environment
+                    };
+
+                    const response = await secondaryApiAxios.post('/v1/equifax/user/get-credit-report', equifaxPayload);
+                    let score: number | undefined;
+                    let riskStatusUid: string | undefined;
+
+                    // Handle various response formats
+                    const responseData = response?.data !== undefined ? response.data : response;
+
+                    if (responseData?.creditScoreData?.score?.score_masterscale) {
+                        score = parseInt(responseData.creditScoreData.score.score_masterscale);
+                    } else if (responseData?.creditScore) {
+                        score = parseInt(responseData.creditScore);
+                    } else if (Array.isArray(responseData) && responseData.length >= 2) {
+                        const v1 = parseInt(responseData[0]);
+                        const v2 = parseInt(responseData[1]);
+                        score = v1 > 100 ? v1 : v2;
+                    } else if (typeof responseData === 'string') {
+                        const parts = responseData.trim().split(/\s+/);
+                        if (parts.length >= 2) {
+                            const v1 = parseInt(parts[0]);
+                            const v2 = parseInt(parts[1]);
+                            score = v1 > 100 ? v1 : v2;
+                        } else if (parts.length === 1 && !isNaN(parseInt(parts[0]))) {
+                            score = parseInt(parts[0]);
+                        }
+                    } else if (typeof responseData === 'number') {
+                        score = responseData;
+                    }
+
+                    if (score !== undefined && !isNaN(score)) {
+                        const matched = riskStatuses.find((rs: any) => {
+                            if (rs.scoreMin === null && rs.scoreMax === null) return false;
+                            const minOk = rs.scoreMin === null || score! >= rs.scoreMin;
+                            const maxOk = rs.scoreMax === null || score! < rs.scoreMax;
+                            return minOk && maxOk;
+                        });
+                        if (matched) {
+                            riskStatusUid = matched.uid;
+                        }
+                    }
+
+                    if (riskStatusUid) {
+                        await updateCustomer({
+                            variables: {
+                                uid: savedCustomer.uid,
+                                input: {
+                                    creditScore: score,
+                                    isCreditScoreFetched: 1,
+                                    riskStatus: riskStatusUid
+                                }
+                            }
+                        });
+                        updateField('isCreditScoreFetched', true);
+                        toast.success(`Credit check passed. Score: ${score}`);
+                    }
+                } catch (error) {
+                    console.error('Credit check failed:', error);
+                    toast.warn('Automated credit check failed. Customer was saved without credit score.');
                 }
             }
 
@@ -2567,7 +2528,6 @@ export const CustomerFormPage = () => {
                                                     updateField('vpp', checked);
                                                     if (checked) {
                                                         updateField('hasSolar', true);
-                                                        updateField('vppSignupBonus', '600');
                                                     } else {
                                                         // Clear bonuses when VPP is unchecked
                                                         updateField('vppSignupBonus', null);
