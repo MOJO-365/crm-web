@@ -941,7 +941,7 @@ export const CustomerFormPage = () => {
                 inverterCapacity: c.solarDetails?.invertercapacity?.toString() || '',
                 vpp: c.vppDetails?.vpp === 1,
                 vppConnected: c.vppDetails?.vppConnected === 1,
-                vppSignupBonus: c.vppDetails?.vppSignupBonus?.toString() || (c.vppDetails?.vpp === 1 ? '600' : ''),
+                vppSignupBonus: c.vppDetails?.vppSignupBonus != null ? c.vppDetails.vppSignupBonus.toString() : '',
                 batteryBrand: c.batteryDetails?.batterybrand || '',
                 batteryCapacity: c.batteryDetails?.batterycapacity?.toString() || '',
                 snNumber: c.batteryDetails?.snnumber || '',
