@@ -297,13 +297,13 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
         { label: 'Off-Peak', value: offer.offPeak, type: 'offPeak' },
         { label: 'Shoulder', value: offer.shoulder, type: 'shoulder' },
         { label: 'Anytime', value: offer.anytime, type: 'anytime' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
     ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
 
     // Supply Charges Items
     const supplyChargesItems = [
         { label: 'Supply', value: offer.supplyCharge, type: 'supplyCharge' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
     ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
 
     // Demand Charges Items
@@ -312,13 +312,13 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
         { label: 'Demand (Op)', value: offer.demandOp, type: 'demandOp' },
         { label: 'Demand (P)', value: offer.demandP, type: 'demandP' },
         { label: 'Demand (S)', value: offer.demandS, type: 'demandS' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
     ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
 
     // VPP Orchestration Charges Items
     const vppChargesItems = [
-        { label: 'Orchestration', value: offer.vppOrcharge, type: 'vppOrcharge', applyDiscount: true },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount }))
+        { label: 'Orchestration', value: offer.vppOrcharge, type: 'vppOrcharge' },
+        ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
     ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
 
     const hasColumn2 = supplyChargesItems.length > 0 || demandChargesItems.length > 0 || vppChargesItems.length > 0;
@@ -330,7 +330,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
         { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
         { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
         { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
     ].filter(rate => {
         const numericValue = parseFloat(String(rate.value || 0));
         if (numericValue <= 0) return false;
@@ -346,7 +346,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
         { label: 'CL2 Usage', value: offer.cl2Usage, type: 'cl2_usage' },
         { label: 'CL1 Supply', value: offer.cl1Supply, type: 'cl1_supply' },
         { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
     ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
 
     // Remaining dynamic rates
@@ -406,8 +406,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                             .map((rate, idx) => {
                                 const isAnytime = rate.type === 'anytime';
                                 const numericValue = parseFloat(String(rate.value || 0));
-                                const shouldApplyDiscount = rate.type === 'dynamic' ? !!(rate as any).applyDiscount : true;
-                                const price = shouldApplyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
+                                const price = calculateDiscountedRate(numericValue, discount);
                                 const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : 'kWh') : formatUnit(rate.type, 'kWh');
                                 return (
                                     <div key={idx} className={cn(
@@ -442,7 +441,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                                     const isDynamic = r.type === 'dynamic';
                                     const unit = isDynamic ? (r.unitId ? units[r.unitId] : 'day') : formatUnit('supplyCharge', 'day');
                                     const numericValue = parseFloat(String(r.value || '0'));
-                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
+                                    const price = numericValue;
                                     return (
                                         <div key={id} className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                             <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
@@ -464,7 +463,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                                     const typeKey = d.type === 'demand' ? 'demand' : d.type === 'demandOp' ? 'demandOp' : d.type === 'demandP' ? 'demandP' : d.type === 'demandS' ? 'demandS' : '';
                                     const unit = d.type === 'dynamic' ? (d.unitId ? units[d.unitId] : 'kVA/day') : formatUnit(typeKey, 'kVA/day');
                                     const numericValue = parseFloat(String(d.value || 0));
-                                    const price = d.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
+                                    const price = calculateDiscountedRate(numericValue, discount);
                                     return (
                                         <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                             <div className="text-rose-600 dark:text-rose-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
@@ -481,28 +480,15 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                                 <div className="flex items-center gap-2 text-amber-500 dark:text-amber-400 mb-2">
                                     <ActivityIcon size={14} />
                                     <span className="text-xs font-bold uppercase tracking-wide">VPP Orchestration Charges</span>
-                                    {discount > 0 && vppChargesItems.some(r => r.applyDiscount) && (
-                                        <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-500 text-white rounded-md uppercase tracking-tighter">Discount Applied</span>
-                                    )}
                                 </div>
                                 {vppChargesItems.map((r: any, id: number) => {
                                     const isDynamic = r.type === 'dynamic';
                                     const unit = isDynamic ? (r.unitId ? units[r.unitId] : 'day') : formatUnit('vppOrcharge', 'day');
                                     const numericValue = parseFloat(String(r.value || '0'));
-                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
+                                    const price = numericValue;
                                     return (
                                         <div key={id} className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                            <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">
-                                                <div className="flex flex-col items-center">
-                                                    <span>${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</span>
-                                                    {r.applyDiscount && discount > 0 && (
-                                                        <div className="flex items-center gap-1.5 leading-none mt-0.5">
-                                                            <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
-                                                            <span className="px-1 py-0.5 text-[8px] font-black bg-amber-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
+                                            <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
                                             <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">{r.label}</div>
                                         </div>
                                     );
@@ -524,7 +510,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                             .map((rate, idx) => {
                                 const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : 'kWh') : formatUnit(rate.type, 'kWh');
                                 const numericValue = parseFloat(String(rate.value || '0'));
-                                const price = rate.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
+                                const price = numericValue;
                                 return (
                                     <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                         <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
@@ -545,8 +531,7 @@ const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan
                         {controlledLoadItems.map((rate, idx) => {
                             const numericValue = parseFloat(String(rate.value || 0));
                             const isUsage = rate.type.endsWith('_usage') || (rate.type === 'dynamic' && !rate.label.toLowerCase().includes('supply'));
-                            const shouldApplyDiscount = rate.type === 'dynamic' ? !!(rate as any).applyDiscount : isUsage;
-                            const price = shouldApplyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
+                            const price = calculateDiscountedRate(numericValue, discount);
                             const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : (isUsage ? 'kWh' : 'day')) : (isUsage ? 'kWh' : 'day');
                             const unitStr = rate.type === 'dynamic' ? unit : formatUnit(rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', unit);
                             return (
