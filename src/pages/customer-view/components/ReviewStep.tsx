@@ -165,12 +165,8 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
             const numericValue = parseFloat(String(item.value || '0'));
 
             let applyDiscount = false;
-            if (item.applyDiscount !== undefined) {
-                applyDiscount = !!item.applyDiscount;
-            } else if (category === 'Energy Rates') {
+            if (category === 'Energy Rates' || category === 'Demand Charges' || category === 'Controlled Load') {
                 applyDiscount = true;
-            } else if (category === 'Controlled Load') {
-                applyDiscount = item.type?.includes('usage') || !!isUsageOverride;
             }
 
             const isDiscounted = applyDiscount && discount > 0;

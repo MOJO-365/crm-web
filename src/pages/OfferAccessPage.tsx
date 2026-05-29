@@ -1141,7 +1141,7 @@ export const OfferAccessPage = () => {
                                 })),
                                 ...energyDynamicRates.map((r: any) => {
                                     const numericValue = parseFloat(String(r.value || 0));
-                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    const price = calculateDiscountedRate(numericValue, customerData.discount ?? 0);
                                     return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
                                 })
                             ]
@@ -1168,7 +1168,7 @@ export const OfferAccessPage = () => {
                                 })),
                                 ...supplyDynamicRates.map((r: any) => {
                                     const numericValue = parseFloat(String(r.value || 0));
-                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    const price = numericValue;
                                     return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
                                 })
                             ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r: any) => ({
@@ -1183,7 +1183,7 @@ export const OfferAccessPage = () => {
                                 { label: 'Demand (S)', value: activeOffer.demandS, type: 'demandS' },
                                 ...demandDynamicRates.map((r: any) => {
                                     const numericValue = parseFloat(String(r.value || 0));
-                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    const price = calculateDiscountedRate(numericValue, customerData.discount ?? 0);
                                     return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
                                 })
                             ]
@@ -1200,7 +1200,7 @@ export const OfferAccessPage = () => {
                                 { label: 'Orchestration', value: activeOffer.vppOrcharge, type: 'vppOrcharge' },
                                 ...vppDynamicRates.map((r: any) => {
                                     const numericValue = parseFloat(String(r.value || 0));
-                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    const price = numericValue;
                                     return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
                                 })
                             ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r: any) => {
@@ -1218,7 +1218,7 @@ export const OfferAccessPage = () => {
                                 { label: 'BASE FIT', value: activeOffer.fitVpp, type: 'fitVpp' },
                                 ...solarFitDynamicRates.map((r: any) => {
                                     const numericValue = parseFloat(String(r.value || 0));
-                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    const price = numericValue;
                                     return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
                                 })
                             ]
@@ -1239,7 +1239,7 @@ export const OfferAccessPage = () => {
 
                             const extraFitRates = remainingDynamicRates.filter((r: any) => r.type === 'fit' || r.type === 'extra_fit' || (!r.type && (customerData.vppDetails?.vpp === 1 || ratePlan?.vpp === 1))).map((dRate: any) => {
                                 const val = parseFloat(String(dRate.value || '0'));
-                                const price = dRate.applyDiscount ? calculateDiscountedRate(val, customerData.discount ?? 0) : val;
+                                const price = val;
                                 return {
                                     label: dRate.name,
                                     value: price,
@@ -1254,7 +1254,7 @@ export const OfferAccessPage = () => {
 
                             const extraChargeRates = remainingDynamicRates.filter((r: any) => r.type === 'charges' || r.type === 'extra_charges' || (!r.type && !(customerData.vppDetails?.vpp === 1 || ratePlan?.vpp === 1))).map((dRate: any) => {
                                 const val = parseFloat(String(dRate.value || '0'));
-                                const price = dRate.applyDiscount ? calculateDiscountedRate(val, customerData.discount ?? 0) : val;
+                                const price = val;
                                 return {
                                     label: dRate.name,
                                     value: price,
@@ -1268,13 +1268,13 @@ export const OfferAccessPage = () => {
                             }));
 
                             const clRates = [
-                                { label: 'CL1 Usage', value: activeOffer.cl1Usage, type: 'cl1_usage' },
-                                { label: 'CL2 Usage', value: activeOffer.cl2Usage, type: 'cl2_usage' },
-                                { label: 'CL1 Supply', value: activeOffer.cl1Supply, type: 'cl1_supply' },
-                                { label: 'CL2 Supply', value: activeOffer.cl2Supply, type: 'cl2_supply' },
+                                { label: 'CL1 Usage', value: calculateDiscountedRate(activeOffer.cl1Usage ?? 0, customerData.discount ?? 0), type: 'cl1_usage' },
+                                { label: 'CL2 Usage', value: calculateDiscountedRate(activeOffer.cl2Usage ?? 0, customerData.discount ?? 0), type: 'cl2_usage' },
+                                { label: 'CL1 Supply', value: calculateDiscountedRate(activeOffer.cl1Supply ?? 0, customerData.discount ?? 0), type: 'cl1_supply' },
+                                { label: 'CL2 Supply', value: calculateDiscountedRate(activeOffer.cl2Supply ?? 0, customerData.discount ?? 0), type: 'cl2_supply' },
                                 ...clDynamicRates.map((r: any) => {
                                     const numericValue = parseFloat(String(r.value || 0));
-                                    const price = r.applyDiscount ? calculateDiscountedRate(numericValue, customerData.discount ?? 0) : numericValue;
+                                    const price = calculateDiscountedRate(numericValue, customerData.discount ?? 0);
                                     return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
                                 })
                             ]
