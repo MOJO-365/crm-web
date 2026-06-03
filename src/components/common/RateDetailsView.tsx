@@ -249,7 +249,6 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                     <span className="text-xs font-bold uppercase tracking-wide">Supply Charges</span>
                                 </div>
                                 {supplyChargesItems.map((r: any, id: number) => {
-                                    const isDynamic = r.type === 'dynamic';
                                     const unit = resolveUnit(r, 'supplyCharge', 'day');
                                     const numericValue = parseFloat(String(r.value || '0'));
                                     const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
@@ -296,7 +295,6 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                     )}
                                 </div>
                                 {vppChargesItems.map((r: any, id: number) => {
-                                    const isDynamic = r.type === 'dynamic';
                                     const unit = resolveUnit(r, 'vppOrcharge', 'day');
                                     const numericValue = parseFloat(String(r.value || '0'));
                                     const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
