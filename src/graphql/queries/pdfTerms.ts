@@ -9,6 +9,7 @@ export const GET_PDF_TERMS_LIST = gql`
                 name
                 rateType
                 rateUids
+                planUids
                 isActive
                 isDeleted
                 createdAt
@@ -33,6 +34,7 @@ export const GET_PDF_TERM = gql`
             content
             rateType
             rateUids
+            planUids
             isActive
             isDeleted
             createdAt

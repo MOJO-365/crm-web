@@ -23,6 +23,7 @@ const CUSTOMER_FULL_RESPONSE = `
     propertyType
     tariffCode
     ratePlanUid
+    planUid
     status
     discount
     signDate

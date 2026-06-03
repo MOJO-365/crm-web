@@ -16,6 +16,7 @@ export * from './queries/auditLogs';
 export * from './queries/dashboard';
 export * from './queries/battery';
 export * from './queries/inverter';
+export * from './queries/plans';
 
 
 // Mutations
@@ -29,6 +30,7 @@ export * from './mutations/userPermissions';
 export * from './mutations/emailTemplates';
 export * from './mutations/documents';
 export * from './mutations/notes';
+export * from './mutations/plans';
 
 // Queries
 export * from './queries/emailTemplates';

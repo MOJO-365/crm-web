@@ -15,7 +15,8 @@ import {
     CustomerIcon,
     MailIcon,
     FileTextIcon,
-    UserSettingIcon
+    UserSettingIcon,
+    ListIcon
 } from '@/components/icons';
 import { GET_MENUS, GET_ROLE_PERMISSIONS, GET_USER_PERMISSIONS, UPSERT_USER_PERMISSION, GET_FEATURES, GET_ROLE_FEATURE_PERMISSIONS, GET_USER_FEATURE_PERMISSIONS, UPSERT_USER_FEATURE_PERMISSION, GET_ROLES } from '@/graphql';
 import { cn } from '@/lib/utils';
@@ -640,6 +641,7 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
         audit_logs: FileTextIcon,
         settings: UserSettingIcon,
         master_data: ShieldCheckIcon,
+        plans_master: ListIcon,
         battery_master: BatteryIcon,
         inverter_master: InverterIcon,
         rates: ZapIcon
