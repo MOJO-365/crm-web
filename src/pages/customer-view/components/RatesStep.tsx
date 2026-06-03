@@ -39,7 +39,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
         return map;
     }, [measurementUnits]);
 
-    const discount = parseFloat(payload.discount || 0);
+    const discount = parseFloat(String(payload?.discount ?? customer?.discount ?? customer?.plan?.discount ?? 0));
 
     const parsedPriceUnits: Record<string, string> = typeof mainOffer?.priceUnits === 'string'
         ? (() => { try { return JSON.parse(mainOffer.priceUnits); } catch { return {}; } })()
@@ -49,99 +49,145 @@ export const RatesStep: React.FC<RatesStepProps> = ({
         ? (() => { try { return JSON.parse(mainOffer.dynamicRates); } catch { return []; } })()
         : (mainOffer?.dynamicRates || []);
 
+    const planRates = React.useMemo(() => {
+        const planRatesJson = customer?.plan?.ratesJson;
+        if (!planRatesJson) return [];
+        if (typeof planRatesJson === 'object') {
+            return Array.isArray(planRatesJson) ? planRatesJson : [];
+        }
+        try {
+            return JSON.parse(planRatesJson);
+        } catch {
+            return [];
+        }
+    }, [customer?.plan?.ratesJson]);
+
+    const processItems = React.useCallback((items: any[], type: string) => {
+        if (!planRates || planRates.length === 0) {
+            return items.filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
+        }
+
+        const processed = items.map(item => {
+            const matchingPlanRate = planRates.find((pr: any) => pr.name.replace(/\s+/g, '').toUpperCase() === item.label.replace(/\s+/g, '').toUpperCase());
+            if (!matchingPlanRate) return null;
+            if (matchingPlanRate.rateType === 'Fixed') {
+                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit };
+            }
+            if (matchingPlanRate.rateType === 'According to Tariff') {
+                return item;
+            }
+            return null;
+        }).filter(Boolean) as any[];
+
+        const tariffLabels = items.map(i => i.label.toUpperCase());
+        const fixedAdditions = planRates.filter((pr: any) => (pr.dynamicType === type || (!pr.dynamicType && type === 'energy_rates')) && pr.rateType === 'Fixed' && !tariffLabels.includes(pr.name.toUpperCase()));
+
+        fixedAdditions.forEach((fa: any) => {
+            processed.push({
+                label: fa.name,
+                value: fa.rate,
+                type: 'dynamic',
+                unitId: fa.unit,
+                applyDiscount: false
+            });
+        });
+
+        return processed.filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
+    }, [planRates]);
+
     const formatUnit = (key: string, fallback: string) => {
         const unitUid = parsedPriceUnits[key];
         const unit = unitUid ? (unitMap[unitUid] || fallback) : fallback;
         return unit ? `/${unit}` : '';
     };
 
-    const hasCL = (mainOffer?.cl1Usage || 0) > 0 || (mainOffer?.cl2Usage || 0) > 0 || (mainOffer?.cl1Supply || 0) > 0 || (mainOffer?.cl2Supply || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'controlled_load');
-    const hasFiTRates = ((mainOffer?.fit || 0) > 0 || (mainOffer?.fitPeak || 0) > 0 || (mainOffer?.fitCritical || 0) > 0 || (mainOffer?.fitVpp || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit'));
+    const hasCL = (mainOffer?.cl1Usage || 0) > 0 ||
+        (mainOffer?.cl2Usage || 0) > 0 ||
+        (mainOffer?.cl1Supply || 0) > 0 ||
+        (mainOffer?.cl2Supply || 0) > 0 ||
+        parsedDynamicRates.some((r: any) => r.type === 'controlled_load') ||
+        planRates.some((pr: any) => ['CL1 SUPPLY', 'CL2 SUPPLY', 'CL1 USAGE', 'CL2 USAGE'].includes(pr.name.toUpperCase()) && parseFloat(String(pr.rate || 0)) > 0);
+    const hasFiTRates = (mainOffer?.fit || 0) > 0 ||
+        (mainOffer?.fitPeak || 0) > 0 ||
+        (mainOffer?.fitCritical || 0) > 0 ||
+        (mainOffer?.fitVpp || 0) > 0 ||
+        parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit') ||
+        planRates.some((pr: any) => ['FEED-IN', 'PREMIUM FIT', 'CRITICAL EVENT FIT', 'BASE FIT'].includes(pr.name.toUpperCase()) && parseFloat(String(pr.rate || 0)) > 0);
     const hasSolar = customer?.solarDetails?.hassolar === 1;
-    const hasFiT = hasFiTRates && hasSolar;
-
-    const energyRatesItems = React.useMemo(() => {
+    const hasFiT = hasFiTRates && hasSolar; const energyRatesItems = React.useMemo(() => {
         if (!mainOffer) return [];
-        return [
+        return processItems([
             { label: 'Anytime', value: mainOffer.anytime, type: 'anytime' },
             { label: 'Peak', value: mainOffer.peak, type: 'peak' },
             { label: 'Shoulder', value: mainOffer.shoulder, type: 'shoulder' },
             { label: 'Off-Peak', value: mainOffer.offPeak, type: 'offPeak' },
             ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-        ].filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
-    }, [mainOffer, parsedDynamicRates]);
-
-    const supplyChargesItems = React.useMemo(() => {
+        ], 'energy_rates');
+    }, [mainOffer, parsedDynamicRates, processItems]); const supplyChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
-        return [
+        return processItems([
             { label: 'Supply', value: mainOffer.supplyCharge, type: 'supplyCharge' },
             ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
-        ].filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
-    }, [mainOffer, parsedDynamicRates]);
-
-    const demandChargesItems = React.useMemo(() => {
+        ], 'supply_charges');
+    }, [mainOffer, parsedDynamicRates, processItems]); const demandChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
-        return [
+        return processItems([
             { label: 'Demand', value: mainOffer.demand, type: 'demand' },
-            { label: 'Demand (Op)', value: mainOffer.demandOp, type: 'demandOp' },
-            { label: 'Demand (P)', value: mainOffer.demandP, type: 'demandP' },
-            { label: 'Demand (S)', value: mainOffer.demandS, type: 'demandS' },
+            { label: 'Demand(Op)', value: mainOffer.demandOp, type: 'demandOp' },
+            { label: 'Demand(P)', value: mainOffer.demandP, type: 'demandP' },
+            { label: 'Demand(S)', value: mainOffer.demandS, type: 'demandS' },
             ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
-        ].filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
-    }, [mainOffer, parsedDynamicRates]);
-
-    const vppChargesItems = React.useMemo(() => {
+        ], 'demand_charges');
+    }, [mainOffer, parsedDynamicRates, processItems]); const vppChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
-        return [
+        return processItems([
             { label: 'Orchestration', value: mainOffer.vppOrcharge, type: 'vppOrcharge', applyDiscount: true },
             ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
-        ].filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
-    }, [mainOffer, parsedDynamicRates]);
-
-    const solarFitItems = React.useMemo(() => {
+        ], 'vpp_charges');
+    }, [mainOffer, parsedDynamicRates, processItems]); const solarFitItems = React.useMemo(() => {
         if (!mainOffer || !hasFiT) return [];
-        return [
+        return processItems([
             { label: 'Feed-in', value: mainOffer.fit, type: 'fit' },
             { label: 'PREMIUM FIT', value: mainOffer.fitPeak, type: 'fitPeak' },
             { label: 'CRITICAL EVENT FIT', value: mainOffer.fitCritical, type: 'fitCritical' },
             { label: 'BASE FIT', value: mainOffer.fitVpp, type: 'fitVpp' },
             ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
-        ].filter(rate => {
+        ], 'solar_fit').filter(rate => {
             const numericValue = parseFloat(String(rate.value || 0));
             if (numericValue <= 0) return false;
             const isVppActive = customer?.vppDetails?.vpp === 1 || ratePlan?.vpp === 1;
             if (rate.type === 'fit') return !isVppActive;
             return isVppActive;
         });
-    }, [mainOffer, parsedDynamicRates, hasFiT, customer, ratePlan]);
+    }, [mainOffer, parsedDynamicRates, hasFiT, customer, ratePlan, processItems]);
 
     const handledTypes = React.useMemo(() => ['energy_rates', 'supply_charges', 'demand_charges', 'vpp_charges', 'solar_fit', 'controlled_load'], []);
 
     const extraFitItems = React.useMemo(() => {
         if (!mainOffer) return [];
-        return parsedDynamicRates
+        const items = parsedDynamicRates
             .filter((r: any) => (r.type === 'fit' || r.type === 'extra_fit') && !handledTypes.includes(r.type))
-            .filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
-    }, [mainOffer, parsedDynamicRates, handledTypes]);
-
-    const controlledLoadItems = React.useMemo(() => {
+            .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }));
+        return processItems(items, 'extra_fit');
+    }, [mainOffer, parsedDynamicRates, handledTypes, processItems]); const controlledLoadItems = React.useMemo(() => {
         if (!mainOffer || !hasCL) return [];
-        return [
+        return processItems([
             { label: 'CL1 Usage', value: mainOffer.cl1Usage, type: 'cl1_usage' },
             { label: 'CL2 Usage', value: mainOffer.cl2Usage, type: 'cl2_usage' },
             { label: 'CL1 Supply', value: mainOffer.cl1Supply, type: 'cl1_supply' },
             { label: 'CL2 Supply', value: mainOffer.cl2Supply, type: 'cl2_supply' },
             ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
-        ].filter((rate: any) => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
-    }, [mainOffer, parsedDynamicRates, hasCL]);
+        ], 'controlled_load');
+    }, [mainOffer, parsedDynamicRates, hasCL, processItems]);
 
     const extraChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         const handledAll = [...handledTypes, 'fit', 'extra_fit'];
-        return parsedDynamicRates
+        const items = parsedDynamicRates
             .filter((r: any) => !handledAll.includes(r.type) && (!r.type || r.type === 'charges' || r.type === 'extra_charges'))
-            .filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
-    }, [mainOffer, parsedDynamicRates, handledTypes]);
+            .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }));
+        return processItems(items, 'extra_charges');
+    }, [mainOffer, parsedDynamicRates, handledTypes, processItems]);
 
     const processedRateItems = React.useMemo(() => {
         const items: Array<{ category: string; item: any; fallbackUnit: string; isUsageOverride?: boolean }> = [];
@@ -154,24 +200,25 @@ export const RatesStep: React.FC<RatesStepProps> = ({
         controlledLoadItems.forEach((item: any) => items.push({ category: 'Controlled Load', item, fallbackUnit: item.type?.includes('usage') ? '/kWh' : '/day', isUsageOverride: item.type?.includes('usage') }));
         extraChargesItems.forEach((item: any) => items.push({ category: 'Extra Charges', item, fallbackUnit: '' }));
 
-        return items.map(({ category, item, fallbackUnit, isUsageOverride }) => {
+        return items.map(({ category, item, fallbackUnit }) => {
             const numericValue = parseFloat(String(item.value || '0'));
 
             let applyDiscount = false;
             if (item.applyDiscount !== undefined) {
                 applyDiscount = !!item.applyDiscount;
-            } else if (category === 'Energy Rates') {
+            } else if (category === 'Energy Rates' || category === 'Demand Charges' || category === 'Controlled Load') {
                 applyDiscount = true;
-            } else if (category === 'Controlled Load') {
-                applyDiscount = item.type?.includes('usage') || !!isUsageOverride;
             }
 
             const isDiscounted = applyDiscount && discount > 0;
             const price = isDiscounted ? calculateDiscountedRate(numericValue, discount) : numericValue;
 
             let unit = '';
-            if (item.type === 'dynamic') {
-                unit = item.unitId ? `/${unitMap[item.unitId]}` : fallbackUnit;
+            if (item.unitId) {
+                const resolvedUnitName = unitMap[item.unitId] || item.unitId;
+                unit = resolvedUnitName.startsWith('/') ? resolvedUnitName : `/${resolvedUnitName}`;
+            } else if (item.type === 'dynamic') {
+                unit = fallbackUnit;
             } else {
                 const formatKey = item.type?.startsWith('demand') ? item.type : (item.type === 'vppOrcharge' ? 'vppOrcharge' : item.type);
                 unit = formatUnit(formatKey, fallbackUnit.replace('/', ''));
@@ -351,8 +398,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
                                             <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
                                                 <th className="px-4 py-3 font-semibold">DETAILS</th>
                                                 <th className="px-4 py-3 font-semibold">CATEGORY</th>
-                                                {discount > 0 && <th className="px-4 py-3 text-right font-semibold">Standard Rate</th>}
-                                                <th className="px-4 py-3 text-right font-semibold">{discount > 0 ? 'Discounted Rate' : 'Rate'}</th>
+                                                <th className="px-4 py-3 text-right font-semibold">Rate</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -373,14 +419,8 @@ export const RatesStep: React.FC<RatesStepProps> = ({
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{rate.category}</td>
-                                                    {discount > 0 && (
-                                                        <td className="px-4 py-3 text-sm text-right text-slate-500 whitespace-nowrap">
-                                                            {rate.isDiscounted ? `$${rate.numericValue.toFixed(4)}${rate.unit}` : '—'}
-                                                        </td>
-                                                    )}
                                                     <td className="px-4 py-3 text-sm text-right font-semibold text-slate-900 whitespace-nowrap">
                                                         ${rate.price.toFixed(4)}{rate.unit}
-                                                        {rate.isDiscounted && <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-primary/10 text-primary rounded uppercase tracking-tighter">-{discount}%</span>}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -413,12 +453,6 @@ export const RatesStep: React.FC<RatesStepProps> = ({
                                                     <div className="text-sm font-bold text-slate-900">
                                                         ${rate.price.toFixed(4)}{rate.unit}
                                                     </div>
-                                                    {rate.isDiscounted && (
-                                                        <div className="flex items-center justify-end gap-1.5 text-xs text-slate-500">
-                                                            <span className="line-through">${rate.numericValue.toFixed(4)}{rate.unit}</span>
-                                                            <span className="px-1 py-0.5 text-[9px] font-bold bg-primary/10 text-primary rounded">-{discount}%</span>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
                                         </div>

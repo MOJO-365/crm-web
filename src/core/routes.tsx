@@ -34,6 +34,8 @@ const MasterDataPage = lazyWithRetry(() => import('@/pages/master/MasterDataPage
 const LeadsPage = lazyWithRetry(() => import('@/pages/leads/LeadsPage'));
 const BatteryMasterPage = lazyWithRetry(() => import('@/pages/master/BatteryMasterPage').then(m => ({ default: m.BatteryMasterPage })));
 const InverterMasterPage = lazyWithRetry(() => import('@/pages/master/InverterMasterPage').then(m => ({ default: m.InverterMasterPage })));
+const PlansMasterPage = lazyWithRetry(() => import('@/pages/master/PlansMaster').then(m => ({ default: m.PlansMasterPage })));
+const AddPlanPage = lazyWithRetry(() => import('@/pages/master/PlansMaster/AddPlanPage').then(m => ({ default: m.AddPlanPage })));
 const BranchDashboardPage = lazyWithRetry(() => import('@/pages/branch/BranchDashboardPage').then(m => ({ default: m.BranchDashboardPage })));
 const BranchLeadFormPage = lazyWithRetry(() => import('@/pages/branch/BranchLeadFormPage').then(m => ({ default: m.BranchLeadFormPage })));
 const BranchEnrollmentsPage = lazyWithRetry(() => import('@/pages/branch/BranchEnrollmentsPage').then(m => ({ default: m.BranchEnrollmentsPage })));
@@ -113,6 +115,9 @@ const router = createBrowserRouter(
                 <Route path="/bonus_master" element={<RequirePermission menuCode="bonus_master"><BonusMasterPage /></RequirePermission>} />
                 <Route path="/battery-master" element={<RequirePermission menuCode="battery_master"><BatteryMasterPage /></RequirePermission>} />
                 <Route path="/inverter-master" element={<RequirePermission menuCode="inverter_master"><InverterMasterPage /></RequirePermission>} />
+                <Route path="/plans-master" element={<RequirePermission menuCode="plans_master"><PlansMasterPage /></RequirePermission>} />
+                <Route path="/plans-master/new" element={<RequirePermission menuCode="plans_master"><AddPlanPage /></RequirePermission>} />
+                <Route path="/plans-master/:uid/edit" element={<RequirePermission menuCode="plans_master"><AddPlanPage /></RequirePermission>} />
 
                 <Route path="/master-data" element={<RequirePermission menuCode="document_types"><MasterDataPage /></RequirePermission>} />
 

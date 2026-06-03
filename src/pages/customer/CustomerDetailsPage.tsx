@@ -56,8 +56,8 @@ import {
 } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { calculateDiscountedRate } from '@/lib/rate-utils';
 import { VppCertificateTab } from './components/VppCertificateTab';
+import { RateDetailsView } from '@/components/common/RateDetailsView';
 
 interface CustomerAddress {
     id: string;
@@ -128,6 +128,12 @@ interface CustomerDetails {
     discount?: number;
     tariffCode?: string;
     ratePlanUid?: string;
+    planUid?: string;
+    plan?: {
+        uid?: string;
+        ratesJson?: string;
+        discount?: number;
+    };
     signDate?: string;
     signedPdfPath?: string;
     emailSent?: number;
@@ -670,16 +676,27 @@ const CustomerEmailLogsTable = ({ customerUid }: { customerUid: string }) => {
         {
             key: 'subject',
             header: 'Subject',
-            render: (log: EmailLog) => (
-                <div className="flex flex-col">
-                    <span className="text-sm font-medium text-foreground truncate max-w-[280px]" title={log.subject || ''}>
-                        {log.subject || 'No Subject'}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                        {EMAIL_TYPE_LABELS[log.emailType || ''] || log.emailType}
-                    </span>
-                </div>
-            )
+            render: (log: EmailLog) => {
+                const hasAttachments = log.attachments && log.attachments.length > 0;
+                return (
+                    <div className="flex flex-col">
+                        <span className="text-sm font-medium text-foreground truncate max-w-[280px]" title={log.subject || ''}>
+                            {log.subject || 'No Subject'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">
+                                {EMAIL_TYPE_LABELS[log.emailType || ''] || log.emailType}
+                            </span>
+                            {hasAttachments && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50" title={`${log.attachments!.length} attachment(s) sent`}>
+                                    <FileTextIcon size={10} />
+                                    {log.attachments!.length} attached
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
         },
         {
             key: 'status',
@@ -1191,328 +1208,7 @@ const InlineMaintenanceNotes = ({
             </div>
         </div>
     );
-};
-
-
-const RateDetailsView = ({
-    offer,
-    discount,
-    hasSolar,
-    vpp,
-    units = {},
-    isVppPlan
-}: {
-    offer: any;
-    discount: number;
-    hasSolar: boolean;
-    vpp: boolean;
-    units?: Record<string, string>;
-    isVppPlan: boolean;
-}) => {
-    const parsedDynamicRates = typeof offer?.dynamicRates === 'string'
-        ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
-        : (offer?.dynamicRates || []);
-
-    const parsedPriceUnits: Record<string, string> = typeof offer?.priceUnits === 'string'
-        ? (() => { try { return JSON.parse(offer.priceUnits); } catch { return {}; } })()
-        : (offer?.priceUnits || {});
-
-    const formatUnit = (key: string, fallback: string) => {
-        const unitUid = parsedPriceUnits[key];
-        const unit = unitUid ? (units[unitUid] || fallback) : fallback;
-        return unit ? `/${unit}` : '';
-    };
-
-    // Column 1: Energy Rates Items
-    const energyRatesItems = [
-        { label: 'Peak', value: offer?.peak, type: 'peak' },
-        { label: 'Off-Peak', value: offer?.offPeak, type: 'offPeak' },
-        { label: 'Shoulder', value: offer?.shoulder, type: 'shoulder' },
-        { label: 'Anytime', value: offer?.anytime, type: 'anytime' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
-
-    // Column 2 Items
-    const supplyChargesItems = [
-        { label: 'Supply', value: offer?.supplyCharge, type: 'supplyCharge' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
-
-    const demandChargesItems = [
-        { label: 'Demand', value: offer?.demand, type: 'demand' },
-        { label: 'Demand (Op)', value: offer?.demandOp, type: 'demandOp' },
-        { label: 'Demand (P)', value: offer?.demandP, type: 'demandP' },
-        { label: 'Demand (S)', value: offer?.demandS, type: 'demandS' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
-
-    const vppChargesItems = [
-        { label: 'Orchestration', value: offer?.vppOrcharge, type: 'vppOrcharge' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
-
-    const hasColumn2 = supplyChargesItems.length > 0 || demandChargesItems.length > 0 || vppChargesItems.length > 0;
-
-    // Column 3: Solar FiT Items
-    const hasFiTFlag = (offer?.fit || 0) > 0 || (offer?.fitPeak || 0) > 0 || (offer?.fitCritical || 0) > 0 || (offer?.fitVpp || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit');
-    const solarFitItems = !hasFiTFlag || !hasSolar ? [] : [
-        { label: 'Feed-in', value: offer?.fit, type: 'fit' },
-        { label: 'PREMIUM FIT', value: offer?.fitPeak, type: 'fitPeak' },
-        { label: 'CRITICAL EVENT FIT', value: offer?.fitCritical, type: 'fitCritical' },
-        { label: 'BASE FIT', value: offer?.fitVpp, type: 'fitVpp' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => {
-        const numericValue = parseFloat(String(rate.value || 0));
-        if (numericValue <= 0) return false;
-        if (rate.type === 'fit') return !vpp;
-        if (rate.type === 'dynamic') return true;
-        return vpp;
-    });
-
-    // Column 4: Controlled Load Items
-    const hasCLFlag = (offer?.cl1Usage || 0) > 0 || (offer?.cl2Usage || 0) > 0 || (offer?.cl1Supply || 0) > 0 || (offer?.cl2Supply || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'controlled_load');
-    const controlledLoadItems = !hasCLFlag ? [] : [
-        { label: 'CL1 Usage', value: offer?.cl1Usage, type: 'cl1_usage' },
-        { label: 'CL2 Usage', value: offer?.cl2Usage, type: 'cl2_usage' },
-        { label: 'CL1 Supply', value: offer?.cl1Supply, type: 'cl1_supply' },
-        { label: 'CL2 Supply', value: offer?.cl2Supply, type: 'cl2_supply' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
-
-    // Remaining dynamic rates
-    const handledTypes = ['energy_rates', 'supply_charges', 'demand_charges', 'vpp_charges', 'solar_fit', 'controlled_load'];
-    const remainingDynamicRates = parsedDynamicRates.filter((r: any) => !handledTypes.includes(r.type));
-
-    const fitRates = remainingDynamicRates.filter((r: any) => r.type === 'fit' || r.type === 'extra_fit' || (!r.type && (vpp || isVppPlan))).filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
-    const chargeRates = remainingDynamicRates.filter((r: any) => r.type === 'charges' || r.type === 'extra_charges' || (!r.type && !(vpp || isVppPlan))).filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
-
-    const renderRatesColumn = (rates: any[], label: string, colorClass: string, icon: any = ActivityIcon) => {
-        if (rates.length === 0) return null;
-        const Icon = icon;
-        return (
-            <div className="space-y-4 min-w-[180px] flex-1">
-                <div className={cn("flex items-center gap-2 mb-2",
-                    colorClass === 'indigo' ? "text-indigo-500 dark:text-indigo-400" : "text-teal-500 dark:text-teal-400"
-                )}>
-                    <Icon size={16} />
-                    <h4 className="text-sm font-bold uppercase tracking-wide">{label}</h4>
-                </div>
-                <div className="space-y-3">
-                    {rates.map((dRate: any, id: number) => {
-                        const unitName = dRate.unitId ? units[dRate.unitId] : '';
-                        const val = parseFloat(String(dRate.value || '0'));
-                        return (
-                            <div key={id} className={cn(
-                                colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
-                                "rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
-                            )}>
-                                <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-base tracking-tight")}>
-                                    ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
-                                </div>
-                                <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "text-[10px] font-bold uppercase tracking-wider opacity-80")}>
-                                    {dRate.name}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
-
-    return (
-        <div className="space-y-4">
-            {offer?.offerName && (
-                <h4 className="text-sm font-bold text-foreground">{offer.offerName}</h4>
-            )}
-            <div className="flex flex-wrap gap-8">
-                {/* Column 1: Energy Rates */}
-                {energyRatesItems.length > 0 && (
-                    <div className="space-y-4 min-w-[180px] flex-1">
-                        <div className="flex items-center gap-2 text-blue-500 dark:text-blue-400">
-                            <Settings2Icon size={16} />
-                            <h4 className="text-sm font-bold uppercase tracking-wide">Energy Rates</h4>
-                        </div>
-                        <div className="space-y-3">
-                            {[...energyRatesItems]
-                                .sort((a, b) => calculateDiscountedRate(parseFloat(String(a.value || 0)), discount) - calculateDiscountedRate(parseFloat(String(b.value || 0)), discount))
-                                .map((rate, idx) => {
-                                    const isAnytime = rate.type === 'anytime';
-                                    const numericValue = parseFloat(String(rate.value || 0));
-                                    const price = calculateDiscountedRate(numericValue, discount);
-                                    const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : 'kWh') : formatUnit(rate.type, 'kWh');
-                                    return (
-                                        <div
-                                            key={idx}
-                                            className={cn(
-                                                "border rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm",
-                                                isAnytime
-                                                    ? "bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800"
-                                                    : "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800"
-                                            )}
-                                        >
-                                            <div className={cn(
-                                                "font-bold text-base tracking-tight",
-                                                isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
-                                            )}>
-                                                ${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}
-                                            </div>
-                                            <div className={cn(
-                                                "text-[10px] font-bold uppercase tracking-wider opacity-80",
-                                                isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
-                                            )}>
-                                                {rate.label}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                        </div>
-                    </div>
-                )}
-
-                {/* Column 2: Supply, Demand, VPP Charges */}
-                {hasColumn2 && (
-                    <div className="space-y-4 min-w-[180px] flex-1">
-                        {/* Supply Charges */}
-                        {supplyChargesItems.length > 0 && (
-                            <>
-                                <div className="flex items-center gap-2 text-purple-500 dark:text-purple-400">
-                                    <PlugIcon size={16} />
-                                    <h4 className="text-sm font-bold uppercase tracking-wide">Supply Charges</h4>
-                                </div>
-                                <div className="space-y-3">
-                                    {supplyChargesItems.map((r: any, id) => {
-                                        const isDynamic = r.type === 'dynamic';
-                                        const unit = isDynamic ? (r.unitId ? units[r.unitId] : 'day') : formatUnit('supplyCharge', 'day');
-                                        const numericValue = parseFloat(String(r.value || '0'));
-                                        const price = numericValue;
-                                        return (
-                                            <div key={id} className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                <div className="text-purple-600 dark:text-purple-400 font-bold text-base tracking-tight">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                                <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">{r.label}</div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        )}
-
-                        {/* Demand Charges */}
-                        {demandChargesItems.length > 0 && (
-                            <>
-                                <div className={cn("flex items-center gap-2 text-rose-500 dark:text-rose-400", supplyChargesItems.length > 0 ? "mt-4" : "")}>
-                                    <ActivityIcon size={16} />
-                                    <h4 className="text-sm font-bold uppercase tracking-wide">Demand Charges</h4>
-                                </div>
-                                <div className="space-y-3">
-                                    {demandChargesItems.map((d: any, id) => {
-                                        const typeKey = d.type === 'demand' ? 'demand' : d.type === 'demandOp' ? 'demandOp' : d.type === 'demandP' ? 'demandP' : d.type === 'demandS' ? 'demandS' : '';
-                                        const unit = d.type === 'dynamic' ? (d.unitId ? units[d.unitId] : 'kVA/day') : formatUnit(typeKey, 'kVA/day');
-                                        const numericValue = parseFloat(String(d.value || '0'));
-                                        const price = calculateDiscountedRate(numericValue, discount);
-                                        return (
-                                            <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                <div className="text-rose-600 dark:text-rose-400 font-bold text-base tracking-tight">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                                <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        )}
-
-                        {/* VPP Charges */}
-                        {vppChargesItems.length > 0 && (
-                            <>
-                                <div className={cn("flex items-center gap-2 text-amber-500 dark:text-amber-400", (supplyChargesItems.length > 0 || demandChargesItems.length > 0) ? "mt-4" : "")}>
-                                    <ActivityIcon size={16} />
-                                    <h4 className="text-sm font-bold uppercase tracking-wide">VPP Charges</h4>
-                                </div>
-                                <div className="space-y-3">
-                                    {vppChargesItems.map((r: any, id) => {
-                                        const isDynamic = r.type === 'dynamic';
-                                        const unit = isDynamic ? (r.unitId ? units[r.unitId] : 'day') : formatUnit('vppOrcharge', 'day');
-                                        const numericValue = parseFloat(String(r.value || '0'));
-                                        const price = numericValue;
-                                        return (
-                                            <div key={id} className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                                <div className="text-amber-600 dark:text-amber-400 font-bold text-base tracking-tight">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                                <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">{r.label}</div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* Column 3: Solar FiT */}
-                {solarFitItems.length > 0 && (
-                    <div className="space-y-4 min-w-[180px] flex-1">
-                        <div className="flex items-center gap-2 text-teal-500 dark:text-teal-400">
-                            <ZapIcon size={16} />
-                            <h4 className="text-sm font-bold uppercase tracking-wide">Solar FiT</h4>
-                        </div>
-                        <div className="space-y-3">
-                            {[...solarFitItems]
-                                .sort((a, b) => (parseFloat(String(a.value || 0)) ?? 0) - (parseFloat(String(b.value || 0)) ?? 0))
-                                .map((rate, idx) => {
-                                    const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : 'kWh') : formatUnit(rate.type, 'kWh');
-                                    const numericValue = parseFloat(String(rate.value || '0'));
-                                    const price = numericValue;
-                                    return (
-                                        <div
-                                            key={idx}
-                                            className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm"
-                                        >
-                                            <div className="text-teal-800 dark:text-teal-300 font-bold text-base tracking-tight">
-                                                ${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}
-                                            </div>
-                                            <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">
-                                                {rate.label}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                        </div>
-                    </div>
-                )}
-
-                {/* Column 4: Controlled Load */}
-                {controlledLoadItems.length > 0 && (
-                    <div className="space-y-4 min-w-[180px] flex-1">
-                        <div className="flex items-center gap-2 text-green-500 dark:text-green-400">
-                            <PlugIcon size={16} />
-                            <h4 className="text-sm font-bold uppercase tracking-wide">Controlled Load</h4>
-                        </div>
-                        <div className="space-y-3">
-                            {controlledLoadItems.map((rate, idx) => {
-                                const numericValue = parseFloat(String(rate.value || 0));
-                                const price = calculateDiscountedRate(numericValue, discount);
-                                const isUsage = rate.type === 'cl1_usage' || rate.type === 'cl2_usage' || (rate.type === 'dynamic' && !(rate.unitId && units?.[rate.unitId]?.toLowerCase().includes('day')));
-                                const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : (isUsage ? 'kWh' : 'day')) : (isUsage ? 'kWh' : 'day');
-                                const unitStr = rate.type === 'dynamic' ? unit : formatUnit(rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', unit);
-                                return (
-                                    <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm">
-                                        <div className="text-green-600 dark:text-green-400 font-bold text-base tracking-tight">${price.toFixed(4)}{unitStr.startsWith('/') ? unitStr : `/${unitStr}`}</div>
-                                        <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{rate.label}</div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-
-                {/* Extra Columns */}
-                {renderRatesColumn(chargeRates, "Extra Charges", "indigo")}
-                {renderRatesColumn(fitRates, "Extra FiT", "teal", ZapIcon)}
-            </div>
-        </div>
-    );
-};
-
-export function CustomerDetailsPage() {
+}; export function CustomerDetailsPage() {
     const { uid } = useParams();
     const navigate = useNavigate();
     // const canView = useAuthStore((state) => state.canViewMenu('customers'));
@@ -1746,6 +1442,29 @@ export function CustomerDetailsPage() {
         });
         return map;
     }, [unitsData]);
+
+    // Fetch rates snapshot at the version assigned to this customer
+    const customerRateVersion = selectedCustomerDetails?.rateVersion ? String(selectedCustomerDetails.rateVersion) : null;
+    const { data: customerRatesHistoryData, loading: ratesSnapshotLoading } = useQuery(GET_RATES_HISTORY_BY_VERSION, {
+        variables: { version: customerRateVersion },
+        skip: !customerRateVersion,
+        fetchPolicy: 'cache-first',
+    });
+
+    // Extract matching rate plan from the snapshot by ratePlanUid
+    const snapshotRatePlan = useMemo(() => {
+        if (!customerRatesHistoryData?.ratesHistoryByVersion?.newRecord) return null;
+        try {
+            const parsed = typeof customerRatesHistoryData.ratesHistoryByVersion.newRecord === 'string'
+                ? JSON.parse(customerRatesHistoryData.ratesHistoryByVersion.newRecord)
+                : customerRatesHistoryData.ratesHistoryByVersion.newRecord;
+            if (!Array.isArray(parsed)) return null;
+            const ratePlanUid = selectedCustomerDetails?.ratePlanUid || selectedCustomerDetails?.ratePlan?.uid;
+            return parsed.find((rp: any) => rp.uid === ratePlanUid) || null;
+        } catch {
+            return null;
+        }
+    }, [customerRatesHistoryData, selectedCustomerDetails?.ratePlanUid, selectedCustomerDetails?.ratePlan?.uid]);
 
     const loadingGeneral = false; // Replaced by primary query
 
@@ -4103,36 +3822,48 @@ export function CustomerDetailsPage() {
                                                     </RateVersionTooltip>
                                                 </div>
                                             )}
-                                            {Number(selectedCustomerDetails.discount || 0) > 0 && (
+                                            {Number(selectedCustomerDetails.discount ?? selectedCustomerDetails.plan?.discount ?? 0) > 0 && (
                                                 <span className="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 rounded-lg">
-                                                    {selectedCustomerDetails.discount}% Discount
+                                                    {selectedCustomerDetails.discount ?? selectedCustomerDetails.plan?.discount}% Discount
                                                 </span>
                                             )}
                                             {selectedCustomerDetails.vppDetails?.vpp === 1 && <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-lg">VPP Active</span>}
                                         </div>
                                     </div>
 
-                                    {selectedCustomerDetails.ratePlan.offers && selectedCustomerDetails.ratePlan.offers.length > 0 ? (
-                                        <div className="space-y-6">
-                                            {selectedCustomerDetails.ratePlan.offers.map((offer: any, idx) => (
-                                                <RateDetailsView
-                                                    key={offer.uid || idx}
-                                                    offer={offer}
-                                                    discount={selectedCustomerDetails.discount ?? 0}
-                                                    hasSolar={selectedCustomerDetails.solarDetails?.hassolar === 1}
-                                                    vpp={selectedCustomerDetails.vppDetails?.vpp === 1}
-                                                    units={unitMap}
-                                                    isVppPlan={selectedCustomerDetails.ratePlan?.vpp === 1}
-                                                />
-                                            ))}
+                                    {ratesSnapshotLoading ? (
+                                        <div className="flex items-center justify-center py-12">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                                            <span className="ml-3 text-sm text-muted-foreground">Loading versioned rates...</span>
                                         </div>
-                                    ) : (
-                                        <p className="text-center text-muted-foreground py-8">No rate offers available.</p>
-                                    )}
+                                    ) : (() => {
+                                        // Use snapshot offers (from customer's assigned rate version) if available,
+                                        // otherwise fall back to live ratePlan offers
+                                        const offersToShow = snapshotRatePlan?.offers?.length
+                                            ? snapshotRatePlan.offers
+                                            : selectedCustomerDetails.ratePlan.offers;
+                                        const isVppPlan = snapshotRatePlan ? snapshotRatePlan.vpp === 1 : selectedCustomerDetails.ratePlan?.vpp === 1;
+                                        return offersToShow && offersToShow.length > 0 ? (
+                                            <div className="space-y-6">
+                                                {offersToShow.map((offer: any, idx: number) => (
+                                                    <RateDetailsView
+                                                        key={offer.uid || idx}
+                                                        offer={offer}
+                                                        discount={selectedCustomerDetails.discount ?? selectedCustomerDetails.plan?.discount ?? 0}
+                                                        hasSolar={selectedCustomerDetails.solarDetails?.hassolar === 1}
+                                                        vpp={selectedCustomerDetails.vppDetails?.vpp === 1}
+                                                        units={unitMap}
+                                                        isVppPlan={isVppPlan}
+                                                        planRatesJson={selectedCustomerDetails.plan?.ratesJson}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-center text-muted-foreground py-8">No rate offers available.</p>
+                                        );
+                                    })()}
                                 </div>
                             )}
-
-
 
                             {selectedDetailSection === 'vpp_certificate' && (
                                 <VppCertificateTab

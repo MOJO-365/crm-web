@@ -4,7 +4,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import logo from '@/assets/main-logo-dark-1.png';
 import { useAccessibleMenus, useUser } from '@/stores/useAuthStore';
-import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon } from '@/components/icons';
+import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon, ListIcon } from '@/components/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 // Dashboard icon component (locally defined in Header originally)
@@ -50,6 +50,7 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     leads: UserIcon,
     battery_master: BatteryIcon,
     inverter_master: InverterIcon,
+    plans_master: ListIcon,
     master_data: ShieldCheckIcon,
     customer_approvals: ShieldCheckIcon,
     customer_group: CustomerIcon
@@ -76,6 +77,7 @@ const pathMap: Record<string, string> = {
     leads: '/leads',
     battery_master: '/battery-master',
     inverter_master: '/inverter-master',
+    plans_master: '/plans-master',
     master_data: '/master-data',
     customer_approvals: '/customer-approvals',
     customer_group: '' // Parent grouper

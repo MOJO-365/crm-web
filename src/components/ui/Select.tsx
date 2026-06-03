@@ -64,24 +64,23 @@ export function Select({
         return Array.isArray(value) ? value : [value];
     }, [value]);
 
+    // Track whether the user has actively typed (vs the query being auto-synced from selected value)
+    const [isUserTyping, setIsUserTyping] = React.useState(false);
+
     // Filter options based on search query
     const filteredOptions = React.useMemo(() => {
         if (!searchQuery) return options;
 
-        // If the search query explicitly matches the selected value's label (for single select),
-        // we assume the user hasn't typed a new search yet, so show all options.
-        // Note: Use explicit null/undefined check because value can be empty string ''
-        if (!multiple && value !== undefined && value !== null) {
-            const selectedLabel = options.find(o => o.value === value)?.label || '';
-            if (searchQuery === selectedLabel) {
-                return options;
-            }
+        // If the user hasn't actively typed (query was auto-synced from selected value),
+        // show all options so the dropdown isn't pre-filtered on open.
+        if (!isUserTyping) {
+            return options;
         }
 
         return options.filter(option =>
             (option.label || '').toLowerCase().includes(searchQuery.toLowerCase())
         );
-    }, [options, searchQuery, value, multiple]);
+    }, [options, searchQuery, isUserTyping]);
 
     // Reset focused index when options change or search query changes
     React.useEffect(() => {
@@ -94,6 +93,7 @@ export function Select({
             const opt = options.find(o => o.value === value);
             const label = opt ? opt.label : (value !== undefined && value !== null ? String(value) : '');
             setSearchQuery(label);
+            setIsUserTyping(false); // Reset typing flag when syncing from value
         }
     }, [value, isOpen, multiple, options]);
 
@@ -137,7 +137,43 @@ export function Select({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Handle keyboard input for type-ahead search when dropdown is open
+    const updatePosition = React.useCallback(() => {
+        if (containerRef.current && dropdownRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            dropdownRef.current.style.top = `${rect.bottom + 4}px`;
+            dropdownRef.current.style.left = `${rect.left}px`;
+            dropdownRef.current.style.minWidth = `${rect.width}px`;
+        }
+    }, []);
+
+    React.useEffect(() => {
+        if (!isOpen) return;
+        
+        // Initial position
+        updatePosition();
+        
+        const handleScroll = (e: Event) => {
+            // If scrolling happens inside the dropdown itself, ignore it
+            if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) {
+                return;
+            }
+            updatePosition();
+        };
+
+        // Use capture: true to catch all scroll events in any scrollable container
+        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('resize', updatePosition);
+        
+        return () => {
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('resize', updatePosition);
+        };
+    }, [isOpen, updatePosition]);
+
+
+    // Handle keyboard navigation when dropdown is open
+    // NOTE: Backspace and character typing are handled by the <input> element directly.
+    // This listener only handles navigation keys (Escape, Arrow, Enter).
     React.useEffect(() => {
         if (!isOpen) return;
 
@@ -146,12 +182,7 @@ export function Select({
             if (event.key === 'Escape') {
                 setIsOpen(false);
                 setSearchQuery('');
-                return;
-            }
-
-            // Handle Backspace to remove last character from search
-            if (event.key === 'Backspace') {
-                setSearchQuery(prev => prev.slice(0, -1));
+                setIsUserTyping(false);
                 return;
             }
 
@@ -186,23 +217,18 @@ export function Select({
                 }
                 return;
             }
-
-            // Remove global character handling as input handles it now
-            // if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
-            //    setSearchQuery(prev => prev + event.key);
-            // }
         };
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, focusedIndex, filteredOptions]); // Added focusedIndex and filteredOptions dependencies logic inside
+    }, [isOpen, focusedIndex, filteredOptions]);
 
 
     const handleToggle = () => {
         if (!disabled) {
             setIsOpen(!isOpen);
             if (!isOpen) {
-                setSearchQuery('');
+                setIsUserTyping(false);
                 setFocusedIndex(-1);
             }
         }
@@ -284,9 +310,15 @@ export function Select({
                         value={searchQuery}
                         onChange={(e) => {
                             setSearchQuery(e.target.value);
+                            setIsUserTyping(true);
                             if (!isOpen) setIsOpen(true);
                         }}
-                        onFocus={() => !disabled && setIsOpen(true)}
+                        onFocus={() => {
+                            if (!disabled) {
+                                setIsUserTyping(false); // Reset on focus so opening shows all options
+                                setIsOpen(true);
+                            }
+                        }}
                         placeholder={selectedValues.length > 0 ? (multiple ? '' : '') : placeholder}
                         disabled={disabled}
                         onBlur={onBlur}
@@ -332,9 +364,6 @@ export function Select({
                             ref={dropdownRef}
                             style={{
                                 position: 'fixed',
-                                top: containerRef.current ? containerRef.current.getBoundingClientRect().bottom + window.scrollY + 4 : 0,
-                                left: containerRef.current ? containerRef.current.getBoundingClientRect().left + window.scrollX : 0,
-                                minWidth: containerRef.current ? containerRef.current.getBoundingClientRect().width : 'auto',
                                 zIndex: 9999
                             }}
                             className="bg-white dark:bg-neutral-900 border border-border rounded-md shadow-lg max-h-60 overflow-hidden"

@@ -8,6 +8,7 @@ export const CREATE_PDF_TERM = gql`
             name
             rateType
             rateUids
+            planUids
             message
         }
     }
@@ -21,6 +22,7 @@ export const UPDATE_PDF_TERM = gql`
             name
             rateType
             rateUids
+            planUids
             message
         }
     }

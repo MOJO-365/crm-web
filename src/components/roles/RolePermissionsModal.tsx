@@ -15,7 +15,8 @@ import {
     CustomerIcon,
     MailIcon,
     FileTextIcon,
-    UserSettingIcon
+    UserSettingIcon,
+    ListIcon
 } from '@/components/icons';
 import {
     GET_MENUS,
@@ -233,6 +234,7 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
         audit_logs: FileTextIcon,
         settings: UserSettingIcon,
         master_data: ShieldCheckIcon,
+        plans_master: ListIcon,
         battery_master: BatteryIcon,
         inverter_master: InverterIcon,
         rates: ZapIcon

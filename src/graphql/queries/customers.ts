@@ -24,6 +24,7 @@ export const GET_CUSTOMERS = gql`
                 propertyType
                 tariffCode
                 ratePlanUid
+                planUid
                 status
                 utilmateStatus
                 utilmateUpdatedAt
@@ -532,6 +533,12 @@ export const GET_CUSTOMER_BY_ID = gql`
             propertyType
             tariffCode
             ratePlanUid
+            planUid
+            plan {
+                uid
+                ratesJson
+                discount
+            }
             status
             discount
             signDate
@@ -718,6 +725,12 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             propertyType
             tariffCode
             ratePlanUid
+            planUid
+            plan {
+                uid
+                ratesJson
+                discount
+            }
             status
             discount
             signDate
@@ -1260,6 +1273,13 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
             propertyType
             tariffCode
             ratePlanUid
+            planUid
+            plan {
+                uid
+                ratesJson
+                discount
+                title
+            }
             status
             discount
             signDate

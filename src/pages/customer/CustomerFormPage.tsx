@@ -25,7 +25,8 @@ import {
     GET_USERS,
     CREATE_CUSTOMER_NOTE,
     MARK_WEB_ENROLLMENT_PROCESSED,
-    SEND_PDRS_CONSENT_EMAIL
+    SEND_PDRS_CONSENT_EMAIL,
+    GET_ACTIVE_PLANS
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
@@ -37,9 +38,6 @@ import {
     UserIcon,
     CheckIcon,
     ZapIcon,
-    PlugIcon,
-    // PiggyBankIcon,
-    Settings2Icon,
     ShieldIcon,
     CreditCardIcon,
     MapPinIcon,
@@ -51,16 +49,18 @@ import {
     CheckCircleIcon,
     SearchIcon,
     SpinnerIcon,
-    AlertCircleIcon
+    AlertCircleIcon,
+    FileTextIcon
 } from '@/components/icons';
 import { sendVerification, checkVerification, normalisePhone, denormalisePhone } from '@/lib/twilio';
 
-import { calculateDiscountedRate } from '@/lib/rate-utils';
+// import { calculateDiscountedRate } from '@/lib/rate-utils';
 import {
     uploadDocument,
     // getDocumentPreviewUrl, isImageFile, isPdfFile,
 } from '@/lib/document-upload';
 import DocumentPreview from '@/components/common/DocumentPreview';
+import { RateDetailsView } from '@/components/common/RateDetailsView';
 import LocationAutocomplete from '../LocationAutocomplete';
 import { Modal } from '@/components/common/Modal';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -128,6 +128,7 @@ const initialFormData: CustomerFormData = {
     employerName: '',
     dob: '',
     propertyType: 0,
+    planUid: '',
     businessName: '',
     legalName: '',
     abn: '',
@@ -194,6 +195,7 @@ const initialFormData: CustomerFormData = {
     assignedToUid: undefined,
     pdrsEmailSent: 0,
     pdrsEmailSentAt: undefined,
+    isCreditScoreFetched: false,
 };
 
 
@@ -265,294 +267,92 @@ const StepBadge: React.FC<StepBadgeProps> = ({ index, label, active, done, statu
 
 
 // ============================================================================
-// RATE DETAILS COMPONENT
-// ============================================================================
+const applyPlanOverridesToOffer = (offer: any, planRatesJson: any) => {
+    if (!offer || !planRatesJson) return offer;
+    try {
+        let planRates;
+        if (typeof planRatesJson === 'object') {
+            planRates = planRatesJson;
+        } else {
+            planRates = JSON.parse(planRatesJson);
+        }
+        if (!Array.isArray(planRates) || planRates.length === 0) return offer;
 
-const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan, className }: {
-    offer: any,
-    discount: number,
-    hasSolar: boolean,
-    vpp: boolean,
-    units?: Record<string, string>,
-    isVppPlan: boolean,
-    className?: string
-}) => {
-    const parsedDynamicRates = typeof offer.dynamicRates === 'string'
-        ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
-        : (offer.dynamicRates || []);
+        const newOffer = { ...offer };
+        let dynamicRates = typeof newOffer.dynamicRates === 'string'
+            ? JSON.parse(newOffer.dynamicRates)
+            : (newOffer.dynamicRates ? [...newOffer.dynamicRates] : []);
 
-    const parsedPriceUnits: Record<string, string> = typeof offer.priceUnits === 'string'
-        ? (() => { try { return JSON.parse(offer.priceUnits); } catch { return {}; } })()
-        : (offer.priceUnits || {});
+        let priceUnits = typeof newOffer.priceUnits === 'string'
+            ? (() => { try { return JSON.parse(newOffer.priceUnits); } catch { return {}; } })()
+            : (newOffer.priceUnits ? { ...newOffer.priceUnits } : {});
 
-    const formatUnit = (key: string, fallback: string) => {
-        const unitUid = parsedPriceUnits[key];
-        const unit = unitUid ? (units[unitUid] || fallback) : fallback;
-        return unit ? `/${unit}` : '';
-    };
+        const labelToKeyMap: Record<string, string> = {
+            'ANYTIME': 'anytime',
+            'PEAK': 'peak',
+            'OFF-PEAK': 'offPeak',
+            'SHOULDER': 'shoulder',
+            'SUPPLY CHARGE': 'supplyCharge',
+            'DEMAND': 'demand',
+            'DEMAND(OP)': 'demandOp',
+            'DEMAND(P)': 'demandP',
+            'DEMAND(S)': 'demandS',
+            'VPP ORCHESTRATION': 'vppOrcharge',
+            'FEED-IN': 'fit',
+            'PREMIUM FIT': 'fitPeak',
+            'CRITICAL EVENT FIT': 'fitCritical',
+            'BASE FIT': 'fitVpp',
+            'CL1 USAGE': 'cl1Usage',
+            'CL2 USAGE': 'cl2Usage',
+            'CL1 SUPPLY': 'cl1Supply',
+            'CL2 SUPPLY': 'cl2Supply'
+        };
 
-    // Column 1: Energy Rates Items
-    const energyRatesItems = [
-        { label: 'Peak', value: offer.peak, type: 'peak' },
-        { label: 'Off-Peak', value: offer.offPeak, type: 'offPeak' },
-        { label: 'Shoulder', value: offer.shoulder, type: 'shoulder' },
-        { label: 'Anytime', value: offer.anytime, type: 'anytime' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
+        planRates.forEach((pr: any) => {
+            const upperName = pr.name.toUpperCase();
+            if (pr.rateType === 'Fixed') {
+                const standardKey = labelToKeyMap[upperName];
+                const numericRate = parseFloat(String(pr.rate)) || 0;
+                if (standardKey) {
+                    newOffer[standardKey] = numericRate;
+                    if (pr.unit) {
+                        priceUnits[standardKey] = pr.unit;
+                    }
+                } else {
+                    const existingDyn = dynamicRates.find((dr: any) => dr.name.toUpperCase() === upperName);
+                    if (existingDyn) {
+                        existingDyn.value = numericRate;
+                        if (pr.unit) existingDyn.unitId = pr.unit;
+                    } else {
+                        dynamicRates.push({
+                            name: pr.name,
+                            value: numericRate,
+                            unitId: pr.unit,
+                            type: pr.dynamicType || 'extra_charges',
+                            applyDiscount: false
+                        });
+                    }
+                }
+            }
+        });
+        const planRateNames = planRates.map((pr: any) => pr.name.toUpperCase());
+        Object.keys(labelToKeyMap).forEach(label => {
+            if (!planRateNames.includes(label)) {
+                const key = labelToKeyMap[label];
+                newOffer[key] = 0;
+            }
+        });
 
-    // Supply Charges Items
-    const supplyChargesItems = [
-        { label: 'Supply', value: offer.supplyCharge, type: 'supplyCharge' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
+        dynamicRates = dynamicRates.filter((dr: any) => planRateNames.includes(dr.name.toUpperCase()));
 
-    // Demand Charges Items
-    const demandChargesItems = [
-        { label: 'Demand', value: offer.demand, type: 'demand' },
-        { label: 'Demand (Op)', value: offer.demandOp, type: 'demandOp' },
-        { label: 'Demand (P)', value: offer.demandP, type: 'demandP' },
-        { label: 'Demand (S)', value: offer.demandS, type: 'demandS' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
-
-    // VPP Orchestration Charges Items
-    const vppChargesItems = [
-        { label: 'Orchestration', value: offer.vppOrcharge, type: 'vppOrcharge' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
-
-    const hasColumn2 = supplyChargesItems.length > 0 || demandChargesItems.length > 0 || vppChargesItems.length > 0;
-
-    // Solar FiT Items
-    const hasFiTFlag = (offer.fit || 0) > 0 || (offer.fitPeak || 0) > 0 || (offer.fitCritical || 0) > 0 || (offer.fitVpp || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit');
-    const solarFitItems = !hasFiTFlag || !hasSolar ? [] : [
-        { label: 'Feed-in', value: offer.fit, type: 'fit' },
-        { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
-        { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
-        { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => {
-        const numericValue = parseFloat(String(rate.value || 0));
-        if (numericValue <= 0) return false;
-        if (rate.type === 'fit') return !vpp;
-        if (rate.type === 'dynamic') return true;
-        return vpp;
-    });
-
-    // Controlled Load Items
-    const hasCLFlag = (offer.cl1Usage || 0) > 0 || (offer.cl2Usage || 0) > 0 || (offer.cl1Supply || 0) > 0 || (offer.cl2Supply || 0) > 0 || parsedDynamicRates.some((r: any) => r.type === 'controlled_load');
-    const controlledLoadItems = !hasCLFlag ? [] : [
-        { label: 'CL1 Usage', value: offer.cl1Usage, type: 'cl1_usage' },
-        { label: 'CL2 Usage', value: offer.cl2Usage, type: 'cl2_usage' },
-        { label: 'CL1 Supply', value: offer.cl1Supply, type: 'cl1_supply' },
-        { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
-    ].filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
-
-    // Remaining dynamic rates
-    const handledTypes = ['energy_rates', 'supply_charges', 'demand_charges', 'vpp_charges', 'solar_fit', 'controlled_load'];
-    const remainingDynamicRates = parsedDynamicRates.filter((r: any) => !handledTypes.includes(r.type));
-
-    const fitRates = remainingDynamicRates.filter((r: any) => r.type === 'fit' || r.type === 'extra_fit' || (!r.type && (vpp || isVppPlan))).filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
-    const chargeRates = remainingDynamicRates.filter((r: any) => r.type === 'charges' || r.type === 'extra_charges' || (!r.type && !(vpp || isVppPlan))).filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0);
-
-    const renderRatesColumn = (rates: any[], label: string, colorClass: string, icon: any = ActivityIcon) => {
-        if (rates.length === 0) return null;
-        const Icon = icon;
-        return (
-            <div className="space-y-2 min-w-[180px] flex-1">
-                <div className={cn("flex items-center gap-2 mb-2",
-                    colorClass === 'indigo' ? "text-indigo-500 dark:text-indigo-400" : "text-teal-500 dark:text-teal-400"
-                )}>
-                    <Icon size={14} />
-                    <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
-                </div>
-                <div className="space-y-2">
-                    {rates.map((dRate: any, id: number) => {
-                        const unitName = dRate.unitId ? units[dRate.unitId] : '';
-                        const val = parseFloat(String(dRate.value || '0'));
-                        return (
-                            <div key={id} className={cn(
-                                colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
-                                "rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm"
-                            )}>
-                                <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-sm")}>
-                                    ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
-                                </div>
-                                <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "text-[10px] font-bold uppercase tracking-wider opacity-80")}>
-                                    {dRate.name}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
-
-    return (
-        <div className={cn("p-5 bg-card border border-border rounded-xl", className)}>
-            <h4 className="text-sm font-bold text-foreground mb-5">{offer.offerName || 'DEFAULT MARKET OFFER'}</h4>
-            <div className="flex flex-wrap gap-5">
-                {/* Column 1: Energy Rates */}
-                {energyRatesItems.length > 0 && (
-                    <div className="space-y-2 min-w-[180px] flex-1">
-                        <div className="flex items-center gap-2 text-blue-500 dark:text-blue-400 mb-2">
-                            <Settings2Icon size={14} />
-                            <span className="text-xs font-bold uppercase tracking-wide">Energy Rates</span>
-                        </div>
-                        {[...energyRatesItems]
-                            .sort((a, b) => calculateDiscountedRate(parseFloat(String(a.value || 0)), discount) - calculateDiscountedRate(parseFloat(String(b.value || 0)), discount))
-                            .map((rate, idx) => {
-                                const isAnytime = rate.type === 'anytime';
-                                const numericValue = parseFloat(String(rate.value || 0));
-                                const price = calculateDiscountedRate(numericValue, discount);
-                                const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : 'kWh') : formatUnit(rate.type, 'kWh');
-                                return (
-                                    <div key={idx} className={cn(
-                                        "border rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm",
-                                        isAnytime ? "bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800" : "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800"
-                                    )}>
-                                        <div className={cn(
-                                            "font-bold text-sm",
-                                            isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
-                                        )}>${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                        <div className={cn(
-                                            "text-[10px] font-bold uppercase tracking-wider opacity-80",
-                                            isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
-                                        )}>{rate.label}</div>
-                                    </div>
-                                );
-                            })}
-                    </div>
-                )}
-
-                {/* Column 2: Supply, Demand, VPP Charges */}
-                {hasColumn2 && (
-                    <div className="space-y-4 min-w-[180px] flex-1">
-                        {/* Supply Charges Sub-block */}
-                        {supplyChargesItems.length > 0 && (
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-purple-500 dark:text-purple-400 mb-2">
-                                    <PlugIcon size={14} />
-                                    <span className="text-xs font-bold uppercase tracking-wide">Supply Charges</span>
-                                </div>
-                                {supplyChargesItems.map((r: any, id: number) => {
-                                    const isDynamic = r.type === 'dynamic';
-                                    const unit = isDynamic ? (r.unitId ? units[r.unitId] : 'day') : formatUnit('supplyCharge', 'day');
-                                    const numericValue = parseFloat(String(r.value || '0'));
-                                    const price = numericValue;
-                                    return (
-                                        <div key={id} className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                            <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                            <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">{r.label}</div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        {/* Demand Charges Sub-block */}
-                        {demandChargesItems.length > 0 && (
-                            <div className="space-y-2 pt-2">
-                                <div className="flex items-center gap-2 text-rose-500 dark:text-rose-400 mb-2">
-                                    <ActivityIcon size={14} />
-                                    <span className="text-xs font-bold uppercase tracking-wide">Demand Charges</span>
-                                </div>
-                                {demandChargesItems.map((d: any, id: number) => {
-                                    const typeKey = d.type === 'demand' ? 'demand' : d.type === 'demandOp' ? 'demandOp' : d.type === 'demandP' ? 'demandP' : d.type === 'demandS' ? 'demandS' : '';
-                                    const unit = d.type === 'dynamic' ? (d.unitId ? units[d.unitId] : 'kVA/day') : formatUnit(typeKey, 'kVA/day');
-                                    const numericValue = parseFloat(String(d.value || 0));
-                                    const price = calculateDiscountedRate(numericValue, discount);
-                                    return (
-                                        <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                            <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        {/* VPP Charges Sub-block */}
-                        {vppChargesItems.length > 0 && (
-                            <div className="space-y-2 pt-2">
-                                <div className="flex items-center gap-2 text-amber-500 dark:text-amber-400 mb-2">
-                                    <ActivityIcon size={14} />
-                                    <span className="text-xs font-bold uppercase tracking-wide">VPP Orchestration Charges</span>
-                                </div>
-                                {vppChargesItems.map((r: any, id: number) => {
-                                    const isDynamic = r.type === 'dynamic';
-                                    const unit = isDynamic ? (r.unitId ? units[r.unitId] : 'day') : formatUnit('vppOrcharge', 'day');
-                                    const numericValue = parseFloat(String(r.value || '0'));
-                                    const price = numericValue;
-                                    return (
-                                        <div key={id} className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                            <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                            <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">{r.label}</div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Column 3: Solar FiT */}
-                {solarFitItems.length > 0 && (
-                    <div className="space-y-2 min-w-[180px] flex-1">
-                        <div className="flex items-center gap-2 text-teal-500 dark:text-teal-400 mb-2">
-                            <ZapIcon size={14} />
-                            <span className="text-xs font-bold uppercase tracking-wide">Solar FiT</span>
-                        </div>
-                        {[...solarFitItems]
-                            .sort((a, b) => (parseFloat(String(a.value || 0)) ?? 0) - (parseFloat(String(b.value || 0)) ?? 0))
-                            .map((rate, idx) => {
-                                const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : 'kWh') : formatUnit(rate.type, 'kWh');
-                                const numericValue = parseFloat(String(rate.value || '0'));
-                                const price = numericValue;
-                                return (
-                                    <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                        <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                        <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">{rate.label}</div>
-                                    </div>
-                                );
-                            })}
-                    </div>
-                )}
-
-                {/* Column 4: Controlled Load */}
-                {controlledLoadItems.length > 0 && (
-                    <div className="space-y-2 min-w-[180px] flex-1">
-                        <div className="flex items-center gap-2 text-green-500 dark:text-green-400 mb-2">
-                            <PlugIcon size={14} />
-                            <span className="text-xs font-bold uppercase tracking-wide">Controlled Load</span>
-                        </div>
-                        {controlledLoadItems.map((rate, idx) => {
-                            const numericValue = parseFloat(String(rate.value || 0));
-                            const isUsage = rate.type.endsWith('_usage') || (rate.type === 'dynamic' && !rate.label.toLowerCase().includes('supply'));
-                            const price = calculateDiscountedRate(numericValue, discount);
-                            const unit = rate.type === 'dynamic' ? (rate.unitId ? units[rate.unitId] : (isUsage ? 'kWh' : 'day')) : (isUsage ? 'kWh' : 'day');
-                            const unitStr = rate.type === 'dynamic' ? unit : formatUnit(rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', unit);
-                            return (
-                                <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                    <div className="text-green-600 dark:text-green-400 font-bold text-sm">${price.toFixed(4)}{unitStr.startsWith('/') ? unitStr : `/${unitStr}`}</div>
-                                    <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{rate.label}</div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* Extra Charges / Extra FiT */}
-                {renderRatesColumn(chargeRates, "Extra Charges", "indigo")}
-                {renderRatesColumn(fitRates, "Extra FiT", "teal", ZapIcon)}
-            </div>
-        </div>
-    );
+        newOffer.dynamicRates = dynamicRates;
+        newOffer.priceUnits = priceUnits;
+        return newOffer;
+    } catch (err) {
+        return offer;
+    }
 };
 
-// ============================================================================
 export const CustomerFormPage = () => {
     const { uid } = useParams();
     const navigate = useNavigate();
@@ -631,6 +431,20 @@ export const CustomerFormPage = () => {
         skip: !isEditMode,
         fetchPolicy: 'network-only',
     });
+
+    const { data: activePlansData } = useQuery(GET_ACTIVE_PLANS, { fetchPolicy: 'cache-first' });
+    const planOptions = useMemo(() => {
+        if (!activePlansData?.activePlans) return [];
+        return activePlansData.activePlans.map((plan: any) => ({
+            label: plan.title,
+            value: plan.uid
+        }));
+    }, [activePlansData]);
+
+    const selectedPlan = useMemo(() => {
+        if (!activePlansData?.activePlans || !formData.planUid) return null;
+        return activePlansData.activePlans.find((p: any) => p.uid === formData.planUid);
+    }, [activePlansData, formData.planUid]);
 
     const { data: usersData } = useQuery(GET_USERS, {
         variables: { limit: 1000, status: 'ACTIVE', onlyVisibleRoles: true },
@@ -959,6 +773,7 @@ export const CustomerFormPage = () => {
                 firstDebitDate: c.debitDetails?.firstDebitDate ? formatSydneyTime(c.debitDetails.firstDebitDate, 'YYYY-MM-DD') : '',
                 tariffCode: c.tariffCode || '',
                 ratePlanUid: c.ratePlanUid || c.ratePlan?.uid || undefined,
+                planUid: c.planUid || '',
                 discount: c.discount || 0,
                 creditScore: c.creditScore,
                 riskStatus: c.riskStatus,
@@ -968,7 +783,8 @@ export const CustomerFormPage = () => {
                 additionalDocument: c.additionalDocument || null,
                 selectedBonuses: c.selectedBonuses || [],
                 pdrsEmailSent: c.pdrsEmailSent || 0,
-                pdrsEmailSentAt: c.pdrsEmailSentAt || undefined
+                pdrsEmailSentAt: c.pdrsEmailSentAt || undefined,
+                isCreditScoreFetched: c.isCreditScoreFetched === 1
             });
 
             if (c.phoneVerifiedAt) {
@@ -1376,7 +1192,12 @@ export const CustomerFormPage = () => {
 
             if (data.tariffCode) {
                 updateField('tariffCode', data.tariffCode);
-                handleTariffChange(data.tariffCode);
+
+                const matchedPlanUid = formData.vpp
+                    ? (data.rates?.withVpp?.ratePlanUid || data.withVppRatePlanUid)
+                    : (data.rates?.withoutVpp?.ratePlanUid || data.withoutVppRatePlanUid || data.ratePlanUid);
+
+                handleTariffChange(matchedPlanUid || data.tariffCode);
 
                 if (data.customerType === 'RESIDENTIAL') {
                     updateField('propertyType', 0);
@@ -1789,7 +1610,8 @@ export const CustomerFormPage = () => {
                 propertyType: formData.propertyType,
                 assignedToUid: formData.assignedToUid,
                 tariffCode: formData.tariffCode,
-                ratePlanUid: formData.ratePlanUid || selectedRatePlan?.uid || undefined,
+                ratePlanUid: formData.ratePlanUid || selectedRatePlan?.uid || null,
+                planUid: formData.planUid ? formData.planUid : null,
                 discount: formData.discount,
                 status: finalStatus,
                 gender: formData.gender,
@@ -2025,31 +1847,32 @@ export const CustomerFormPage = () => {
         setIsLoadingPreview(true);
         try {
             const offer = selectedRatePlan?.offers?.[0];
-            const discount = formData.discount || 0;
-            const charges = offer ? {
-                supplyCharge: offer.supplyCharge,
-                anytime: calculateDiscountedRate(offer.anytime, discount),
-                peak: calculateDiscountedRate(offer.peak, discount),
-                shoulder: calculateDiscountedRate(offer.shoulder, discount),
-                offPeak: calculateDiscountedRate(offer.offPeak, discount),
-                cl1Usage: calculateDiscountedRate(offer.cl1Usage, discount),
-                cl2Usage: calculateDiscountedRate(offer.cl2Usage, discount),
-                cl1Supply: offer.cl1Supply,
-                cl2Supply: offer.cl2Supply,
-                demand: offer.demand,
-                demandOp: offer.demandOp,
-                demandP: offer.demandP,
-                demandS: offer.demandS,
-                fit: offer.fit,
-                fitPeak: offer.fitPeak,
-                fitCritical: offer.fitCritical,
-                fitVpp: offer.fitVpp,
-                vppOrchestration: offer.vppOrcharge,
+            const discount = formData.discount ?? selectedPlan?.discount ?? 0;
+            const overriddenOffer = offer ? applyPlanOverridesToOffer(offer, selectedPlan?.ratesJson || customerData?.plan?.ratesJson) : null;
+            const charges = overriddenOffer ? {
+                supplyCharge: overriddenOffer.supplyCharge,
+                anytime: overriddenOffer.anytime,
+                peak: overriddenOffer.peak,
+                shoulder: overriddenOffer.shoulder,
+                offPeak: overriddenOffer.offPeak,
+                cl1Usage: overriddenOffer.cl1Usage,
+                cl2Usage: overriddenOffer.cl2Usage,
+                cl1Supply: overriddenOffer.cl1Supply,
+                cl2Supply: overriddenOffer.cl2Supply,
+                demand: overriddenOffer.demand,
+                demandOp: overriddenOffer.demandOp,
+                demandP: overriddenOffer.demandP,
+                demandS: overriddenOffer.demandS,
+                fit: overriddenOffer.fit,
+                fitPeak: overriddenOffer.fitPeak,
+                fitCritical: overriddenOffer.fitCritical,
+                fitVpp: overriddenOffer.fitVpp,
+                vppOrchestration: overriddenOffer.vppOrcharge,
                 vppSignupBonus: formData.vppSignupBonus ? parseFloat(formData.vppSignupBonus) : 0,
-                dynamicRates: offer.dynamicRates || [],
-                priceUnits: typeof offer.priceUnits === 'string'
-                    ? (() => { try { return JSON.parse(offer.priceUnits); } catch { return {}; } })()
-                    : (offer.priceUnits || {}),
+                dynamicRates: overriddenOffer.dynamicRates || [],
+                priceUnits: typeof overriddenOffer.priceUnits === 'string'
+                    ? (() => { try { return JSON.parse(overriddenOffer.priceUnits); } catch { return {}; } })()
+                    : (overriddenOffer.priceUnits || {}),
             } : {};
 
             const addressString = [
@@ -2086,11 +1909,12 @@ export const CustomerFormPage = () => {
                 hasVpp: formData.vpp,
                 vppSignupBonus: formData.vppSignupBonus ? parseFloat(formData.vppSignupBonus) : 0,
                 vppOrchestration: offer?.vppOrcharge || 0,
-                planName: formData.tariffCode || '',
+                planName: selectedPlan?.title || selectedPlan?.planName || formData.tariffCode || '',
                 discount: discount,
                 showAsBusinessName: formData.showAsBusinessName,
                 tenant: 'mojo',
                 ratePlanUid: selectedRatePlan?.uid,
+                planUid: formData.planUid || selectedPlan?.uid || undefined,
                 selectedBonuses: activeBonuses.filter((b: Bonus) => formData.selectedBonuses.includes(b.uid)),
                 uid: targetUid === 'new' ? undefined : targetUid,
                 isWithoutSignature: isWithoutSignatureOverride !== undefined ? isWithoutSignatureOverride : isWithoutSignature
@@ -2761,8 +2585,31 @@ export const CustomerFormPage = () => {
                                             value={selectedRatePlan?.uid || ''} // Use UID for uniqueness to avoid selecting multiple items with same code
                                             onChange={(val) => handleTariffChange(val as string)}
                                             placeholder="Select tariff"
-                                        />                                        {/* Discount Field with Pill Selector */}
-                                        {selectedRatePlan?.discountApplies === 1 && (
+                                        />
+                                        <Select
+                                            label="Plan"
+                                            options={[{ label: 'None', value: '' }, ...planOptions]}
+                                            value={formData.planUid || ''}
+                                            onChange={(val) => {
+                                                const planUid = val as string;
+                                                updateField('planUid', planUid);
+                                                if (planUid && activePlansData?.activePlans) {
+                                                    const selected = activePlansData.activePlans.find((p: any) => p.uid === planUid);
+                                                    if (selected) {
+                                                        const defaultDiscount = (selected.discount !== undefined && selected.discount !== null) ? selected.discount : 0;
+                                                        updateField('discount', defaultDiscount);
+                                                        if (!['0', '5', '7', '10', '13', '15'].includes(defaultDiscount.toString())) {
+                                                            setIsCustomDiscountMode(true);
+                                                        } else {
+                                                            setIsCustomDiscountMode(false);
+                                                        }
+                                                    }
+                                                }
+                                            }}
+                                            placeholder="Select plan"
+                                        />
+                                        {/* Discount Field with Pill Selector (Hidden for now) */}
+                                        {false && selectedRatePlan?.discountApplies === 1 && (
                                             <div className="space-y-1">
                                                 <label className="text-sm font-medium text-title leading-none block">
                                                     Discount
@@ -2843,11 +2690,12 @@ export const CustomerFormPage = () => {
                                             <RateDetailsView
                                                 key={offer.id}
                                                 offer={offer}
-                                                discount={formData.discount || 0}
+                                                discount={formData.discount ?? selectedPlan?.discount ?? 0}
                                                 hasSolar={formData.hasSolar}
                                                 vpp={formData.vpp}
                                                 units={unitMap}
                                                 isVppPlan={selectedRatePlan?.vpp === 1}
+                                                planRatesJson={selectedPlan?.ratesJson}
                                             />
                                         ))}
                                     </div>
@@ -3384,7 +3232,7 @@ export const CustomerFormPage = () => {
                                                 <h3 className="font-medium mb-3 flex items-center gap-2"><ShieldIcon size={16} className="text-blue-600" /> Plan & Pricing</h3>
                                                 <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Tariff Code:</span> <span className="font-medium">{formData.tariffCode}</span></p>
-                                                    <p className="flex justify-between"><span className="text-muted-foreground">Discount:</span> <span className="font-medium badge bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded">{formData.discount > 0 ? `${formData.discount}%` : '0%'}</span></p>
+                                                    <p className="flex justify-between"><span className="text-muted-foreground">Discount:</span> <span className="font-medium badge bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded">{(formData.discount ?? selectedPlan?.discount ?? 0) > 0 ? `${formData.discount ?? selectedPlan?.discount}%` : '0%'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Distributor:</span> <span className="font-medium">{selectedRatePlan?.dnsp !== undefined ? (DNSP_MAP[selectedRatePlan.dnsp.toString()] || selectedRatePlan.dnsp) : '—'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Tariff Type:</span> <span className="font-medium">{selectedRatePlan?.tariff || '—'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Pricing Version:</span> <span className="font-medium font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{activeVersionForLookup || activeRateVersion}</span></p>
@@ -3412,11 +3260,12 @@ export const CustomerFormPage = () => {
                                         {selectedRatePlan?.offers?.[0] && (
                                             <RateDetailsView
                                                 offer={selectedRatePlan.offers![0]}
-                                                discount={formData.discount || 0}
+                                                discount={formData.discount ?? selectedPlan?.discount ?? 0}
                                                 hasSolar={formData.hasSolar}
                                                 vpp={formData.vpp}
                                                 units={unitMap}
                                                 isVppPlan={selectedRatePlan?.vpp === 1}
+                                                planRatesJson={selectedPlan?.ratesJson}
                                                 className="md:col-span-2"
                                             />
                                         )}
@@ -3891,6 +3740,56 @@ export const CustomerFormPage = () => {
                                 </div>
                             </div>
 
+                            {/* Attachments Preview */}
+                            {(() => {
+                                const predictedAttachments: string[] = [];
+                                const isVpp = !!formData.vpp;
+                                const hasVppBonus = Number(formData.vppSignupBonus) === 600;
+                                const isTransfer = isEditMode && !!(customerData as any)?.customer?.previousCustomerUid;
+                                const willAttachPdfs = isTransfer || isWithoutSignature;
+
+                                // BESS2 & Nomination Form for VPP+$600 customers
+                                if (isVpp && hasVppBonus) {
+                                    predictedAttachments.push('BESS2 and Nomination Form.pdf');
+                                }
+
+                                // Static PDFs + Agreement PDF for transfer or without-signature
+                                if (willAttachPdfs) {
+                                    predictedAttachments.push('GEE_Welcome_Pack.pdf');
+                                    predictedAttachments.push('GEE Direct Debit Request Form.pdf');
+                                    predictedAttachments.push('GEE_Agreement.pdf');
+                                }
+
+                                // Offer Summary PDF for agreement-signed (without signature)
+                                if (isWithoutSignature && !isTransfer) {
+                                    predictedAttachments.push('Offer Summary.pdf');
+                                }
+
+                                if (predictedAttachments.length === 0) return null;
+
+                                return (
+                                    <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                                        <h4 className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <FileTextIcon size={12} />
+                                            Attachments ({predictedAttachments.length})
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {predictedAttachments.map((fileName, idx) => (
+                                                <div key={idx} className="flex items-center gap-2 text-sm text-foreground bg-white dark:bg-neutral-800 px-3 py-2 rounded-lg border border-border/50 shadow-sm">
+                                                    <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                                                        <FileTextIcon size={13} />
+                                                    </div>
+                                                    <span className="font-medium text-xs truncate max-w-[200px]" title={fileName}>
+                                                        {fileName}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground mt-2 italic">These files will be attached to the email sent to the customer.</p>
+                                    </div>
+                                );
+                            })()}
+
                             <div className="rounded-lg border border-border bg-card overflow-hidden">
                                 <div className="px-4 py-3 border-b border-border bg-muted/30">
                                     <p className="text-sm font-semibold text-foreground">Subject: {emailPreview?.subject}</p>
@@ -4007,7 +3906,7 @@ export const CustomerFormPage = () => {
                                 <SummaryItem icon={LockIcon} label="Tariff" value={formData.tariffCode} />
                                 <SummaryItem icon={CreditCardIcon} label="DNSP" value={selectedRatePlan?.dnsp !== undefined ? (DNSP_MAP[selectedRatePlan.dnsp.toString()] || selectedRatePlan.dnsp) : '—'} />
                                 <SummaryItem icon={ClockIcon} label="Tariff Type" value={selectedRatePlan?.tariff || '—'} />
-                                <SummaryItem icon={PercentIcon} label="% Discount" value={`${formData.discount}%`} />
+                                <SummaryItem icon={PercentIcon} label="% Discount" value={`${formData.discount ?? selectedPlan?.discount ?? 0}%`} />
                                 <SummaryItem icon={ZapIcon} label="Sale type" value={SALE_TYPE_OPTIONS.find(o => o.value === formData.saleType.toString())?.label} />
                                 <SummaryItem icon={CalendarIcon} label="Connection date" value={formData.connectionDate} />
                                 <SummaryItem icon={UserIcon} label="Name" value={`${formData.title ? `${formData.title} ` : ''}${formData.firstName} ${formData.lastName}`} />

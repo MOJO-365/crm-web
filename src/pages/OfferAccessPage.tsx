@@ -12,14 +12,15 @@ import { Button } from '@/components/ui/Button';
 import { toast } from 'react-toastify';
 import {
     CheckIcon, UserIcon, MapPinIcon, MailIcon, PhoneIcon, HashIcon,
-    CreditCardIcon, ZapIcon, PlugIcon, PencilIcon, TypeIcon, ActivityIcon, Settings2Icon
+    CreditCardIcon, ZapIcon, PencilIcon, TypeIcon, 
 } from '@/components/icons';
 import MainLogo from '@/assets/main-logo-dark-1.png';
 import BankAutocomplete from '@/components/BankAutocomplete';
 import LocationAutocomplete from '@/pages/LocationAutocomplete';
 import { Modal } from '@/components/common/Modal';
+import { RateDetailsView } from '@/components/common/RateDetailsView';
 import { ID_TYPE_MAP, SALE_TYPE_LABELS, BILLING_PREF_LABELS, RATE_TYPE_MAP } from '@/lib/constants';
-import { calculateDiscountedRate } from '@/lib/rate-utils';
+import { } from '@/lib/rate-utils';
 import {
     //  formatDateTime, 
     formatDate
@@ -45,7 +46,7 @@ function extractBase64(dataUrl?: string | null): string | null {
     return base64 || null
 }
 
-const cn = (...classes: string[]) => classes.filter(Boolean).join(' ');
+
 
 export const OfferAccessPage = () => {
     const [searchParams] = useSearchParams();
@@ -879,10 +880,7 @@ export const OfferAccessPage = () => {
                                 <div className="text-xs text-muted-foreground mb-1">Date of Birth</div>
                                 <div className="text-sm font-medium text-foreground">{customerData.dob ? formatDate(customerData.dob) : '—'}</div>
                             </div>
-                            {customerData.discount > 0 && <div>
-                                <div className="text-xs text-muted-foreground mb-1">Discount</div>
-                                <div className="text-sm font-medium text-foreground">{`${customerData.discount}%`}</div>
-                            </div>}
+
                             {/* <div>
                                 <div className="text-xs text-muted-foreground mb-1">Rate Version</div>
                                 <div className="text-sm font-medium text-foreground">{customerData.rateVersion || '—'}</div>
@@ -1023,14 +1021,14 @@ export const OfferAccessPage = () => {
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-semibold text-foreground">Your Energy Rates</h3>
-                                    <p className="text-xs text-muted-foreground">Tariff: {customerData.tariffCode || customerData.ratePlan?.tariff || ratesData?.ratePlanByCode?.tariff || '—'}</p>
+                                    {customerData.planUid || customerData.plan ? (
+                                        <p className="text-xs text-muted-foreground">Plan: {customerData.plan?.title || customerData.plan?.planName || customerData.plan?.name || '—'}</p>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">Tariff: {customerData.tariffCode || customerData.ratePlan?.tariff || ratesData?.ratePlanByCode?.tariff || '—'}</p>
+                                    )}
                                 </div>
                             </div>
-                            {customerData.discount > 0 && (
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-400">
-                                    {customerData.discount}% Discount Applied
-                                </span>
-                            )}
+
                         </div>
                     </div>
 
@@ -1053,275 +1051,17 @@ export const OfferAccessPage = () => {
                                     </p>
                                 );
                             }
-
-                            const parsedDynamicRates = typeof activeOffer.dynamicRates === 'string'
-                                ? (() => { try { return JSON.parse(activeOffer.dynamicRates); } catch { return []; } })()
-                                : (activeOffer.dynamicRates || []);
-
-                            const energyDynamicRates = parsedDynamicRates.filter((r: any) => r.type === 'energy_rates');
-                            const supplyDynamicRates = parsedDynamicRates.filter((r: any) => r.type === 'supply_charges');
-                            const demandDynamicRates = parsedDynamicRates.filter((r: any) => r.type === 'demand_charges');
-                            const vppDynamicRates = parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges');
-                            const solarFitDynamicRates = parsedDynamicRates.filter((r: any) => r.type === 'solar_fit');
-                            const clDynamicRates = parsedDynamicRates.filter((r: any) => r.type === 'controlled_load');
-                            
-                            const handledDynamicTypes = ['energy_rates', 'supply_charges', 'demand_charges', 'vpp_charges', 'solar_fit', 'controlled_load'];
-                            const remainingDynamicRates = parsedDynamicRates.filter((r: any) => !handledDynamicTypes.includes(r.type));
-
-
-                            const parsedPriceUnits: Record<string, string> = typeof activeOffer.priceUnits === 'string'
-                                ? (() => { try { return JSON.parse(activeOffer.priceUnits); } catch { return {}; } })()
-                                : (activeOffer.priceUnits || {});
-
-                            const formatUnit = (key: string, fallback: string) => {
-                                const unitUid = parsedPriceUnits[key];
-                                const unit = unitUid ? (unitMap[unitUid] || fallback) : fallback;
-                                return unit ? `/${unit}` : '';
-                            };
-
-                            const renderRatesColumn = (rates: any[], label: string, columnColor: 'blue' | 'orange' | 'purple' | 'rose' | 'amber' | 'teal' | 'indigo' | 'green', icon: any) => {
-                                if (rates.length === 0) return null;
-                                const Icon = icon;
-
-                                const themeClasses: Record<string, any> = {
-                                    blue: { header: "text-blue-500", card: "bg-blue-50 border-blue-200 text-blue-600" },
-                                    orange: { header: "text-orange-500", card: "bg-orange-50 border-orange-200 text-orange-600" },
-                                    purple: { header: "text-purple-500", card: "bg-purple-50 border-purple-200 text-purple-600" },
-                                    rose: { header: "text-rose-500", card: "bg-rose-50 border-rose-200 text-rose-600" },
-                                    amber: { header: "text-amber-500", card: "bg-amber-50 border-amber-200 text-amber-600" },
-                                    teal: { header: "text-teal-500", card: "bg-teal-50 border-teal-200 text-teal-600" },
-                                    indigo: { header: "text-indigo-500", card: "bg-indigo-50 border-indigo-200 text-indigo-600" },
-                                    green: { header: "text-green-500", card: "bg-green-50 border-green-200 text-green-600" },
-                                };
-
-                                const classes = themeClasses[columnColor];
-
-                                return (
-                                    <div className="space-y-4">
-                                        <div className={cn("flex items-center gap-2", classes.header)}>
-                                            <Icon size={16} />
-                                            <h4 className="text-sm font-bold uppercase tracking-wide">{label}</h4>
-                                        </div>
-                                        <div className="space-y-3">
-                                            {rates.map((rate, idx) => {
-                                                const rateColor = rate.color || columnColor;
-                                                const itemClasses = themeClasses[rateColor];
-                                                return (
-                                                    <div key={idx} className={cn(
-                                                        itemClasses.card,
-                                                        "border rounded-lg p-3 text-center space-y-0.5 transition-all duration-200 hover:shadow-sm dark:bg-opacity-20"
-                                                    )}>
-                                                        <div className="font-bold text-base tracking-tight">
-                                                            {rate.displayValue}
-                                                        </div>
-                                                        <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">
-                                                            {rate.label}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            };
-
-                            const clUsageRates = clDynamicRates.filter((r: any) => r.type === 'controlled_load' && (r.unitId ? unitMap?.[r.unitId]?.toLowerCase().includes('kwh') : true));
-                            const clSupplyRates = clDynamicRates.filter((r: any) => r.type === 'controlled_load' && (r.unitId ? unitMap?.[r.unitId]?.toLowerCase().includes('day') : true));
-
-                            const energyRates = [
-                                { label: 'Peak', value: calculateDiscountedRate(activeOffer.peak, customerData.discount ?? 0), type: 'peak' },
-                                { label: 'Off-Peak', value: calculateDiscountedRate(activeOffer.offPeak, customerData.discount ?? 0), type: 'offPeak' },
-                                { label: 'Shoulder', value: calculateDiscountedRate(activeOffer.shoulder, customerData.discount ?? 0), type: 'shoulder' },
-                                { label: 'Anytime', value: calculateDiscountedRate(activeOffer.anytime, customerData.discount ?? 0), type: 'anytime' },
-                                ...clUsageRates.map((r: any) => ({
-                                    label: r.name,
-                                    value: calculateDiscountedRate(r.value, customerData.discount ?? 0),
-                                    type: 'clUsage',
-                                    unitId: r.unitId
-                                })),
-                                ...energyDynamicRates.map((r: any) => {
-                                    const numericValue = parseFloat(String(r.value || 0));
-                                    const price = calculateDiscountedRate(numericValue, customerData.discount ?? 0);
-                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
-                                })
-                            ]
-                                .filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0)
-                                .sort((a, b) => parseFloat(String(a.value || 0)) - parseFloat(String(b.value || 0)))
-                                .map((rate: any) => {
-                                    const isAnytime = rate.type === 'anytime';
-                                    const price = parseFloat(String(rate.value || 0));
-                                    const unit = rate.type === 'dynamic' || rate.type === 'clUsage' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : '/kWh') : formatUnit(rate.type, 'kWh');
-                                    return {
-                                        label: rate.label,
-                                        displayValue: `$${price.toFixed(4)}${unit}`,
-                                        color: isAnytime ? 'orange' : 'blue'
-                                    };
-                                });
-
-                            const supplyRates = [
-                                { label: 'Supply', value: activeOffer.supplyCharge, type: 'supplyCharge' }, // Usually not discounted
-                                ...clSupplyRates.map((r: any) => ({
-                                    label: r.name,
-                                    value: r.value, // Usually not discounted
-                                    type: 'clSupply',
-                                    unitId: r.unitId
-                                })),
-                                ...supplyDynamicRates.map((r: any) => {
-                                    const numericValue = parseFloat(String(r.value || 0));
-                                    const price = numericValue;
-                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
-                                })
-                            ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r: any) => ({
-                                label: r.label,
-                                displayValue: `$${parseFloat(String(r.value || '0')).toFixed(4)}${r.type === 'dynamic' || r.type === 'clSupply' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit('supplyCharge', 'day')}`
-                            }));
-
-                            const demandRates = [
-                                { label: 'Demand', value: activeOffer.demand, type: 'demand' },
-                                { label: 'Demand (Op)', value: activeOffer.demandOp, type: 'demandOp' },
-                                { label: 'Demand (P)', value: activeOffer.demandP, type: 'demandP' },
-                                { label: 'Demand (S)', value: activeOffer.demandS, type: 'demandS' },
-                                ...demandDynamicRates.map((r: any) => {
-                                    const numericValue = parseFloat(String(r.value || 0));
-                                    const price = calculateDiscountedRate(numericValue, customerData.discount ?? 0);
-                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
-                                })
-                            ]
-                                .filter(d => (parseFloat(String(d.value || 0)) ?? 0) > 0)
-                                .map((d: any) => {
-                                    const price = parseFloat(String(d.value || '0'));
-                                    return {
-                                        label: d.label,
-                                        displayValue: `$${price.toFixed(4)}${d.type === 'dynamic' ? (d.unitId ? `/${unitMap?.[d.unitId]}` : '/kVA/day') : formatUnit(d.type, 'kVA/day')}`
-                                    };
-                                });
-
-                            const vppCharges = [
-                                { label: 'Orchestration', value: activeOffer.vppOrcharge, type: 'vppOrcharge' },
-                                ...vppDynamicRates.map((r: any) => {
-                                    const numericValue = parseFloat(String(r.value || 0));
-                                    const price = numericValue;
-                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
-                                })
-                            ].filter(r => (parseFloat(String(r.value || 0)) ?? 0) > 0).map((r: any) => {
-                                const price = parseFloat(String(r.value || '0'));
-                                return {
-                                    label: r.label,
-                                    displayValue: `$${price.toFixed(4)}${r.type === 'dynamic' ? (r.unitId ? `/${unitMap?.[r.unitId]}` : '/day') : formatUnit('vppOrcharge', 'day')}`
-                                };
-                            });
-
-                            const solarFitRates = [
-                                { label: 'Feed-in', value: activeOffer.fit, type: 'fit' },
-                                { label: 'PREMIUM FIT', value: activeOffer.fitPeak, type: 'fitPeak' },
-                                { label: 'CRITICAL EVENT FIT', value: activeOffer.fitCritical, type: 'fitCritical' },
-                                { label: 'BASE FIT', value: activeOffer.fitVpp, type: 'fitVpp' },
-                                ...solarFitDynamicRates.map((r: any) => {
-                                    const numericValue = parseFloat(String(r.value || 0));
-                                    const price = numericValue;
-                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
-                                })
-                            ]
-                                .filter(rate => {
-                                    const numericValue = parseFloat(String(rate.value || 0));
-                                    if (numericValue <= 0) return false;
-                                    const isVppActive = customerData.vppDetails?.vpp === 1;
-                                    const hasSolar = customerData.solarDetails?.hassolar === 1;
-                                    if (!hasSolar) return false;
-                                    if (rate.type === 'fit') return !isVppActive;
-                                    return (rate.type === 'fitPeak' || rate.type === 'fitCritical' || rate.type === 'fitVpp' || rate.type === 'dynamic') ? (isVppActive || rate.type === 'dynamic') : true;
-                                })
-                                .sort((a, b) => (parseFloat(String(a.value || 0)) ?? 0) - (parseFloat(String(b.value || 0)) ?? 0))
-                                .map((rate: any) => ({
-                                    label: rate.label,
-                                    displayValue: `$${parseFloat(String(rate.value || '0')).toFixed(4)}${rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : '/kWh') : formatUnit(rate.type, 'kWh')}`
-                                }));
-
-                            const extraFitRates = remainingDynamicRates.filter((r: any) => r.type === 'fit' || r.type === 'extra_fit' || (!r.type && (customerData.vppDetails?.vpp === 1 || ratePlan?.vpp === 1))).map((dRate: any) => {
-                                const val = parseFloat(String(dRate.value || '0'));
-                                const price = val;
-                                return {
-                                    label: dRate.name,
-                                    value: price,
-                                    unitId: dRate.unitId
-                                };
-                            })
-                            .filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0)
-                            .map((rate: any) => ({
-                                label: rate.label,
-                                displayValue: `$${parseFloat(String(rate.value)).toFixed(4)}${rate.unitId ? `/${unitMap?.[rate.unitId]}` : ''}`
-                            }));
-
-                            const extraChargeRates = remainingDynamicRates.filter((r: any) => r.type === 'charges' || r.type === 'extra_charges' || (!r.type && !(customerData.vppDetails?.vpp === 1 || ratePlan?.vpp === 1))).map((dRate: any) => {
-                                const val = parseFloat(String(dRate.value || '0'));
-                                const price = val;
-                                return {
-                                    label: dRate.name,
-                                    value: price,
-                                    unitId: dRate.unitId
-                                };
-                            })
-                            .filter((r: any) => (parseFloat(String(r.value || 0)) ?? 0) > 0)
-                            .map((rate: any) => ({
-                                label: rate.label,
-                                displayValue: `$${parseFloat(String(rate.value)).toFixed(4)}${rate.unitId ? `/${unitMap?.[rate.unitId]}` : ''}`
-                            }));
-
-                            const clRates = [
-                                { label: 'CL1 Usage', value: calculateDiscountedRate(activeOffer.cl1Usage ?? 0, customerData.discount ?? 0), type: 'cl1_usage' },
-                                { label: 'CL2 Usage', value: calculateDiscountedRate(activeOffer.cl2Usage ?? 0, customerData.discount ?? 0), type: 'cl2_usage' },
-                                { label: 'CL1 Supply', value: calculateDiscountedRate(activeOffer.cl1Supply ?? 0, customerData.discount ?? 0), type: 'cl1_supply' },
-                                { label: 'CL2 Supply', value: calculateDiscountedRate(activeOffer.cl2Supply ?? 0, customerData.discount ?? 0), type: 'cl2_supply' },
-                                ...clDynamicRates.map((r: any) => {
-                                    const numericValue = parseFloat(String(r.value || 0));
-                                    const price = calculateDiscountedRate(numericValue, customerData.discount ?? 0);
-                                    return { label: r.name, value: price, type: 'dynamic', unitId: r.unitId };
-                                })
-                            ]
-                                .filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0)
-                                .map((rate: any) => {
-                                    const numericValue = parseFloat(String(rate.value || 0));
-                                    const isUsage = rate.type === 'cl1_usage' || rate.type === 'cl2_usage' || (rate.type === 'dynamic' && !(rate.unitId && unitMap?.[rate.unitId]?.toLowerCase().includes('day')));
-                                    const price = numericValue;
-                                    const unit = rate.type === 'dynamic' ? (rate.unitId ? `/${unitMap?.[rate.unitId]}` : (isUsage ? '/kWh' : '/day')) : (isUsage ? '/kWh' : '/day');
-                                    return {
-                                        label: rate.label,
-                                        displayValue: `$${price.toFixed(4)}${unit}`
-                                    };
-                                });
-
-                            const hasCol1 = energyRates.length > 0;
-                            const hasCol2 = supplyRates.length > 0 || demandRates.length > 0 || vppCharges.length > 0;
-                            const hasCol3 = solarFitRates.length > 0 || extraFitRates.length > 0 || clRates.length > 0 || extraChargeRates.length > 0;
-
-                            const activeColsCount = [hasCol1, hasCol2, hasCol3].filter(Boolean).length;
-
                             return (
-                                <div className={cn(
-                                    "grid gap-8",
-                                    activeColsCount === 1 ? "grid-cols-1 max-w-md mx-auto" :
-                                    activeColsCount === 2 ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" :
-                                    "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-                                )}>
-                                    {hasCol1 && renderRatesColumn(energyRates, "Energy Rates", "blue", Settings2Icon)}
-
-                                    {hasCol2 && (
-                                        <div className="space-y-10">
-                                            {renderRatesColumn(supplyRates, "Supply Charges", "purple", PlugIcon)}
-                                            {renderRatesColumn(demandRates, "Demand Charges", "rose", ActivityIcon)}
-                                            {renderRatesColumn(vppCharges, "VPP Charges", "amber", ActivityIcon)}
-                                        </div>
-                                    )}
-
-                                    {hasCol3 && (
-                                        <div className="space-y-10">
-                                            {customerData.solarDetails?.hassolar === 1 && renderRatesColumn(solarFitRates, "Solar FiT", "teal", ZapIcon)}
-                                            {renderRatesColumn(extraFitRates, "Extra FiT", "teal", ZapIcon)}
-                                            {renderRatesColumn(clRates, "Controlled Load", "green", PlugIcon)}
-                                            {renderRatesColumn(extraChargeRates, "Extra Charges", "indigo", ActivityIcon)}
-                                        </div>
-                                    )}
-                                </div>
+                                <RateDetailsView
+                                    offer={activeOffer}
+                                    discount={customerData.discount ?? 0}
+                                    hasSolar={customerData.solarDetails?.hassolar === 1}
+                                    vpp={customerData.vppDetails?.vpp === 1}
+                                    units={unitMap}
+                                    isVppPlan={ratePlan?.vpp === 1}
+                                    planRatesJson={customerData.plan?.ratesJson}
+                                    className="border-none shadow-none bg-transparent p-0"
+                                />
                             );
                         })()}
                     </div>
