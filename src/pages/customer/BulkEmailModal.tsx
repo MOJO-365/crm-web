@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { GET_EMAIL_TEMPLATES, GET_EMAIL_TEMPLATE, GET_CUSTOMER_BY_ID, SEND_BULK_EMAIL, GET_NOTIFICATION_ENTITIES } from '@/graphql';
+import { GET_EMAIL_TEMPLATES, GET_EMAIL_TEMPLATE, GET_CUSTOMER_BY_ID, SEND_BULK_EMAIL, GET_NOTIFICATION_ENTITIES, GET_ANNOUNCEMENTS } from '@/graphql';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
@@ -113,6 +113,10 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
         fetchPolicy: 'network-only'
     });
 
+    const { data: announcementsData } = useQuery(GET_ANNOUNCEMENTS, {
+        fetchPolicy: 'cache-first'
+    });
+    
     // Fetch Single Customer data for preview (only when 1 customer selected)
     const { data: customerData, loading: loadingCustomer } = useQuery(GET_CUSTOMER_BY_ID, {
         variables: { uid: selectedCustomerIds[0] },
@@ -122,6 +126,11 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
 
     const selectedTemplate = templateData?.emailTemplate;
     const previewCustomer = customerData?.customer;
+    
+    const templateAnnouncement = useMemo(() => {
+        if (!selectedTemplate?.announcementUid || !announcementsData?.announcements) return null;
+        return announcementsData.announcements.find((a: any) => a.uid === selectedTemplate.announcementUid);
+    }, [selectedTemplate?.announcementUid, announcementsData]);
 
     // Process template content with variable replacement
     const processedSubject = useMemo(() => {
@@ -400,6 +409,20 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
                                     ))}
                                 </div>
                             )}
+                            
+                            {/* Template Announcement Attachment */}
+                            {templateAnnouncement && (
+                                <div className="space-y-2 mt-2">
+                                    <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg border border-blue-100 dark:border-blue-800/50">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                            </svg>
+                                            <span className="text-sm text-blue-700 dark:text-blue-300 truncate">{templateAnnouncement.name} (Attached to template)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-lg text-xs text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50">
@@ -597,8 +620,8 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
                                         </div>
                                     </div>
                                 )}
-                                {attachments.length > 0 && (
-                                    <div className="flex items-start gap-3">
+                                {(attachments.length > 0 || templateAnnouncement) && (
+                                    <div className="flex items-start gap-3 pb-3 border-b border-gray-100 dark:border-gray-800">
                                         <span className="text-sm text-gray-500 dark:text-gray-400 w-24 flex-shrink-0">Attachments</span>
                                         <div className="flex flex-wrap gap-2">
                                             {attachments.map((file, i) => (
@@ -609,6 +632,14 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
                                                     {file.name}
                                                 </span>
                                             ))}
+                                            {templateAnnouncement && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300 rounded">
+                                                    <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                    </svg>
+                                                    {templateAnnouncement.name}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 )}
