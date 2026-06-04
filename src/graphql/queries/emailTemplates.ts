@@ -9,6 +9,7 @@ export const GET_EMAIL_TEMPLATES = gql`
                 name
                 subject
                 entityType
+                announcementUid
                 status
                 isActive
                 isDeleted
@@ -34,6 +35,7 @@ export const GET_EMAIL_TEMPLATE = gql`
             entityType
             subject
             body
+            announcementUid
             status
             isActive
             isDeleted
@@ -49,6 +51,19 @@ export const PREVIEW_SYSTEM_TEMPLATE = gql`
             subject
             body
             isCustom
+        }
+    }
+`;
+
+export const GET_ANNOUNCEMENTS = gql`
+    query GetAnnouncements {
+        announcements {
+            id
+            uid
+            name
+            fileName
+            isActive
+            createdAt
         }
     }
 `;

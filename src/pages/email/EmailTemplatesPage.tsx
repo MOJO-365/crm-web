@@ -15,7 +15,7 @@ import {
     UPDATE_EMAIL_TEMPLATE,
     SOFT_DELETE_EMAIL_TEMPLATE,
     RESTORE_EMAIL_TEMPLATE,
-
+    GET_ANNOUNCEMENTS,
 } from '@/graphql';
 import { formatDateTime, getUserTimezone } from '@/lib/date';
 import { EMAIL_VARIABLES } from '@/lib/email-variables';
@@ -30,11 +30,21 @@ interface EmailTemplate {
     entityType: number; // 1 = Project
     subject: string;
     body?: string;
+    announcementUid?: string;
     status: number;
     isActive: boolean;
     isDeleted: boolean;
     createdAt: string;
     updatedAt: string;
+}
+
+interface Announcement {
+    id: string;
+    uid: string;
+    name: string;
+    fileName: string;
+    isActive: boolean;
+    createdAt: string;
 }
 
 interface EmailTemplatesResponse {
@@ -163,6 +173,7 @@ export function EmailTemplatesPage() {
         entityType: 1,
         subject: '',
         body: DEFAULT_EMAIL_BODY,
+        announcementUid: '',
         isActive: true
     };
 
@@ -214,7 +225,11 @@ export function EmailTemplatesPage() {
     const [restoreTemplate] = useMutation(RESTORE_EMAIL_TEMPLATE);
     const [fetchTemplate] = useLazyQuery(GET_EMAIL_TEMPLATE);
 
-
+    // Fetch announcements for dropdown
+    const { data: announcementsData } = useQuery(GET_ANNOUNCEMENTS, {
+        fetchPolicy: 'cache-first'
+    });
+    const announcements: Announcement[] = announcementsData?.announcements || [];
 
     const meta = data?.emailTemplates?.meta;
     const hasMore = meta ? page < meta.totalPages : false;
@@ -275,6 +290,7 @@ export function EmailTemplatesPage() {
             entityType: template.entityType || 1,
             subject: template.subject,
             body: template.body || '',
+            announcementUid: template.announcementUid || '',
             isActive: template.isActive
         });
         setErrors({});
@@ -287,7 +303,8 @@ export function EmailTemplatesPage() {
             if (data?.emailTemplate) {
                 setFormData(prev => ({
                     ...prev,
-                    body: unwrapEmailContent(data.emailTemplate.body || '')
+                    body: unwrapEmailContent(data.emailTemplate.body || ''),
+                    announcementUid: data.emailTemplate.announcementUid || ''
                 }));
             }
         } catch (error) {
@@ -321,6 +338,7 @@ export function EmailTemplatesPage() {
                 entityType: Number(formData.entityType),
                 subject: formData.subject,
                 body: wrapEmailContent(formData.body),
+                announcementUid: formData.announcementUid || undefined,
                 isActive: formData.isActive
             };
 
@@ -651,17 +669,35 @@ export function EmailTemplatesPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Subject <span className="text-red-500">*</span></label>
-                        <Input
-                            placeholder="Email Subject"
-                            value={formData.subject}
-                            onChange={(e) => {
-                                setFormData(prev => ({ ...prev, subject: e.target.value }));
-                                if (errors.subject) setErrors(prev => ({ ...prev, subject: '' }));
-                            }}
-                            error={errors.subject}
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Subject <span className="text-red-500">*</span></label>
+                            <Input
+                                placeholder="Email Subject"
+                                value={formData.subject}
+                                onChange={(e) => {
+                                    setFormData(prev => ({ ...prev, subject: e.target.value }));
+                                    if (errors.subject) setErrors(prev => ({ ...prev, subject: '' }));
+                                }}
+                                error={errors.subject}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Attachment (Announcement)</label>
+                            <select
+                                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                value={formData.announcementUid}
+                                onChange={(e) => setFormData(prev => ({ ...prev, announcementUid: e.target.value }))}
+                            >
+                                <option value="">No Attachment</option>
+                                {announcements.map((a) => (
+                                    <option key={a.uid} value={a.uid}>
+                                        {a.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     <div className="space-y-2">

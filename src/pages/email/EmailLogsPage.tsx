@@ -10,6 +10,7 @@ import {
     EyeIcon,
     MailIcon,
     ChevronRightIcon,
+    FileTextIcon,
 } from '@/components/icons';
 import { GET_ALL_EMAIL_LOGS } from '@/graphql';
 import { cn } from '@/lib/utils';
@@ -38,6 +39,7 @@ interface EmailLog {
     createdBy: string | null;
     tenant: string | null;
     verificationCode: string | null;
+    attachments: string[] | null;
 }
 
 interface EmailLogsResponse {
@@ -268,15 +270,28 @@ export function EmailLogsPage() {
             key: 'subject',
             header: 'Subject',
             width: 'w-[250px]',
-            render: (log: ProcessedEmailLog) => (
-                <span className="text-sm text-foreground truncate block max-w-[240px]" title={log.subject || ''}>
-                    {log._isBatchHeader ? (
-                        <span className="text-orange-600 dark:text-orange-400 font-medium">{log.subject || 'Bulk Email Batch'}</span>
-                    ) : (
-                        log.subject || <span className="text-muted-foreground italic">No subject</span>
-                    )}
-                </span>
-            )
+            render: (log: ProcessedEmailLog) => {
+                const hasAttachments = log.attachments && log.attachments.length > 0;
+                return (
+                    <div className="flex flex-col gap-1">
+                        <span className="text-sm text-foreground truncate block max-w-[240px]" title={log.subject || ''}>
+                            {log._isBatchHeader ? (
+                                <span className="text-orange-600 dark:text-orange-400 font-medium">{log.subject || 'Bulk Email Batch'}</span>
+                            ) : (
+                                log.subject || <span className="text-muted-foreground italic">No subject</span>
+                            )}
+                        </span>
+                        {hasAttachments && !log._isBatchHeader && (
+                            <div>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50" title={`${log.attachments!.length} attachment(s) sent`}>
+                                    <FileTextIcon size={10} />
+                                    {log.attachments!.length} attached
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
         },
         {
             key: 'emailType',
@@ -538,6 +553,19 @@ export function EmailLogsPage() {
                                             {selectedLog.customerId}
                                         </p>
                                     </div>
+                                    {selectedLog.attachments && selectedLog.attachments.length > 0 && (
+                                        <div className="col-span-2">
+                                            <label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Attachments</label>
+                                            <div className="flex flex-col gap-2 mt-2">
+                                                {selectedLog.attachments.map((att, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 text-sm bg-card px-3 py-2 border rounded-md shadow-sm">
+                                                        <FileTextIcon size={16} className="text-blue-500" />
+                                                        <span className="font-medium text-foreground truncate">{att}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
