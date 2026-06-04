@@ -17,10 +17,25 @@ import {
     SOFT_DELETE_PDF_TERM,
     RESTORE_PDF_TERM,
     GET_ACTIVE_PLANS,
+    GET_RATE_PLANS,
 } from '@/graphql';
 import { formatDateTime, getUserTimezone } from '@/lib/date';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { isNameMatch } from '@/lib/utils';
+
+// Types
+
+interface RatePlan {
+    id: string;
+    uid: string;
+    tariff: string;
+    codes: string;
+    vpp: number;
+    isActive: boolean;
+    isDeleted: boolean;
+    planId?: string;
+    state?: string;
+}
 
 // Types
 
@@ -128,6 +143,8 @@ export function PdfTermsPage() {
         content: '',
         isActive: true,
         planUids: [] as string[],
+        rateType: '' as string,
+        rateUids: [] as string[],
     };
 
     const [formData, setFormData] = useState(initialFormState);
@@ -179,6 +196,40 @@ export function PdfTermsPage() {
         fetchPolicy: 'cache-first',
     });
     const allPlans = plansData?.activePlans || [];
+
+    // Fetch all rate plans for rate selection
+    const { data: ratePlansData } = useQuery(GET_RATE_PLANS, {
+        variables: { page: 1, limit: 10000 },
+        fetchPolicy: 'cache-first',
+    });
+
+    const allRatePlans: RatePlan[] = ratePlansData?.ratePlans?.data || [];
+
+    // Filter rate plans based on selected rate type and availability
+    const filteredRatePlans = useMemo(() => {
+        if (!formData.rateType) return [];
+
+        // Collect all currently assigned rate UIDs from other terms
+        const assignedRateUids = new Set<string>();
+        allTerms.forEach(term => {
+            if (term.uid === editingTerm?.uid) return;
+            if (term.isDeleted || !term.isActive) return;
+
+            if (term.rateUids && Array.isArray(term.rateUids)) {
+                term.rateUids.forEach(uid => assignedRateUids.add(uid));
+            }
+        });
+
+        return allRatePlans.filter((rp) => {
+            if (rp.isDeleted) return false;
+            // Exclude if already assigned to another active term
+            if (assignedRateUids.has(rp.uid)) return false;
+
+            if (formData.rateType === 'vpp') return rp.vpp === 1;
+            if (formData.rateType === 'charges') return rp.vpp === 0;
+            return false;
+        });
+    }, [allRatePlans, formData.rateType, allTerms, editingTerm]);
 
     const filteredPlans = useMemo(() => {
         const assignedPlanUids = new Set<string>();
@@ -262,6 +313,8 @@ export function PdfTermsPage() {
             content: term.content || '',
             isActive: term.isActive,
             planUids: term.planUids || [],
+            rateType: term.rateType || '',
+            rateUids: term.rateUids || [],
         });
         setErrors({});
         setModalOpen(true);
@@ -275,6 +328,8 @@ export function PdfTermsPage() {
                     ...prev,
                     content: data.pdfTerm.content || '',
                     planUids: data.pdfTerm.planUids || prev.planUids,
+                    rateType: data.pdfTerm.rateType || prev.rateType,
+                    rateUids: data.pdfTerm.rateUids || prev.rateUids,
                 }));
             }
         } catch (error) {
@@ -306,9 +361,9 @@ export function PdfTermsPage() {
                 name: formData.name,
                 content: formData.content,
                 isActive: formData.isActive,
-                rateType: null,
-                rateUids: null,
-                planUids: formData.planUids.length > 0 ? formData.planUids : null,
+                rateType: formData.rateType || null,
+                rateUids: formData.rateUids && formData.rateUids.length > 0 ? formData.rateUids : null,
+                planUids: formData.planUids && formData.planUids.length > 0 ? formData.planUids : null,
             };
 
             if (modalMode === 'create') {
@@ -638,20 +693,70 @@ export function PdfTermsPage() {
                         />
                     </div>
 
-                    {/* Applicable Plans */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-medium">Applicable Plans</label>
-                        <Select
-                            multiple
-                            placeholder="Select plans..."
-                            options={filteredPlans.map((p: any) => ({
-                                value: p.uid,
-                                label: p.title,
-                            }))}
-                            value={formData.planUids}
-                            onChange={(val) => setFormData(prev => ({ ...prev, planUids: val as string[] }))}
-                        />
-                    </div>
+                    {/* Plan Selection or Tariff Rate Selection */}
+                    {modalMode === 'edit' && editingTerm?.rateType ? (
+                        <div className="space-y-3">
+                            <label className="text-sm font-medium">Applicable Tariff Rates</label>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${formData.rateType === 'vpp'
+                                        ? 'bg-primary text-white border-primary'
+                                        : 'bg-card text-muted-foreground border-border hover:bg-accent'
+                                        }`}
+                                    onClick={() => setFormData(prev => ({ ...prev, rateType: prev.rateType === 'vpp' ? '' : 'vpp', rateUids: [] }))}
+                                >
+                                    VPP
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${formData.rateType === 'charges'
+                                        ? 'bg-primary text-white border-primary'
+                                        : 'bg-card text-muted-foreground border-border hover:bg-accent'
+                                        }`}
+                                    onClick={() => setFormData(prev => ({ ...prev, rateType: prev.rateType === 'charges' ? '' : 'charges', rateUids: [] }))}
+                                >
+                                    Charges
+                                </button>
+                                {formData.rateType && (
+                                    <button
+                                        type="button"
+                                        className="text-xs text-muted-foreground hover:text-red-500 transition-colors ml-1"
+                                        onClick={() => setFormData(prev => ({ ...prev, rateType: '', rateUids: [] }))}
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
+
+                            {formData.rateType && (
+                                <Select
+                                    multiple
+                                    placeholder="Select rate plans..."
+                                    options={filteredRatePlans.map(rp => ({
+                                        value: rp.uid,
+                                        label: `${rp.codes}${rp.tariff ? ` - ${rp.tariff}` : ''}${rp.state ? ` (${rp.state})` : ''}`,
+                                    }))}
+                                    value={formData.rateUids}
+                                    onChange={(val) => setFormData(prev => ({ ...prev, rateUids: val as string[] }))}
+                                />
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <label className="text-sm font-medium">Applicable Plans</label>
+                            <Select
+                                multiple
+                                placeholder="Select plans..."
+                                options={filteredPlans.map((p: any) => ({
+                                    value: p.uid,
+                                    label: p.title,
+                                }))}
+                                value={formData.planUids}
+                                onChange={(val) => setFormData(prev => ({ ...prev, planUids: val as string[] }))}
+                            />
+                        </div>
+                    )}
 
                     {/* Insert Title Buttons */}
                     <div className="space-y-4">
@@ -684,39 +789,43 @@ export function PdfTermsPage() {
                             <p className="text-xs text-muted-foreground">Click a button to insert styled headers or contract logic into the editor.</p>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-foreground">Insert VPP FIT Terms</label>
-                            <div className="flex flex-wrap gap-2">
-                                {VPP_FIT_OPTIONS.map((opt) => (
-                                    <Tooltip key={opt.label} content={opt.description}>
+                        {(formData.rateType === 'vpp' || !formData.rateType) && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-foreground">Insert VPP FIT Terms</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {VPP_FIT_OPTIONS.map((opt) => (
+                                        <Tooltip key={opt.label} content={opt.description}>
+                                            <button
+                                                type="button"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-all duration-200 cursor-pointer"
+                                                onClick={() => handleInsertCustomHtml(opt.html)}
+                                            >
+                                                <PlusIcon size={12} />
+                                                {opt.label}
+                                            </button>
+                                        </Tooltip>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {(formData.rateType === 'charges' || !formData.rateType) && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-foreground">Insert Charges Terms</label>
+                                <div className="flex flex-wrap gap-2">
+                                    <Tooltip content={SOLAR_FIT_OPTION.description}>
                                         <button
                                             type="button"
                                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-all duration-200 cursor-pointer"
-                                            onClick={() => handleInsertCustomHtml(opt.html)}
+                                            onClick={() => handleInsertCustomHtml(SOLAR_FIT_OPTION.html)}
                                         >
                                             <PlusIcon size={12} />
-                                            {opt.label}
+                                            {SOLAR_FIT_OPTION.label}
                                         </button>
                                     </Tooltip>
-                                ))}
+                                </div>
                             </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-foreground">Insert Charges Terms</label>
-                            <div className="flex flex-wrap gap-2">
-                                <Tooltip content={SOLAR_FIT_OPTION.description}>
-                                    <button
-                                        type="button"
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-all duration-200 cursor-pointer"
-                                        onClick={() => handleInsertCustomHtml(SOLAR_FIT_OPTION.html)}
-                                    >
-                                        <PlusIcon size={12} />
-                                        {SOLAR_FIT_OPTION.label}
-                                    </button>
-                                </Tooltip>
-                            </div>
-                        </div>
+                        )}
                     </div>
 
                     <div className="space-y-4">
