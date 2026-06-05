@@ -6,7 +6,7 @@ export const MasterDataPage = () => {
     return (
         <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
             <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">Master Data Management</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">Master Data Management</h1>
                 <p className="text-muted-foreground text-sm max-w-2xl">
                     Manage global lookup values and dropdown fields across the CRM system.
                 </p>
@@ -28,7 +28,7 @@ export const MasterDataPage = () => {
                     <NoteTypeTable />
                 </div>
             </div>
-            
+
             {/* Note: More master tables can be added here in future rows */}
         </div>
     );
