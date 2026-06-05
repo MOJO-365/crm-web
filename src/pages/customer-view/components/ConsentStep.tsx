@@ -19,7 +19,7 @@ export const ConsentStep: React.FC<ConsentStepProps> = ({ isChecked, onToggleCon
             <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-100">
                 <div className="space-y-8">
                     <div className="border-b border-slate-100 pb-6 text-center">
-                        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">Consent & Acknowledgement</h1>
+                        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">Acknowledgement</h1>
                         <p className="text-slate-500">Please review the following information carefully before proceeding.</p>
                     </div>
 

@@ -4,7 +4,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import logo from '@/assets/main-logo-dark-1.png';
 import { useAccessibleMenus, useUser } from '@/stores/useAuthStore';
-import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon, ListIcon } from '@/components/icons';
+import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon, ListIcon, ActivityIcon, UploadIcon, PlugIcon } from '@/components/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 // Dashboard icon component (locally defined in Header originally)
@@ -53,7 +53,10 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     plans_master: ListIcon,
     master_data: ShieldCheckIcon,
     customer_approvals: ShieldCheckIcon,
-    customer_group: CustomerIcon
+    customer_group: CustomerIcon,
+    trackers: ActivityIcon,
+    push_to_gsync: UploadIcon,
+    msat_tracker: PlugIcon
 };
 
 // Path mapping
@@ -80,7 +83,9 @@ const pathMap: Record<string, string> = {
     plans_master: '/plans-master',
     master_data: '/master-data',
     customer_approvals: '/customer-approvals',
-    customer_group: '' // Parent grouper
+    customer_group: '', // Parent grouper
+    push_to_gsync: '/push-to-gsync',
+    msat_tracker: '/push-to-msat'
     // user_management and email have no path, they are groupers
 };
 
@@ -274,10 +279,10 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                 {rootMenus.map((menu) => {
                     const children = getChildren(menu.menuUid);
                     
-                    // If a group has only ONE sub-menu, simplify it to a direct link
+                    // If a group has only ONE sub-menu, simplify it to a direct link (except Trackers)
                     const isSingleChild = children.length === 1;
-                    const effectiveMenu = isSingleChild ? children[0] : menu;
-                    const hasSubMenus = children.length > 1;
+                    const effectiveMenu = (isSingleChild && menu.menuCode !== 'trackers') ? children[0] : menu;
+                    const hasSubMenus = children.length > 1 || menu.menuCode === 'trackers';
                     
                     // Priority for icon: Child icon > Parent Icon
                     const IconComponent = iconMap[effectiveMenu.menuCode] || iconMap[menu.menuCode];
