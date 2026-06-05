@@ -41,6 +41,8 @@ const BranchLeadFormPage = lazyWithRetry(() => import('@/pages/branch/BranchLead
 const BranchEnrollmentsPage = lazyWithRetry(() => import('@/pages/branch/BranchEnrollmentsPage').then(m => ({ default: m.BranchEnrollmentsPage })));
 const BranchStaffPage = lazyWithRetry(() => import('@/pages/branch/BranchStaffPage').then(m => ({ default: m.BranchStaffPage })));
 const CustomerViewPage = lazyWithRetry(() => import('@/pages/customer-view/CustomerViewPage').then(m => ({ default: m.CustomerViewPage })));
+const PushToGsyncPage = lazyWithRetry(() => import('@/pages/trackers/PushToGsyncPage').then(m => ({ default: m.PushToGsyncPage })));
+const PushToMsatPage = lazyWithRetry(() => import('@/pages/trackers/PushToMsatPage').then(m => ({ default: m.PushToMsatPage })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -104,6 +106,8 @@ const router = createBrowserRouter(
                 <Route path="/email-templates" element={<RequirePermission menuCode="email_templates"><EmailTemplatesPage /></RequirePermission>} />
                 <Route path="/email-logs" element={<RequirePermission menuCode="email_logs"><EmailLogsPage /></RequirePermission>} />
                 <Route path="/email-send" element={<RequirePermission menuCode="email_templates"><EmailSendPage /></RequirePermission>} />
+                <Route path="/push-to-gsync" element={<RequirePermission menuCode="push_to_gsync"><PushToGsyncPage /></RequirePermission>} />
+                <Route path="/push-to-msat" element={<RequirePermission menuCode="msat_tracker"><PushToMsatPage /></RequirePermission>} />
 
                 {/* Master Routes */}
                 <Route path="/document-types" element={<RequirePermission menuCode="document_types"><DocumentTypesPage /></RequirePermission>} />

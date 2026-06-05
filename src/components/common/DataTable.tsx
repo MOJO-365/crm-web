@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState, type ReactNode } from 'react';
+import { useRef, useEffect, useCallback, useState, Fragment, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from './EmptyState';
 
@@ -324,7 +324,7 @@ export function DataTable<T>({
                                     const canExpand = renderExpandedRow && (isExpandable ? isExpandable(row) : true);
 
                                     return (
-                                        <div key={`row-group-${key}`} className="contents">
+                                        <Fragment key={`row-group-${key}`}>
                                             <tr
                                                 key={key}
                                                 className={cn(
@@ -428,7 +428,7 @@ export function DataTable<T>({
                                                     </td>
                                                 </tr>
                                             )}
-                                        </div>
+                                        </Fragment>
                                     );
                                 })}
                                 {/* Loading more indicator - ONLY for infinite scroll */}

@@ -149,7 +149,7 @@ export const PlansMasterPage: React.FC = () => {
 
     return (
         <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
-            <div className="flex flex-col gap-2 border-b border-border pb-4">
+            <div className="flex flex-col gap-2 border-border pb-2">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
