@@ -8,8 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { DataTable, type Column, Modal } from '@/components/common';
 import {
     RefreshCwIcon, CheckIcon, SearchIcon,
-    AlertCircleIcon, UserIcon, ArrowLeftIcon,
-    ArrowRightIcon
+    AlertCircleIcon, UserIcon, ArrowLeftIcon
 } from '@/components/icons';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -450,7 +449,7 @@ export const PushToMsatPage: React.FC = () => {
             >
                 <div className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        {actionType === 'CONNECT' 
+                        {actionType === 'CONNECT'
                             ? `Are you sure you want to mark customer ${selectedCustomer?.firstName} ${selectedCustomer?.lastName} as Connected to MSAT?`
                             : `Are you sure you want to disconnect customer ${selectedCustomer?.firstName} ${selectedCustomer?.lastName} from MSAT?`
                         }
