@@ -69,6 +69,10 @@ interface GsyncStatsResponse {
 type GsyncPushStatus = 'pending' | 'api' | 'manual' | 'connected';
 
 const getGsyncPushStatus = (row: Customer): GsyncPushStatus => {
+    if (row.vppDetails?.vppConnected !== 1) {
+        return 'pending';
+    }
+
     const raw = row.vppDetails?.vppApiPushed;
 
     if (raw !== null && raw !== undefined) {
