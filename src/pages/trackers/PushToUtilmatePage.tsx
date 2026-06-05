@@ -68,6 +68,10 @@ type UtilmatePushStatus = 'pending' | 'api' | 'manual' | 'connected';
 
 /** Status from customer_utilmate.utilmate_api_pushed (0 = manual, 1 = API, null = pending) */
 const getUtilmatePushStatus = (row: Customer): UtilmatePushStatus => {
+    if (row.utilmateDetails?.utilmateConnected !== 1 && row.utilmateStatus !== 1) {
+        return 'pending';
+    }
+
     const raw = row.utilmateDetails?.utilmateApiPushed;
 
     if (raw !== null && raw !== undefined) {

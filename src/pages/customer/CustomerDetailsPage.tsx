@@ -2218,7 +2218,8 @@ const InlineMaintenanceNotes = ({
             ...selectedCustomerDetails,
             vppDetails: {
                 ...selectedCustomerDetails.vppDetails,
-                vppConnected: newValue ? 1 : 0
+                vppConnected: newValue ? 1 : 0,
+                ...(!newValue ? { vppApiPushed: null } : {})
             }
         });
 
@@ -2231,7 +2232,8 @@ const InlineMaintenanceNotes = ({
                     uid: customerUid,
                     input: {
                         vppDetails: {
-                            vppConnected: newValue ? 1 : 0
+                            vppConnected: newValue ? 1 : 0,
+                            ...(!newValue ? { vppApiPushed: null } : {})
                         },
                         skipStatusUpdate: true
                     }
@@ -2442,6 +2444,7 @@ const InlineMaintenanceNotes = ({
                 ...selectedCustomerDetails.utilmateDetails,
                 utilmateConnected: newValue ? 1 : 0,
                 utilmateConnectedAt: newValue ? now : selectedCustomerDetails.utilmateDetails?.utilmateConnectedAt,
+                ...(!newValue ? { utilmateApiPushed: null } : {})
             }
         });
 
@@ -2463,6 +2466,7 @@ const InlineMaintenanceNotes = ({
                         utilmateDetails: {
                             utilmateConnected: newValue ? 1 : 0,
                             utilmateConnectedAt: newValue ? now : undefined,
+                            ...(!newValue ? { utilmateApiPushed: null } : {})
                         },
                         skipStatusUpdate: true
                     }
