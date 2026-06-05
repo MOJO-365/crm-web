@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { DataTable, type Column, Modal } from '@/components/common';
 import {
-    RefreshCwIcon, CheckIcon, SearchIcon,
+    CheckIcon, SearchIcon,
     AlertCircleIcon, UserIcon, ArrowLeftIcon
 } from '@/components/icons';
 import { toast } from 'react-toastify';
@@ -243,6 +243,15 @@ export const PushToMsatPage: React.FC = () => {
             )
         },
         {
+            header: 'Updated At',
+            key: 'updatedAt',
+            render: (row) => row.msatDetails?.msatUpdatedAt ? (
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {new Date(row.msatDetails.msatUpdatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+            ) : <span className="text-xs text-muted-foreground italic">—</span>,
+        },
+        {
             header: 'Actions',
             key: 'actions',
             render: (row) => {
@@ -385,14 +394,9 @@ export const PushToMsatPage: React.FC = () => {
                 </div>
 
                 <div className="p-5">
-                    {loading ? (
-                        <div className="p-12 flex justify-center items-center">
-                            <RefreshCwIcon className="animate-spin w-8 h-8 text-primary" />
-                        </div>
-                    ) : error ? (
-                        <div className="p-12 text-center text-destructive flex flex-col items-center gap-2">
-                            <AlertCircleIcon size={32} />
-                            <span>Error loading customer data: {error.message}</span>
+                    {error ? (
+                        <div className="p-8 text-center text-red-500 font-semibold border border-red-200 bg-red-50 rounded-lg">
+                            Error loading customer data: {error.message}
                         </div>
                     ) : (
                         <DataTable

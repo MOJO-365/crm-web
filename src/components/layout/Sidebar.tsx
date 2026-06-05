@@ -56,7 +56,8 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     customer_group: CustomerIcon,
     trackers: ActivityIcon,
     push_to_gsync: UploadIcon,
-    msat_tracker: PlugIcon
+    msat_tracker: PlugIcon,
+    utilmate_tracker: ZapIcon
 };
 
 // Path mapping
@@ -85,7 +86,8 @@ const pathMap: Record<string, string> = {
     customer_approvals: '/customer-approvals',
     customer_group: '', // Parent grouper
     push_to_gsync: '/push-to-gsync',
-    msat_tracker: '/push-to-msat'
+    msat_tracker: '/push-to-msat',
+    utilmate_tracker: '/push-to-utilmate'
     // user_management and email have no path, they are groupers
 };
 

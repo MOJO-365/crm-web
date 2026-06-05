@@ -2276,6 +2276,7 @@ const InlineMaintenanceNotes = ({
                 vppDetails: {
                     vpp: 1,
                     vppConnected: 1,
+                    vppApiPushed: 1,
                     vppSignupBonus: vppForm.vppSignupBonus ? parseFloat(vppForm.vppSignupBonus) : undefined,
                 },
                 batteryDetails: vppForm.batteryBrand ? {
@@ -2335,6 +2336,7 @@ const InlineMaintenanceNotes = ({
                 vppDetails: {
                     vpp: 1,
                     vppConnected: 1,
+                    vppApiPushed: 0,
                 },
                 skipStatusUpdate: true
             };
@@ -2508,11 +2510,13 @@ const InlineMaintenanceNotes = ({
             const input: any = {
                 status: 9,
                 utilmateStatus: 1,
+                utilmateUpdatedAt: now,
                 utilmateDetails: {
                     siteIdentifier: utilmateForm.siteIdentifier || undefined,
                     accountNumber: utilmateForm.accountNumber || undefined,
                     utilmateConnected: 1,
                     utilmateConnectedAt: now,
+                    utilmateApiPushed: 1,
                 }
             };
 
@@ -2549,11 +2553,13 @@ const InlineMaintenanceNotes = ({
             const input: any = {
                 status: 9,
                 utilmateStatus: 1,
+                utilmateUpdatedAt: now,
                 utilmateDetails: {
                     siteIdentifier: utilmateForm.siteIdentifier || undefined,
                     accountNumber: utilmateForm.accountNumber || undefined,
                     utilmateConnected: 1,
                     utilmateConnectedAt: now,
+                    utilmateApiPushed: 0,
                 }
             };
 

@@ -9,38 +9,36 @@ import { DataTable, type Column, Modal } from '@/components/common';
 import {
     CheckIcon, SearchIcon,
     AlertCircleIcon, ChevronRightIcon, UserIcon, ArrowLeftIcon,
-    ZapIcon, ArrowRightIcon
+    ArrowRightIcon
 } from '@/components/icons';
 import { toast } from 'react-toastify';
 import { secondaryApiAxios } from '@/lib/apollo';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { BATTERY_BRAND_OPTIONS } from '@/lib/constants';
+import { DNSP_LABELS } from '@/lib/constants';
 
 interface Customer {
     uid: string;
     customerId?: string;
     firstName: string;
     lastName: string;
-    email: string;
+    email?: string;
     number?: string;
     status: number | string;
-    vppDetails?: {
-        vpp?: number;
-        vppConnected?: number;
-        vppSignupBonus?: number;
-        vppApiPushed?: number | null;
-        updatedAt?: string;
+    utilmateStatus?: number;
+    utilmateUpdatedAt?: string;
+    utilmateDetails?: {
+        utilmateConnected?: number;
+        utilmateConnectedAt?: string;
+        utilmateApiPushed?: number | null;
+        siteIdentifier?: string;
+        accountNumber?: string;
     };
-    batteryDetails?: {
-        batterybrand?: string;
-        snnumber?: string;
-        batterycapacity?: number;
-        exportlimit?: number;
-        inverterCapacity?: number;
-        checkCode?: string;
+    ratePlan?: {
+        dnsp?: number;
     };
     address?: {
         fullAddress?: string;
+        nmi?: string;
     };
 }
 
@@ -59,17 +57,18 @@ interface CustomersCursorResponse {
     };
 }
 
-interface GsyncStatsResponse {
+interface UtilmateStatsResponse {
     total: { pageInfo: { totalCount: number } };
     connected: { pageInfo: { totalCount: number } };
     skipConnect: { pageInfo: { totalCount: number } };
     pending: { pageInfo: { totalCount: number } };
 }
 
-type GsyncPushStatus = 'pending' | 'api' | 'manual' | 'connected';
+type UtilmatePushStatus = 'pending' | 'api' | 'manual' | 'connected';
 
-const getGsyncPushStatus = (row: Customer): GsyncPushStatus => {
-    const raw = row.vppDetails?.vppApiPushed;
+/** Status from customer_utilmate.utilmate_api_pushed (0 = manual, 1 = API, null = pending) */
+const getUtilmatePushStatus = (row: Customer): UtilmatePushStatus => {
+    const raw = row.utilmateDetails?.utilmateApiPushed;
 
     if (raw !== null && raw !== undefined) {
         const apiPushed = Number(raw);
@@ -79,16 +78,16 @@ const getGsyncPushStatus = (row: Customer): GsyncPushStatus => {
         }
     }
 
-    if (row.vppDetails?.vppConnected === 1) {
+    if (row.utilmateDetails?.utilmateConnected === 1 || row.utilmateStatus === 1) {
         return 'connected';
     }
 
     return 'pending';
 };
 
-const isGsyncPending = (row: Customer) => getGsyncPushStatus(row) === 'pending';
+const isUtilmatePending = (row: Customer) => getUtilmatePushStatus(row) === 'pending';
 
-const renderGsyncStatusBadge = (status: GsyncPushStatus) => {
+const renderUtilmateStatusBadge = (status: UtilmatePushStatus) => {
     switch (status) {
         case 'api':
         case 'connected':
@@ -117,39 +116,38 @@ const renderGsyncStatusBadge = (status: GsyncPushStatus) => {
 
 type StatusFilter = 'ALL' | '0' | 'api' | 'manual';
 
-const getGsyncFilterVariables = (filter: StatusFilter) => {
-    const base = { searchVpp: 1, searchSigned: 1 as const };
+const getUtilmateFilterVariables = (filter: StatusFilter) => {
     switch (filter) {
         case '0':
-            return { ...base, searchVppConnected: 0, searchVppApiPushed: undefined };
+            return { searchUtilmateStatus: 0, searchUtilmateApiPushed: undefined };
         case 'api':
-            return { ...base, searchVppConnected: 1, searchVppApiPushed: 1 };
+            return { searchUtilmateStatus: 1, searchUtilmateApiPushed: 1 };
         case 'manual':
-            return { ...base, searchVppConnected: 1, searchVppApiPushed: 0 };
+            return { searchUtilmateStatus: 1, searchUtilmateApiPushed: 0 };
         case 'ALL':
         default:
-            return { ...base, searchVppConnected: undefined, searchVppApiPushed: undefined };
+            return { searchUtilmateStatus: undefined, searchUtilmateApiPushed: undefined };
     }
 };
 
-const GET_GSYNC_STATS = gql`
-    query GetGsyncStats($searchSigned: Int) {
-        total: customersCursor(first: 1, searchVpp: 1, searchSigned: $searchSigned) {
+const GET_UTILMATE_STATS = gql`
+    query GetUtilmateStats($searchSigned: Int) {
+        total: customersCursor(first: 1, searchSigned: $searchSigned) {
             pageInfo {
                 totalCount
             }
         }
-        connected: customersCursor(first: 1, searchVpp: 1, searchVppConnected: 1, searchVppApiPushed: 1, searchSigned: $searchSigned) {
+        connected: customersCursor(first: 1, searchUtilmateStatus: 1, searchUtilmateApiPushed: 1, searchSigned: $searchSigned) {
             pageInfo {
                 totalCount
             }
         }
-        skipConnect: customersCursor(first: 1, searchVpp: 1, searchVppConnected: 1, searchVppApiPushed: 0, searchSigned: $searchSigned) {
+        skipConnect: customersCursor(first: 1, searchUtilmateStatus: 1, searchUtilmateApiPushed: 0, searchSigned: $searchSigned) {
             pageInfo {
                 totalCount
             }
         }
-        pending: customersCursor(first: 1, searchVpp: 1, searchVppConnected: 0, searchSigned: $searchSigned) {
+        pending: customersCursor(first: 1, searchUtilmateStatus: 0, searchSigned: $searchSigned) {
             pageInfo {
                 totalCount
             }
@@ -157,61 +155,49 @@ const GET_GSYNC_STATS = gql`
     }
 `;
 
-export const PushToGsyncPage: React.FC = () => {
+export const PushToUtilmatePage: React.FC = () => {
     const navigate = useNavigate();
-    const canEdit = useAuthStore((state) => state.canEditInMenu('push_to_gsync'));
+    const canEdit = useAuthStore((state) => state.canEditInMenu('utilmate_tracker'));
 
-    // Search and filter states
     const [searchName, setSearchName] = useState('');
     const [searchId, setSearchId] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('0');
 
-    // Debounced search filters
     const [debouncedName, setDebouncedName] = useState('');
     const [debouncedId, setDebouncedId] = useState('');
 
-    // Pagination states
     const [currentPage, setCurrentPage] = useState(1);
     const [limit, setLimit] = useState(20);
     const [pageCursors, setPageCursors] = useState<(string | null)[]>([null]);
 
-    // Modal state for pushing to Gsync
-    const [pushModalOpen, setPushModalOpen] = useState(false);
+    const [connectModalOpen, setConnectModalOpen] = useState(false);
+    const [disconnectModalOpen, setDisconnectModalOpen] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [isPushing, setIsPushing] = useState(false);
-    const [isSkippingVpp, setIsSkippingVpp] = useState(false);
+    const [isSkipping, setIsSkipping] = useState(false);
+    const [isDisconnecting, setIsDisconnecting] = useState(false);
 
-    // Form fields for VPP push details
-    const [vppForm, setVppForm] = useState({
-        vppSignupBonus: '',
-        batteryBrand: '',
-        snNumber: '',
-        batteryCapacity: '',
-        exportLimit: '',
-        inverterCapacity: '',
-        checkCode: ''
+    const [utilmateForm, setUtilmateForm] = useState({
+        siteIdentifier: '',
+        accountNumber: '',
     });
 
-    // Debounce search changes
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedName(searchName);
             setDebouncedId(searchId);
-            // Reset pagination when search changes
             setCurrentPage(1);
             setPageCursors([null]);
         }, 500);
         return () => clearTimeout(timer);
     }, [searchName, searchId]);
 
-    // Reset pagination when status filter changes
     useEffect(() => {
         setCurrentPage(1);
         setPageCursors([null]);
     }, [statusFilter]);
 
-    // Fetch VPP customers (only customers with vpp: 1 and who are signed)
-    const filterVariables = getGsyncFilterVariables(statusFilter);
+    const filterVariables = getUtilmateFilterVariables(statusFilter);
 
     const { data, loading, error, refetch } = useQuery<CustomersCursorResponse>(GET_CUSTOMERS_CURSOR, {
         variables: {
@@ -220,13 +206,13 @@ export const PushToGsyncPage: React.FC = () => {
             ...filterVariables,
             searchName: debouncedName || undefined,
             searchId: debouncedId || undefined,
+            searchSigned: 1,
         },
         fetchPolicy: 'network-only',
         notifyOnNetworkStatusChange: true,
     });
 
-    // Fetch static VPP stats counts (unaffected by UI filters)
-    const { data: statsData, refetch: refetchStats } = useQuery<GsyncStatsResponse>(GET_GSYNC_STATS, {
+    const { data: statsData, refetch: refetchStats } = useQuery<UtilmateStatsResponse>(GET_UTILMATE_STATS, {
         variables: {
             searchSigned: 1,
         },
@@ -235,14 +221,9 @@ export const PushToGsyncPage: React.FC = () => {
 
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
 
-    // Dynamic stats query to get total counts (we can use a separate fetch or deduce from overall counts)
-    // For premium UX, we will fetch overall pending vs connected counts by doing quick parallel queries or local counts if simple.
-    // Let's call refetch when appropriate.
-
     const customers = data?.customersCursor?.data || [];
     const pageInfo = data?.customersCursor?.pageInfo;
 
-    // Track page end cursor for next navigation
     useEffect(() => {
         if (pageInfo?.endCursor) {
             setPageCursors(prev => {
@@ -259,112 +240,139 @@ export const PushToGsyncPage: React.FC = () => {
         setCurrentPage(newPage);
     };
 
-    const handleOpenPushModal = (customer: Customer) => {
+    const handleOpenConnectModal = (customer: Customer) => {
         setSelectedCustomer(customer);
-        setVppForm({
-            vppSignupBonus: customer.vppDetails?.vppSignupBonus?.toString() || '',
-            batteryBrand: customer.batteryDetails?.batterybrand || '',
-            snNumber: customer.batteryDetails?.snnumber || '',
-            batteryCapacity: customer.batteryDetails?.batterycapacity?.toString() || '',
-            exportLimit: customer.batteryDetails?.exportlimit?.toString() || '',
-            inverterCapacity: customer.batteryDetails?.inverterCapacity?.toString() || '',
-            checkCode: customer.batteryDetails?.checkCode || ''
+        setUtilmateForm({
+            siteIdentifier: customer.utilmateDetails?.siteIdentifier || '',
+            accountNumber: customer.utilmateDetails?.accountNumber || '',
         });
-        setPushModalOpen(true);
+        setConnectModalOpen(true);
     };
 
-    const handleSkipAndConnectVpp = async () => {
+    const handleSkipAndConnect = async () => {
         if (!selectedCustomer) return;
-        setIsSkippingVpp(true);
+        setIsSkipping(true);
         try {
-            const inputData = {
-                vppDetails: {
-                    vpp: 1,
-                    vppConnected: 1,
-                    vppApiPushed: 0,
-                },
-                skipStatusUpdate: true
-            };
-
+            const now = new Date().toISOString();
             await updateCustomer({
                 variables: {
                     uid: selectedCustomer.uid,
-                    input: inputData
-                }
+                    input: {
+                        status: 9,
+                        utilmateStatus: 1,
+                        utilmateUpdatedAt: now,
+                        utilmateDetails: {
+                            siteIdentifier: utilmateForm.siteIdentifier || undefined,
+                            accountNumber: utilmateForm.accountNumber || undefined,
+                            utilmateConnected: 1,
+                            utilmateConnectedAt: now,
+                            utilmateApiPushed: 0,
+                        },
+                        skipStatusUpdate: true,
+                    },
+                },
             });
 
-            toast.success('VPP connected (Skip & Connect)');
-            setPushModalOpen(false);
+            toast.success('Utilmate connected (Skip & Connect)');
+            setConnectModalOpen(false);
             setSelectedCustomer(null);
             refetch();
             refetchStats();
-        } catch (error: any) {
-            console.error('Error connecting VPP (Skip):', error);
-            toast.error(error.message || 'Failed to connect VPP');
+        } catch (err: any) {
+            console.error('Error connecting Utilmate (Skip):', err);
+            toast.error(err.message || 'Failed to connect Utilmate');
         } finally {
-            setIsSkippingVpp(false);
+            setIsSkipping(false);
         }
     };
 
-    const handleConfirmPush = async () => {
+    const handleConfirmConnect = async () => {
         if (!selectedCustomer) return;
 
-        if (!vppForm.batteryBrand || !vppForm.snNumber) {
-            toast.error('Battery Brand and Serial Number are required');
+        if (!utilmateForm.siteIdentifier || !utilmateForm.accountNumber) {
+            toast.error('Site Identifier and Account Number are required');
             return;
         }
 
         setIsPushing(true);
         try {
-            // 1. Sync with secondary API first (matching logic in CustomerDetailsPage.tsx)
             try {
-                await secondaryApiAxios.post('/v1/utilmate/user/add-user-battery', {
-                    user_id: selectedCustomer.customerId || selectedCustomer.uid,
-                    battery_brand: vppForm.batteryBrand,
-                    battery_sn_number: vppForm.snNumber,
-                    check_code: vppForm.checkCode,
-                    battery_usable_capacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : 0,
-                    inverter_capacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : 0
+                await secondaryApiAxios.post('/v1/utilmate/user/add-user', {
+                    account_number: utilmateForm.accountNumber,
+                    site_identifier: utilmateForm.siteIdentifier,
+                    gee_id: selectedCustomer.customerId || selectedCustomer.uid,
+                    dnsp: (selectedCustomer.ratePlan?.dnsp !== undefined && selectedCustomer.ratePlan?.dnsp !== null)
+                        ? (DNSP_LABELS[selectedCustomer.ratePlan.dnsp as keyof typeof DNSP_LABELS] || '')
+                        : '',
+                    nmi_number: selectedCustomer.address?.nmi || '',
                 });
             } catch (secErr: any) {
                 console.error('Failed to sync with secondary API', secErr);
-                throw new Error(secErr.response?.data?.message || 'Failed to sync with secondary system. VPP not connected.');
+                throw new Error(secErr.response?.data?.message || 'Failed to sync with secondary system. Utilmate not connected.');
             }
 
-            // 2. Update customer details in backend DB
-            const inputData = {
-                vppDetails: {
-                    vpp: 1,
-                    vppConnected: 1,
-                    vppApiPushed: 1,
-                },
-                batteryDetails: {
-                    batterybrand: vppForm.batteryBrand,
-                    snnumber: vppForm.snNumber,
-                    batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : undefined,
-                    inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : undefined,
-                    checkCode: vppForm.checkCode || undefined,
-                },
-                skipStatusUpdate: true
-            };
-
+            const now = new Date().toISOString();
             await updateCustomer({
                 variables: {
                     uid: selectedCustomer.uid,
-                    input: inputData
-                }
+                    input: {
+                        status: 9,
+                        utilmateStatus: 1,
+                        utilmateUpdatedAt: now,
+                        utilmateDetails: {
+                            siteIdentifier: utilmateForm.siteIdentifier || undefined,
+                            accountNumber: utilmateForm.accountNumber || undefined,
+                            utilmateConnected: 1,
+                            utilmateConnectedAt: now,
+                            utilmateApiPushed: 1,
+                        },
+                        skipStatusUpdate: true,
+                    },
+                },
             });
 
-            toast.success('VPP connected successfully');
-            setPushModalOpen(false);
+            toast.success('Utilmate connected successfully');
+            setConnectModalOpen(false);
             setSelectedCustomer(null);
             refetch();
             refetchStats();
-        } catch (error: any) {
-            console.error('Error pushing to Gsync:', error);
-            toast.error(error.message || 'Failed to push to Gsync VPP');
+        } catch (err: any) {
+            console.error('Error connecting Utilmate:', err);
+            toast.error(err.message || 'Failed to connect Utilmate');
         } finally {
             setIsPushing(false);
+        }
+    };
+
+    const handleDisconnect = async () => {
+        if (!selectedCustomer) return;
+        setIsDisconnecting(true);
+
+        try {
+            await updateCustomer({
+                variables: {
+                    uid: selectedCustomer.uid,
+                    input: {
+                        utilmateStatus: 0,
+                        utilmateDetails: {
+                            utilmateConnected: 0,
+                            utilmateApiPushed: null,
+                        },
+                        skipStatusUpdate: true,
+                    },
+                },
+            });
+
+            toast.success('Utilmate disconnected successfully');
+            setDisconnectModalOpen(false);
+            setSelectedCustomer(null);
+            refetch();
+            refetchStats();
+        } catch (err: any) {
+            console.error('Error disconnecting Utilmate:', err);
+            toast.error(err.message || 'Failed to disconnect Utilmate');
+        } finally {
+            setIsDisconnecting(false);
         }
     };
 
@@ -379,50 +387,52 @@ export const PushToGsyncPage: React.FC = () => {
                 >
                     {row.customerId || row.uid.slice(0, 8)}
                 </button>
-            )
+            ),
         },
         {
             header: 'Name',
             key: 'name',
-            render: (row) => <span className="font-medium text-foreground">{row.firstName} {row.lastName}</span>
+            render: (row) => <span className="font-medium text-foreground">{row.firstName} {row.lastName}</span>,
         },
         {
             header: 'Contact Info',
             key: 'contact',
             render: (row) => (
                 <div className="flex flex-col text-xs">
-                    <span className="text-muted-foreground">{row.email}</span>
+                    {row.email && <span className="text-muted-foreground">{row.email}</span>}
                     {row.number && <span className="text-muted-foreground/80">{row.number}</span>}
                 </div>
-            )
+            ),
         },
         {
-            header: 'Battery Details',
-            key: 'battery',
+            header: 'Utilmate Details',
+            key: 'utilmate',
             render: (row) => (
-                row.batteryDetails?.batterybrand || row.batteryDetails?.snnumber ? (
+                row.utilmateDetails?.siteIdentifier || row.utilmateDetails?.accountNumber ? (
                     <div className="flex flex-col text-xs">
-                        <span className="font-medium">{row.batteryDetails.batterybrand || 'Unknown brand'}</span>
-                        {row.batteryDetails.snnumber && (
-                            <span className="text-[10px] text-muted-foreground font-mono">SN: {row.batteryDetails.snnumber}</span>
+                        {row.utilmateDetails.siteIdentifier && (
+                            <span className="font-medium">Site: {row.utilmateDetails.siteIdentifier}</span>
+                        )}
+                        {row.utilmateDetails.accountNumber && (
+                            <span className="text-[10px] text-muted-foreground font-mono">Acct: {row.utilmateDetails.accountNumber}</span>
                         )}
                     </div>
                 ) : (
                     <span className="text-xs text-muted-foreground italic">—</span>
                 )
-            )
+            ),
         },
         {
-            header: 'Gsync Status',
-            key: 'vppConnected',
-            render: (row) => renderGsyncStatusBadge(getGsyncPushStatus(row)),
+            header: 'Utilmate Status',
+            key: 'utilmateStatus',
+            render: (row) => renderUtilmateStatusBadge(getUtilmatePushStatus(row)),
         },
         {
             header: 'Updated At',
             key: 'updatedAt',
-            render: (row) => row.vppDetails?.updatedAt ? (
+            render: (row) => row.utilmateUpdatedAt ? (
                 <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(row.vppDetails.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {new Date(row.utilmateUpdatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </span>
             ) : <span className="text-xs text-muted-foreground italic">—</span>,
         },
@@ -431,43 +441,57 @@ export const PushToGsyncPage: React.FC = () => {
             key: 'actions',
             render: (row) => (
                 <div className="flex items-center gap-2">
-                    {isGsyncPending(row) ? (
+                    {isUtilmatePending(row) ? (
                         <Button
                             size="sm"
                             disabled={!canEdit}
-                            onClick={() => handleOpenPushModal(row)}
+                            onClick={() => handleOpenConnectModal(row)}
                             className="bg-primary hover:bg-primary/95 text-primary-foreground font-medium text-xs py-1 px-3 h-8 shadow-sm flex items-center gap-1.5"
-                            leftIcon={<ZapIcon size={12} />}
+                            leftIcon={<ArrowRightIcon size={12} />}
                         >
-                            Push to Gsync
+                            Push to Utilmate
                         </Button>
                     ) : (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => navigate(`/customers/${row.uid}`)}
-                            className="border-border hover:bg-accent text-muted-foreground hover:text-foreground text-xs py-1 px-3 h-8"
-                        >
-                            Details
-                            <ChevronRightIcon size={13} className="ml-1" />
-                        </Button>
+                        <>
+                            {canEdit && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-border hover:bg-accent text-muted-foreground hover:text-foreground text-xs py-1 px-3 h-8"
+                                    onClick={() => {
+                                        setSelectedCustomer(row);
+                                        setDisconnectModalOpen(true);
+                                    }}
+                                >
+                                    Disconnect
+                                </Button>
+                            )}
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => navigate(`/customers/${row.uid}`)}
+                                className="border-border hover:bg-accent text-muted-foreground hover:text-foreground text-xs py-1 px-3 h-8"
+                            >
+                                Details
+                                <ChevronRightIcon size={13} className="ml-1" />
+                            </Button>
+                        </>
                     )}
                 </div>
-            )
-        }
+            ),
+        },
     ];
 
     return (
         <div className="space-y-6">
-            {/* Header section */}
             <div className="flex flex-col gap-2 border-border">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
-                            Push to Gsync Tracker
+                            Push to Utilmate Tracker
                         </h1>
                         <p className="text-muted-foreground">
-                            Track VPP customers and push their battery systems to the Gsync VPP platform.
+                            Track signed customers and push their accounts to the Utilmate platform.
                         </p>
                     </div>
                     <Button variant="outline" onClick={() => navigate(-1)} className="h-9 px-3 text-sm">
@@ -477,14 +501,13 @@ export const PushToGsyncPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Quick stats panel */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                 <div className="bg-card border border-border rounded-xl p-4 shadow-sm flex items-center gap-4">
                     <div className="w-12 h-12 rounded-lg bg-primary/5 text-primary flex items-center justify-center shrink-0 border border-primary/10">
                         <UserIcon size={24} />
                     </div>
                     <div>
-                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider block">Total VPP Customers</span>
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider block">Total Signed Customers</span>
                         <span className="text-2xl font-bold text-foreground">
                             {statsData?.total?.pageInfo?.totalCount !== undefined ? statsData.total.pageInfo.totalCount : '—'}
                         </span>
@@ -528,7 +551,6 @@ export const PushToGsyncPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Filter and Table Container */}
             <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
                 <div className="p-5 border-b border-border bg-muted/20">
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4">
@@ -574,7 +596,7 @@ export const PushToGsyncPage: React.FC = () => {
                 <div className="p-5">
                     {error ? (
                         <div className="p-8 text-center text-red-500 font-semibold border border-red-200 bg-red-50 rounded-lg">
-                            Error loading VPP customer data: {error.message}
+                            Error loading customer data: {error.message}
                         </div>
                     ) : (
                         <DataTable
@@ -582,7 +604,7 @@ export const PushToGsyncPage: React.FC = () => {
                             columns={columns}
                             rowKey={(row) => row.uid}
                             loading={loading}
-                            emptyMessage="No VPP customers found matching the filters"
+                            emptyMessage="No customers found matching the filters"
                             containerHeightClass="h-[300px] sm:h-[calc(100vh-486px)]"
                             pagination={pageInfo ? {
                                 currentPage,
@@ -602,35 +624,35 @@ export const PushToGsyncPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* VPP Connection Modal */}
             <Modal
-                isOpen={pushModalOpen}
-                onClose={() => setPushModalOpen(false)}
-                title="Connect VPP - Battery Details"
-                size="lg"
+                isOpen={connectModalOpen}
+                onClose={() => !isPushing && !isSkipping && setConnectModalOpen(false)}
+                title="Connect Utilmate"
+                size="md"
                 footer={
                     <>
                         <Button
                             variant="ghost"
-                            onClick={() => setPushModalOpen(false)}
+                            onClick={() => setConnectModalOpen(false)}
+                            disabled={isPushing || isSkipping}
                         >
                             Cancel
                         </Button>
                         <Button
                             variant="outline"
                             className="mr-2 text-primary border-primary/20 hover:bg-primary/5 shadow-sm hover:shadow transition-all duration-300 group"
-                            onClick={handleSkipAndConnectVpp}
-                            isLoading={isSkippingVpp}
+                            onClick={handleSkipAndConnect}
+                            isLoading={isSkipping}
+                            disabled={isPushing}
                             rightIcon={<ArrowRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
                         >
                             Skip & Connect
                         </Button>
                         <Button
                             className="bg-neutral-900 text-white hover:bg-neutral-800 shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200"
-                            onClick={handleConfirmPush}
+                            onClick={handleConfirmConnect}
                             isLoading={isPushing}
-                            disabled={isPushing}
-                            leftIcon={<ZapIcon className="w-4 h-4 text-yellow-400 fill-yellow-400" />}
+                            disabled={isPushing || isSkipping}
                         >
                             Connect & Save
                         </Button>
@@ -639,78 +661,59 @@ export const PushToGsyncPage: React.FC = () => {
             >
                 <div className="space-y-4">
                     <p className="text-sm text-muted-foreground mb-4">
-                        Please provide battery details to connect VPP.
+                        Please provide Utilmate details to connect.
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Brand</label>
-                            <Select
-                                options={BATTERY_BRAND_OPTIONS}
-                                value={vppForm.batteryBrand}
-                                onChange={(val) => setVppForm({ ...vppForm, batteryBrand: val as string })}
-                                placeholder="Select Brand..."
-                                className="w-full"
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Site Identifier</label>
+                            <Input
+                                placeholder="Site ID..."
+                                value={utilmateForm.siteIdentifier}
+                                onChange={(e) => setUtilmateForm({ ...utilmateForm, siteIdentifier: e.target.value })}
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">SN Number</label>
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Account Number</label>
                             <Input
-                                placeholder="e.g. SN12345678"
-                                value={vppForm.snNumber}
-                                onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
+                                placeholder="Account #..."
+                                value={utilmateForm.accountNumber}
+                                onChange={(e) => setUtilmateForm({ ...utilmateForm, accountNumber: e.target.value })}
                             />
                         </div>
-                        <div className="space-y-2 relative">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Capacity</label>
-                            <div className="relative">
-                                <Input
-                                    type="number"
-                                    step="0.1"
-                                    placeholder="13.5"
-                                    value={vppForm.batteryCapacity}
-                                    onChange={(e) => setVppForm({ ...vppForm, batteryCapacity: e.target.value })}
-                                />
-                                <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
-                            </div>
-                        </div>
-                        {/* <div className="space-y-2 relative">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Export Limit</label>
-                            <div className="relative">
-                                <Input
-                                    type="number"
-                                    step="0.1"
-                                    placeholder="5.0"
-                                    value={vppForm.exportLimit}
-                                    onChange={(e) => setVppForm({ ...vppForm, exportLimit: e.target.value })}
-                                />
-                                <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
-                            </div>
-                        </div> */}
-                        <div className="space-y-2 relative">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Inverter Capacity</label>
-                            <div className="relative">
-                                <Input
-                                    type="number"
-                                    step="0.1"
-                                    placeholder="6.0"
-                                    value={vppForm.inverterCapacity}
-                                    onChange={(e) => setVppForm({ ...vppForm, inverterCapacity: e.target.value })}
-                                />
-                                <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
-                            </div>
-                        </div>
-                        {(vppForm.batteryBrand === 'Fox ESS' || vppForm.batteryBrand === 'NeoVolt' || vppForm.batteryBrand === 'AlphaESS' || vppForm.batteryBrand === 'Alpha ESS' || vppForm.batteryBrand === 'Aerl') && (
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase text-muted-foreground">Check Code</label>
-                                <Input
-                                    placeholder="Verification Code"
-                                    value={vppForm.checkCode}
-                                    onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
-                                />
-                            </div>
-                        )}
                     </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={disconnectModalOpen}
+                onClose={() => !isDisconnecting && setDisconnectModalOpen(false)}
+                title="Disconnect from Utilmate"
+                size="md"
+                footer={
+                    <>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setDisconnectModalOpen(false)}
+                            disabled={isDisconnecting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-md"
+                            onClick={handleDisconnect}
+                            isLoading={isDisconnecting}
+                            disabled={isDisconnecting}
+                        >
+                            Disconnect Utilmate
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        Are you sure you want to disconnect customer {selectedCustomer?.firstName} {selectedCustomer?.lastName} from Utilmate?
+                    </p>
                 </div>
             </Modal>
         </div>
