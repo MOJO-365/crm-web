@@ -433,8 +433,8 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
 `;
 
 export const GET_CUSTOMERS_CURSOR = gql`
-    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: String, $searchVpp: Int, $searchVppConnected: Int, $searchUtilmateStatus: Int, $searchMsatConnected: Int, $searchAssignedTo: String, $searchPortal: String, $searchSigned: Int, $includeDeleted: String) {
-        customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchRiskStatus: $searchRiskStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchUtilmateStatus: $searchUtilmateStatus, searchMsatConnected: $searchMsatConnected, searchAssignedTo: $searchAssignedTo, searchPortal: $searchPortal, searchSigned: $searchSigned, includeDeleted: $includeDeleted) {
+    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: String, $searchVpp: Int, $searchVppConnected: Int, $searchVppApiPushed: Int, $searchUtilmateStatus: Int, $searchUtilmateApiPushed: Int, $searchMsatConnected: Int, $searchAssignedTo: String, $searchPortal: String, $searchSigned: Int, $includeDeleted: String) {
+        customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchRiskStatus: $searchRiskStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchVppApiPushed: $searchVppApiPushed, searchUtilmateStatus: $searchUtilmateStatus, searchUtilmateApiPushed: $searchUtilmateApiPushed, searchMsatConnected: $searchMsatConnected, searchAssignedTo: $searchAssignedTo, searchPortal: $searchPortal, searchSigned: $searchSigned, includeDeleted: $includeDeleted) {
             data {
                 id
                 uid
@@ -449,6 +449,8 @@ export const GET_CUSTOMERS_CURSOR = gql`
                 tariffCode
                 status
                 utilmateStatus
+                utilmateUpdatedAt
+                utilmateUploadedManually
                 riskStatus
                 leadUid
                 portalName
@@ -456,6 +458,7 @@ export const GET_CUSTOMERS_CURSOR = gql`
                 referralName
                 msatDetails {
                   msatConnected
+                  msatUpdatedAt
                 }
                 discount
                 pdrsEmailSent
@@ -470,12 +473,19 @@ export const GET_CUSTOMERS_CURSOR = gql`
                     vpp
                     vppConnected
                     vppSignupBonus
+                    vppApiPushed
+                    updatedAt
                 }
                 utilmateDetails {
                     utilmateConnected
+                    siteIdentifier
+                    accountNumber
+                    utilmateConnectedAt
+                    utilmateApiPushed
                 }
                 address {
                     fullAddress
+                    nmi
                 }
                 assignedToUid
                 assignedToUser {
@@ -1106,6 +1116,7 @@ export const GET_CUSTOMER_UTILMATE_DETAILS = gql`
                 accountNumber
                 utilmateConnected
                 utilmateConnectedAt
+                utilmateApiPushed
             }
             msatDetails {
                 id
