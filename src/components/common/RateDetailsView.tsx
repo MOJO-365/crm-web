@@ -7,7 +7,9 @@ import {
     PlugIcon,
     Settings2Icon,
     ActivityIcon,
+    InfoIcon,
 } from '@/components/icons';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 export interface RateDetailsViewProps {
     offer: any;
@@ -21,6 +23,57 @@ export interface RateDetailsViewProps {
 }
 
 export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan, className, planRatesJson }: RateDetailsViewProps) => {
+    const getTooltipText = (label: string) => {
+        const lower = (label || '').toLowerCase();
+        if (lower.includes('discounted usage') || lower.includes('discounted rate')) return "First 10 kWh/day";
+        if (lower.includes('standard usage') || lower.includes('standard rate')) return "After 10 kWh/day";
+        if (lower.includes('premium feed-in tariff') || lower.includes('premium fit')) return "The first 10kWh exported between 5:00pm and 9:00pm";
+        if (lower.includes('critical event bonus') || lower.includes('critical event')) return "When electricity cost is more than $1/kwh at AEMO and we trigger the batteries to discharge";
+        if (lower.includes('zero evening')) return "If your grid import is effectively zero—defined as less than 0.03 kWh per hour from the grid, during the 5–8 pm evening peak every day.";
+        if (lower.includes('base fit')) {
+            return (
+                <div className="space-y-1.5 text-[11px] leading-normal font-sans text-left text-white p-1">
+                    <div className="font-bold border-b border-gray-700 pb-1 mb-1.5 uppercase tracking-wider text-xs">Base FIT</div>
+                    <div className="flex flex-col gap-0.5">
+                        <div className="flex justify-between items-center gap-2">
+                            <span className="text-gray-400 font-medium">Standard Hours:</span>
+                            <span className="font-semibold">5:00pm to 9:00pm</span>
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-0.5 border-t border-gray-700/50 pt-1">
+                        <div className="flex justify-between items-center gap-2">
+                            <span className="text-gray-400 font-medium">Seasonal Bonus Hours:</span>
+                            <span className="font-semibold">5:00am to 8:00am</span>
+                        </div>
+                        <span className="text-[10px] text-gray-400 italic text-right mt-0.5">(1 March to 31 August)</span>
+                    </div>
+                </div>
+            );
+        }
+        if (lower === 'anytime') return "Flat usage rate charged at all times.";
+        if (lower === 'peak') return "Usage rate charged during peak periods of high demand.";
+        if (lower === 'shoulder') return "Usage rate charged during shoulder transition periods.";
+        if (lower === 'off-peak') return "Usage rate charged during off-peak periods (typically overnight).";
+        if (lower === 'supply' || lower === 'supply charge') return "Daily service charge for connection to the grid.";
+        return null;
+    };
+
+    const renderLabelWithTooltip = (label: string, textClass?: string) => {
+        const tooltipContent = getTooltipText(label);
+        return (
+            <div className={cn("text-[10px] font-bold uppercase tracking-wider opacity-80 flex items-center justify-center gap-1", textClass)}>
+                <span>{label}</span>
+                {tooltipContent && (
+                    <Tooltip content={tooltipContent} position="top">
+                        <span className="cursor-help opacity-70 hover:opacity-100 transition-opacity">
+                            <InfoIcon size={10} />
+                        </span>
+                    </Tooltip>
+                )}
+            </div>
+        );
+    };
+
     const planRates: any[] = React.useMemo(() => {
         if (!planRatesJson) return [];
         if (typeof planRatesJson === 'object') {
@@ -189,9 +242,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                 <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-sm")}>
                                     ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
                                 </div>
-                                <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "text-[10px] font-bold uppercase tracking-wider opacity-80")}>
-                                    {dRate.name}
-                                </div>
+                                {renderLabelWithTooltip(dRate.name, colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400")}
                             </div>
                         );
                     })}
@@ -228,10 +279,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                             "font-bold text-sm",
                                             isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
                                         )}>${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                        <div className={cn(
-                                            "text-[10px] font-bold uppercase tracking-wider opacity-80",
-                                            isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
-                                        )}>{rate.label}</div>
+                                        {renderLabelWithTooltip(rate.label, isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400")}
                                     </div>
                                 );
                             })}
@@ -255,7 +303,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                     return (
                                         <div key={id} className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                             <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                            <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider opacity-80">{r.label}</div>
+                                            {renderLabelWithTooltip(r.label, "text-purple-600 dark:text-purple-400")}
                                         </div>
                                     );
                                 })}
@@ -277,7 +325,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                     return (
                                         <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                             <div className="text-rose-600 dark:text-rose-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                            <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider opacity-80">{d.label}</div>
+                                            {renderLabelWithTooltip(d.label, "text-rose-600 dark:text-rose-400")}
                                         </div>
                                     );
                                 })}
@@ -311,7 +359,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider opacity-80">{r.label}</div>
+                                            {renderLabelWithTooltip(r.label, "text-amber-600 dark:text-amber-400")}
                                         </div>
                                     );
                                 })}
@@ -336,7 +384,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                 return (
                                     <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                         <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                        <div className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider opacity-80">{rate.label}</div>
+                                        {renderLabelWithTooltip(rate.label, "text-teal-800 dark:text-teal-300")}
                                     </div>
                                 );
                             })}
@@ -359,7 +407,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                             return (
                                 <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                     <div className="text-green-600 dark:text-green-400 font-bold text-sm">${price.toFixed(4)}{unitStr.startsWith('/') ? unitStr : `/${unitStr}`}</div>
-                                    <div className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider opacity-80">{rate.label}</div>
+                                    {renderLabelWithTooltip(rate.label, "text-green-600 dark:text-green-400")}
                                 </div>
                             );
                         })}

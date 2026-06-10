@@ -5,11 +5,12 @@ import { CREATE_PLAN } from '@/graphql';
 import { GET_PLAN } from '@/graphql/queries/plans';
 import { UPDATE_PLAN } from '@/graphql/mutations/plans';
 import { GET_MEASUREMENT_UNITS, GET_RATE_PLANS } from '@/graphql/queries/rates';
+import { GET_ACTIVE_BONUSES } from '@/graphql/queries/bonus';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { toast } from 'react-toastify';
-import { ChevronRightIcon } from '@/components/icons';
+import { ChevronRightIcon, CheckIcon } from '@/components/icons';
 import Modal from '@/components/common/Modal';
 
 const TARIFF_COMPONENTS = [
@@ -65,6 +66,8 @@ export const AddPlanPage: React.FC = () => {
         variables: { uid },
         skip: !uid
     });
+    const { data: bonusesData } = useQuery(GET_ACTIVE_BONUSES);
+    const activeBonuses = bonusesData?.activeBonuses || [];
 
     const unitOptions = React.useMemo(() => {
         if (!unitsData?.measurementUnits) return [];
@@ -79,6 +82,11 @@ export const AddPlanPage: React.FC = () => {
         description: '',
         discount: 0,
         propertyType: 0,
+        isSolarRequired: false,
+        isBatteryRequired: false,
+        contractTerm: '',
+        exitFee: '' as number | string,
+        bonusUids: [] as string[],
         components: TARIFF_COMPONENTS.map(name => ({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false as boolean | undefined, rateType: 'None' }))
     });
 
@@ -136,6 +144,11 @@ export const AddPlanPage: React.FC = () => {
                     description: plan.description || '',
                     discount: plan.discount || 0,
                     propertyType: plan.propertyType ?? 0,
+                    isSolarRequired: plan.isSolarRequired ?? false,
+                    isBatteryRequired: plan.isBatteryRequired ?? false,
+                    contractTerm: plan.contractTerm || '',
+                    exitFee: plan.exitFee ?? '',
+                    bonusUids: plan.bonusUids || [],
                     components: baseComponents
                 };
             });
@@ -322,8 +335,13 @@ export const AddPlanPage: React.FC = () => {
                             description: formData.description,
                             discount: Number(formData.discount) || 0,
                             propertyType: formData.propertyType,
+                            isSolarRequired: formData.isSolarRequired,
+                            isBatteryRequired: formData.isBatteryRequired,
+                            contractTerm: formData.contractTerm,
+                            exitFee: formData.exitFee === '' ? null : Number(formData.exitFee),
                             ratesJson: JSON.stringify(validComponents),
-                            isActive: true
+                            isActive: true,
+                            bonusUids: formData.bonusUids
                         }
                     }
                 });
@@ -336,8 +354,13 @@ export const AddPlanPage: React.FC = () => {
                             description: formData.description,
                             discount: Number(formData.discount) || 0,
                             propertyType: formData.propertyType,
+                            isSolarRequired: formData.isSolarRequired,
+                            isBatteryRequired: formData.isBatteryRequired,
+                            contractTerm: formData.contractTerm,
+                            exitFee: formData.exitFee === '' ? null : Number(formData.exitFee),
                             ratesJson: JSON.stringify(validComponents),
-                            isActive: true
+                            isActive: true,
+                            bonusUids: formData.bonusUids
                         }
                     }
                 });
@@ -365,116 +388,237 @@ export const AddPlanPage: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="bg-card border border-border rounded-xl shadow-sm flex flex-col h-[calc(100vh-120px)] min-h-[500px]">
                     <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2 flex flex-col justify-start">
-                                <label className="text-sm font-medium text-foreground">
-                                    Plan Title <span className="text-destructive">*</span>
-                                </label>
-                                <Input
-                                    value={formData.title}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, title: e.target.value });
-                                        if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
-                                    }}
-                                    placeholder="e.g. Standard VPP Plan"
-                                    className={`w-full ${errors.title ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                                />
-                                {errors.title && <span className="text-xs text-destructive mt-1">{errors.title}</span>}
-                            </div>
-                            <div className="space-y-2 flex flex-col justify-start">
-                                <label className="text-sm font-medium text-foreground">
-                                    Description <span className="text-destructive">*</span>
-                                </label>
-                                <textarea
-                                    value={formData.description}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, description: e.target.value });
-                                        if (errors.description) setErrors(prev => ({ ...prev, description: '' }));
-                                    }}
-                                    placeholder="Enter plan description..."
-                                    className={`w-full h-[38px] rounded-md border ${errors.description ? 'border-destructive focus-visible:outline-destructive' : 'border-input focus-visible:outline-primary'} bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50`}
-                                />
-                                {errors.description && <span className="text-xs text-destructive mt-1">{errors.description}</span>}
-                            </div>
-                            <div className="space-y-2 flex flex-col justify-start col-span-1">
-                                <label className="text-sm font-medium text-foreground">
-                                    Discount
-                                </label>
-                                <div className="flex flex-wrap items-center gap-2 min-h-[40px] pt-1">
-                                    {/* Standard Options */}
-                                    {['0', '5', '7', '10', '13', '15'].map((opt) => {
-                                        const isActive = !isCustomDiscountMode && formData.discount?.toString() === opt;
-                                        return (
-                                            <button
-                                                key={opt}
-                                                type="button"
-                                                onClick={() => {
-                                                    setIsCustomDiscountMode(false);
-                                                    setFormData(prev => ({ ...prev, discount: parseFloat(opt) }));
-                                                }}
-                                                className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${
-                                                    isActive
-                                                        ? "bg-neutral-900 text-white border-neutral-900 shadow-sm"
-                                                        : "bg-white text-neutral-600 border-border hover:border-neutral-400 hover:text-neutral-900"
-                                                }`}
-                                            >
-                                                {opt}%
-                                            </button>
-                                        );
-                                    })}
-
-                                    {/* Custom Option */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setIsCustomDiscountMode(true);
+                        <div className="space-y-6">
+                            {/* Section 1: General Information */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 bg-neutral-50/40 dark:bg-neutral-900/10 border border-border/70 rounded-xl">
+                                <div className="space-y-2 flex flex-col justify-start">
+                                    <label className="text-sm font-medium text-foreground">
+                                        Plan Title <span className="text-destructive">*</span>
+                                    </label>
+                                    <Input
+                                        value={formData.title}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, title: e.target.value });
+                                            if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
                                         }}
-                                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${
-                                            (isCustomDiscountMode || (formData.discount !== undefined && !['0', '5', '7', '10', '13', '15'].includes(formData.discount?.toString() || '')))
-                                                ? "bg-neutral-900 text-white border-neutral-900 shadow-sm"
-                                                : "bg-white text-neutral-600 border-border hover:border-neutral-400 hover:text-neutral-900"
-                                        }`}
-                                    >
-                                        Custom
-                                    </button>
+                                        placeholder="e.g. Standard VPP Plan"
+                                        className={`w-full ${errors.title ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                                    />
+                                    {errors.title && <span className="text-xs text-destructive mt-1">{errors.title}</span>}
+                                </div>
 
-                                    {/* Custom Input - Inline */}
-                                    <div className={`overflow-hidden transition-all duration-300 ease-in-out flex items-center gap-2 ${
-                                        (isCustomDiscountMode || (formData.discount !== undefined && !['0', '5', '7', '10', '13', '15'].includes(formData.discount?.toString() || '')))
-                                            ? "w-[120px] opacity-100"
-                                            : "w-0 opacity-0"
-                                    }`}>
-                                        <div className="relative w-full">
-                                            <Input
-                                                type="number"
-                                                value={!['0', '5', '7', '10', '13', '15'].includes(formData.discount?.toString() || '') ? (formData.discount ?? '') : ''}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
-                                                placeholder="0"
-                                                className="h-8 text-xs pr-6"
-                                                min={0}
-                                                max={100}
-                                                step={0.01}
-                                            />
-                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">%</span>
+                                <div className="space-y-2 flex flex-col justify-start">
+                                    <label className="text-sm font-medium text-foreground">
+                                        Property Type <span className="text-destructive">*</span>
+                                    </label>
+                                    <Select
+                                        value={formData.propertyType !== undefined ? String(formData.propertyType) : '0'}
+                                        onChange={(val) => {
+                                            setFormData(prev => ({ ...prev, propertyType: parseInt(Array.isArray(val) ? val[0] : val) }));
+                                        }}
+                                        options={[
+                                            { label: 'Residential', value: '0' },
+                                            { label: 'Commercial', value: '1' }
+                                        ]}
+                                        className="w-full h-[38px]"
+                                    />
+                                </div>
+
+
+                                <div className="space-y-2 flex flex-col justify-start col-span-1 md:col-span-2">
+                                    <label className="text-sm font-medium text-foreground">
+                                        Description <span className="text-destructive">*</span>
+                                    </label>
+                                    <textarea
+                                        value={formData.description}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, description: e.target.value });
+                                            if (errors.description) setErrors(prev => ({ ...prev, description: '' }));
+                                        }}
+                                        placeholder="Enter plan description..."
+                                        className={`w-full min-h-[80px] rounded-md border ${errors.description ? 'border-destructive focus-visible:outline-destructive' : 'border-input focus-visible:outline-primary'} bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50`}
+                                    />
+                                    {errors.description && <span className="text-xs text-destructive mt-1">{errors.description}</span>}
+                                </div>
+
+                                <div className="space-y-2 flex flex-col justify-start col-span-1">
+                                    <label className="text-sm font-medium text-foreground">
+                                        Discount
+                                    </label>
+                                    <div className="flex flex-wrap items-center gap-2 min-h-[40px] pt-1">
+                                        {/* Standard Options */}
+                                        {['0', '5', '7', '10', '13', '15'].map((opt) => {
+                                            const isActive = !isCustomDiscountMode && formData.discount?.toString() === opt;
+                                            return (
+                                                <button
+                                                    key={opt}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsCustomDiscountMode(false);
+                                                        setFormData(prev => ({ ...prev, discount: parseFloat(opt) }));
+                                                    }}
+                                                    className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${
+                                                        isActive
+                                                            ? "bg-neutral-900 text-white border-neutral-900 shadow-sm"
+                                                            : "bg-white text-neutral-600 border-border hover:border-neutral-400 hover:text-neutral-900"
+                                                    }`}
+                                                >
+                                                    {opt}%
+                                                </button>
+                                            );
+                                        })}
+
+                                        {/* Custom Option */}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsCustomDiscountMode(true);
+                                            }}
+                                            className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${
+                                                (isCustomDiscountMode || (formData.discount !== undefined && !['0', '5', '7', '10', '13', '15'].includes(formData.discount?.toString() || '')))
+                                                    ? "bg-neutral-900 text-white border-neutral-900 shadow-sm"
+                                                    : "bg-white text-neutral-600 border-border hover:border-neutral-400 hover:text-neutral-900"
+                                            }`}
+                                        >
+                                            Custom
+                                        </button>
+
+                                        {/* Custom Input - Inline */}
+                                        <div className={`overflow-hidden transition-all duration-300 ease-in-out flex items-center gap-2 ${
+                                            (isCustomDiscountMode || (formData.discount !== undefined && !['0', '5', '7', '10', '13', '15'].includes(formData.discount?.toString() || '')))
+                                                ? "w-[120px] opacity-100"
+                                                : "w-0 opacity-0"
+                                        }`}>
+                                            <div className="relative w-full">
+                                                <Input
+                                                    type="number"
+                                                    value={!['0', '5', '7', '10', '13', '15'].includes(formData.discount?.toString() || '') ? (formData.discount ?? '') : ''}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
+                                                    placeholder="0"
+                                                    className="h-8 text-xs pr-6"
+                                                    min={0}
+                                                    max={100}
+                                                    step={0.01}
+                                                />
+                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">%</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+
+                                <div className="space-y-2 flex flex-col justify-start col-span-1">
+                                    <label className="text-sm font-medium text-foreground">
+                                        Requirements
+                                    </label>
+                                    <div className="flex flex-row items-center gap-6 min-h-[40px] pt-1">
+                                        <label className="flex items-center gap-2 cursor-pointer group">
+                                            <div className="relative flex items-center justify-center w-4 h-4 border border-input rounded shadow-sm group-hover:border-primary transition-colors">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="absolute opacity-0 w-full h-full cursor-pointer"
+                                                    checked={formData.isSolarRequired}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, isSolarRequired: e.target.checked }))}
+                                                />
+                                                {formData.isSolarRequired && <CheckIcon size={12} className="text-primary pointer-events-none" />}
+                                            </div>
+                                            <span className="text-sm text-foreground select-none">Solar Required</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer group">
+                                            <div className="relative flex items-center justify-center w-4 h-4 border border-input rounded shadow-sm group-hover:border-primary transition-colors">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="absolute opacity-0 w-full h-full cursor-pointer"
+                                                    checked={formData.isBatteryRequired}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, isBatteryRequired: e.target.checked }))}
+                                                />
+                                                {formData.isBatteryRequired && <CheckIcon size={12} className="text-primary pointer-events-none" />}
+                                            </div>
+                                            <span className="text-sm text-foreground select-none">Battery Required</span>
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="space-y-2 flex flex-col justify-start col-span-1">
-                                <label className="text-sm font-medium text-foreground">
-                                    Property Type <span className="text-destructive">*</span>
-                                </label>
-                                <Select
-                                    value={formData.propertyType !== undefined ? String(formData.propertyType) : '0'}
-                                    onChange={(val) => {
-                                        setFormData(prev => ({ ...prev, propertyType: parseInt(Array.isArray(val) ? val[0] : val) }));
-                                    }}
-                                    options={[
-                                        { label: 'Residential', value: '0' },
-                                        { label: 'Commercial', value: '1' }
-                                    ]}
-                                    className="w-full h-[38px]"
-                                />
+
+                            {/* Associated Bonuses Card */}
+                            <div className="p-5 bg-card border border-border rounded-xl shadow-sm space-y-4">
+                                <h3 className="text-sm font-bold text-foreground border-b border-border pb-2 flex items-center gap-2 uppercase tracking-wider">
+                                    <span className="w-1.5 h-3.5 rounded-full bg-primary" />
+                                    Associated Bonuses
+                                </h3>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-neutral-50/40 dark:bg-neutral-900/10 border border-border/70 rounded-xl mb-4">
+                                    <div className="space-y-2 flex flex-col justify-start">
+                                        <label className="text-sm font-medium text-foreground">
+                                            Contract Term
+                                        </label>
+                                        <Input
+                                            value={formData.contractTerm}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, contractTerm: e.target.value }))}
+                                            placeholder="e.g. 12 Months"
+                                            className="w-full bg-background"
+                                        />
+                                    </div>
+                                    <div className="space-y-2 flex flex-col justify-start">
+                                        <label className="text-sm font-medium text-foreground">
+                                            Exit Fee
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                            <Input
+                                                type="number"
+                                                value={formData.exitFee}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, exitFee: e.target.value }))}
+                                                placeholder="0.00"
+                                                className="w-full pl-7 bg-background"
+                                                min="0"
+                                                step="0.01"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                                    {activeBonuses.map((bonus: any) => {
+                                        const isChecked = formData.bonusUids.includes(bonus.uid);
+                                        return (
+                                            <div 
+                                                key={bonus.uid} 
+                                                onClick={() => {
+                                                    const newUids = isChecked
+                                                        ? formData.bonusUids.filter(uid => uid !== bonus.uid)
+                                                        : [...formData.bonusUids, bonus.uid];
+                                                    setFormData(prev => ({ ...prev, bonusUids: newUids }));
+                                                }}
+                                                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between group ${
+                                                    isChecked 
+                                                        ? 'border-primary bg-primary/5 shadow-sm' 
+                                                        : 'border-border bg-background hover:border-neutral-400 hover:bg-neutral-50/50'
+                                                }`}
+                                            >
+                                                <div className="flex flex-col">
+                                                    <span className={`text-sm font-semibold transition-colors ${isChecked ? 'text-primary' : 'text-foreground'}`}>
+                                                        {bonus.name}
+                                                    </span>
+                                                    {bonus.description && (
+                                                        <span className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                                                            {bonus.description}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                                                    isChecked 
+                                                        ? 'border-primary bg-primary text-white' 
+                                                        : 'border-input bg-card group-hover:border-neutral-400'
+                                                }`}>
+                                                    {isChecked && <CheckIcon size={12} className="text-white" />}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {activeBonuses.length === 0 && (
+                                        <span className="text-xs text-muted-foreground italic">No active bonuses available</span>
+                                    )}
+                                </div>
                             </div>
                         </div>
 

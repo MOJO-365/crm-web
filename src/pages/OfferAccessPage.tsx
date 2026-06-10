@@ -908,42 +908,54 @@ export const OfferAccessPage = () => {
                         </div >
 
                         {/* VPP Details */}
-                        {customerData.vppDetails?.vpp === 1 && (
-                            <div className="mt-4">
-                                <h4 className="text-xs text-muted-foreground mb-2 font-medium uppercase">VPP Participant</h4>
-                                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
-                                    {[
-                                        { label: 'VPP Enrolled', value: 'Yes' },
-                                        { label: 'VPP Connected', value: customerData.vppDetails?.vppConnected === 1 ? 'Yes' : null },
-                                        {
-                                            label: 'Signup Bonus',
-                                            value: [
-                                                customerData.vppDetails?.vppSignupBonus ? '$50 monthly bill credit for 12 months (total $600)' : null,
-                                                ...(customerData.selectedBonuses && customerData.selectedBonuses.length > 0
-                                                    ? allBonuses
-                                                        .filter((b: any) => customerData.selectedBonuses.includes(b.uid))
-                                                        .map((b: any) => b.description || b.name)
-                                                    : [])
-                                            ].filter(Boolean).join(', ') || null,
-                                            fullWidth: true
-                                        },
-                                        ...(customerData.batteryDetails ? [
-                                            { label: 'Battery Brand', value: customerData.batteryDetails.batterybrand || null },
-                                            { label: 'SN Number', value: customerData.batteryDetails.snnumber || null },
-                                            { label: 'Battery Capacity', value: customerData.batteryDetails.batterycapacity ? `${customerData.batteryDetails.batterycapacity} kW` : null },
-                                            { label: 'Export Limit', value: customerData.batteryDetails.exportlimit ? `${customerData.batteryDetails.exportlimit} kW` : null },
-                                        ] : [])
-                                    ].map((item: any, i) => (
-                                        item.value ? (
-                                            <div key={i} className={item.fullWidth ? "sm:col-span-3" : ""}>
-                                                <div className="text-xs text-muted-foreground mb-1">{item.label}</div>
-                                                <div className="text-sm font-medium text-foreground">{item.value}</div>
-                                            </div>
-                                        ) : null
-                                    ))}
+                        {customerData.vppDetails?.vpp === 1 && (() => {
+                            const isPdrs = customerData.portalName?.toUpperCase() === 'PEERLESSGROUP' || customerData.portalName?.toUpperCase() === 'PDRS';
+                            const hasBattery = customerData.batteryDetails?.isbattery === 1;
+                            const signupBonusLabel = (customerData.vppDetails?.vppSignupBonus || (isPdrs && !hasBattery)) 
+                                ? '$50 monthly bill credit for 12 months (total $600)' 
+                                : null;
+                            const selectedBonusesLabels = customerData.selectedBonuses && customerData.selectedBonuses.length > 0
+                                ? allBonuses
+                                    .filter((b: any) => customerData.selectedBonuses.includes(b.uid))
+                                    .map((b: any) => b.description || b.name)
+                                : [];
+                            const planBonusesLabels = customerData.plan?.bonusUids && customerData.plan.bonusUids.length > 0
+                                ? allBonuses
+                                    .filter((b: any) => customerData.plan.bonusUids.includes(b.uid))
+                                    .map((b: any) => b.description || b.name)
+                                : [];
+                            const signupBonusValue = [signupBonusLabel, ...selectedBonusesLabels, ...planBonusesLabels].filter(Boolean).join(', ') || null;
+
+                            return (
+                                <div className="mt-4">
+                                    <h4 className="text-xs text-muted-foreground mb-2 font-medium uppercase">VPP Participant</h4>
+                                    <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-4 bg-muted/50 rounded-lg p-4">
+                                        {[
+                                            { label: 'VPP Enrolled', value: 'Yes' },
+                                            { label: 'VPP Connected', value: customerData.vppDetails?.vppConnected === 1 ? 'Yes' : null },
+                                            {
+                                                label: 'Signup Bonus',
+                                                value: signupBonusValue,
+                                                fullWidth: true
+                                            },
+                                            ...(customerData.batteryDetails ? [
+                                                { label: 'Battery Brand', value: customerData.batteryDetails.batterybrand || null },
+                                                { label: 'SN Number', value: customerData.batteryDetails.snnumber || null },
+                                                { label: 'Battery Capacity', value: customerData.batteryDetails.batterycapacity ? `${customerData.batteryDetails.batterycapacity} kW` : null },
+                                                { label: 'Export Limit', value: customerData.batteryDetails.exportlimit ? `${customerData.batteryDetails.exportlimit} kW` : null },
+                                            ] : [])
+                                        ].map((item: any, i) => (
+                                            item.value ? (
+                                                <div key={i} className={item.fullWidth ? "sm:col-span-3" : ""}>
+                                                    <div className="text-xs text-muted-foreground mb-1">{item.label}</div>
+                                                    <div className="text-sm font-medium text-foreground">{item.value}</div>
+                                                </div>
+                                            ) : null
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
                         {/* MSAT Details */}
                         {/* <div className="mt-4">

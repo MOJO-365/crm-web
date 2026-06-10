@@ -110,8 +110,8 @@ const CUSTOMER_FULL_RESPONSE = `
         batterybrand
         snnumber
         batterycapacity
-        batterycapacity
         exportlimit
+        batterymodel
         inverterCapacity
         checkCode
     }

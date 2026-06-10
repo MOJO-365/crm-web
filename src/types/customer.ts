@@ -42,14 +42,18 @@ export interface CustomerFormData {
 
     // VPP Details
     vpp: boolean;
+    isVpp?: number;
     vppConnected: boolean;
     vppSignupBonus: string | null;
 
     // Battery Details
+    hasBattery: boolean;
+    isBattery?: number;
     batteryBrand: string;
     batteryCapacity: string;
     snNumber: string;
-    exportLimit: string;
+    exportLimit?: string;
+    batteryModel: string;
 
     // Enrollment Details
     saleType: number;

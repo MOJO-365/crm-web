@@ -39,7 +39,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
         return map;
     }, [measurementUnits]);
 
-    const discount = parseFloat(String(payload?.discount ?? customer?.discount ?? customer?.plan?.discount ?? 0));
+    const discount = parseFloat(String(payload?.discount || customer?.discount || customer?.plan?.discount || 0));
 
     const parsedPriceUnits: Record<string, string> = typeof mainOffer?.priceUnits === 'string'
         ? (() => { try { return JSON.parse(mainOffer.priceUnits); } catch { return {}; } })()
@@ -126,7 +126,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
     }, [mainOffer, parsedDynamicRates, processItems]); const supplyChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
-            { label: 'Supply', value: mainOffer.supplyCharge, type: 'supplyCharge' },
+            { label: 'Supply Charge', value: mainOffer.supplyCharge, type: 'supplyCharge' },
             ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
         ], 'supply_charges');
     }, [mainOffer, parsedDynamicRates, processItems]); const demandChargesItems = React.useMemo(() => {
@@ -141,7 +141,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
     }, [mainOffer, parsedDynamicRates, processItems]); const vppChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
-            { label: 'Orchestration', value: mainOffer.vppOrcharge, type: 'vppOrcharge', applyDiscount: true },
+            { label: 'VPP Orchestration', value: mainOffer.vppOrcharge, type: 'vppOrcharge', applyDiscount: true },
             ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
         ], 'vpp_charges');
     }, [mainOffer, parsedDynamicRates, processItems]); const solarFitItems = React.useMemo(() => {
@@ -253,6 +253,11 @@ export const RatesStep: React.FC<RatesStepProps> = ({
                         </div>
                     );
                 }
+                if (lower === 'anytime') return "Flat usage rate charged at all times.";
+                if (lower === 'peak') return "Usage rate charged during peak periods of high demand.";
+                if (lower === 'shoulder') return "Usage rate charged during shoulder transition periods.";
+                if (lower === 'off-peak') return "Usage rate charged during off-peak periods (typically overnight).";
+                if (lower === 'supply' || lower === 'supply charge') return "Daily service charge for connection to the grid.";
                 return null;
             })();
 

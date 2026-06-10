@@ -9,9 +9,14 @@ export const CREATE_PLAN = gql`
       description
       discount
       propertyType
+      isSolarRequired
+      isBatteryRequired
+      contractTerm
+      exitFee
       isActive
       createdAt
       updatedAt
+      bonusUids
     }
   }
 `;
@@ -25,10 +30,15 @@ export const UPDATE_PLAN = gql`
       description
       discount
       propertyType
+      isSolarRequired
+      isBatteryRequired
+      contractTerm
+      exitFee
       ratesJson
       isActive
       createdAt
       updatedAt
+      bonusUids
     }
   }
 `;

@@ -20,6 +20,10 @@ interface Plan {
     description?: string;
     isActive?: boolean;
     propertyType?: number;
+    isSolarRequired?: boolean;
+    isBatteryRequired?: boolean;
+    contractTerm?: string;
+    exitFee?: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -103,6 +107,27 @@ export const PlansMasterPage: React.FC = () => {
             )
         },
         {
+            header: 'Requirements',
+            key: 'requirements' as any,
+            render: (item) => (
+                <div className="flex gap-2">
+                    {item.isSolarRequired && <span className="text-[10px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full dark:bg-yellow-900/30 dark:text-yellow-400 font-medium whitespace-nowrap border border-yellow-200 dark:border-yellow-800">Solar Req.</span>}
+                    {item.isBatteryRequired && <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded-full dark:bg-green-900/30 dark:text-green-400 font-medium whitespace-nowrap border border-green-200 dark:border-green-800">Battery Req.</span>}
+                    {!item.isSolarRequired && !item.isBatteryRequired && <span className="text-muted-foreground">-</span>}
+                </div>
+            )
+        },
+        {
+            header: 'Contract Term',
+            key: 'contractTerm' as any,
+            render: (item) => <span className="text-sm font-medium">{item.contractTerm || '-'}</span>
+        },
+        {
+            header: 'Exit Fee',
+            key: 'exitFee' as any,
+            render: (item) => <span className="text-sm font-medium">{item.exitFee !== null && item.exitFee !== undefined ? `$${item.exitFee}` : '-'}</span>
+        },
+        {
             header: 'Status',
             key: 'isActive',
             render: (item) => <StatusField type="user_status" value={item.isActive !== false ? 1 : 0} />
@@ -144,8 +169,6 @@ export const PlansMasterPage: React.FC = () => {
         }
     ];
 
-    if (loading) return <div className="p-8">Loading...</div>;
-    if (error) return <div className="p-8 text-red-500">Error loading plans</div>;
 
     return (
         <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
@@ -195,6 +218,8 @@ export const PlansMasterPage: React.FC = () => {
                         data={filteredData}
                         columns={columns}
                         rowKey={(row) => row.uid}
+                        loading={loading}
+                        error={error?.message}
                         emptyMessage="No plans found"
                     />
                 </div>
