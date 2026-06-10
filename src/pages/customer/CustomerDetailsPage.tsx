@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { Button, Input, DatePicker, Select, Tooltip, Switch as ToggleSwitch, ConfirmationPopover, Popover } from '@/components/ui';
 import { DataTable, type Column, Modal, StatusField } from '@/components/common';
@@ -1233,8 +1233,16 @@ const InlineMaintenanceNotes = ({
     const [isDownloading, setIsDownloading] = useState(false);
     const [isEmailSending, setIsEmailSending] = useState(false);
 
+    const [searchParams] = useSearchParams();
+    const sectionParam = searchParams.get('section');
+    const initialSection = (sectionParam && [
+        'general', 'rates', 'vpp_certificate', 'debit', 'utilmate', 'notes', 'documents', 'electricity_bills', 'email_logs', 'activity_log', 'maintenance'
+    ].includes(sectionParam))
+        ? (sectionParam as any)
+        : 'general';
+
     // Detail Section State
-    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log' | 'maintenance'>('general');
+    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log' | 'maintenance'>(initialSection);
 
     // Email Logs Refresh State
     const [emailLogsKey, setEmailLogsKey] = useState(0);
@@ -1307,6 +1315,15 @@ const InlineMaintenanceNotes = ({
             });
         }
     }, [selectedCustomerDetails]);
+
+    useEffect(() => {
+        const section = searchParams.get('section');
+        if (section && [
+            'general', 'rates', 'vpp_certificate', 'debit', 'utilmate', 'notes', 'documents', 'electricity_bills', 'email_logs', 'activity_log', 'maintenance'
+        ].includes(section)) {
+            setSelectedDetailSection(section as any);
+        }
+    }, [searchParams]);
 
     // Date state for electricity bill upload
     const [billStartDate, setBillStartDate] = useState<string>('');

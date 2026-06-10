@@ -50,3 +50,54 @@ export const GET_ITEM_CATEGORIES = gql`
         }
     }
 `;
+
+export const GET_MAINTENANCES = gql`
+    query GetMaintenances($page: Int, $limit: Int, $status: Int, $priority: Int, $category: String, $search: String) {
+        maintenances(page: $page, limit: $limit, status: $status, priority: $priority, category: $category, search: $search) {
+            data {
+                id
+                uid
+                customerUid
+                customer {
+                    uid
+                    customerId
+                    firstName
+                    lastName
+                    email
+                    number
+                }
+                callDate
+                category
+                takenCareByUid
+                takenCareByUser {
+                    uid
+                    name
+                }
+                method
+                status
+                priority
+                notes
+                createdAt
+                createdByName
+            }
+            meta {
+                totalRecords
+                currentPage
+                totalPages
+                recordsPerPage
+            }
+        }
+    }
+`;
+
+export const GET_MAINTENANCE_STATS = gql`
+    query GetMaintenanceStats {
+        maintenanceStats {
+            total
+            inProgress
+            resolved
+            cancelled
+        }
+    }
+`;
+
