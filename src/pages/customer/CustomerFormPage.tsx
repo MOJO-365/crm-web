@@ -26,7 +26,9 @@ import {
     CREATE_CUSTOMER_NOTE,
     MARK_WEB_ENROLLMENT_PROCESSED,
     SEND_PDRS_CONSENT_EMAIL,
-    GET_ACTIVE_PLANS
+    GET_ACTIVE_PLANS,
+    GET_BATTERY_MAKES,
+    GET_BATTERY_MODELS
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
@@ -50,7 +52,9 @@ import {
     SearchIcon,
     SpinnerIcon,
     AlertCircleIcon,
-    FileTextIcon
+    FileTextIcon,
+    PlugIcon,
+    GiftIcon
 } from '@/components/icons';
 import { sendVerification, checkVerification, normalisePhone, denormalisePhone } from '@/lib/twilio';
 
@@ -153,10 +157,13 @@ const initialFormData: CustomerFormData = {
     vpp: false,
     vppConnected: false,
     vppSignupBonus: '',
+    hasBattery: false,
+    isBattery: 0,
     batteryBrand: '',
     batteryCapacity: '',
     snNumber: '',
     exportLimit: '',
+    batteryModel: '',
     saleType: 0,
     connectionDate: '',
     idType: 0,
@@ -426,6 +433,12 @@ export const CustomerFormPage = () => {
     }, []);
 
     // Queries & Mutations
+    const { data: batteryMakesData, loading: batteryMakesLoading } = useQuery(GET_BATTERY_MAKES);
+    const { data: batteryModelsData, loading: batteryModelsLoading } = useQuery(GET_BATTERY_MODELS, {
+        variables: { makeUid: formData.batteryBrand },
+        skip: !formData.batteryBrand
+    });
+
     const { data: customerData, loading: isLoadingCustomer } = useQuery(GET_CUSTOMER_BY_ID, {
         variables: { uid },
         skip: !isEditMode,
@@ -435,11 +448,31 @@ export const CustomerFormPage = () => {
     const { data: activePlansData } = useQuery(GET_ACTIVE_PLANS, { fetchPolicy: 'cache-first' });
     const planOptions = useMemo(() => {
         if (!activePlansData?.activePlans) return [];
-        return activePlansData.activePlans.map((plan: any) => ({
-            label: plan.title,
-            value: plan.uid
-        }));
-    }, [activePlansData]);
+        return activePlansData.activePlans
+            .filter((plan: any) => {
+                // Always keep the currently selected plan in the options
+                if (formData.planUid && plan.uid === formData.planUid) {
+                    return true;
+                }
+                // Match property type (0 = residential, 1 = commercial)
+                if (plan.propertyType !== undefined && plan.propertyType !== null && plan.propertyType !== formData.propertyType) {
+                    return false;
+                }
+                // If plan requires solar, customer must have solar
+                if (plan.isSolarRequired && !formData.hasSolar) {
+                    return false;
+                }
+                // If plan requires battery, customer must have battery
+                if (plan.isBatteryRequired && !formData.hasBattery) {
+                    return false;
+                }
+                return true;
+            })
+            .map((plan: any) => ({
+                label: plan.title,
+                value: plan.uid
+            }));
+    }, [activePlansData, formData.hasSolar, formData.hasBattery, formData.propertyType, formData.planUid]);
 
     const selectedPlan = useMemo(() => {
         if (!activePlansData?.activePlans || !formData.planUid) return null;
@@ -588,27 +621,38 @@ export const CustomerFormPage = () => {
 
     const isPdrs = useMemo(() => {
         if (isEditMode) {
-            return customerData?.customer?.portalName === 'PEERLESSGROUP';
+            const portal = customerData?.customer?.portalName?.toUpperCase();
+            return portal === 'PEERLESSGROUP' || portal === 'PDRS';
         }
-        return (prefillData?.portalname === 'PEERLESSGROUP' || prefillData?.portalName === 'PEERLESSGROUP');
+        const prefillPortal = (prefillData?.portalname || prefillData?.portalName || '')?.toUpperCase();
+        return prefillPortal === 'PEERLESSGROUP' || prefillPortal === 'PDRS';
     }, [prefillData, customerData, isEditMode]);
 
-    // Enforce Peerless Group defaults (VPP = true, Solar = true, VPP Bonus = $600)
+    // Set Peerless Group defaults (VPP = true, Solar = true, VPP Bonus = $600) on initial load for new customers
     useEffect(() => {
         if (isPdrs && !isEditMode) {
-            setFormData(prev => {
-                if (prev.vpp !== true || prev.hasSolar !== true || (prev.vppSignupBonus ? Number(prev.vppSignupBonus) !== 600 : true)) {
-                    return {
-                        ...prev,
-                        vpp: true,
-                        hasSolar: true,
-                        vppSignupBonus: '600'
-                    };
-                }
-                return prev;
-            });
+            setFormData(prev => ({
+                ...prev,
+                vpp: true,
+                hasSolar: true,
+                vppSignupBonus: '600'
+            }));
         }
     }, [isPdrs, isEditMode]);
+
+    // Automatically select VPP Signup Bonus if the loaded customer's battery brand is "Unknown"
+    useEffect(() => {
+        if (isPdrs && isEditMode && customerData?.customer && batteryMakesData?.batteryMakes) {
+            const batteryBrandUid = customerData.customer.batteryDetails?.batterybrand || '';
+            const makeObj = batteryMakesData.batteryMakes.find((m: any) => m.uid === batteryBrandUid);
+            if (makeObj?.make?.toLowerCase() === 'unknown') {
+                setFormData(prev => ({
+                    ...prev,
+                    vppSignupBonus: '600'
+                }));
+            }
+        }
+    }, [isPdrs, isEditMode, customerData, batteryMakesData]);
 
     const isGeeEnergy = useMemo(() => {
         let portal = '';
@@ -675,10 +719,9 @@ export const CustomerFormPage = () => {
             .filter(rp => {
                 const stateMatch = rp.state?.toLowerCase() === formData.state?.toLowerCase();
                 const activeMatch = !rp.isDeleted && rp.isActive !== false;
-                // Only show VPP plans (vpp=1) if customer is a VPP participant
-                // If not a VPP participant, exclude VPP plans entirely
-                const vppMatch = formData.vpp ? rp.vpp === 1 : rp.vpp !== 1;
-                return stateMatch && activeMatch && vppMatch;
+                // Temporarily disabled VPP filtering as requested by user
+                // const vppMatch = formData.vpp ? rp.vpp === 1 : rp.vpp !== 1;
+                return stateMatch && activeMatch; // && vppMatch;
             })
             .map(rp => ({
                 value: rp.uid, // Use UID as unique value to avoid selection ambiguity in the UI
@@ -740,11 +783,14 @@ export const CustomerFormPage = () => {
                 inverterCapacity: c.solarDetails?.invertercapacity?.toString() || '',
                 vpp: c.vppDetails?.vpp === 1,
                 vppConnected: c.vppDetails?.vppConnected === 1,
-                vppSignupBonus: c.vppDetails?.vppSignupBonus != null ? c.vppDetails.vppSignupBonus.toString() : '',
+                vppSignupBonus: c.batteryDetails?.isbattery === 1 ? '' : (c.vppDetails?.vppSignupBonus != null ? c.vppDetails.vppSignupBonus.toString() : (isPdrs ? '600' : '')),
+                hasBattery: c.batteryDetails?.isbattery === 1,
+                isBattery: c.batteryDetails?.isbattery === 1 ? 1 : 0,
                 batteryBrand: c.batteryDetails?.batterybrand || '',
                 batteryCapacity: c.batteryDetails?.batterycapacity?.toString() || '',
                 snNumber: c.batteryDetails?.snnumber || '',
                 exportLimit: c.batteryDetails?.exportlimit?.toString() || '',
+                batteryModel: c.batteryDetails?.batterymodel || '',
                 saleType: c.enrollmentDetails?.saletype || 0,
                 connectionDate: c.enrollmentDetails?.connectiondate ? formatSydneyTime(c.enrollmentDetails.connectiondate, 'YYYY-MM-DD') : '',
                 idType: c.enrollmentDetails?.idtype || 0,
@@ -781,7 +827,7 @@ export const CustomerFormPage = () => {
                 identityProof: c.identityProof || null,
                 licenseDocument: c.licenseDocument || null,
                 additionalDocument: c.additionalDocument || null,
-                selectedBonuses: c.selectedBonuses || [],
+                selectedBonuses: c.batteryDetails?.isbattery === 1 ? [] : (c.selectedBonuses || []),
                 pdrsEmailSent: c.pdrsEmailSent || 0,
                 pdrsEmailSentAt: c.pdrsEmailSentAt || undefined,
                 isCreditScoreFetched: c.isCreditScoreFetched === 1
@@ -1383,10 +1429,6 @@ export const CustomerFormPage = () => {
     };
 
     const updateField = (field: keyof CustomerFormData, value: any) => {
-        if (isPdrs && ['vpp', 'hasSolar', 'vppSignupBonus'].includes(field)) {
-            return;
-        }
-
         // Enforce input masking for specific fields
         let finalValue = value;
 
@@ -1654,12 +1696,14 @@ export const CustomerFormPage = () => {
                     solarcapacity: formData.solarCapacity ? parseFloat(formData.solarCapacity) : undefined,
                     invertercapacity: formData.inverterCapacity ? parseFloat(formData.inverterCapacity) : undefined,
                 } : { hassolar: 0 },
-                batteryDetails: formData.batteryBrand ? {
+                batteryDetails: formData.hasBattery ? {
+                    isbattery: 1,
                     batterybrand: formData.batteryBrand,
                     snnumber: formData.snNumber || undefined,
                     batterycapacity: formData.batteryCapacity ? parseFloat(formData.batteryCapacity) : undefined,
                     exportlimit: formData.exportLimit ? parseFloat(formData.exportLimit) : undefined,
-                } : undefined,
+                    batterymodel: formData.batteryModel || undefined,
+                } : { isbattery: 0 },
                 vppDetails: {
                     vpp: formData.vpp ? 1 : 0,
                     vppConnected: formData.vppConnected ? 1 : 0,
@@ -1915,8 +1959,12 @@ export const CustomerFormPage = () => {
                 tenant: 'mojo',
                 ratePlanUid: selectedRatePlan?.uid,
                 planUid: formData.planUid || selectedPlan?.uid || undefined,
-                selectedBonuses: activeBonuses.filter((b: Bonus) => formData.selectedBonuses.includes(b.uid)),
+                selectedBonuses: activeBonuses.filter((b: Bonus) => 
+                    formData.selectedBonuses.includes(b.uid) || 
+                    (formData.isBattery === 1 && (selectedPlan?.bonusUids || []).includes(b.uid))
+                ),
                 uid: targetUid === 'new' ? undefined : targetUid,
+                isBattery: formData.isBattery,
                 isWithoutSignature: isWithoutSignatureOverride !== undefined ? isWithoutSignatureOverride : isWithoutSignature
             };
 
@@ -2302,7 +2350,7 @@ export const CustomerFormPage = () => {
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm text-neutral-600 w-20 text-right">{formData.hasSolar ? 'Has Solar' : 'No Solar'}</span>
-                                                <ToggleSwitch checked={formData.hasSolar} onChange={(checked) => updateField('hasSolar', checked)} disabled={isPdrs} />
+                                                <ToggleSwitch checked={formData.hasSolar} onChange={(checked) => updateField('hasSolar', checked)} disabled={false} />
                                                 {/* <div className="transform transition-transform group-open:rotate-180"><ChevronRightIcon size={16} className="rotate-90" /></div> */}
                                             </div>
                                         </summary>
@@ -2317,7 +2365,98 @@ export const CustomerFormPage = () => {
                                         )}
                                     </details>
 
+                                    {/* Battery Section - Collapsible */}
+                                    <details open={formData.hasBattery} className="rounded-xl border border-border group mt-6">
+                                        <summary className="flex items-center justify-between p-4 cursor-pointer list-none select-none hover:bg-accent rounded-xl">
+                                            <div className="flex items-center gap-2 font-medium">
+                                                <PlugIcon size={20} className="text-green-500" />
+                                                <span>Battery at this property?</span>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-sm text-neutral-600 w-24 text-right">{formData.hasBattery ? 'Has Battery' : 'No Battery'}</span>
+                                                <ToggleSwitch checked={formData.hasBattery} onChange={(checked) => {
+                                                    updateField('hasBattery', checked);
+                                                    if (checked) {
+                                                        updateField('isBattery', 1);
+                                                        updateField('vpp', true);
+                                                        updateField('isVpp', 1);
+                                                        
+                                                        const makeObj = batteryMakesData?.batteryMakes?.find((m: any) => m.uid === formData.batteryBrand);
+                                                        const isUnknown = makeObj?.make?.toLowerCase() === 'unknown' || !formData.batteryBrand;
+                                                        
+                                                        if (isUnknown) {
+                                                            if (isPdrs) {
+                                                                updateField('vppSignupBonus', '600');
+                                                            }
+                                                        } else {
+                                                            updateField('vppSignupBonus', null);
+                                                            updateField('selectedBonuses', []);
+                                                        }
+                                                    } else {
+                                                        updateField('isBattery', 0);
+                                                        if (isPdrs) {
+                                                            updateField('vpp', true);
+                                                            updateField('isVpp', 1);
+                                                            updateField('vppSignupBonus', '600');
+                                                        } else {
+                                                            updateField('vpp', false);
+                                                            updateField('isVpp', 0);
+                                                        }
+                                                    }
+                                                }} disabled={false} />
+                                            </div>
+                                        </summary>
+
+                                        {formData.hasBattery && (
+                                            <div className="p-4 border-t border-border space-y-6 bg-muted/30">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <Select
+                                                        label="Manufacturer"
+                                                        value={formData.batteryBrand}
+                                                        onChange={(val) => {
+                                                            updateField('batteryBrand', val);
+                                                            updateField('batteryModel', ''); // Reset model
+                                                            
+                                                            const makeObj = batteryMakesData?.batteryMakes?.find((m: any) => m.uid === val);
+                                                            const isUnknown = makeObj?.make?.toLowerCase() === 'unknown' || !val;
+                                                            
+                                                            if (isUnknown) {
+                                                                 if (isPdrs) {
+                                                                     updateField('vppSignupBonus', '600');
+                                                                 }
+                                                            } else {
+                                                                 updateField('vppSignupBonus', null);
+                                                                 updateField('selectedBonuses', []);
+                                                            }
+                                                        }}
+                                                        options={batteryMakesData?.batteryMakes?.map((m: any) => ({ label: m.make, value: m.uid })) || []}
+                                                        placeholder="Select Manufacturer"
+                                                        isLoading={batteryMakesLoading}
+                                                    />
+                                                    <Select
+                                                        label="Model"
+                                                        value={formData.batteryModel}
+                                                        onChange={(val) => {
+                                                            updateField('batteryModel', val);
+                                                            const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.uid === val);
+                                                            if (modelObj?.capacity) {
+                                                                updateField('batteryCapacity', modelObj.capacity.toString());
+                                                            }
+                                                        }}
+                                                        options={batteryModelsData?.batteryModels?.map((m: any) => ({ label: m.model, value: m.uid })) || []}
+                                                        placeholder={formData.batteryBrand ? "Select Model" : "Select Manufacturer first"}
+                                                        isLoading={batteryModelsLoading}
+                                                        disabled={!formData.batteryBrand}
+                                                    />
+                                                    <Input label="Serial Number" placeholder="SN Number" value={formData.snNumber} onChange={(e) => updateField('snNumber', e.target.value)} />
+                                                    <Input label="Capacity (kWh)" type="number" step="any" placeholder="13.5" value={formData.batteryCapacity} onChange={(e) => updateField('batteryCapacity', e.target.value)} />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </details>
+
                                     {/* VPP Section - Standalone */}
+                                    {isEditMode && (
                                     <div className={`rounded-xl border transition-all duration-300 ${formData.vpp ? 'border-primary/20 bg-primary/5' : 'border-border bg-card'}`}>
                                         <div className="flex items-center justify-between p-4">
                                             <div className="flex items-center gap-3">
@@ -2337,12 +2476,17 @@ export const CustomerFormPage = () => {
                                                     updateField('vpp', checked);
                                                     if (checked) {
                                                         updateField('hasSolar', true);
+                                                        updateField('isVpp', 1);
+                                                        if (isPdrs && !formData.hasBattery) {
+                                                            updateField('vppSignupBonus', '600');
+                                                        }
                                                     } else {
+                                                        updateField('isVpp', 0);
                                                         // Clear bonuses when VPP is unchecked
                                                         updateField('vppSignupBonus', null);
                                                         updateField('selectedBonuses', []);
                                                     }
-                                                }} disabled={isPdrs} />
+                                                }} disabled={false} />
                                             </div>
                                         </div>
 
@@ -2363,7 +2507,7 @@ export const CustomerFormPage = () => {
                                                         type="button"
                                                         size="sm"
                                                         onClick={() => updateField('vppSignupBonus', Number(formData.vppSignupBonus) === 600 ? null : '600')}
-                                                        disabled={isPdrs}
+                                                        disabled={formData.hasBattery}
                                                         className={cn(
                                                             "shrink-0 transition-all font-semibold shadow-sm",
                                                             Number(formData.vppSignupBonus) === 600
@@ -2407,6 +2551,7 @@ export const CustomerFormPage = () => {
                                                                         : [...formData.selectedBonuses, bonus.uid];
                                                                     updateField('selectedBonuses', newSelected);
                                                                 }}
+                                                                disabled={formData.hasBattery}
                                                                 className={cn(
                                                                     "shrink-0 transition-all font-semibold shadow-sm",
                                                                     isApplied
@@ -2427,6 +2572,7 @@ export const CustomerFormPage = () => {
                                             </div>
                                         )}
                                     </div>
+                                    )}
 
 
                                     {/* Address */}
@@ -2586,28 +2732,65 @@ export const CustomerFormPage = () => {
                                             onChange={(val) => handleTariffChange(val as string)}
                                             placeholder="Select tariff"
                                         />
-                                        <Select
-                                            label="Plan"
-                                            options={[{ label: 'None', value: '' }, ...planOptions]}
-                                            value={formData.planUid || ''}
-                                            onChange={(val) => {
-                                                const planUid = val as string;
-                                                updateField('planUid', planUid);
-                                                if (planUid && activePlansData?.activePlans) {
-                                                    const selected = activePlansData.activePlans.find((p: any) => p.uid === planUid);
-                                                    if (selected) {
-                                                        const defaultDiscount = (selected.discount !== undefined && selected.discount !== null) ? selected.discount : 0;
-                                                        updateField('discount', defaultDiscount);
-                                                        if (!['0', '5', '7', '10', '13', '15'].includes(defaultDiscount.toString())) {
-                                                            setIsCustomDiscountMode(true);
-                                                        } else {
-                                                            setIsCustomDiscountMode(false);
+                                        <div className="flex flex-col w-full">
+                                            <Select
+                                                label="Plan"
+                                                options={[{ label: 'None', value: '' }, ...planOptions]}
+                                                value={formData.planUid || ''}
+                                                onChange={(val) => {
+                                                    const planUid = val as string;
+                                                    updateField('planUid', planUid);
+                                                    if (planUid && activePlansData?.activePlans) {
+                                                        const selected = activePlansData.activePlans.find((p: any) => p.uid === planUid);
+                                                        if (selected) {
+                                                            const defaultDiscount = (selected.discount !== undefined && selected.discount !== null) ? selected.discount : 0;
+                                                            updateField('discount', defaultDiscount);
+                                                            if (!['0', '5', '7', '10', '13', '15'].includes(defaultDiscount.toString())) {
+                                                                setIsCustomDiscountMode(true);
+                                                            } else {
+                                                                setIsCustomDiscountMode(false);
+                                                            }
                                                         }
                                                     }
-                                                }
-                                            }}
-                                            placeholder="Select plan"
-                                        />
+                                                }}
+                                                placeholder="Select plan"
+                                            />
+                                            {(() => {
+                                                if (formData.isBattery !== 1) return null;
+                                                 if (!formData.vpp || !formData.planUid || !activePlansData?.activePlans || !activeBonuses) return null;
+                                                const selectedPlanDetails = activePlansData.activePlans.find((p: any) => p.uid === formData.planUid);
+                                                if (!selectedPlanDetails?.bonusUids?.length) return null;
+                                                const planBonuses = activeBonuses.filter((b: any) => selectedPlanDetails.bonusUids.includes(b.uid));
+                                                if (planBonuses.length === 0) return null;
+                                                return (
+                                                    <div className="relative group mt-1.5 inline-flex w-max">
+                                                        <div 
+                                                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-600 dark:text-green-400 text-xs font-medium cursor-help shadow-sm animate-in fade-in slide-in-from-top-1"
+                                                        >
+                                                            <GiftIcon size={12} />
+                                                            <span>Plan Bonus</span>
+                                                        </div>
+                                                        {/* Custom Tooltip */}
+                                                        <div className="absolute top-full left-0 mt-1 hidden group-hover:block w-64 z-[100] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                            <div className="p-3 bg-white dark:bg-neutral-900 border border-border rounded-xl shadow-xl shadow-black/5 text-sm text-foreground whitespace-normal font-normal">
+                                                                <div className="font-semibold text-green-600 dark:text-green-500 mb-2 flex items-center gap-2">
+                                                                    <GiftIcon size={14} />
+                                                                    Included Bonuses
+                                                                </div>
+                                                                <ul className="space-y-2">
+                                                                    {planBonuses.map((b: any) => (
+                                                                        <li key={b.uid} className="flex items-start gap-2">
+                                                                            <div className="mt-1.5 w-1 h-1 rounded-full bg-green-500 shrink-0" />
+                                                                            <span className="text-muted-foreground text-xs leading-relaxed">{b.description || b.name}</span>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
                                         {/* Discount Field with Pill Selector (Hidden for now) */}
                                         {false && selectedRatePlan?.discountApplies === 1 && (
                                             <div className="space-y-1">
@@ -2690,7 +2873,7 @@ export const CustomerFormPage = () => {
                                             <RateDetailsView
                                                 key={offer.id}
                                                 offer={offer}
-                                                discount={formData.discount ?? selectedPlan?.discount ?? 0}
+                                                discount={formData.discount || selectedPlan?.discount || 0}
                                                 hasSolar={formData.hasSolar}
                                                 vpp={formData.vpp}
                                                 units={unitMap}
@@ -3232,7 +3415,7 @@ export const CustomerFormPage = () => {
                                                 <h3 className="font-medium mb-3 flex items-center gap-2"><ShieldIcon size={16} className="text-blue-600" /> Plan & Pricing</h3>
                                                 <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Tariff Code:</span> <span className="font-medium">{formData.tariffCode}</span></p>
-                                                    <p className="flex justify-between"><span className="text-muted-foreground">Discount:</span> <span className="font-medium badge bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded">{(formData.discount ?? selectedPlan?.discount ?? 0) > 0 ? `${formData.discount ?? selectedPlan?.discount}%` : '0%'}</span></p>
+                                                    <p className="flex justify-between"><span className="text-muted-foreground">Discount:</span> <span className="font-medium badge bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded">{(formData.discount || selectedPlan?.discount || 0) > 0 ? `${formData.discount || selectedPlan?.discount}%` : '0%'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Distributor:</span> <span className="font-medium">{selectedRatePlan?.dnsp !== undefined ? (DNSP_MAP[selectedRatePlan.dnsp.toString()] || selectedRatePlan.dnsp) : '—'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Tariff Type:</span> <span className="font-medium">{selectedRatePlan?.tariff || '—'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Pricing Version:</span> <span className="font-medium font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{activeVersionForLookup || activeRateVersion}</span></p>
@@ -3283,32 +3466,98 @@ export const CustomerFormPage = () => {
                                                         </div>
                                                     )}
 
-                                                    <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
-                                                        <p className="font-medium text-xs uppercase text-muted-foreground mb-1">VPP Participant</p>
-                                                        <p className="flex justify-between"><span className="text-muted-foreground">VPP Participant:</span> <span className="font-medium">Yes</span></p>
-                                                        {formData.batteryBrand && <p className="flex justify-between"><span className="text-muted-foreground">Battery Brand:</span> <span className="font-medium">{formData.batteryBrand}</span></p>}
-                                                        {formData.snNumber && <p className="flex justify-between"><span className="text-muted-foreground">SN Number:</span> <span className="font-medium">{formData.snNumber}</span></p>}
-                                                        {formData.batteryCapacity && <p className="flex justify-between"><span className="text-muted-foreground">Battery Capacity:</span> <span className="font-medium">{formData.batteryCapacity} kW</span></p>}
-                                                        {formData.exportLimit && <p className="flex justify-between"><span className="text-muted-foreground">Export Limit:</span> <span className="font-medium">{formData.exportLimit} kW</span></p>}
-                                                        {(Number(formData.vppSignupBonus) === 600 || (formData.selectedBonuses && formData.selectedBonuses.length > 0)) && (
-                                                            <div className="flex justify-between items-start gap-2">
-                                                                <span className="text-muted-foreground shrink-0">Signup Bonus:</span>
-                                                                <div className="flex flex-col items-end">
-                                                                    {Number(formData.vppSignupBonus) === 600 && (
-                                                                        <span className="font-medium text-right text-green-600">$50 monthly bill credit for 12 months (total $600)</span>
-                                                                    )}
-                                                                    {formData.selectedBonuses && formData.selectedBonuses.length > 0 && (
-                                                                        <span className="font-medium text-right text-green-600">
-                                                                            {activeBonuses
-                                                                                .filter((b: any) => formData.selectedBonuses.includes(b.uid))
-                                                                                .map((b: any) => b.description)
-                                                                                .join(', ')}
-                                                                        </span>
-                                                                    )}
+                                                    {(formData.vpp && !formData.hasBattery) && (
+                                                        <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
+                                                            <p className="font-medium text-xs uppercase text-muted-foreground mb-1">VPP Participant</p>
+                                                            <p className="flex justify-between"><span className="text-muted-foreground">VPP Participant:</span> <span className="font-medium">Yes</span></p>
+                                                            {(Number(formData.vppSignupBonus) === 600 || (formData.selectedBonuses && formData.selectedBonuses.length > 0)) && (
+                                                                <div className="flex justify-between items-start gap-2 mt-2">
+                                                                    <span className="text-muted-foreground shrink-0">Signup Bonus:</span>
+                                                                    <div className="flex flex-col items-end">
+                                                                        {Number(formData.vppSignupBonus) === 600 && (
+                                                                            <span className="font-medium text-right text-green-600">$50 monthly bill credit for 12 months (total $600)</span>
+                                                                        )}
+                                                                        {formData.selectedBonuses && formData.selectedBonuses.length > 0 && (
+                                                                            <span className="font-medium text-right text-green-600">
+                                                                                {activeBonuses
+                                                                                    ?.filter((b: any) => formData.selectedBonuses?.includes(b.uid))
+                                                                                    .map((b: any) => b.description)
+                                                                                    .join(', ')}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                            )}
+                                                            {(() => {
+                                                                if (formData.isBattery !== 1) return null;
+                                                                 if (!formData.vpp || !formData.planUid || !activePlansData?.activePlans || !activeBonuses) return null;
+                                                                const selectedPlanDetails = activePlansData.activePlans.find((p: any) => p.uid === formData.planUid);
+                                                                if (!selectedPlanDetails?.bonusUids?.length) return null;
+                                                                const planBonuses = activeBonuses.filter((b: any) => selectedPlanDetails.bonusUids.includes(b.uid));
+                                                                if (planBonuses.length === 0) return null;
+                                                                
+                                                                return (
+                                                                    <div className="flex justify-between items-start gap-2 mt-2">
+                                                                        <span className="text-muted-foreground shrink-0">Plan Bonus:</span>
+                                                                        <div className="flex flex-col items-end">
+                                                                            <span className="font-medium text-right text-green-600">
+                                                                                {planBonuses.map((b: any) => b.description || b.name).join(', ')}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    )}
+
+                                                    {(formData.hasBattery) && (
+                                                        <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
+                                                            <p className="font-medium text-xs uppercase text-muted-foreground mb-1">Battery System</p>
+                                                            <p className="flex justify-between"><span className="text-muted-foreground">Has Battery:</span> <span className="font-medium">Yes</span></p>
+                                                            {formData.batteryBrand && <p className="flex justify-between"><span className="text-muted-foreground">Battery Brand:</span> <span className="font-medium">{formData.batteryBrand}</span></p>}
+                                                            {formData.snNumber && <p className="flex justify-between"><span className="text-muted-foreground">SN Number:</span> <span className="font-medium">{formData.snNumber}</span></p>}
+                                                            {formData.batteryCapacity && <p className="flex justify-between"><span className="text-muted-foreground">Battery Capacity:</span> <span className="font-medium">{formData.batteryCapacity} kW</span></p>}
+                                                            {formData.exportLimit && <p className="flex justify-between"><span className="text-muted-foreground">Export Limit:</span> <span className="font-medium">{formData.exportLimit} kW</span></p>}
+                                                            
+                                                            {(Number(formData.vppSignupBonus) === 600 || (formData.selectedBonuses && formData.selectedBonuses.length > 0)) && (
+                                                                <div className="flex justify-between items-start gap-2 mt-2">
+                                                                    <span className="text-muted-foreground shrink-0">Signup Bonus:</span>
+                                                                    <div className="flex flex-col items-end">
+                                                                        {Number(formData.vppSignupBonus) === 600 && (
+                                                                            <span className="font-medium text-right text-green-600">$50 monthly bill credit for 12 months (total $600)</span>
+                                                                        )}
+                                                                        {formData.selectedBonuses && formData.selectedBonuses.length > 0 && (
+                                                                            <span className="font-medium text-right text-green-600">
+                                                                                {activeBonuses
+                                                                                    ?.filter((b: any) => formData.selectedBonuses?.includes(b.uid))
+                                                                                    .map((b: any) => b.description)
+                                                                                    .join(', ')}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {(() => {
+                                                                if (formData.isBattery !== 1) return null;
+                                                                 if (!formData.vpp || !formData.planUid || !activePlansData?.activePlans || !activeBonuses) return null;
+                                                                const selectedPlanDetails = activePlansData.activePlans.find((p: any) => p.uid === formData.planUid);
+                                                                if (!selectedPlanDetails?.bonusUids?.length) return null;
+                                                                const planBonuses = activeBonuses.filter((b: any) => selectedPlanDetails.bonusUids.includes(b.uid));
+                                                                if (planBonuses.length === 0) return null;
+                                                                
+                                                                return (
+                                                                    <div className="flex justify-between items-start gap-2 mt-2">
+                                                                        <span className="text-muted-foreground shrink-0">Plan Bonus:</span>
+                                                                        <div className="flex flex-col items-end">
+                                                                            <span className="font-medium text-right text-green-600">
+                                                                                {planBonuses.map((b: any) => b.description || b.name).join(', ')}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}

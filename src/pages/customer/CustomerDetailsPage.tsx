@@ -41,7 +41,9 @@ import {
     CREATE_CUSTOMER_MAINTENANCE,
     UPDATE_CUSTOMER_MAINTENANCE,
     DELETE_CUSTOMER_MAINTENANCE,
-    CREATE_ITEM_CATEGORY
+    CREATE_ITEM_CATEGORY,
+    GET_BATTERY_MAKES,
+    GET_BATTERY_MODELS
 } from '@/graphql';
 import { formatSydneyTime } from '@/lib/date';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
@@ -233,6 +235,7 @@ interface CustomerDetails {
         snnumber?: string;
         batterycapacity?: number;
         exportlimit?: number;
+        batterymodel?: string;
         inverterCapacity?: number;
         checkCode?: string;
     };
@@ -250,6 +253,7 @@ interface CustomerDetails {
         isVppCertificateEmailSent?: number;
         isVppCertificateEmailSentAt?: string;
         batteryManufacturer?: string;
+        batteryModel?: string;
         batterySerialNumber?: string;
         batteryUsableCapacity?: number;
         inverterManufacturer?: string;
@@ -1284,6 +1288,7 @@ const InlineMaintenanceNotes = ({
         snNumber: '',
         batteryCapacity: '',
         exportLimit: '',
+        batteryModel: '',
         inverterCapacity: '',
         checkCode: ''
     });
@@ -1296,6 +1301,7 @@ const InlineMaintenanceNotes = ({
                 snNumber: selectedCustomerDetails.batteryDetails?.snnumber || selectedCustomerDetails.vppCertificateDetails?.batterySerialNumber || '',
                 batteryCapacity: selectedCustomerDetails.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.batteryUsableCapacity?.toString() || '',
                 exportLimit: selectedCustomerDetails.batteryDetails?.exportlimit?.toString() || '',
+                batteryModel: selectedCustomerDetails.batteryDetails?.batterymodel || selectedCustomerDetails.vppCertificateDetails?.batteryModel || '',
                 inverterCapacity: selectedCustomerDetails.batteryDetails?.inverterCapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.inverterCapacity?.toString() || '',
                 checkCode: selectedCustomerDetails.batteryDetails?.checkCode || ''
             });
@@ -1394,8 +1400,27 @@ const InlineMaintenanceNotes = ({
 
     const { data: noteTypesData, refetch: refetchNoteTypes } = useQuery(GET_NOTE_TYPES, {
         skip: selectedDetailSection !== 'notes' && !noteModalOpen,
-        fetchPolicy: 'network-only'
     });
+
+    const { data: makesData } = useQuery(GET_BATTERY_MAKES, { fetchPolicy: 'cache-first' });
+    const selectedBatteryMake = useMemo(() => {
+        if (!makesData?.batteryMakes || !vppForm.batteryBrand) return null;
+        return makesData.batteryMakes.find((m: any) => m.make?.toLowerCase() === vppForm.batteryBrand?.toLowerCase());
+    }, [makesData, vppForm.batteryBrand]);
+
+    const { data: batteryModelsData, loading: loadingBatteryModels } = useQuery(GET_BATTERY_MODELS, {
+        variables: { makeUid: selectedBatteryMake?.uid },
+        skip: !selectedBatteryMake?.uid,
+        fetchPolicy: 'cache-first'
+    });
+
+    const batteryModelOptions = useMemo(() => {
+        if (!batteryModelsData?.batteryModels) return [];
+        return batteryModelsData.batteryModels.filter((m: any) => m.isActive).map((m: any) => ({
+            value: m.uid,
+            label: m.model
+        }));
+    }, [batteryModelsData]);
 
     // Maintenance Categories Query
     const { data: categoriesData, refetch: refetchCategories } = useQuery(GET_ITEM_CATEGORIES, {
@@ -1556,6 +1581,7 @@ const InlineMaintenanceNotes = ({
                 snNumber: selectedCustomerDetails.batteryDetails?.snnumber || '',
                 batteryCapacity: selectedCustomerDetails.batteryDetails?.batterycapacity?.toString() || '',
                 exportLimit: selectedCustomerDetails.batteryDetails?.exportlimit?.toString() || '',
+                batteryModel: selectedCustomerDetails.batteryDetails?.batterymodel || '',
                 inverterCapacity: selectedCustomerDetails.batteryDetails?.inverterCapacity?.toString() || '',
                 checkCode: selectedCustomerDetails.batteryDetails?.checkCode || ''
             });
@@ -1839,7 +1865,7 @@ const InlineMaintenanceNotes = ({
                     batterybrand: vppForm.batteryBrand,
                     snnumber: vppForm.snNumber || undefined,
                     batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : undefined,
-                    exportlimit: vppForm.exportLimit ? parseFloat(vppForm.exportLimit) : undefined,
+                    batterymodel: vppForm.batteryModel || undefined,
                     inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : undefined,
                     checkCode: vppForm.checkCode || undefined,
                 } : undefined,
@@ -2193,6 +2219,7 @@ const InlineMaintenanceNotes = ({
                     snNumber: latestDetails?.batteryDetails?.snnumber || latestDetails?.vppCertificateDetails?.batterySerialNumber || selectedCustomerDetails?.batteryDetails?.snnumber || selectedCustomerDetails.vppCertificateDetails?.batterySerialNumber || '',
                     batteryCapacity: latestDetails?.batteryDetails?.batterycapacity?.toString() || latestDetails?.vppCertificateDetails?.batteryUsableCapacity?.toString() || selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.batteryUsableCapacity?.toString() || '',
                     exportLimit: latestDetails?.batteryDetails?.exportlimit?.toString() || selectedCustomerDetails?.batteryDetails?.exportlimit?.toString() || '',
+                    batteryModel: latestDetails?.batteryDetails?.batterymodel || selectedCustomerDetails?.batteryDetails?.batterymodel || '',
                     inverterCapacity: latestDetails?.batteryDetails?.inverterCapacity?.toString() || latestDetails?.vppCertificateDetails?.inverterCapacity?.toString() || selectedCustomerDetails?.batteryDetails?.inverterCapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.inverterCapacity?.toString() || '',
                     checkCode: latestDetails?.batteryDetails?.checkCode || selectedCustomerDetails?.batteryDetails?.checkCode || ''
                 });
@@ -2205,6 +2232,7 @@ const InlineMaintenanceNotes = ({
                     snNumber: selectedCustomerDetails?.batteryDetails?.snnumber || selectedCustomerDetails.vppCertificateDetails?.batterySerialNumber || '',
                     batteryCapacity: selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.batteryUsableCapacity?.toString() || '',
                     exportLimit: selectedCustomerDetails?.batteryDetails?.exportlimit?.toString() || '',
+                    batteryModel: selectedCustomerDetails?.batteryDetails?.batterymodel || '',
                     inverterCapacity: selectedCustomerDetails?.batteryDetails?.inverterCapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.inverterCapacity?.toString() || '',
                     checkCode: selectedCustomerDetails?.batteryDetails?.checkCode || ''
                 });
@@ -2285,7 +2313,7 @@ const InlineMaintenanceNotes = ({
                     batterybrand: vppForm.batteryBrand,
                     snnumber: vppForm.snNumber || undefined,
                     batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : undefined,
-                    exportlimit: vppForm.exportLimit ? parseFloat(vppForm.exportLimit) : undefined,
+                    batterymodel: vppForm.batteryModel || undefined,
                     inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : undefined,
                     checkCode: vppForm.checkCode || undefined,
                 } : undefined,
@@ -2340,6 +2368,14 @@ const InlineMaintenanceNotes = ({
                     vppConnected: 1,
                     vppApiPushed: 0,
                 },
+                batteryDetails: vppForm.batteryBrand ? {
+                    batterybrand: vppForm.batteryBrand,
+                    snnumber: vppForm.snNumber || undefined,
+                    batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : undefined,
+                    batterymodel: vppForm.batteryModel || undefined,
+                    inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : undefined,
+                    checkCode: vppForm.checkCode || undefined,
+                } : undefined,
                 skipStatusUpdate: true
             };
 
@@ -4926,17 +4962,28 @@ const InlineMaintenanceNotes = ({
                             <Select
                                 options={BATTERY_BRAND_OPTIONS}
                                 value={vppForm.batteryBrand}
-                                onChange={(val) => setVppForm({ ...vppForm, batteryBrand: val as string })}
+                                onChange={(val) => setVppForm({ ...vppForm, batteryBrand: val as string, batteryModel: '' })}
                                 placeholder="Select Brand..."
                                 className="w-full"
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">SN Number</label>
-                            <Input
-                                placeholder="e.g. SN12345678"
-                                value={vppForm.snNumber}
-                                onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Model</label>
+                            <Select
+                                options={batteryModelOptions}
+                                value={vppForm.batteryModel}
+                                onChange={(val) => {
+                                    const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.uid === val);
+                                    setVppForm({
+                                        ...vppForm,
+                                        batteryModel: val as string,
+                                        ...(modelObj?.capacity ? { batteryCapacity: modelObj.capacity.toString() } : {})
+                                    });
+                                }}
+                                placeholder="Select Model..."
+                                className="w-full"
+                                isLoading={loadingBatteryModels}
+                                creatable
                             />
                         </div>
                         <div className="space-y-2 relative">
@@ -4952,19 +4999,14 @@ const InlineMaintenanceNotes = ({
                                 <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
                             </div>
                         </div>
-                        {/* <div className="space-y-2 relative">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">Export Limit</label>
-                            <div className="relative">
-                                <Input
-                                    type="number"
-                                    step="0.1"
-                                    placeholder="5.0"
-                                    value={vppForm.exportLimit}
-                                    onChange={(e) => setVppForm({ ...vppForm, exportLimit: e.target.value })}
-                                />
-                                <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
-                            </div>
-                        </div> */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">SN Number</label>
+                            <Input
+                                placeholder="e.g. SN12345678"
+                                value={vppForm.snNumber}
+                                onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
+                            />
+                        </div>
                         <div className="space-y-2 relative">
                             <label className="text-xs font-semibold uppercase text-muted-foreground">Inverter Capacity</label>
                             <div className="relative">

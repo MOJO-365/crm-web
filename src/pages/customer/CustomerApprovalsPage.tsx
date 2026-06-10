@@ -795,6 +795,18 @@ export function CustomerApprovalsPage() {
                                             </span>
                                         )}
                                     </span>
+                                    <span className="text-muted-foreground">Battery Participation</span>
+                                    <span className="font-medium">
+                                        {selectedEnrollment.payload.isBattery === 1 || selectedEnrollment.payload.isBattery === '1' || selectedEnrollment.payload.isBattery === true || selectedEnrollment.payload.isBattery === 'true' ? (
+                                            <span className="inline-flex items-center gap-1.5 text-green-600 font-bold uppercase text-[10px]">
+                                                <CheckIcon size={14} /> YES
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 text-red-500 font-bold uppercase text-[10px]">
+                                                <XIcon size={14} /> NO
+                                            </span>
+                                        )}
+                                    </span>
                                 </div>
                             </div>
 

@@ -58,6 +58,14 @@ interface Customer {
         vppConnected?: number;
         vppSignupBonus?: number;
     };
+    batteryDetails?: {
+        batterybrand?: string;
+        snnumber?: string;
+        batterycapacity?: number;
+        exportlimit?: number;
+        batterymodel?: string;
+        inverterCapacity?: number;
+    };
     utilmateStatus?: number;
     msatDetails?: {
         msatConnected?: number;
@@ -706,6 +714,34 @@ export function CustomersPage() {
                     )}
                 </div>
             ),
+        },
+        {
+            key: 'isBattery',
+            header: (
+                <div className="flex flex-col gap-1 items-start">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors whitespace-nowrap">
+                            Is Battery
+                        </span>
+                    </div>
+                </div>
+            ),
+            render: (row) => {
+                const hasBattery = !!(row.batteryDetails?.batterybrand || row.batteryDetails?.batterymodel || row.batteryDetails?.snnumber);
+                return (
+                    <div className="flex justify-center">
+                        {hasBattery ? (
+                            <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-1">
+                                <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            </div>
+                        ) : (
+                            <div className="rounded-full bg-red-100 dark:bg-red-900/30 p-1">
+                                <XIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
+                            </div>
+                        )}
+                    </div>
+                );
+            },
         },
         {
             key: 'portalName',

@@ -116,7 +116,7 @@ export function VppCertificateTab({
     });
 
     const batteryModelOptions = batteryModelsData?.batteryModels?.filter((m: any) => m.isActive).map((m: any) => ({
-        value: m.model,
+        value: m.uid,
         label: m.model
     })) || [];
 
@@ -126,7 +126,7 @@ export function VppCertificateTab({
     })) || [];
 
     const handleBatteryModelChange = (value: string) => {
-        const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.model === value);
+        const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.uid === value);
         setFormState(prev => ({
             ...prev,
             batteryModel: value,
@@ -159,40 +159,41 @@ export function VppCertificateTab({
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     useEffect(() => {
-        if (data?.customer?.vppCertificateDetails) {
+        if (data?.customer) {
             const v = data.customer.vppCertificateDetails;
+            const b = data.customer.batteryDetails;
             setTimeout(() => {
                 setFormState({
-                    batteryManufacturer: v.batteryManufacturer || '',
-                    batteryModel: v.batteryModel || '',
-                    batterySerialNumber: v.batterySerialNumber || '',
-                    batteryInstalledDate: v.batteryInstalledDate ? new Date(v.batteryInstalledDate).toISOString().split('T')[0] : '',
-                    batteryUsableCapacity: v.batteryUsableCapacity?.toString() || '',
-                    batteryPortConnected: v.batteryPortConnected ?? 0,
-                    inverterManufacturer: v.inverterManufacturer || '',
-                    inverterModel: v.inverterModel || '',
-                    inverterSnNumbers: v.inverterSnNumbers || '',
-                    inverterCapacity: v.inverterCapacity?.toString() || '',
-                    isLifeSupportEquipment: v.isLifeSupportEquipment ?? 0,
-                    ifYesDetails: v.ifYesDetails || '',
-                    internetConnectionType: v.internetConnectionType ?? 0,
-                    internetOtherText: v.internetOtherText || '',
-                    modemRouterLocation: v.modemRouterLocation || '',
-                    apiIntegration: v.apiIntegration ?? 0,
-                    remoteChargesCommandTest: v.remoteChargesCommandTest ?? 0,
-                    remoteChargesCommandTestAt: v.remoteChargesCommandTestAt ? new Date(v.remoteChargesCommandTestAt).toISOString().slice(0, 16) : '',
-                    remoteDischargesCommandTest: v.remoteDischargesCommandTest ?? 0,
-                    remoteDischargesCommandTestAt: v.remoteDischargesCommandTestAt ? new Date(v.remoteDischargesCommandTestAt).toISOString().slice(0, 16) : '',
-                    stateOfChangeMonitoring: v.stateOfChangeMonitoring ?? 0,
-                    stateOfChangeMonitoringAt: v.stateOfChangeMonitoringAt ? new Date(v.stateOfChangeMonitoringAt).toISOString().slice(0, 16) : '',
-                    gridExportVerification: v.gridExportVerification ?? 0,
-                    gridExportVerificationAt: v.gridExportVerificationAt ? new Date(v.gridExportVerificationAt).toISOString().slice(0, 16) : '',
-                    gridImportVerification: v.gridImportVerification ?? 0,
-                    gridImportVerificationAt: v.gridImportVerificationAt ? new Date(v.gridImportVerificationAt).toISOString().slice(0, 16) : '',
-                    communicationFailSafeTest: v.communicationFailSafeTest ?? 0,
-                    communicationFailSafeTestAt: v.communicationFailSafeTestAt ? new Date(v.communicationFailSafeTestAt).toISOString().slice(0, 16) : '',
-                    testResult: v.testResult || '',
-                    additionalNotes: v.additionalNotes || ''
+                    batteryManufacturer: v?.batteryManufacturer || b?.batterybrand || '',
+                    batteryModel: v?.batteryModel || b?.batterymodel || '',
+                    batterySerialNumber: v?.batterySerialNumber || b?.snnumber || '',
+                    batteryInstalledDate: v?.batteryInstalledDate ? new Date(v.batteryInstalledDate).toISOString().split('T')[0] : '',
+                    batteryUsableCapacity: v?.batteryUsableCapacity?.toString() || b?.batterycapacity?.toString() || '',
+                    batteryPortConnected: v?.batteryPortConnected ?? 0,
+                    inverterManufacturer: v?.inverterManufacturer || '',
+                    inverterModel: v?.inverterModel || '',
+                    inverterSnNumbers: v?.inverterSnNumbers || '',
+                    inverterCapacity: v?.inverterCapacity?.toString() || b?.inverterCapacity?.toString() || '',
+                    isLifeSupportEquipment: v?.isLifeSupportEquipment ?? 0,
+                    ifYesDetails: v?.ifYesDetails || '',
+                    internetConnectionType: v?.internetConnectionType ?? 0,
+                    internetOtherText: v?.internetOtherText || '',
+                    modemRouterLocation: v?.modemRouterLocation || '',
+                    apiIntegration: v?.apiIntegration ?? 0,
+                    remoteChargesCommandTest: v?.remoteChargesCommandTest ?? 0,
+                    remoteChargesCommandTestAt: v?.remoteChargesCommandTestAt ? new Date(v.remoteChargesCommandTestAt).toISOString().slice(0, 16) : '',
+                    remoteDischargesCommandTest: v?.remoteDischargesCommandTest ?? 0,
+                    remoteDischargesCommandTestAt: v?.remoteDischargesCommandTestAt ? new Date(v.remoteDischargesCommandTestAt).toISOString().slice(0, 16) : '',
+                    stateOfChangeMonitoring: v?.stateOfChangeMonitoring ?? 0,
+                    stateOfChangeMonitoringAt: v?.stateOfChangeMonitoringAt ? new Date(v.stateOfChangeMonitoringAt).toISOString().slice(0, 16) : '',
+                    gridExportVerification: v?.gridExportVerification ?? 0,
+                    gridExportVerificationAt: v?.gridExportVerificationAt ? new Date(v.gridExportVerificationAt).toISOString().slice(0, 16) : '',
+                    gridImportVerification: v?.gridImportVerification ?? 0,
+                    gridImportVerificationAt: v?.gridImportVerificationAt ? new Date(v.gridImportVerificationAt).toISOString().slice(0, 16) : '',
+                    communicationFailSafeTest: v?.communicationFailSafeTest ?? 0,
+                    communicationFailSafeTestAt: v?.communicationFailSafeTestAt ? new Date(v.communicationFailSafeTestAt).toISOString().slice(0, 16) : '',
+                    testResult: v?.testResult || '',
+                    additionalNotes: v?.additionalNotes || ''
                 });
             }, 0);
         }

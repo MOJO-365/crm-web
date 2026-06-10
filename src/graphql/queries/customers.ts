@@ -188,10 +188,12 @@ export const GET_CUSTOMERS = gql`
                 batteryDetails {
                     id
                     customerUid
+                    isbattery
                     batterybrand
                     snnumber
                     batterycapacity
                     exportlimit
+                    batterymodel
                     inverterCapacity
                     checkCode
                     isActive
@@ -476,6 +478,15 @@ export const GET_CUSTOMERS_CURSOR = gql`
                     vppApiPushed
                     updatedAt
                 }
+                batteryDetails {
+                    isbattery
+                    batterybrand
+                    snnumber
+                    batterycapacity
+                    exportlimit
+                    batterymodel
+                    inverterCapacity
+                }
                 utilmateDetails {
                     utilmateConnected
                     siteIdentifier
@@ -643,10 +654,12 @@ export const GET_CUSTOMER_BY_ID = gql`
                 invertercapacity
             }
             batteryDetails {
+                isbattery
                 batterybrand
                 snnumber
                 batterycapacity
                 exportlimit
+                batterymodel
                 inverterCapacity
             }
             enrollmentDetails {
@@ -838,6 +851,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 snnumber
                 batterycapacity
                 exportlimit
+                batterymodel
                 inverterCapacity
             }
             enrollmentDetails {
@@ -1011,10 +1025,12 @@ export const GET_CUSTOMER_SOLAR_VPP_DETAILS = gql`
             batteryDetails {
                 id
                 customerUid
+                isbattery
                 batterybrand
                 snnumber
                 batterycapacity
                 exportlimit
+                batterymodel
                 inverterCapacity
                 checkCode
                 isActive
@@ -1075,7 +1091,13 @@ export const GET_CUSTOMER_VPP_CERTIFICATE_DETAILS = gql`
                 isAllRequiredFilled
                 isVppCertificateEmailSent
                 isVppCertificateEmailSentAt
-
+            }
+            batteryDetails {
+                batterybrand
+                snnumber
+                batterycapacity
+                batterymodel
+                inverterCapacity
             }
         }
     }
@@ -1272,6 +1294,7 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
             uid
             selectedBonuses
             customerId
+            portalName
             email
             firstName
             lastName
@@ -1284,12 +1307,47 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
             propertyType
             tariffCode
             ratePlanUid
+            ratePlan {
+                uid
+                codes
+                planId
+                dnsp
+                state
+                tariff
+                type
+                vpp
+                offers {
+                    uid
+                    offerName
+                    anytime
+                    cl1Supply
+                    cl1Usage
+                    cl2Supply
+                    cl2Usage
+                    demand
+                    demandOp
+                    demandP
+                    demandS
+                    fit
+                    fitPeak
+                    fitCritical
+                    fitVpp
+                    offPeak
+                    peak
+                    shoulder
+                    supplyCharge
+                    vppOrcharge
+                    dynamicRates
+                    priceUnits
+                }
+            }
             planUid
             plan {
                 uid
                 ratesJson
                 discount
                 title
+                bonusUids
             }
             status
             discount
@@ -1344,10 +1402,12 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
             batteryDetails {
                 id
                 customerUid
+                isbattery
                 batterybrand
                 snnumber
                 batterycapacity
                 exportlimit
+                batterymodel
                 inverterCapacity
                 checkCode
                 isActive
