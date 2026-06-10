@@ -44,6 +44,7 @@ const CustomerViewPage = lazyWithRetry(() => import('@/pages/customer-view/Custo
 const PushToGsyncPage = lazyWithRetry(() => import('@/pages/trackers/PushToGsyncPage').then(m => ({ default: m.PushToGsyncPage })));
 const PushToMsatPage = lazyWithRetry(() => import('@/pages/trackers/PushToMsatPage').then(m => ({ default: m.PushToMsatPage })));
 const PushToUtilmatePage = lazyWithRetry(() => import('@/pages/trackers/PushToUtilmatePage').then(m => ({ default: m.PushToUtilmatePage })));
+const MaintenanceTrackerPage = lazyWithRetry(() => import('@/pages/trackers/MaintenanceTrackerPage').then(m => ({ default: m.MaintenanceTrackerPage })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -110,6 +111,7 @@ const router = createBrowserRouter(
                 <Route path="/push-to-gsync" element={<RequirePermission menuCode="push_to_gsync"><PushToGsyncPage /></RequirePermission>} />
                 <Route path="/push-to-msat" element={<RequirePermission menuCode="msat_tracker"><PushToMsatPage /></RequirePermission>} />
                 <Route path="/push-to-utilmate" element={<RequirePermission menuCode="utilmate_tracker"><PushToUtilmatePage /></RequirePermission>} />
+                <Route path="/maintenance-tracker" element={<RequirePermission menuCode="maintenance_tracker"><MaintenanceTrackerPage /></RequirePermission>} />
 
                 {/* Master Routes */}
                 <Route path="/document-types" element={<RequirePermission menuCode="document_types"><DocumentTypesPage /></RequirePermission>} />
