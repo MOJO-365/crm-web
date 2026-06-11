@@ -5,8 +5,11 @@ import {
     GET_PLANS,
     DELETE_PLAN
 } from '@/graphql';
+import { UPDATE_PLAN } from '@/graphql/mutations/plans';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Switch } from '@/components/ui/Switch';
+import { ConfirmationPopover } from '@/components/ui';
 import { DataTable, type Column, Modal, StatusField } from '@/components/common';
 import { PlusIcon, TrashIcon, PencilIcon } from '@/components/icons';
 import { toast } from 'react-toastify';
@@ -32,6 +35,7 @@ export const PlansMasterPage: React.FC = () => {
     const navigate = useNavigate();
     const { data, loading, error, refetch } = useQuery(GET_PLANS);
     const [deletePlan, { loading: deleting }] = useMutation(DELETE_PLAN);
+    const [updatePlan] = useMutation(UPDATE_PLAN);
 
     const canManage = useAuthStore((state) => state.canEditInMenu('plans_master'));
 
@@ -86,6 +90,23 @@ export const PlansMasterPage: React.FC = () => {
         }
     };
 
+    const handleToggleStatus = async (plan: Plan) => {
+        try {
+            await updatePlan({
+                variables: {
+                    uid: plan.uid,
+                    input: {
+                        isActive: plan.isActive === false ? true : false
+                    }
+                }
+            });
+            toast.success(`Plan marked as ${plan.isActive === false ? 'active' : 'inactive'}`);
+            refetch();
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to update plan status');
+        }
+    };
+
     const columns: Column<Plan>[] = [
         {
             header: 'Plan Title',
@@ -130,7 +151,27 @@ export const PlansMasterPage: React.FC = () => {
         {
             header: 'Status',
             key: 'isActive',
-            render: (item) => <StatusField type="user_status" value={item.isActive !== false ? 1 : 0} />
+            render: (item) => (
+                <div className="flex items-center gap-3">
+                    <ConfirmationPopover
+                        title="Confirm Status Change"
+                        description={`Are you sure you want to mark this plan as ${item.isActive === false ? 'Active' : 'Inactive'}?`}
+                        onConfirm={() => handleToggleStatus(item)}
+                        enabled={canManage}
+                        confirmVariant="default"
+                        placement="left"
+                    >
+                        <div className={!canManage ? 'pointer-events-none opacity-50' : ''}>
+                            <Switch
+                                checked={item.isActive !== false}
+                                onChange={() => { }}
+                                disabled={!canManage}
+                            />
+                        </div>
+                    </ConfirmationPopover>
+                    <StatusField type="user_status" value={item.isActive !== false ? 1 : 0} />
+                </div>
+            )
         },
         {
             header: 'Created At',
@@ -171,7 +212,7 @@ export const PlansMasterPage: React.FC = () => {
 
 
     return (
-        <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
+        <div className="space-y-6 pb-10">
             <div className="flex flex-col gap-2 border-border pb-2">
                 <div className="flex items-center justify-between">
                     <div>
