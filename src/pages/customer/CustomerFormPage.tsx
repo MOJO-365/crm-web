@@ -335,7 +335,7 @@ const applyPlanOverridesToOffer = (offer: any, planRatesJson: any) => {
                             name: pr.name,
                             value: numericRate,
                             unitId: pr.unit,
-                            type: pr.dynamicType || 'extra_charges',
+                            type: pr.dynamicType ? String(pr.dynamicType).toLowerCase().replace(/\s+/g, '_') : 'extra_charges',
                             applyDiscount: false
                         });
                     }

@@ -104,7 +104,13 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
         }).filter(Boolean) as any[];
 
         const tariffLabels = items.map(i => i.label.toUpperCase());
-        const fixedAdditions = planRates.filter(pr => (pr.dynamicType === type || (!pr.dynamicType && type === 'energy_rates')) && pr.rateType === 'Fixed' && !tariffLabels.includes(pr.name.toUpperCase()));
+        const fixedAdditions = planRates.filter(pr => {
+            const prDynType = String(pr.dynamicType || '').toLowerCase().replace(/\s+/g, '_');
+            const targetType = String(type || '').toLowerCase().replace(/\s+/g, '_');
+            return (prDynType === targetType || (!prDynType && targetType === 'energy_rates')) && 
+                   pr.rateType === 'Fixed' && 
+                   !tariffLabels.includes(pr.name.toUpperCase());
+        });
         
         fixedAdditions.forEach(fa => {
             processed.push({
