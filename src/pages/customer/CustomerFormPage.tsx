@@ -1110,7 +1110,10 @@ export const CustomerFormPage = () => {
                 houseNumber: formData.houseNumber || formData.streetNumber || '',
                 streetName: formData.streetName || '',
                 StreetType: formData.streetType || '',
-                SuburbOrPlaceOrLocality: formData.suburb || ''
+                SuburbOrPlaceOrLocality: formData.suburb || '',
+                flatOrUnitNumber: formData.unitNumber || '',
+                floorOrLevelNumber: formData.floorLevelNumber || '',
+                buildingOrPropertyName: formData.buildingName || ''
             };
 
             const response = await fetch(`${import.meta.env.VITE_MSAT_API_URL}/api/nmi-lookup`, {
@@ -1178,8 +1181,8 @@ export const CustomerFormPage = () => {
                 const address = item?.address;
                 if (address) {
                     updateField('unitNumber', address.flatOrUnitNumber || '');
-                    updateField('houseNumber', address.houseNumber || '');
-                    updateField('streetNumber', address.houseNumber || '');
+                    updateField('houseNumber', `${address.houseNumber || ''}${address.houseNumberSuffix || ''}`);
+                    updateField('streetNumber', `${address.houseNumber || ''}${address.houseNumberSuffix || ''}`);
                     updateField('streetName', address.streetName || '');
                     updateField('streetType', address.streetType || '');
                     updateField('suburb', address.suburb || '');
@@ -1254,8 +1257,8 @@ export const CustomerFormPage = () => {
                 if (data.address && !addressSearch) {
                     setAddressSearch(data.address);
                     updateField('unitNumber', data.flatOrUnitNumber || '');
-                    updateField('houseNumber', data.houseNumber || '');
-                    updateField('streetNumber', data.houseNumber || '');
+                    updateField('houseNumber', `${data.houseNumber || ''}${data.houseNumberSuffix || ''}`);
+                    updateField('streetNumber', `${data.houseNumber || ''}${data.houseNumberSuffix || ''}`);
                     updateField('streetName', data.streetName || '');
                     updateField('streetType', data.streetType || '');
                     updateField('suburb', data.suburb || '');
