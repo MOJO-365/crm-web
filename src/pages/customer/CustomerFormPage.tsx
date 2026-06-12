@@ -1890,7 +1890,23 @@ export const CustomerFormPage = () => {
             navigate('/customers');
         } catch (err: any) {
             console.error('Failed to save customer:', err);
-            toast.error(err.message || 'Failed to save customer');
+            
+            let errorMessage = 'Failed to save customer';
+            if (err.graphQLErrors && err.graphQLErrors.length > 0) {
+                errorMessage = err.graphQLErrors[0].message;
+            } else if (err.networkError && (err.networkError as any).response?.data?.errors?.length > 0) {
+                errorMessage = (err.networkError as any).response.data.errors[0].message;
+            } else if (err.networkError && (err.networkError as any).result?.errors?.length > 0) {
+                errorMessage = (err.networkError as any).result.errors[0].message;
+            } else if (err.response?.data?.errors?.length > 0) {
+                errorMessage = err.response.data.errors[0].message;
+            } else if (err.response?.data?.message) {
+                errorMessage = err.response.data.message;
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+
+            toast.error(errorMessage);
             // Re-enable dirty check if failed
             setIsFormDirty(true);
         } finally { setSubmittingStatus(null); }
