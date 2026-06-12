@@ -1324,8 +1324,8 @@ export function RatesPage() {
 
                         if (row['Type']) {
                             const typeLabel = String(row['Type']).trim().toLowerCase();
-                            if (typeLabel === 'residential') importedPlan.type = '1';
-                            else if (typeLabel === 'business' || typeLabel === 'commercial') importedPlan.type = '0';
+                            if (typeLabel === 'residential') importedPlan.type = '0';
+                            else if (typeLabel === 'business' || typeLabel === 'commercial') importedPlan.type = '1';
                         }
 
                         if (row['VPP']) {
@@ -1416,7 +1416,7 @@ export function RatesPage() {
                             planId: '',
                             dnsp: DNSP_OPTIONS.find(opt => opt.label.toLowerCase() === String(row['DNSP'] || '').trim().toLowerCase())?.value || '0',
                             state: String(row['State'] || 'NSW').trim(),
-                            type: String(row['Type'] || '').trim().toLowerCase() === 'residential' ? '1' : '0',
+                            type: String(row['Type'] || '').trim().toLowerCase() === 'residential' ? '0' : '1',
                             vpp: String(row['VPP'] || '').trim().toLowerCase() === 'yes' ? 1 : 0,
                             discountApplies: String(row['Discount Applies'] || '').trim().toLowerCase() === 'yes',
                             discountPercentage: parseFloat(String(row['Discount %'] || '0')) || 0,
