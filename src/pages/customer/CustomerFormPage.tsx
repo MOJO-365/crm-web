@@ -740,9 +740,12 @@ export const CustomerFormPage = () => {
 
 
 
+    const initializedFormForUid = React.useRef<string | null>(null);
+    const initializedRatePlanForUid = React.useRef<string | null>(null);
+
     // Load Data
     useEffect(() => {
-        if (customerData?.customer) {
+        if (customerData?.customer && initializedFormForUid.current !== uid) {
             const c = customerData.customer;
 
             setFormData({
@@ -856,21 +859,29 @@ export const CustomerFormPage = () => {
                 }
             }
 
-            if (c.tariffCode && ratePlans.length > 0) {
-                // Prefer matching by saved RatePlan UID if available, otherwise fallback to codes
-                const rp = (c.ratePlan?.uid)
-                    ? ratePlans.find((r: any) => r.uid === c.ratePlan?.uid)
-                    : ratePlans.find((r: any) => r.codes === c.tariffCode);
-                if (rp) setSelectedRatePlan(rp);
-            }
-
             console.log('[Edit Mode] Customer data loaded:', c);
 
             if (c.rateVersion && !selectedVersion) {
                 setSelectedVersion(c.rateVersion);
             }
+            
+            initializedFormForUid.current = uid || null;
         }
-    }, [customerData, ratePlans]);
+    }, [customerData, uid, selectedVersion]);
+
+    // Initial Rate Plan Selection
+    useEffect(() => {
+        if (customerData?.customer && ratePlans.length > 0 && initializedRatePlanForUid.current !== uid) {
+            const c = customerData.customer;
+            if (c.tariffCode) {
+                const rp = (c.ratePlan?.uid)
+                    ? ratePlans.find((r: any) => r.uid === c.ratePlan?.uid)
+                    : ratePlans.find((r: any) => r.codes === c.tariffCode);
+                if (rp) setSelectedRatePlan(rp);
+            }
+            initializedRatePlanForUid.current = uid || null;
+        }
+    }, [customerData, ratePlans, uid]);
 
     // Duplicate Check - Address
     useEffect(() => {
@@ -2384,16 +2395,19 @@ export const CustomerFormPage = () => {
                                                         updateField('vpp', true);
                                                         updateField('isVpp', 1);
                                                         
+                                                        updateField('selectedBonuses', []);
+
                                                         const makeObj = batteryMakesData?.batteryMakes?.find((m: any) => m.uid === formData.batteryBrand);
                                                         const isUnknown = makeObj?.make?.toLowerCase() === 'unknown' || !formData.batteryBrand;
                                                         
                                                         if (isUnknown) {
                                                             if (isPdrs) {
                                                                 updateField('vppSignupBonus', '600');
+                                                            } else {
+                                                                updateField('vppSignupBonus', null);
                                                             }
                                                         } else {
                                                             updateField('vppSignupBonus', null);
-                                                            updateField('selectedBonuses', []);
                                                         }
                                                     } else {
                                                         updateField('isBattery', 0);
@@ -2420,16 +2434,19 @@ export const CustomerFormPage = () => {
                                                             updateField('batteryBrand', val);
                                                             updateField('batteryModel', ''); // Reset model
                                                             
+                                                            updateField('selectedBonuses', []);
+
                                                             const makeObj = batteryMakesData?.batteryMakes?.find((m: any) => m.uid === val);
                                                             const isUnknown = makeObj?.make?.toLowerCase() === 'unknown' || !val;
                                                             
                                                             if (isUnknown) {
                                                                  if (isPdrs) {
                                                                      updateField('vppSignupBonus', '600');
+                                                                 } else {
+                                                                     updateField('vppSignupBonus', null);
                                                                  }
                                                             } else {
                                                                  updateField('vppSignupBonus', null);
-                                                                 updateField('selectedBonuses', []);
                                                             }
                                                         }}
                                                         options={batteryMakesData?.batteryMakes?.map((m: any) => ({ label: m.make, value: m.uid })) || []}
