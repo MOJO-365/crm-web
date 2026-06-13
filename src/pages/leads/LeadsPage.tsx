@@ -30,6 +30,7 @@ interface Lead {
     createdAt: string;
     assignedTo?: string;
     assignedToUser?: { uid: string; name: string; };
+    isDuplicate?: number;
 }
 
 interface LeadsResponse {
@@ -197,9 +198,16 @@ export default function LeadsPage() {
             ),
             render: (row) => (
                 <div className="flex flex-col">
-                    <span className="font-medium text-foreground">
-                        {row.title ? row.title + ' ' : ''}{row.firstname} {row.lastname}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="font-medium text-foreground">
+                            {row.title ? row.title + ' ' : ''}{row.firstname} {row.lastname}
+                        </span>
+                        {row.isDuplicate === 1 && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">
+                                Dup
+                            </span>
+                        )}
+                    </div>
                     {row.email && <span className="text-xs text-muted-foreground">{row.email}</span>}
                 </div>
             ),

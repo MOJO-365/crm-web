@@ -23,6 +23,7 @@ export interface CustomerFormData {
     // Address
     unitNumber: string;
     houseNumber: string;
+    houseNumberSuffix: string;
     buildingName: string;
     floorLevelNumber: string;
     streetNumber: string;
@@ -33,6 +34,7 @@ export interface CustomerFormData {
     postcode: string;
     country: string;
     nmi: string;
+    isVppAndIsBattery?: boolean;
     ownershipStatus?: number;
 
     // Solar Details

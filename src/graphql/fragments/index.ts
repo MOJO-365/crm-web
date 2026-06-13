@@ -153,5 +153,6 @@ export const LEAD_FIELDS = gql`
         customer {
             status
         }
+        isDuplicate
     }
 `;

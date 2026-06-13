@@ -85,6 +85,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                     ref={ref}
                     disabled={disabled || isLoading}
                     onKeyDown={handleKeyDown}
+                    required={required}
                     {...props}
                 />
             );
@@ -128,6 +129,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                         aria-invalid={!!error}
                         aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
                         onKeyDown={handleKeyDown}
+                        required={required}
                         {...props}
                     />
                     {hasRightElement && (
