@@ -4,15 +4,15 @@ import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { Modal } from '@/components/common';
-import { GET_LEAD, CREATE_LEAD, UPDATE_LEAD, GET_LEADS, GET_LEAD_SOURCES, CREATE_LEAD_SOURCE, CHECK_ADDRESS_EXISTS, CHECK_NMI_EXISTS, GET_USERS } from '@/graphql';
+import { Modal, ConfirmModal } from '@/components/common';
+import { GET_LEAD, CREATE_LEAD, UPDATE_LEAD, GET_LEADS, GET_LEAD_SOURCES, CREATE_LEAD_SOURCE, CHECK_ADDRESS_EXISTS, CHECK_NMI_EXISTS, GET_USERS, CHECK_LEAD_DUPLICATE } from '@/graphql';
 import { TITLE_OPTIONS } from '@/lib/constants';
 import LocationAutocomplete from '../LocationAutocomplete';
 import { PlusIcon } from '@/components/icons';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 // Reuse the Field component pattern from CustomerFormPage
-const Field = ({ label, required, hint, children, error, action }: { label: string, required?: boolean, hint?: string, children: React.ReactNode, error?: string, action?: React.ReactNode }) => (
+const Field = ({ label, required, hint, children, error, warning, action }: { label: string, required?: boolean, hint?: string, children: React.ReactNode, error?: string, warning?: string, action?: React.ReactNode }) => (
     <div className="space-y-2">
         <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-foreground flex items-center gap-1">
@@ -24,6 +24,7 @@ const Field = ({ label, required, hint, children, error, action }: { label: stri
         {children}
         {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
         {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
+        {warning && <p className="text-xs text-amber-600 font-medium">{warning}</p>}
     </div>
 );
 
@@ -38,6 +39,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
     const canManageLeadSources = useAuthStore((state) => state.hasFeatureAccess('feature_manage_lead_sources'));
     const canViewAllCustomers = useAuthStore((state) => state.hasFeatureAccess('feature_view_all_customers'));
     const currentUserUid = useAuthStore((state) => state.user?.uid);
+    const canCreateDuplicates = useAuthStore((state) => state.hasFeatureAccess('feature_allow_duplicate_leads'));
 
     const [formData, setFormData] = useState({
         title: '',
@@ -66,10 +68,13 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
     const [addressSearch, setAddressSearch] = useState('');
     const [isAddingNewSourceInline, setIsAddingNewSourceInline] = useState(false);
     const [newSourceName, setNewSourceName] = useState('');
-    const [duplicateErrors, setDuplicateErrors] = useState<{ address?: string; nmi?: string }>({});
+    const [duplicateErrors, setDuplicateErrors] = useState<{ address?: string; nmi?: string; lead?: string }>({});
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+    const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false);
 
     const [checkAddressExists] = useLazyQuery(CHECK_ADDRESS_EXISTS);
     const [checkNmiExists] = useLazyQuery(CHECK_NMI_EXISTS);
+    const [checkLeadDuplicate] = useLazyQuery(CHECK_LEAD_DUPLICATE);
 
     const { data, loading } = useQuery(GET_LEAD, {
         variables: { uid },
@@ -259,8 +264,62 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
             } else {
                 setDuplicateErrors(prev => ({ ...prev, address: undefined }));
             }
+            
+            // Check for Lead duplicates
+            const { data: leadData } = await checkLeadDuplicate({
+                variables: {
+                    address: {
+                        unitNumber: addressData.unitNumber || undefined,
+                        houseNumber: addressData.houseNumber || undefined,
+                        buildingName: addressData.buildingName || undefined,
+                        floorLevelNumber: addressData.floorLevelNumber || undefined,
+                        streetNumber: addressData.streetNumber,
+                        streetName: addressData.streetName,
+                        streetType: addressData.streetType || undefined,
+                        suburb: addressData.suburb,
+                        postcode: addressData.postcode,
+                        state: addressData.state || undefined,
+                        country: addressData.country || undefined,
+                    }
+                }
+            });
+            
+            if (leadData?.checkLeadDuplicate) {
+                const existing = leadData.checkLeadDuplicate;
+                setDuplicateErrors(prev => ({
+                    ...prev,
+                    lead: `Lead with this address already exists: ${existing.firstname} ${existing.lastname}`
+                }));
+            } else {
+                setDuplicateErrors(prev => ({ ...prev, lead: undefined }));
+            }
         } catch (err) {
             console.error('Address check failed:', err);
+        }
+    };
+
+    const checkNumberDuplicate = async (number: string) => {
+        if (isEditMode) return;
+        if (!number || number.length < 9) {
+            setDuplicateErrors(prev => ({ ...prev, lead: undefined }));
+            return;
+        }
+
+        try {
+            const { data } = await checkLeadDuplicate({
+                variables: { number }
+            });
+            if (data?.checkLeadDuplicate) {
+                const existing = data.checkLeadDuplicate;
+                setDuplicateErrors(prev => ({
+                    ...prev,
+                    lead: `Lead with this number already exists: ${existing.firstname} ${existing.lastname}`
+                }));
+            } else {
+                setDuplicateErrors(prev => ({ ...prev, lead: undefined }));
+            }
+        } catch (err) {
+            console.error('Number check failed:', err);
         }
     };
 
@@ -287,12 +346,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (duplicateErrors.address || duplicateErrors.nmi) {
-            toast.error('Please resolve duplicate entries before saving');
-            return;
-        }
+    const executeSubmit = async (isDuplicate = 0) => {
         try {
             if (isEditMode) {
                 await updateLead({
@@ -301,7 +355,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 toast.success('Lead updated successfully');
             } else {
                 await createLead({
-                    variables: { input: formData }
+                    variables: { input: { ...formData, isDuplicate } }
                 });
                 toast.success('Lead created successfully');
             }
@@ -309,6 +363,48 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
         } catch (err: any) {
             toast.error(err.message || 'Error saving lead');
         }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        // Custom validation
+        const newErrors: Record<string, string> = {};
+        if (!formData.firstname?.trim()) newErrors.firstname = 'First name is required';
+        if (!formData.lastname?.trim()) newErrors.lastname = 'Last name is required';
+        if (!formData.email?.trim()) {
+            newErrors.email = 'Email is required';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            newErrors.email = 'Please enter a valid email address';
+        }
+        if (!formData.number?.trim()) {
+            newErrors.number = 'Phone number is required';
+        } else if (formData.number.length !== 9) {
+            newErrors.number = 'Phone number must be exactly 9 digits';
+        }
+        
+        if (Object.keys(newErrors).length > 0) {
+            setValidationErrors(newErrors);
+            return;
+        }
+        
+        setValidationErrors({});
+
+        if (duplicateErrors.address || duplicateErrors.nmi || duplicateErrors.lead) {
+            if (!isEditMode) {
+                if (!canCreateDuplicates) {
+                    toast.error('You do not have permission to create duplicate entries. Please resolve the duplicate fields.');
+                    return;
+                }
+                setShowDuplicateConfirm(true);
+                return;
+            } else {
+                toast.error('Please resolve duplicate entries before saving');
+                return;
+            }
+        }
+        
+        await executeSubmit(0);
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -329,6 +425,12 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
             }
 
             setFormData(prev => ({ ...prev, [name]: val }));
+            
+            if (val.length === 9) {
+                 checkNumberDuplicate(val);
+            } else {
+                 if (duplicateErrors.lead) setDuplicateErrors(prev => ({ ...prev, lead: undefined }));
+            }
             return;
         }
 
@@ -336,6 +438,10 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
             if (duplicateErrors.nmi) {
                 setDuplicateErrors(prev => ({ ...prev, nmi: undefined }));
             }
+        }
+
+        if (validationErrors[name]) {
+            setValidationErrors(prev => ({ ...prev, [name]: '' }));
         }
 
         const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
@@ -347,7 +453,8 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
     };
 
     return (
-        <Modal
+        <>
+            <Modal
             isOpen={isOpen}
             onClose={onClose}
             title={isEditMode ? 'Edit Lead' : 'Create New Lead'}
@@ -369,7 +476,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 </div>
             }
         >
-            <form id="lead-form" onSubmit={handleSubmit} className="space-y-6 pt-2">
+            <form id="lead-form" onSubmit={handleSubmit} noValidate className="space-y-6 pt-2">
                 {loading && isEditMode ? (
                     <div className="py-12 text-center text-muted-foreground flex flex-col items-center gap-3">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -389,12 +496,12 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                 </Field>
                             </div>
                             <div className="md:col-span-3">
-                                <Field label="First Name" required>
+                                <Field label="First Name" required error={validationErrors.firstname}>
                                     <Input name="firstname" value={formData.firstname} onChange={handleChange} required placeholder="First name" />
                                 </Field>
                             </div>
                             <div className="md:col-span-3">
-                                <Field label="Last Name" required>
+                                <Field label="Last Name" required error={validationErrors.lastname}>
                                     <Input name="lastname" value={formData.lastname} onChange={handleChange} required placeholder="Last name" />
                                 </Field>
                             </div>
@@ -412,12 +519,12 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
 
                             {/* Row 2: Email, Phone, Source */}
                             <div className="md:col-span-4">
-                                <Field label="Email" required>
+                                <Field label="Email" required error={validationErrors.email}>
                                     <Input name="email" type="email" value={formData.email} onChange={handleChange} required placeholder="Email address" />
                                 </Field>
                             </div>
                             <div className="md:col-span-4">
-                                <Field label="Phone Number" required>
+                                <Field label="Phone Number" required error={validationErrors.number}>
                                     <div className="flex items-center">
                                         <div className="flex items-center justify-center h-10 px-3 bg-muted border border-r-0 border-border rounded-l-md text-sm font-medium text-muted-foreground whitespace-nowrap">
                                             +61
@@ -426,6 +533,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                             name="number"
                                             value={formData.number}
                                             onChange={handleChange}
+                                            onBlur={() => checkNumberDuplicate(formData.number)}
                                             required
                                             maxLength={9}
                                             className="rounded-l-none rounded-r-md"
@@ -488,7 +596,12 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
 
                             {/* Row 3: Address Search & NMI */}
                             <div className="md:col-span-8">
-                                <Field label="Search Address" hint="Start typing to verify address" error={duplicateErrors.address}>
+                                <Field 
+                                    label="Search Address" 
+                                    hint="Start typing to verify address" 
+                                    error={!canCreateDuplicates ? (duplicateErrors.address || duplicateErrors.lead) : undefined}
+                                    warning={canCreateDuplicates ? (duplicateErrors.address || duplicateErrors.lead) : undefined}
+                                >
                                     <LocationAutocomplete
                                         value={addressSearch}
                                         onChange={(val) => {
@@ -542,7 +655,11 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                 </Field>
                             </div>
                             <div className="md:col-span-4">
-                                <Field label="NMI" error={duplicateErrors.nmi}>
+                                <Field 
+                                    label="NMI" 
+                                    error={!canCreateDuplicates ? duplicateErrors.nmi : undefined}
+                                    warning={canCreateDuplicates ? duplicateErrors.nmi : undefined}
+                                >
                                     <Input
                                         name="nmi"
                                         value={formData.nmi}
@@ -648,5 +765,20 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 )}
             </form>
         </Modal>
+        <ConfirmModal
+            isOpen={showDuplicateConfirm}
+            onClose={() => setShowDuplicateConfirm(false)}
+            onConfirm={() => {
+                setShowDuplicateConfirm(false);
+                executeSubmit(1);
+            }}
+            title="Duplicate Entry Detected"
+            message="Are you sure you want to create a duplicate entry?"
+            confirmText="Create Duplicate"
+            cancelText="Cancel"
+            variant="warning"
+            confirmButtonClassName="bg-[#5c8a1d] hover:bg-[#4a6f17] text-white border-0"
+        />
+        </>
     );
 }

@@ -37,3 +37,14 @@ export const GET_LEAD_SOURCES = gql`
         }
     }
 `;
+
+export const CHECK_LEAD_DUPLICATE = gql`
+    query CheckLeadDuplicate($number: String, $address: CustomerAddressInput) {
+        checkLeadDuplicate(number: $number, address: $address) {
+            uid
+            firstname
+            lastname
+            isDuplicate
+        }
+    }
+`;

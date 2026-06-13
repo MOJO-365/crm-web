@@ -140,6 +140,7 @@ const initialFormData: CustomerFormData = {
     showName: true,
     unitNumber: '',
     houseNumber: '',
+    houseNumberSuffix: '',
     buildingName: '',
     floorLevelNumber: '',
     streetNumber: '',
@@ -151,6 +152,7 @@ const initialFormData: CustomerFormData = {
     country: 'Australia',
     ownershipStatus: 0,
     nmi: '',
+    isVppAndIsBattery: false,
     hasSolar: true,
     solarCapacity: '',
     inverterCapacity: '',
@@ -204,7 +206,6 @@ const initialFormData: CustomerFormData = {
     pdrsEmailSentAt: undefined,
     isCreditScoreFetched: false,
 };
-
 
 const streetTypeOptions = [
     { value: 'St', label: 'Street' },
@@ -458,13 +459,20 @@ export const CustomerFormPage = () => {
                 if (plan.propertyType !== undefined && plan.propertyType !== null && plan.propertyType !== formData.propertyType) {
                     return false;
                 }
-                // If plan requires solar, customer must have solar
-                if (plan.isSolarRequired && !formData.hasSolar) {
-                    return false;
-                }
-                // If plan requires battery, customer must have battery
-                if (plan.isBatteryRequired && !formData.hasBattery) {
-                    return false;
+                // If NMI has VPP battery (B1 register), only show plans that require both solar AND battery
+                if (formData.isVppAndIsBattery) {
+                    if (!plan.isSolarRequired || !plan.isBatteryRequired) {
+                        return false;
+                    }
+                } else {
+                    // If plan requires solar, customer must have solar
+                    if (plan.isSolarRequired && !formData.hasSolar) {
+                        return false;
+                    }
+                    // If plan requires battery, customer must have battery
+                    if (plan.isBatteryRequired && !formData.hasBattery) {
+                        return false;
+                    }
                 }
                 return true;
             })
@@ -472,7 +480,7 @@ export const CustomerFormPage = () => {
                 label: plan.title,
                 value: plan.uid
             }));
-    }, [activePlansData, formData.hasSolar, formData.hasBattery, formData.propertyType, formData.planUid]);
+    }, [activePlansData, formData.hasSolar, formData.hasBattery, formData.propertyType, formData.planUid, formData.isVppAndIsBattery]);
 
     const selectedPlan = useMemo(() => {
         if (!activePlansData?.activePlans || !formData.planUid) return null;
@@ -771,6 +779,7 @@ export const CustomerFormPage = () => {
                 showName: c.showName ?? true,
                 unitNumber: c.address?.unitNumber || '',
                 houseNumber: c.address?.houseNumber || '',
+                houseNumberSuffix: c.address?.houseNumberSuffix || '',
                 buildingName: c.address?.buildingName || '',
                 floorLevelNumber: c.address?.floorLevelNumber || '',
                 streetNumber: c.address?.streetNumber || '',
@@ -864,7 +873,7 @@ export const CustomerFormPage = () => {
             if (c.rateVersion && !selectedVersion) {
                 setSelectedVersion(c.rateVersion);
             }
-            
+
             initializedFormForUid.current = uid || null;
         }
     }, [customerData, uid, selectedVersion]);
@@ -1173,6 +1182,7 @@ export const CustomerFormPage = () => {
                 }
 
                 updateField('nmi', nmi);
+                updateField('isVppAndIsBattery', !!item?.isVppAndIsBattery);
                 checkNmiDuplicate(nmi);
 
                 // ✅ Auto tariff match (use primary tariff or first found)
@@ -1192,13 +1202,24 @@ export const CustomerFormPage = () => {
                 const address = item?.address;
                 if (address) {
                     updateField('unitNumber', address.flatOrUnitNumber || '');
-                    updateField('houseNumber', `${address.houseNumber || ''}${address.houseNumberSuffix || ''}`);
-                    updateField('streetNumber', `${address.houseNumber || ''}${address.houseNumberSuffix || ''}`);
+                    updateField('houseNumber', address.houseNumber || '');
+                    updateField('houseNumberSuffix', address.houseNumberSuffix || '');
+                    updateField('streetNumber', address.houseNumber || '');
                     updateField('streetName', address.streetName || '');
                     updateField('streetType', address.streetType || '');
                     updateField('suburb', address.suburb || '');
                     updateField('state', address.state || '');
                     updateField('postcode', address.postcode || '');
+
+                    setAddressSearch([
+                        address.flatOrUnitNumber ? `Unit ${address.flatOrUnitNumber}` : '',
+                        (address.houseNumber || '') + (address.houseNumberSuffix || ''),
+                        address.streetName,
+                        address.streetType,
+                        address.suburb,
+                        address.state,
+                        address.postcode
+                    ].filter(Boolean).join(', ').trim());
                 }
 
                 toast.success('NMI successfully found');
@@ -1224,63 +1245,91 @@ export const CustomerFormPage = () => {
         try {
             setIsNmiLookupLoading(true);
 
-            const webToken = import.meta.env.VITE_WEB_TOKEN || 'GSYNC_WEB_v1_0tuu903stcif2kzsx7t8fyy';
-            const body = {
-                nmi: formData.nmi,
-                address: addressSearch,
-                deliveryPointIdentifier: null,
-                flatOrUnitNumber: formData.unitNumber || null,
-                houseNumber: formData.houseNumber || formData.streetNumber || null,
-                postcode: formData.postcode,
-                state: formData.state,
-                streetName: formData.streetName,
-                streetSuffix: null,
-                streetType: formData.streetType,
-                suburb: formData.suburb
+            const nmiLookupBody = {
+                jurisdictionCode: formData.state || 'NSW',
+                stateOrTerritory: formData.state || 'NSW',
+                postcode: formData.postcode || '',
+                houseNumber: formData.houseNumber || formData.streetNumber || '',
+                streetName: formData.streetName || '',
+                StreetType: formData.streetType || '',
+                SuburbOrPlaceOrLocality: formData.suburb || '',
+                flatOrUnitNumber: formData.unitNumber || '',
+                floorOrLevelNumber: formData.floorLevelNumber || '',
+                buildingOrPropertyName: formData.buildingName || '',
+                nmi: formData.nmi
             };
 
-            const response = await fetch(`/api/web/nmi-tariff`, {
+            const response = await fetch(`${import.meta.env.VITE_MSAT_API_URL}/api/nmi-lookup`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Web-Token': webToken
-                },
-                body: JSON.stringify(body)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(nmiLookupBody)
             });
 
             const data = await response.json();
 
-            if (data.tariffCode) {
-                updateField('tariffCode', data.tariffCode);
+            // Find the result matching the entered NMI
+            const results = data?.results || [];
+            const item = results.find((r: any) => r.nmi === formData.nmi) || results[0];
 
-                const matchedPlanUid = formData.vpp
-                    ? (data.rates?.withVpp?.ratePlanUid || data.withVppRatePlanUid)
-                    : (data.rates?.withoutVpp?.ratePlanUid || data.withoutVppRatePlanUid || data.ratePlanUid);
-
-                handleTariffChange(matchedPlanUid || data.tariffCode);
-
-                if (data.customerType === 'RESIDENTIAL') {
-                    updateField('propertyType', 0);
-                } else if (data.customerType === 'BUSINESS' || data.customerType === 'COMMERCIAL') {
-                    updateField('propertyType', 1);
-                }
-
-                if (data.address && !addressSearch) {
-                    setAddressSearch(data.address);
-                    updateField('unitNumber', data.flatOrUnitNumber || '');
-                    updateField('houseNumber', `${data.houseNumber || ''}${data.houseNumberSuffix || ''}`);
-                    updateField('streetNumber', `${data.houseNumber || ''}${data.houseNumberSuffix || ''}`);
-                    updateField('streetName', data.streetName || '');
-                    updateField('streetType', data.streetType || '');
-                    updateField('suburb', data.suburb || '');
-                    updateField('state', data.state || '');
-                    updateField('postcode', data.postcode || '');
-                }
-
-                toast.success(`Tariff ${data.tariffCode} resolved successfully`);
-            } else {
-                toast.error(data.error?.message || 'Failed to resolve tariff for this NMI');
+            if (!item) {
+                toast.error('NMI not found');
+                return;
             }
+
+            // If multiple tariffs, open modal for selection
+            const allTariffs = Array.from(new Set([
+                item?.network?.tariff,
+                ...(item?.registers?.map((r: any) => r.tariffCode) || []),
+                ...(item?.meters?.flatMap((m: any) => m.registers?.map((r: any) => r.tariffCode)) || [])
+            ].filter(Boolean)));
+
+            if (allTariffs.length > 1) {
+                setNmiOptions([item]);
+                setSelectedNmiForTariff(item);
+                setIsNmiModalOpen(true);
+                return;
+            }
+
+            // Single tariff — auto-select
+            updateField('nmi', item.nmi);
+            updateField('isVppAndIsBattery', !!item?.isVppAndIsBattery);
+            checkNmiDuplicate(item.nmi);
+
+            const tariff = allTariffs[0] as string;
+            if (tariff) {
+                autoSelectTariff(tariff, item);
+            }
+
+            if (item.customerType === 'RESIDENTIAL') {
+                updateField('propertyType', 0);
+            } else if (item.customerType === 'BUSINESS' || item.customerType === 'COMMERCIAL') {
+                updateField('propertyType', 1);
+            }
+
+            const address = item?.address;
+            if (address) {
+                updateField('unitNumber', address.flatOrUnitNumber || '');
+                updateField('houseNumber', address.houseNumber || '');
+                updateField('houseNumberSuffix', address.houseNumberSuffix || '');
+                updateField('streetNumber', address.houseNumber || '');
+                updateField('streetName', address.streetName || '');
+                updateField('streetType', address.streetType || '');
+                updateField('suburb', address.suburb || '');
+                updateField('state', address.state || '');
+                updateField('postcode', address.postcode || '');
+
+                setAddressSearch([
+                    address.flatOrUnitNumber ? `Unit ${address.flatOrUnitNumber}` : '',
+                    (address.houseNumber || '') + (address.houseNumberSuffix || ''),
+                    address.streetName,
+                    address.streetType,
+                    address.suburb,
+                    address.state,
+                    address.postcode
+                ].filter(Boolean).join(', ').trim());
+            }
+
+            toast.success(`Tariff ${tariff || 'N/A'} resolved successfully`);
         } catch (error) {
             console.error('❌ NMI Tariff Lookup Error:', error);
             toast.error('Failed to lookup NMI tariff');
@@ -1890,7 +1939,7 @@ export const CustomerFormPage = () => {
             navigate('/customers');
         } catch (err: any) {
             console.error('Failed to save customer:', err);
-            
+
             let errorMessage = 'Failed to save customer';
             if (err.graphQLErrors && err.graphQLErrors.length > 0) {
                 errorMessage = err.graphQLErrors[0].message;
@@ -1989,8 +2038,8 @@ export const CustomerFormPage = () => {
                 tenant: 'mojo',
                 ratePlanUid: selectedRatePlan?.uid,
                 planUid: formData.planUid || selectedPlan?.uid || undefined,
-                selectedBonuses: activeBonuses.filter((b: Bonus) => 
-                    formData.selectedBonuses.includes(b.uid) || 
+                selectedBonuses: activeBonuses.filter((b: Bonus) =>
+                    formData.selectedBonuses.includes(b.uid) ||
                     (formData.isBattery === 1 && (selectedPlan?.bonusUids || []).includes(b.uid))
                 ),
                 uid: targetUid === 'new' ? undefined : targetUid,
@@ -2410,12 +2459,12 @@ export const CustomerFormPage = () => {
                                                         updateField('isBattery', 1);
                                                         updateField('vpp', true);
                                                         updateField('isVpp', 1);
-                                                        
+
                                                         updateField('selectedBonuses', []);
 
                                                         const makeObj = batteryMakesData?.batteryMakes?.find((m: any) => m.uid === formData.batteryBrand);
                                                         const isUnknown = makeObj?.make?.toLowerCase() === 'unknown' || !formData.batteryBrand;
-                                                        
+
                                                         if (isUnknown) {
                                                             if (isPdrs) {
                                                                 updateField('vppSignupBonus', '600');
@@ -2449,20 +2498,20 @@ export const CustomerFormPage = () => {
                                                         onChange={(val) => {
                                                             updateField('batteryBrand', val);
                                                             updateField('batteryModel', ''); // Reset model
-                                                            
+
                                                             updateField('selectedBonuses', []);
 
                                                             const makeObj = batteryMakesData?.batteryMakes?.find((m: any) => m.uid === val);
                                                             const isUnknown = makeObj?.make?.toLowerCase() === 'unknown' || !val;
-                                                            
+
                                                             if (isUnknown) {
-                                                                 if (isPdrs) {
-                                                                     updateField('vppSignupBonus', '600');
-                                                                 } else {
-                                                                     updateField('vppSignupBonus', null);
-                                                                 }
+                                                                if (isPdrs) {
+                                                                    updateField('vppSignupBonus', '600');
+                                                                } else {
+                                                                    updateField('vppSignupBonus', null);
+                                                                }
                                                             } else {
-                                                                 updateField('vppSignupBonus', null);
+                                                                updateField('vppSignupBonus', null);
                                                             }
                                                         }}
                                                         options={batteryMakesData?.batteryMakes?.map((m: any) => ({ label: m.make, value: m.uid })) || []}
@@ -2493,121 +2542,121 @@ export const CustomerFormPage = () => {
 
                                     {/* VPP Section - Standalone */}
                                     {isEditMode && (
-                                    <div className={`rounded-xl border transition-all duration-300 ${formData.vpp ? 'border-primary/20 bg-primary/5' : 'border-border bg-card'}`}>
-                                        <div className="flex items-center justify-between p-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${formData.vpp ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                                                    <ZapIcon className="w-4 h-4" />
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium text-foreground">VPP Participant</span>
-                                                    <span className="text-xs text-muted-foreground">Enroll customer in Virtual Power Plant</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className={`text-sm font-medium ${formData.vpp ? 'text-primary' : 'text-muted-foreground'}`}>
-                                                    {formData.vpp ? 'Active' : 'Inactive'}
-                                                </span>
-                                                <ToggleSwitch checked={formData.vpp} onChange={(checked) => {
-                                                    updateField('vpp', checked);
-                                                    if (checked) {
-                                                        updateField('hasSolar', true);
-                                                        updateField('isVpp', 1);
-                                                        if (isPdrs && !formData.hasBattery) {
-                                                            updateField('vppSignupBonus', '600');
-                                                        }
-                                                    } else {
-                                                        updateField('isVpp', 0);
-                                                        // Clear bonuses when VPP is unchecked
-                                                        updateField('vppSignupBonus', null);
-                                                        updateField('selectedBonuses', []);
-                                                    }
-                                                }} disabled={false} />
-                                            </div>
-                                        </div>
-
-                                        {formData.vpp && (
-                                            <div className="p-4 pt-0 space-y-5 animate-in slide-in-from-top-2 duration-300">
-                                                {/* Signup Bonus Card */}
-                                                <div className="p-4 rounded-xl border border-dashed border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                                    <div>
-                                                        <div className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wide">
-                                                            <ZapIcon size={14} />
-                                                            VPP SIGNUP BONUS
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground mt-1 max-w-md leading-relaxed">
-                                                            Eligible customers receive a $50 monthly bill credit for 12 months, totaling $600 in value.
-                                                        </div>
+                                        <div className={`rounded-xl border transition-all duration-300 ${formData.vpp ? 'border-primary/20 bg-primary/5' : 'border-border bg-card'}`}>
+                                            <div className="flex items-center justify-between p-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${formData.vpp ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                                                        <ZapIcon className="w-4 h-4" />
                                                     </div>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        onClick={() => updateField('vppSignupBonus', Number(formData.vppSignupBonus) === 600 ? null : '600')}
-                                                        disabled={formData.hasBattery}
-                                                        className={cn(
-                                                            "shrink-0 transition-all font-semibold shadow-sm",
-                                                            Number(formData.vppSignupBonus) === 600
-                                                                ? "bg-primary hover:bg-primary/90 text-primary-foreground border-transparent"
-                                                                : "bg-transparent border-primary/20 text-primary hover:bg-primary/10"
-                                                        )}
-                                                        variant={Number(formData.vppSignupBonus) === 600 ? 'default' : 'outline'}
-                                                    >
-                                                        {Number(formData.vppSignupBonus) === 600 ? (
-                                                            <><CheckIcon className="w-3 h-3 mr-1.5" /> Bonus Applied</>
-                                                        ) : (
-                                                            'Add $600 Bonus'
-                                                        )}
-                                                    </Button>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-medium text-foreground">VPP Participant</span>
+                                                        <span className="text-xs text-muted-foreground">Enroll customer in Virtual Power Plant</span>
+                                                    </div>
                                                 </div>
-
-                                                {/* Battery details moved to Customer Modal on VPP Connect */}
-
-                                                {/* Dynamic Bonuses */}
-                                                {activeBonuses.filter((b: Bonus) => b.uid !== 'vpp_signup_bonus_uid').map((bonus: Bonus) => {
-                                                    const isApplied = formData.selectedBonuses.includes(bonus.uid);
-                                                    return (
-                                                        <div key={bonus.uid} className="p-4 rounded-xl border border-dashed border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
-                                                            <div>
-                                                                <div className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wide">
-                                                                    <ZapIcon size={14} />
-                                                                    {bonus.name}
-                                                                </div>
-                                                                {bonus.description && (
-                                                                    <div className="text-xs text-muted-foreground mt-1 max-w-md leading-relaxed">
-                                                                        {bonus.description}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    const newSelected = isApplied
-                                                                        ? formData.selectedBonuses.filter(uid => uid !== bonus.uid)
-                                                                        : [...formData.selectedBonuses, bonus.uid];
-                                                                    updateField('selectedBonuses', newSelected);
-                                                                }}
-                                                                disabled={formData.hasBattery}
-                                                                className={cn(
-                                                                    "shrink-0 transition-all font-semibold shadow-sm",
-                                                                    isApplied
-                                                                        ? "bg-primary hover:bg-primary/90 text-primary-foreground border-transparent"
-                                                                        : "bg-transparent border-primary/20 text-primary hover:bg-primary/10"
-                                                                )}
-                                                                variant={isApplied ? 'default' : 'outline'}
-                                                            >
-                                                                {isApplied ? (
-                                                                    <><CheckIcon className="w-3 h-3 mr-1.5" /> Bonus Applied</>
-                                                                ) : (
-                                                                    `Add $${bonus.amount} Bonus`
-                                                                )}
-                                                            </Button>
-                                                        </div>
-                                                    );
-                                                })}
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`text-sm font-medium ${formData.vpp ? 'text-primary' : 'text-muted-foreground'}`}>
+                                                        {formData.vpp ? 'Active' : 'Inactive'}
+                                                    </span>
+                                                    <ToggleSwitch checked={formData.vpp} onChange={(checked) => {
+                                                        updateField('vpp', checked);
+                                                        if (checked) {
+                                                            updateField('hasSolar', true);
+                                                            updateField('isVpp', 1);
+                                                            if (isPdrs && !formData.hasBattery) {
+                                                                updateField('vppSignupBonus', '600');
+                                                            }
+                                                        } else {
+                                                            updateField('isVpp', 0);
+                                                            // Clear bonuses when VPP is unchecked
+                                                            updateField('vppSignupBonus', null);
+                                                            updateField('selectedBonuses', []);
+                                                        }
+                                                    }} disabled={false} />
+                                                </div>
                                             </div>
-                                        )}
-                                    </div>
+
+                                            {formData.vpp && (
+                                                <div className="p-4 pt-0 space-y-5 animate-in slide-in-from-top-2 duration-300">
+                                                    {/* Signup Bonus Card */}
+                                                    <div className="p-4 rounded-xl border border-dashed border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                                        <div>
+                                                            <div className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wide">
+                                                                <ZapIcon size={14} />
+                                                                VPP SIGNUP BONUS
+                                                            </div>
+                                                            <div className="text-xs text-muted-foreground mt-1 max-w-md leading-relaxed">
+                                                                Eligible customers receive a $50 monthly bill credit for 12 months, totaling $600 in value.
+                                                            </div>
+                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            onClick={() => updateField('vppSignupBonus', Number(formData.vppSignupBonus) === 600 ? null : '600')}
+                                                            disabled={formData.hasBattery}
+                                                            className={cn(
+                                                                "shrink-0 transition-all font-semibold shadow-sm",
+                                                                Number(formData.vppSignupBonus) === 600
+                                                                    ? "bg-primary hover:bg-primary/90 text-primary-foreground border-transparent"
+                                                                    : "bg-transparent border-primary/20 text-primary hover:bg-primary/10"
+                                                            )}
+                                                            variant={Number(formData.vppSignupBonus) === 600 ? 'default' : 'outline'}
+                                                        >
+                                                            {Number(formData.vppSignupBonus) === 600 ? (
+                                                                <><CheckIcon className="w-3 h-3 mr-1.5" /> Bonus Applied</>
+                                                            ) : (
+                                                                'Add $600 Bonus'
+                                                            )}
+                                                        </Button>
+                                                    </div>
+
+                                                    {/* Battery details moved to Customer Modal on VPP Connect */}
+
+                                                    {/* Dynamic Bonuses */}
+                                                    {activeBonuses.filter((b: Bonus) => b.uid !== 'vpp_signup_bonus_uid').map((bonus: Bonus) => {
+                                                        const isApplied = formData.selectedBonuses.includes(bonus.uid);
+                                                        return (
+                                                            <div key={bonus.uid} className="p-4 rounded-xl border border-dashed border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                                                                <div>
+                                                                    <div className="text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-wide">
+                                                                        <ZapIcon size={14} />
+                                                                        {bonus.name}
+                                                                    </div>
+                                                                    {bonus.description && (
+                                                                        <div className="text-xs text-muted-foreground mt-1 max-w-md leading-relaxed">
+                                                                            {bonus.description}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        const newSelected = isApplied
+                                                                            ? formData.selectedBonuses.filter(uid => uid !== bonus.uid)
+                                                                            : [...formData.selectedBonuses, bonus.uid];
+                                                                        updateField('selectedBonuses', newSelected);
+                                                                    }}
+                                                                    disabled={formData.hasBattery}
+                                                                    className={cn(
+                                                                        "shrink-0 transition-all font-semibold shadow-sm",
+                                                                        isApplied
+                                                                            ? "bg-primary hover:bg-primary/90 text-primary-foreground border-transparent"
+                                                                            : "bg-transparent border-primary/20 text-primary hover:bg-primary/10"
+                                                                    )}
+                                                                    variant={isApplied ? 'default' : 'outline'}
+                                                                >
+                                                                    {isApplied ? (
+                                                                        <><CheckIcon className="w-3 h-3 mr-1.5" /> Bonus Applied</>
+                                                                    ) : (
+                                                                        `Add $${bonus.amount} Bonus`
+                                                                    )}
+                                                                </Button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
 
 
@@ -2793,14 +2842,14 @@ export const CustomerFormPage = () => {
                                             />
                                             {(() => {
                                                 if (formData.isBattery !== 1) return null;
-                                                 if (!formData.vpp || !formData.planUid || !activePlansData?.activePlans || !activeBonuses) return null;
+                                                if (!formData.vpp || !formData.planUid || !activePlansData?.activePlans || !activeBonuses) return null;
                                                 const selectedPlanDetails = activePlansData.activePlans.find((p: any) => p.uid === formData.planUid);
                                                 if (!selectedPlanDetails?.bonusUids?.length) return null;
                                                 const planBonuses = activeBonuses.filter((b: any) => selectedPlanDetails.bonusUids.includes(b.uid));
                                                 if (planBonuses.length === 0) return null;
                                                 return (
                                                     <div className="relative group mt-1.5 inline-flex w-max">
-                                                        <div 
+                                                        <div
                                                             className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-600 dark:text-green-400 text-xs font-medium cursor-help shadow-sm animate-in fade-in slide-in-from-top-1"
                                                         >
                                                             <GiftIcon size={12} />
@@ -3526,12 +3575,12 @@ export const CustomerFormPage = () => {
                                                             )}
                                                             {(() => {
                                                                 if (formData.isBattery !== 1) return null;
-                                                                 if (!formData.vpp || !formData.planUid || !activePlansData?.activePlans || !activeBonuses) return null;
+                                                                if (!formData.vpp || !formData.planUid || !activePlansData?.activePlans || !activeBonuses) return null;
                                                                 const selectedPlanDetails = activePlansData.activePlans.find((p: any) => p.uid === formData.planUid);
                                                                 if (!selectedPlanDetails?.bonusUids?.length) return null;
                                                                 const planBonuses = activeBonuses.filter((b: any) => selectedPlanDetails.bonusUids.includes(b.uid));
                                                                 if (planBonuses.length === 0) return null;
-                                                                
+
                                                                 return (
                                                                     <div className="flex justify-between items-start gap-2 mt-2">
                                                                         <span className="text-muted-foreground shrink-0">Plan Bonus:</span>
@@ -3554,7 +3603,7 @@ export const CustomerFormPage = () => {
                                                             {formData.snNumber && <p className="flex justify-between"><span className="text-muted-foreground">SN Number:</span> <span className="font-medium">{formData.snNumber}</span></p>}
                                                             {formData.batteryCapacity && <p className="flex justify-between"><span className="text-muted-foreground">Battery Capacity:</span> <span className="font-medium">{formData.batteryCapacity} kW</span></p>}
                                                             {formData.exportLimit && <p className="flex justify-between"><span className="text-muted-foreground">Export Limit:</span> <span className="font-medium">{formData.exportLimit} kW</span></p>}
-                                                            
+
                                                             {(Number(formData.vppSignupBonus) === 600 || (formData.selectedBonuses && formData.selectedBonuses.length > 0)) && (
                                                                 <div className="flex justify-between items-start gap-2 mt-2">
                                                                     <span className="text-muted-foreground shrink-0">Signup Bonus:</span>
@@ -3575,12 +3624,12 @@ export const CustomerFormPage = () => {
                                                             )}
                                                             {(() => {
                                                                 if (formData.isBattery !== 1) return null;
-                                                                 if (!formData.vpp || !formData.planUid || !activePlansData?.activePlans || !activeBonuses) return null;
+                                                                if (!formData.vpp || !formData.planUid || !activePlansData?.activePlans || !activeBonuses) return null;
                                                                 const selectedPlanDetails = activePlansData.activePlans.find((p: any) => p.uid === formData.planUid);
                                                                 if (!selectedPlanDetails?.bonusUids?.length) return null;
                                                                 const planBonuses = activeBonuses.filter((b: any) => selectedPlanDetails.bonusUids.includes(b.uid));
                                                                 if (planBonuses.length === 0) return null;
-                                                                
+
                                                                 return (
                                                                     <div className="flex justify-between items-start gap-2 mt-2">
                                                                         <span className="text-muted-foreground shrink-0">Plan Bonus:</span>
@@ -3766,7 +3815,7 @@ export const CustomerFormPage = () => {
                                                 </p>
                                                 <p className="text-xs text-muted-foreground mt-1">
                                                     {item?.address?.flatOrUnitNumber ? `Unit ${item.address.flatOrUnitNumber}, ` : ''}
-                                                    {item?.address?.houseNumber} {item?.address?.streetName} {item?.address?.streetType},{" "}
+                                                    {item?.address?.houseNumber}{item?.address?.houseNumberSuffix || ''} {item?.address?.streetName} {item?.address?.streetType},{" "}
                                                     {item?.address?.suburb} {item?.address?.postcode}
                                                 </p>
                                             </div>
@@ -3782,7 +3831,7 @@ export const CustomerFormPage = () => {
                                     <p className="font-bold text-sm text-primary">{selectedNmiForTariff.nmi}</p>
                                     <p className="text-xs text-muted-foreground">
                                         {selectedNmiForTariff.address?.flatOrUnitNumber ? `Unit ${selectedNmiForTariff.address.flatOrUnitNumber}, ` : ''}
-                                        {selectedNmiForTariff.address?.houseNumber} {selectedNmiForTariff.address?.streetName} {selectedNmiForTariff.address?.streetType}, {selectedNmiForTariff.address?.suburb}
+                                        {selectedNmiForTariff.address?.houseNumber}{selectedNmiForTariff.address?.houseNumberSuffix || ''} {selectedNmiForTariff.address?.streetName} {selectedNmiForTariff.address?.streetType}, {selectedNmiForTariff.address?.suburb}
                                     </p>
                                 </div>
 
@@ -3823,6 +3872,7 @@ export const CustomerFormPage = () => {
                                                         onClick={() => {
                                                             const item = selectedNmiForTariff;
                                                             updateField('nmi', item.nmi);
+                                                            updateField('isVppAndIsBattery', !!item?.isVppAndIsBattery);
                                                             checkNmiDuplicate(item.nmi);
                                                             autoSelectTariff(t, item);
 
@@ -3836,12 +3886,23 @@ export const CustomerFormPage = () => {
                                                             if (addr) {
                                                                 updateField('unitNumber', addr.flatOrUnitNumber || '');
                                                                 updateField('houseNumber', addr.houseNumber || '');
+                                                                updateField('houseNumberSuffix', addr.houseNumberSuffix || '');
                                                                 updateField('streetNumber', addr.houseNumber || '');
                                                                 updateField('streetName', addr.streetName || '');
                                                                 updateField('streetType', addr.streetType || '');
                                                                 updateField('suburb', addr.suburb || '');
                                                                 updateField('state', addr.state || '');
                                                                 updateField('postcode', addr.postcode || '');
+
+                                                                setAddressSearch([
+                                                                    addr.flatOrUnitNumber ? `Unit ${addr.flatOrUnitNumber}` : '',
+                                                                    (addr.houseNumber || '') + (addr.houseNumberSuffix || ''),
+                                                                    addr.streetName,
+                                                                    addr.streetType,
+                                                                    addr.suburb,
+                                                                    addr.state,
+                                                                    addr.postcode
+                                                                ].filter(Boolean).join(', ').trim());
                                                             }
 
                                                             setIsNmiModalOpen(false);

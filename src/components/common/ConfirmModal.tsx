@@ -13,6 +13,7 @@ interface ConfirmModalProps {
     cancelText?: string;
     isLoading?: boolean;
     variant?: 'destructive' | 'primary' | 'warning';
+    confirmButtonClassName?: string;
 }
 
 export function ConfirmModal({
@@ -24,7 +25,8 @@ export function ConfirmModal({
     confirmText = 'Confirm',
     cancelText = 'Cancel',
     isLoading = false,
-    variant = 'destructive'
+    variant = 'destructive',
+    confirmButtonClassName
 }: ConfirmModalProps) {
     const getVariantColor = () => {
         switch (variant) {
@@ -68,6 +70,7 @@ export function ConfirmModal({
                         variant={getButtonVariant() as any} 
                         onClick={onConfirm} 
                         isLoading={isLoading}
+                        className={confirmButtonClassName}
                     >
                         {confirmText}
                     </Button>
