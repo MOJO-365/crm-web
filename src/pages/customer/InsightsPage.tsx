@@ -300,8 +300,8 @@ export default function InsightsPage() {
     // Filter active customers to only show status === 9
     const activeCustomersList = (dashboardData?.customerDashboard?.utilmateStatusSummary?.customers || []).filter((c: any) => c.status === 9);
     
-    const activeVppCustomers = activeCustomersList.filter((c: any) => c.vppConnected === 1);
-    const activeNonVppCustomers = activeCustomersList.filter((c: any) => c.vppConnected !== 1);
+    const activeVppCustomers = activeCustomersList.filter((c: any) => c.vpp === 1);
+    const activeNonVppCustomers = activeCustomersList.filter((c: any) => c.vpp !== 1);
 
     const vppPending = dashboardData?.customerDashboard?.vppPendingSummary?.count || 0;
 

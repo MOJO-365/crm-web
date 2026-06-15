@@ -2855,21 +2855,31 @@ export const CustomerFormPage = () => {
                                                 options={[{ label: 'None', value: '' }, ...planOptions]}
                                                 value={formData.planUid || ''}
                                                 onChange={(val) => {
-                                                    const planUid = val as string;
-                                                    updateField('planUid', planUid);
-                                                    if (planUid && activePlansData?.activePlans) {
-                                                        const selected = activePlansData.activePlans.find((p: any) => p.uid === planUid);
-                                                        if (selected) {
-                                                            const defaultDiscount = (selected.discount !== undefined && selected.discount !== null) ? selected.discount : 0;
-                                                            updateField('discount', defaultDiscount);
-                                                            if (!['0', '5', '7', '10', '13', '15'].includes(defaultDiscount.toString())) {
-                                                                setIsCustomDiscountMode(true);
-                                                            } else {
-                                                                setIsCustomDiscountMode(false);
-                                                            }
-                                                        }
-                                                    }
-                                                }}
+                                                     const planUid = val as string;
+                                                     updateField('planUid', planUid);
+                                                     if (planUid && activePlansData?.activePlans) {
+                                                         const selected = activePlansData.activePlans.find((p: any) => p.uid === planUid);
+                                                         if (selected) {
+                                                             const defaultDiscount = (selected.discount !== undefined && selected.discount !== null) ? selected.discount : 0;
+                                                             updateField('discount', defaultDiscount);
+                                                             if (!['0', '5', '7', '10', '13', '15'].includes(defaultDiscount.toString())) {
+                                                                 setIsCustomDiscountMode(true);
+                                                             } else {
+                                                                 setIsCustomDiscountMode(false);
+                                                             }
+
+                                                             // Prefill based on plan requirements
+                                                             if (selected.isBatteryRequired) {
+                                                                 updateField('isBattery', 1);
+                                                                 updateField('hasBattery', true);
+                                                                 updateField('vpp', true);
+                                                             }
+                                                             if (selected.isSolarRequired) {
+                                                                 updateField('hasSolar', true);
+                                                             }
+                                                         }
+                                                     }
+                                                 }}
                                                 placeholder="Select plan"
                                             />
                                             {(() => {

@@ -13,6 +13,8 @@ export const GET_CUSTOMER_DASHBOARD = gql`
           email
           status
           utilmateStatus
+          vppConnected
+          vpp
         }
       }
       signedStatusSummary {

@@ -783,29 +783,45 @@ export function CustomerApprovalsPage() {
                                     <span className="font-medium">
                                         {selectedEnrollment.payload.discount !== undefined ? `${selectedEnrollment.payload.discount}%` : '-'}
                                     </span>
-                                    <span className="text-muted-foreground">VPP Participation</span>
+                                    <span className="text-muted-foreground">Plan Name</span>
                                     <span className="font-medium">
-                                        {selectedEnrollment.payload.isVpp === 1 || selectedEnrollment.payload.isVpp === '1' || selectedEnrollment.payload.isVpp === true || selectedEnrollment.payload.isVpp === 'true' ? (
-                                            <span className="inline-flex items-center gap-1.5 text-green-600 font-bold uppercase text-[10px]">
-                                                <CheckIcon size={14} /> YES
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1.5 text-red-500 font-bold uppercase text-[10px]">
-                                                <XIcon size={14} /> NO
-                                            </span>
+                                        {renderPayloadField(
+                                            selectedEnrollment.payload.planDetails?.planName || 
+                                            selectedEnrollment.payload.planName || 
+                                            selectedEnrollment.payload.plan_name || 
+                                            selectedEnrollment.payload.ratePlan?.title ||
+                                            selectedEnrollment.payload.ratePlan?.name
                                         )}
+                                    </span>
+                                    <span className="text-muted-foreground">Is Solar</span>
+                                    <span className="font-medium">
+                                        {(() => {
+                                            const val = selectedEnrollment.payload.planDetails?.isSolarRequired ?? selectedEnrollment.payload.isSolarRequired;
+                                            return val === 1 || val === '1' || val === true || val === 'true' ? (
+                                                <span className="inline-flex items-center gap-1.5 text-green-600 font-bold uppercase text-[10px]">
+                                                    <CheckIcon size={14} /> YES
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5 text-red-500 font-bold uppercase text-[10px]">
+                                                    <XIcon size={14} /> NO
+                                                </span>
+                                            );
+                                        })()}
                                     </span>
                                     <span className="text-muted-foreground">Battery Participation</span>
                                     <span className="font-medium">
-                                        {selectedEnrollment.payload.isBattery === 1 || selectedEnrollment.payload.isBattery === '1' || selectedEnrollment.payload.isBattery === true || selectedEnrollment.payload.isBattery === 'true' ? (
-                                            <span className="inline-flex items-center gap-1.5 text-green-600 font-bold uppercase text-[10px]">
-                                                <CheckIcon size={14} /> YES
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1.5 text-red-500 font-bold uppercase text-[10px]">
-                                                <XIcon size={14} /> NO
-                                            </span>
-                                        )}
+                                        {(() => {
+                                            const val = selectedEnrollment.payload.planDetails?.isBatteryRequired ?? selectedEnrollment.payload.isBattery ?? selectedEnrollment.payload.hasBattery ?? selectedEnrollment.payload.is_battery ?? selectedEnrollment.payload.has_battery ?? selectedEnrollment.payload.batteryDetails?.isbattery;
+                                            return val === 1 || val === '1' || val === true || val === 'true' ? (
+                                                <span className="inline-flex items-center gap-1.5 text-green-600 font-bold uppercase text-[10px]">
+                                                    <CheckIcon size={14} /> YES
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5 text-red-500 font-bold uppercase text-[10px]">
+                                                    <XIcon size={14} /> NO
+                                                </span>
+                                            );
+                                        })()}
                                     </span>
                                 </div>
                             </div>
