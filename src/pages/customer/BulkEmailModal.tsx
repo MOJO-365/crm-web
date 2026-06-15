@@ -143,10 +143,14 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
 
     const processedBody = useMemo(() => {
         if (!selectedTemplate?.body) return '';
+        let body = selectedTemplate.body;
         if (isSingleCustomer && previewCustomer) {
-            return replaceEmailVariables(selectedTemplate.body, previewCustomer);
+            body = replaceEmailVariables(body, previewCustomer);
         }
-        return selectedTemplate.body;
+        // Ensure relative logo path and any legacy/broken absolute logo URLs are replaced with the correct working URL for preview
+        body = body.replace(/src=["']\/gee-energy-logo\.svg["']/gi, 'src="https://gee.com.au/images/gee-energy-logo.svg"');
+        body = body.replace(/https:\/\/gee\.com\.au\/images\/GEE(?:%20|\s)+Energy(?:%20|\s)+Logo\.svg/gi, 'https://gee.com.au/images/gee-energy-logo.svg');
+        return body;
     }, [selectedTemplate?.body, previewCustomer, isSingleCustomer]);
 
     const [sendBulkEmail, { loading: sending }] = useMutation(SEND_BULK_EMAIL, {

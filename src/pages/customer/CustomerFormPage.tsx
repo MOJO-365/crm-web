@@ -1128,6 +1128,7 @@ export const CustomerFormPage = () => {
                 stateOrTerritory: formData.state || 'NSW',
                 postcode: formData.postcode || '',
                 houseNumber: formData.houseNumber || formData.streetNumber || '',
+                houseNumberSuffix: formData.houseNumberSuffix || '',
                 streetName: formData.streetName || '',
                 StreetType: formData.streetType || '',
                 SuburbOrPlaceOrLocality: formData.suburb || '',
@@ -1144,15 +1145,20 @@ export const CustomerFormPage = () => {
 
             const data = await response.json();
 
+            const results = Array.isArray(data?.results) ? data.results :
+                            (Array.isArray(data?.data) ? data.data :
+                            (Array.isArray(data) ? data : []));
+
             // ✅ Multiple NMIs → open modal
-            if (Array.isArray(data?.results) && data.results.length > 1) {
-                setNmiOptions(data.results);
+            if (results.length > 1) {
+                setNmiOptions(results);
                 setIsNmiModalOpen(true);
                 return;
             }
 
             // ✅ Extract NMI + Tariff
             const item =
+                results[0] ||
                 data?.results?.[0] ||
                 data?.data?.[0] ||
                 data?.data ||
@@ -1176,7 +1182,7 @@ export const CustomerFormPage = () => {
             if (nmi) {
                 // ✅ If multiple tariffs found, open modal even for single results
                 if (allTariffs.length > 1 && !isNmiModalOpen) {
-                    setNmiOptions(data.results || [item]);
+                    setNmiOptions(results.length > 0 ? results : [item]);
                     setIsNmiModalOpen(true);
                     return;
                 }
@@ -1250,6 +1256,7 @@ export const CustomerFormPage = () => {
                 stateOrTerritory: formData.state || 'NSW',
                 postcode: formData.postcode || '',
                 houseNumber: formData.houseNumber || formData.streetNumber || '',
+                houseNumberSuffix: formData.houseNumberSuffix || '',
                 streetName: formData.streetName || '',
                 StreetType: formData.streetType || '',
                 SuburbOrPlaceOrLocality: formData.suburb || '',
@@ -1268,8 +1275,18 @@ export const CustomerFormPage = () => {
             const data = await response.json();
 
             // Find the result matching the entered NMI
-            const results = data?.results || [];
-            const item = results.find((r: any) => r.nmi === formData.nmi) || results[0];
+            const results = Array.isArray(data?.results) ? data.results :
+                            (Array.isArray(data?.data) ? data.data :
+                            (Array.isArray(data) ? data : []));
+
+            // If multiple NMIs found, open modal for selection
+            if (results.length > 1) {
+                setNmiOptions(results);
+                setIsNmiModalOpen(true);
+                return;
+            }
+
+            const item = results[0];
 
             if (!item) {
                 toast.error('NMI not found');
@@ -2674,12 +2691,23 @@ export const CustomerFormPage = () => {
                                                     onSelect={(place) => {
                                                         setAddressSearch(place.address);
                                                         const unitNumber = place.unitNumber || '';
-                                                        const streetNumber = place.streetNumber || '';
-                                                        const houseNumber = place.houseNumber || '';
+                                                        let streetNumber = place.streetNumber || '';
+                                                        let houseNumberSuffix = '';
+                                                        
+                                                        // Extract suffix if streetNumber ends with a letter (e.g. '47a' or '47 A' -> '47', 'A')
+                                                        const suffixMatch = streetNumber.match(/^(\d+)\s*([a-zA-Z])$/);
+                                                        if (suffixMatch) {
+                                                            streetNumber = suffixMatch[1];
+                                                            houseNumberSuffix = suffixMatch[2].toUpperCase();
+                                                        }
+
+                                                        const houseNumberRaw = place.houseNumber || '';
+                                                        const houseNumber = (houseNumberRaw === place.streetNumber || houseNumberRaw === unitNumber) ? '' : houseNumberRaw;
 
                                                         const newAddressData = {
                                                             unitNumber,
-                                                            houseNumber: (houseNumber === streetNumber || houseNumber === unitNumber) ? '' : houseNumber,
+                                                            houseNumber,
+                                                            houseNumberSuffix,
                                                             buildingName: place.buildingName || '',
                                                             floorLevelNumber: place.floorLevelNumber || '',
                                                             streetNumber,
@@ -2689,8 +2717,12 @@ export const CustomerFormPage = () => {
                                                             state: place.state || '',
                                                             postcode: place.postcode || '',
                                                             country: place.country || 'Australia',
+                                                            nmi: '',
+                                                            tariffCode: '',
+                                                            ratePlanUid: undefined,
                                                         };
                                                         setFormData(prev => ({ ...prev, ...newAddressData }));
+                                                        setSelectedRatePlan(null);
                                                         // Immediately check for duplicate address
                                                         checkAddressDuplicate(newAddressData);
                                                     }}

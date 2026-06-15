@@ -41,3 +41,23 @@ export const GET_CUSTOMER_DASHBOARD = gql`
     }
   }
 `;
+
+export const GET_MONTHLY_ENROLLMENTS = gql`
+  query GetMonthlyEnrollments($months: Int) {
+    monthlyEnrollments(months: $months) {
+      month
+      year
+      count
+    }
+  }
+`;
+
+export const GET_LEAD_SOURCE_DISTRIBUTION = gql`
+  query GetLeadSourceDistribution {
+    leadSourceDistribution {
+      source
+      count
+      percentage
+    }
+  }
+`;
