@@ -64,6 +64,8 @@ const ENTITY_TYPES = [
     // Add more types as they become available
 ];
 
+
+
 // Modernized Email Template Constants
 const EMAIL_HEADER_TEMPLATE = `
 <div style="margin:0; padding:0; background-color:#f4f4f4; font-family:Arial, Helvetica, sans-serif;">
@@ -76,7 +78,7 @@ const EMAIL_HEADER_TEMPLATE = `
               <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
                 <tr>
                   <td>
-                    <img src="https://gee.com.au/images/gee-energy-logo.svg" alt="GEE Energy" height="36" style="display:block; border:0;" />
+                    <img src="/gee-energy-logo.svg" alt="GEE Energy" height="36" style="display:block; border:0;" />
                   </td>
                 </tr>
               </table>
@@ -128,15 +130,41 @@ const wrapEmailContent = (content: string) => {
     return `${EMAIL_HEADER_TEMPLATE}${content}${EMAIL_FOOTER_TEMPLATE}`;
 };
 
-// Helper to unwrap content (extract middle part)
+// Robust helper to unwrap content (extract middle part)
 const unwrapEmailContent = (html: string) => {
     if (!html) return '';
+    
+    // Attempt exact match first
     const headerIndex = html.indexOf(EMAIL_HEADER_TEMPLATE);
     const footerIndex = html.indexOf(EMAIL_FOOTER_TEMPLATE);
-
     if (headerIndex !== -1 && footerIndex !== -1) {
         return html.substring(headerIndex + EMAIL_HEADER_TEMPLATE.length, footerIndex);
     }
+    
+    // Fallback: Robust parsing for any wrapped templates (including old absolute URLs or slight variations)
+    if (html.includes('GEE POWER AND GAS PTY LTD') || html.includes('gee-energy-logo') || html.includes('gee-logo') || html.includes('GEE%20Energy%20Logo') || html.includes('GEE Energy Logo')) {
+        const logoIndex = html.search(/gee-energy-logo|gee-logo|gee%20energy%20logo|gee\s+energy\s+logo/i);
+        if (logoIndex !== -1) {
+            const logoTableEnd = html.indexOf('</table>', logoIndex);
+            
+            // Relaxed footer start search
+            let footerStart = html.search(/background(-color)?\s*:\s*#e8e8e8/i);
+            if (footerStart === -1) {
+                footerStart = html.search(/<div style="height:?1px;/i);
+            }
+            if (footerStart === -1) {
+                footerStart = html.search(/Need any help\?/i);
+            }
+            if (footerStart === -1) {
+                footerStart = html.search(/info@gee\.com\.au/i);
+            }
+            
+            if (logoTableEnd !== -1 && footerStart !== -1 && footerStart > logoTableEnd) {
+                return html.substring(logoTableEnd + '</table>'.length, footerStart).trim();
+            }
+        }
+    }
+    
     return html; // Return as-is if it doesn't match the standardized template
 };
 

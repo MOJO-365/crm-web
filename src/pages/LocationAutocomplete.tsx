@@ -299,8 +299,20 @@ export default function LocationAutocomplete({
             },
             (place: any, status: any) => {
                 if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-                    const address = place.formatted_address || p.description;
+                    const address = p.description || place.formatted_address || '';
                     const parts = parseComponents(place);
+                    
+                    // If Google stripped the suffix in address_components, try to recover it from the description
+                    if (p.description && parts.streetNumber) {
+                        const regex = new RegExp(`^\\b${parts.streetNumber}([a-zA-Z])\\b`, 'i');
+                        const regex2 = new RegExp(`\\b${parts.streetNumber}([a-zA-Z])\\b`, 'i');
+                        const match = p.description.match(regex) || p.description.match(regex2);
+                        if (match) {
+                            parts.houseNumber = match[0];
+                            parts.streetNumber = match[0];
+                        }
+                    }
+                    
                     onSelect({ address, placeId: place.place_id!, ...parts });
                 } else {
                     onSelect({ address: p.description, placeId: p.place_id });

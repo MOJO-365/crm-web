@@ -309,11 +309,11 @@ export default function LeadsPage() {
                     />
                 </div>
             ),
-            render: (row) => (
+            render: (row) => row.source ? (
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                    {row.source || 'Unknown'}
+                    {row.source}
                 </span>
-            ),
+            ) : '-',
         },
         {
             key: 'address',
@@ -499,7 +499,13 @@ export default function LeadsPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 w-8 p-0 text-amber-600 bg-amber-50 hover:text-amber-700 hover:bg-amber-100 transition-colors"
-                                onClick={() => navigate('/customers/new', { state: { prefillData: row } })}
+                                onClick={() => {
+                                    if (!row.number?.trim() || !row.fullAddress?.trim()) {
+                                        toast.error("Phone number and address are required to onboard. Contact master");
+                                        return;
+                                    }
+                                    navigate('/customers/new', { state: { prefillData: row } });
+                                }}
                             >
                                 <ArrowRightIcon size={14} />
                             </Button>
