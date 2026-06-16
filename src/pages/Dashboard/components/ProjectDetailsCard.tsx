@@ -89,6 +89,22 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
         ? CUSTOMER_STATUS_MAP[customer.status]
         : null;
 
+    const hasDebitData = !!customer.debitDetails;
+    const hasSystemData = !!(
+        customer.solarDetails?.solarcapacity ||
+        customer.batteryDetails?.inverterCapacity ||
+        customer.batteryDetails?.batterybrand ||
+        customer.batteryDetails?.batterymodel ||
+        customer.batteryDetails?.batterycapacity ||
+        customer.batteryDetails?.snnumber
+    );
+
+    const visibleCards = 2 + (hasDebitData ? 1 : 0) + (hasSystemData ? 1 : 0);
+    const gridColsClass = 
+        visibleCards === 4 ? "xl:grid-cols-4" : 
+        visibleCards === 3 ? "xl:grid-cols-3" : 
+        "xl:grid-cols-2";
+
     return (
         <div className="flex-1 bg-white/80 dark:bg-[#1c1c1e]/80 backdrop-blur-2xl shadow-[0_12px_40px_rgb(0,0,0,0.08)] dark:shadow-[0_12px_40px_rgb(0,0,0,0.4)] border border-white/50 dark:border-white/5 rounded-[24px] p-8 flex flex-col gap-8 text-foreground transition-all duration-300 overflow-hidden">
 
@@ -100,7 +116,7 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
                             {customer.firstName} {customer.lastName}
                             {statusInfo && (
                                 <span
-                                    className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full tracking-wider"
+                                    className="text-[10px] font-bold uppercase px-2.5 rounded-full tracking-wider"
                                     style={{ backgroundColor: statusInfo.color + '20', color: statusInfo.color }}
                                 >
                                     {statusInfo.label}
@@ -156,9 +172,10 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
                 </div>
             </div>
 
+
             {/* Widgets Grid */}
             <div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 pb-2">
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${gridColsClass} gap-5 pb-2`}>
 
                     {/* Section 1: General Details */}
                     <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-2xl p-6 border border-black/[0.03] dark:border-white/[0.04] flex flex-col gap-5 h-full transition-all hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
@@ -208,102 +225,100 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
                     </div>
 
                     {/* Section 2: Billing & Direct Debit */}
-                    <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-2xl p-6 border border-black/[0.03] dark:border-white/[0.04] flex flex-col gap-5 h-full transition-all hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
-                        <div className="flex items-center gap-3 mb-1">
-                            <div className="w-9 h-9 rounded-full bg-white dark:bg-[#2c2c2e] shadow-sm flex items-center justify-center text-emerald-500">
-                                <IdCardIcon size={16} />
+                    {hasDebitData && (
+                        <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-2xl p-6 border border-black/[0.03] dark:border-white/[0.04] flex flex-col gap-5 h-full transition-all hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="w-9 h-9 rounded-full bg-white dark:bg-[#2c2c2e] shadow-sm flex items-center justify-center text-emerald-500">
+                                    <IdCardIcon size={16} />
+                                </div>
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Direct Debit</h3>
                             </div>
-                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Direct Debit</h3>
-                        </div>
 
-                        {customer.debitDetails ? (
                             <div className="grid grid-cols-2 gap-y-4 gap-x-4">
                                 <div className="flex flex-col gap-1 col-span-2">
                                     <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Account Holder</span>
                                     <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 truncate">
-                                        {customer.debitDetails.accountType === 0
-                                            ? customer.debitDetails.companyName
-                                            : `${customer.debitDetails.firstName || ''} ${customer.debitDetails.lastName || ''}`.trim() || '—'}
+                                        {customer.debitDetails!.accountType === 0
+                                            ? customer.debitDetails!.companyName
+                                            : `${customer.debitDetails!.firstName || ''} ${customer.debitDetails!.lastName || ''}`.trim() || '—'}
                                     </span>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Bank Name</span>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 truncate">{customer.debitDetails.bankName || '—'}</span>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 truncate">{customer.debitDetails!.bankName || '—'}</span>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Frequency</span>
                                     <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                        {customer.debitDetails.paymentFrequency === 0 ? 'Monthly' :
-                                            customer.debitDetails.paymentFrequency === 1 ? 'Fortnightly' :
-                                                customer.debitDetails.paymentFrequency === 2 ? 'Weekly' : '—'}
+                                        {customer.debitDetails!.paymentFrequency === 0 ? 'Monthly' :
+                                            customer.debitDetails!.paymentFrequency === 1 ? 'Fortnightly' :
+                                                customer.debitDetails!.paymentFrequency === 2 ? 'Weekly' : '—'}
                                     </span>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">BSB</span>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 font-mono">{customer.debitDetails.bsb || '—'}</span>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 font-mono">{customer.debitDetails!.bsb || '—'}</span>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Account No.</span>
                                     <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 font-mono">
-                                        {customer.debitDetails.accountNumber ? `•••• ${customer.debitDetails.accountNumber.slice(-4)}` : '—'}
+                                        {customer.debitDetails!.accountNumber ? `•••• ${customer.debitDetails!.accountNumber.slice(-4)}` : '—'}
                                     </span>
                                 </div>
                             </div>
-                        ) : (
-                            <div className="flex-1 flex items-center justify-center py-6 text-sm text-gray-400 dark:text-neutral-500 font-medium">
-                                No Details Configured
-                            </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     {/* Section 3: Solar & Battery System */}
-                    <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-2xl p-6 border border-black/[0.03] dark:border-white/[0.04] flex flex-col gap-5 h-full transition-all hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
-                        <div className="flex items-center gap-3 mb-1">
-                            <div className="w-9 h-9 rounded-full bg-white dark:bg-[#2c2c2e] shadow-sm flex items-center justify-center text-sky-500">
-                                <ZapIcon size={16} />
+                    {hasSystemData && (
+                        <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-2xl p-6 border border-black/[0.03] dark:border-white/[0.04] flex flex-col gap-5 h-full transition-all hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="w-9 h-9 rounded-full bg-white dark:bg-[#2c2c2e] shadow-sm flex items-center justify-center text-sky-500">
+                                    <ZapIcon size={16} />
+                                </div>
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">System Info</h3>
                             </div>
-                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">System Info</h3>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-y-4 gap-x-4">
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">System Size</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                    {customer.solarDetails?.solarcapacity ? `${customer.solarDetails.solarcapacity}kW` : '0kW'}
-                                </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Inverter</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                    {customer.batteryDetails?.inverterCapacity ? `${customer.batteryDetails.inverterCapacity}kW` : '—'}
-                                </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Battery Brand</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 truncate">
-                                    {customer.batteryDetails?.batterybrand || '—'}
-                                </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Battery Model</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 truncate">
-                                    {customer.batteryDetails?.batterymodel || '—'}
-                                </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Capacity</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                    {customer.batteryDetails?.batterycapacity ? `${customer.batteryDetails.batterycapacity}kWh` : '—'}
-                                </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Serial No.</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 font-mono truncate" title={customer.batteryDetails?.snnumber}>
-                                    {customer.batteryDetails?.snnumber || '—'}
-                                </span>
+                            <div className="grid grid-cols-2 gap-y-4 gap-x-4">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">System Size</span>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
+                                        {customer.solarDetails?.solarcapacity ? `${customer.solarDetails.solarcapacity}kW` : '0kW'}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Inverter</span>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
+                                        {customer.batteryDetails?.inverterCapacity ? `${customer.batteryDetails.inverterCapacity}kW` : '—'}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Battery Brand</span>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 truncate">
+                                        {customer.batteryDetails?.batterybrand || '—'}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Battery Model</span>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 truncate">
+                                        {customer.batteryDetails?.batterymodel || '—'}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Capacity</span>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
+                                        {customer.batteryDetails?.batterycapacity ? `${customer.batteryDetails.batterycapacity}kWh` : '—'}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Serial No.</span>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 font-mono truncate" title={customer.batteryDetails?.snnumber}>
+                                        {customer.batteryDetails?.snnumber || '—'}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Section 4: Project Dates Timeline */}
                     <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-2xl p-6 border border-black/[0.03] dark:border-white/[0.04] flex flex-col gap-5 h-full transition-all hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
