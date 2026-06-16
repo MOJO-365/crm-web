@@ -169,7 +169,7 @@ export default function LocationAutocomplete({
         const postcode = byType('postal_code');
         const rawSubpremise = byType('subpremise');
         const premiseFromComponents = byType('premise');
-        const streetNumber = byType('street_number');
+        let streetNumber = byType('street_number');
         const route = byType('route');
         const routeParts = route.trim().split(/\s+/).filter(Boolean);
         const streetType = routeParts.length > 1 ? routeParts[routeParts.length - 1] : '';
@@ -187,17 +187,45 @@ export default function LocationAutocomplete({
             } else if (lower.includes('/')) {
                 // Could be "level 25/unit 5" or "25/5"
                 const parts = rawSubpremise.split('/');
-                for (const part of parts) {
-                    const p = part.trim().toLowerCase();
-                    if (p.startsWith('level') || p.startsWith('floor') || p.startsWith('lvl')) {
-                        floorLevelNumber = part.trim();
-                    } else {
-                        unitNumber = part.trim();
+                // Check if it's a unit/house range like "1003/6" where streetNumber is "10"
+                if (parts.length === 2 && /^\d+$/.test(parts[0].trim()) && /^\d+$/.test(parts[1].trim()) && streetNumber && /^\d+$/.test(streetNumber.trim())) {
+                    unitNumber = parts[0].trim();
+                    streetNumber = `${parts[1].trim()}-${streetNumber.trim()}`;
+                } else {
+                    for (const part of parts) {
+                        const p = part.trim().toLowerCase();
+                        if (p.startsWith('level') || p.startsWith('floor') || p.startsWith('lvl')) {
+                            floorLevelNumber = part.trim();
+                        } else {
+                            unitNumber = part.trim();
+                        }
                     }
                 }
             } else {
-                // Plain number like "5" — treat as unit number
-                unitNumber = rawSubpremise.replace(/^(unit|unit\s+)/i, '');
+                // Check if it's space-separated numbers like "1003 6" where streetNumber is "10"
+                const spaceParts = rawSubpremise.trim().split(/\s+/);
+                if (spaceParts.length === 2 && /^\d+$/.test(spaceParts[0]) && /^\d+$/.test(spaceParts[1]) && streetNumber && /^\d+$/.test(streetNumber.trim())) {
+                    unitNumber = spaceParts[0];
+                    streetNumber = `${spaceParts[1]}-${streetNumber.trim()}`;
+                } else {
+                    // Plain number like "5" — treat as unit number
+                    unitNumber = rawSubpremise.replace(/^(unit|unit\s+)/i, '');
+                }
+            }
+        }
+
+        // Handle slash in streetNumber (e.g. "6/10")
+        if (streetNumber && streetNumber.includes('/')) {
+            const parts = streetNumber.split('/');
+            if (parts.length === 2) {
+                if (unitNumber) {
+                    // We already have a unit (e.g. "1003"), so "6/10" must be the house number range "6-10"
+                    streetNumber = `${parts[0].trim()}-${parts[1].trim()}`;
+                } else {
+                    // No unit number, so "6/10" means Unit 6, House 10
+                    unitNumber = parts[0].trim();
+                    streetNumber = parts[1].trim();
+                }
             }
         }
 
@@ -302,17 +330,45 @@ export default function LocationAutocomplete({
                     const address = p.description || place.formatted_address || '';
                     const parts = parseComponents(place);
                     
-                    // If Google stripped the suffix in address_components, try to recover it from the description
+                    // If Google stripped the suffix or range in address_components, try to recover it from the description
                     if (p.description && parts.streetNumber) {
-                        const regex = new RegExp(`^\\b${parts.streetNumber}([a-zA-Z])\\b`, 'i');
-                        const regex2 = new RegExp(`\\b${parts.streetNumber}([a-zA-Z])\\b`, 'i');
-                        const match = p.description.match(regex) || p.description.match(regex2);
-                        if (match) {
-                            parts.houseNumber = match[0];
-                            parts.streetNumber = match[0];
+                        const rangeRegex = new RegExp(`\\b${parts.streetNumber}-\\d+\\b`, 'i');
+                        const rangeMatch = p.description.match(rangeRegex);
+                        if (rangeMatch) {
+                            parts.houseNumber = rangeMatch[0];
+                            parts.streetNumber = rangeMatch[0];
+                        } else {
+                            const regex = new RegExp(`^\\b${parts.streetNumber}([a-zA-Z])\\b`, 'i');
+                            const regex2 = new RegExp(`\\b${parts.streetNumber}([a-zA-Z])\\b`, 'i');
+                            const match = p.description.match(regex) || p.description.match(regex2);
+                            if (match) {
+                                parts.houseNumber = match[0];
+                                parts.streetNumber = match[0];
+                            }
                         }
                     }
                     
+                    
+                    // Recover unit number and floor/level number from description if missing from Google components
+                    if (!parts.unitNumber && p.description) {
+                        const unitMatch = p.description.match(/\b(Suite|Unit|Apt|Apartment|Shop|Ste|U)\s*(\d+[a-zA-Z]?)\b/i);
+                        if (unitMatch) {
+                            parts.unitNumber = unitMatch[2];
+                        } else {
+                            const slashMatch = p.description.match(/^\s*(\d+[a-zA-Z]?)\//);
+                            if (slashMatch) {
+                                parts.unitNumber = slashMatch[1];
+                            }
+                        }
+                    }
+
+                    if (!parts.floorLevelNumber && p.description) {
+                        const levelMatch = p.description.match(/\b(Level|Floor|Lvl|L)\s*(\d+)\b/i);
+                        if (levelMatch) {
+                            parts.floorLevelNumber = levelMatch[2];
+                        }
+                    }
+
                     onSelect({ address, placeId: place.place_id!, ...parts });
                 } else {
                     onSelect({ address: p.description, placeId: p.place_id });

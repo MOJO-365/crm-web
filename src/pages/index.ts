@@ -1,5 +1,5 @@
 export { LoginPage } from './LoginPage';
-export { DashboardPage } from './DashboardPage';
+export { DashboardPage } from './Dashboard/DashboardPage';
 export { UsersPage } from './user/UsersPage';
 export { CustomersPage } from './customer/CustomersPage';
 export { NotFoundPage } from './NotFoundPage';
