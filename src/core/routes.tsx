@@ -7,7 +7,7 @@ import { lazyWithRetry, clearLazyRetryFlag } from '@/lib/lazy-with-retry';
 
 // Lazy load pages for code splitting
 const LoginPage = lazyWithRetry(() => import('@/pages/LoginPage').then(m => ({ default: m.LoginPage })));
-const DashboardPage = lazyWithRetry(() => import('@/pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const DashboardPage = lazyWithRetry(() => import('@/pages/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const UsersPage = lazyWithRetry(() => import('@/pages/user/UsersPage').then(m => ({ default: m.UsersPage })));
 const ChangePasswordPage = lazyWithRetry(() => import('@/pages/user/ChangePasswordPage').then(m => ({ default: m.ChangePasswordPage })));
 const CustomersPage = lazyWithRetry(() => import('@/pages/customer/CustomersPage').then(m => ({ default: m.CustomersPage })));

@@ -61,6 +61,8 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
         postcode: '',
         country: 'Australia',
         nmi: '',
+        flatorunittype: '',
+        gnafpid: '',
         referralName: '',
         assignedToUid: '',
     });
@@ -116,6 +118,8 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 postcode: lead.postcode || '',
                 country: lead.country || 'Australia',
                 nmi: lead.nmi || '',
+                flatorunittype: lead.flatorunittype || '',
+                gnafpid: lead.gnafpid || '',
                 referralName: lead.referralName || '',
                 assignedToUid: lead.assignedTo || '',
             };
@@ -123,7 +127,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
 
             // Set address search string
             const fullAddr = [
-                lead.unitnumber ? `Unit ${lead.unitnumber}` : '',
+                lead.unitnumber ? `${lead.flatorunittype || 'Unit'} ${lead.unitnumber}` : '',
                 lead.buildingname,
                 lead.floorlevelnumber ? `Level ${lead.floorlevelnumber}` : '',
                 lead.housenumber,
@@ -157,6 +161,8 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                 postcode: '',
                 country: 'Australia',
                 nmi: '',
+                flatorunittype: '',
+                gnafpid: '',
                 referralName: '',
                 assignedToUid: currentUserUid || '',
             });
@@ -374,6 +380,8 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
             if (!canCreateDuplicates) {
                 if (duplicateErrors.address || duplicateErrors.leadAddress) {
                     submissionData.unitnumber = '';
+                    submissionData.flatorunittype = '';
+                    submissionData.gnafpid = '';
                     submissionData.housenumber = '';
                     submissionData.buildingname = '';
                     submissionData.floorlevelnumber = '';
@@ -676,6 +684,8 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                                     state: place.state || '',
                                                     postcode: place.postcode || '',
                                                     country: place.country || 'Australia',
+                                                    flatorunittype: '',
+                                                    gnafpid: '',
                                                 };
                                                 setFormData(prev => ({
                                                     ...prev,
@@ -732,6 +742,10 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                 <div className="md:col-span-12">
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4 pt-4 border-t border-border mt-2">
                                         <div className="space-y-2">
+                                            <label className="text-sm font-medium">Flat/Unit Type</label>
+                                            <Input disabled value={formData.flatorunittype || '-'} />
+                                        </div>
+                                        <div className="space-y-2">
                                             <label className="text-sm font-medium">Unit No.</label>
                                             <Input disabled value={formData.unitnumber || '-'} />
                                         </div>
@@ -784,7 +798,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
                                         <div className="text-sm font-medium text-foreground bg-primary/5 py-3 px-4 rounded-lg border border-primary/10 shadow-sm transition-all duration-200 hover:bg-primary/10">
                                             {[
                                                 formData.buildingname,
-                                                formData.unitnumber ? (formData.unitnumber.toLowerCase().includes('level') || formData.unitnumber.toLowerCase().includes('floor') ? formData.unitnumber : `Unit ${formData.unitnumber}`) : '',
+                                                formData.unitnumber ? (formData.unitnumber.toLowerCase().includes('level') || formData.unitnumber.toLowerCase().includes('floor') ? formData.unitnumber : `${formData.flatorunittype || 'Unit'} ${formData.unitnumber}`) : '',
                                                 formData.floorlevelnumber && formData.floorlevelnumber !== formData.unitnumber ? (formData.floorlevelnumber.toLowerCase().includes('level') || formData.floorlevelnumber.toLowerCase().includes('floor') ? formData.floorlevelnumber : `Level ${formData.floorlevelnumber}`) : '',
                                                 formData.housenumber && formData.housenumber !== formData.streetnumber ? formData.housenumber : '',
                                                 [formData.streetnumber, formData.streetname, formData.streettype].filter(Boolean).join(' '),

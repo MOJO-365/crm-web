@@ -89,6 +89,8 @@ const CUSTOMER_FULL_RESPONSE = `
         id
         customerUid
         unitNumber
+        flatOrUnitType
+        gnafPid
         streetNumber
         streetName
         streetType

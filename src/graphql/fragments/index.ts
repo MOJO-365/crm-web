@@ -121,6 +121,8 @@ export const LEAD_FIELDS = gql`
         source
         notes
         unitnumber
+        flatorunittype
+        gnafpid
         housenumber
         buildingname
         floorlevelnumber

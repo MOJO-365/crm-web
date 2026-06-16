@@ -151,6 +151,8 @@ const initialFormData: CustomerFormData = {
     postcode: '',
     country: 'Australia',
     ownershipStatus: 0,
+    flatOrUnitType: '',
+    gnafPid: '',
     nmi: '',
     isVppAndIsBattery: false,
     hasSolar: true,
@@ -787,6 +789,8 @@ export const CustomerFormPage = () => {
                 streetType: c.address?.streetType || '',
                 suburb: c.address?.suburb || '',
                 state: c.address?.state || '',
+                flatOrUnitType: c.address?.flatOrUnitType || '',
+                gnafPid: c.address?.gnafPid || '',
                 postcode: c.address?.postcode || '',
                 country: c.address?.country || 'Australia',
                 nmi: c.address?.nmi || '',
@@ -857,7 +861,7 @@ export const CustomerFormPage = () => {
                     setAddressSearch(c.address.fullAddress);
                 } else {
                     setAddressSearch([
-                        c.address.unitNumber ? `Unit ${c.address.unitNumber}` : '',
+                        c.address.unitNumber ? `${c.address.flatOrUnitType || 'Unit'} ${c.address.unitNumber}` : '',
                         c.address.streetNumber,
                         c.address.streetName,
                         c.address.streetType,
@@ -1183,6 +1187,7 @@ export const CustomerFormPage = () => {
                 // ✅ If multiple tariffs found, open modal even for single results
                 if (allTariffs.length > 1 && !isNmiModalOpen) {
                     setNmiOptions(results.length > 0 ? results : [item]);
+                    setSelectedNmiForTariff(item);
                     setIsNmiModalOpen(true);
                     return;
                 }
@@ -1207,19 +1212,29 @@ export const CustomerFormPage = () => {
                 // ✅ Auto-prefill address
                 const address = item?.address;
                 if (address) {
+                    const displayHouseNumber = address.houseNumberTo
+                        ? `${address.houseNumber}-${address.houseNumberTo}`
+                        : address.houseNumber || '';
+
                     updateField('unitNumber', address.flatOrUnitNumber || '');
-                    updateField('houseNumber', address.houseNumber || '');
+                    updateField('houseNumber', displayHouseNumber);
                     updateField('houseNumberSuffix', address.houseNumberSuffix || '');
-                    updateField('streetNumber', address.houseNumber || '');
+                    updateField('streetNumber', displayHouseNumber);
                     updateField('streetName', address.streetName || '');
                     updateField('streetType', address.streetType || '');
                     updateField('suburb', address.suburb || '');
                     updateField('state', address.state || '');
                     updateField('postcode', address.postcode || '');
+                    updateField('flatOrUnitType', address.flatOrUnitType || '');
+                    updateField('gnafPid', address.gnafPid || '');
 
                     setAddressSearch([
-                        address.flatOrUnitNumber ? `Unit ${address.flatOrUnitNumber}` : '',
-                        (address.houseNumber || '') + (address.houseNumberSuffix || ''),
+                        address.flatOrUnitNumber
+                            ? (address.flatOrUnitType ? `${address.flatOrUnitType} ${address.flatOrUnitNumber}` : `Unit ${address.flatOrUnitNumber}`)
+                            : '',
+                        address.houseNumberTo
+                            ? `${address.houseNumber}-${address.houseNumberTo}${address.houseNumberSuffix || ''}`
+                            : (address.houseNumber || '') + (address.houseNumberSuffix || ''),
                         address.streetName,
                         address.streetType,
                         address.suburb,
@@ -1325,19 +1340,29 @@ export const CustomerFormPage = () => {
 
             const address = item?.address;
             if (address) {
+                const displayHouseNumber = address.houseNumberTo
+                    ? `${address.houseNumber}-${address.houseNumberTo}`
+                    : address.houseNumber || '';
+
                 updateField('unitNumber', address.flatOrUnitNumber || '');
-                updateField('houseNumber', address.houseNumber || '');
+                updateField('houseNumber', displayHouseNumber);
                 updateField('houseNumberSuffix', address.houseNumberSuffix || '');
-                updateField('streetNumber', address.houseNumber || '');
+                updateField('streetNumber', displayHouseNumber);
                 updateField('streetName', address.streetName || '');
                 updateField('streetType', address.streetType || '');
                 updateField('suburb', address.suburb || '');
                 updateField('state', address.state || '');
                 updateField('postcode', address.postcode || '');
+                updateField('flatOrUnitType', address.flatOrUnitType || '');
+                updateField('gnafPid', address.gnafPid || '');
 
                 setAddressSearch([
-                    address.flatOrUnitNumber ? `Unit ${address.flatOrUnitNumber}` : '',
-                    (address.houseNumber || '') + (address.houseNumberSuffix || ''),
+                    address.flatOrUnitNumber
+                        ? (address.flatOrUnitType ? `${address.flatOrUnitType} ${address.flatOrUnitNumber}` : `Unit ${address.flatOrUnitNumber}`)
+                        : '',
+                    address.houseNumberTo
+                        ? `${address.houseNumber}-${address.houseNumberTo}${address.houseNumberSuffix || ''}`
+                        : (address.houseNumber || '') + (address.houseNumberSuffix || ''),
                     address.streetName,
                     address.streetType,
                     address.suburb,
@@ -1770,6 +1795,8 @@ export const CustomerFormPage = () => {
                     postcode: formData.postcode,
                     country: formData.country || 'Australia',
                     nmi: formData.nmi || undefined,
+                    flatOrUnitType: formData.flatOrUnitType || undefined,
+                    gnafPid: formData.gnafPid || undefined,
                 },
                 solarDetails: formData.hasSolar ? {
                     hassolar: 1,
@@ -2016,7 +2043,7 @@ export const CustomerFormPage = () => {
             } : {};
 
             const addressString = [
-                formData.unitNumber ? `Unit ${formData.unitNumber}` : '',
+                formData.unitNumber ? `${formData.flatOrUnitType || 'Unit'} ${formData.unitNumber}` : '',
                 formData.streetNumber,
                 formData.streetName,
                 formData.streetType,
@@ -2775,6 +2802,7 @@ export const CustomerFormPage = () => {
 
                                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-xl border border-border">
                                             <div className="col-span-2 lg:col-span-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Detailed Breakdown</div>
+                                            <Input label="Flat/Unit Type" disabled className="bg-background font-medium" value={formData.flatOrUnitType || ''} onChange={(e) => updateField('flatOrUnitType', e.target.value)} placeholder="e.g. HSE" />
                                             <Input label="Unit No." disabled className="bg-background font-medium" value={formData.unitNumber} onChange={(e) => updateField('unitNumber', e.target.value)} onBlur={() => handleBlur('unitNumber')} placeholder="e.g. 5" />
                                             <Input label="House No." disabled className="bg-background font-medium" value={formData.houseNumber} onChange={(e) => updateField('houseNumber', e.target.value)} onBlur={() => handleBlur('houseNumber')} placeholder="e.g. 10A" />
                                             <Input label="Building Name" disabled className="bg-background font-medium" value={formData.buildingName} onChange={(e) => updateField('buildingName', e.target.value)} onBlur={() => handleBlur('buildingName')} placeholder="e.g. Eureka Tower" />
@@ -2795,7 +2823,7 @@ export const CustomerFormPage = () => {
                                                 <div className="text-sm font-medium text-foreground bg-primary/5 py-3 px-4 rounded-lg border border-primary/10 shadow-sm transition-all duration-200 hover:bg-primary/10">
                                                     {[
                                                         formData.buildingName,
-                                                        formData.unitNumber ? (formData.unitNumber.toLowerCase().includes('level') || formData.unitNumber.toLowerCase().includes('floor') ? formData.unitNumber : `Unit ${formData.unitNumber}`) : '',
+                                                        formData.unitNumber ? (formData.unitNumber.toLowerCase().includes('level') || formData.unitNumber.toLowerCase().includes('floor') ? formData.unitNumber : `${formData.flatOrUnitType || 'Unit'} ${formData.unitNumber}`) : '',
                                                         formData.floorLevelNumber && formData.floorLevelNumber !== formData.unitNumber ? (formData.floorLevelNumber.toLowerCase().includes('level') || formData.floorLevelNumber.toLowerCase().includes('floor') ? formData.floorLevelNumber : `Level ${formData.floorLevelNumber}`) : '',
                                                         formData.houseNumber && formData.houseNumber !== formData.streetNumber ? formData.houseNumber : '',
                                                         [formData.streetNumber, formData.streetName, formData.streetType].filter(Boolean).join(' '),
@@ -3524,7 +3552,7 @@ export const CustomerFormPage = () => {
                                                 <h3 className="font-medium mb-3 flex items-center gap-2"><MapPinIcon size={16} className="text-blue-600" /> Service Address</h3>
                                                 <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
                                                     <div className="font-medium">
-                                                        {formData.unitNumber && `Unit ${formData.unitNumber}, `}{formData.streetNumber} {formData.streetName} {formData.streetType}
+                                                        {formData.unitNumber && `${formData.flatOrUnitType || 'Unit'} ${formData.unitNumber}, `}{formData.streetNumber} {formData.streetName} {formData.streetType}
                                                         <br />
                                                         {formData.suburb}, {formData.state} {formData.postcode}
                                                         <br />
@@ -3856,8 +3884,8 @@ export const CustomerFormPage = () => {
                                                     NMI: <span className="text-primary">{item?.nmi}</span>
                                                 </p>
                                                 <p className="text-xs text-muted-foreground mt-1">
-                                                    {item?.address?.flatOrUnitNumber ? `Unit ${item.address.flatOrUnitNumber}, ` : ''}
-                                                    {item?.address?.houseNumber}{item?.address?.houseNumberSuffix || ''} {item?.address?.streetName} {item?.address?.streetType},{" "}
+                                                    {item?.address?.flatOrUnitNumber ? `${item.address.flatOrUnitType || 'Unit'} ${item.address.flatOrUnitNumber}, ` : ''}
+                                                    {item?.address?.houseNumber}{item?.address?.houseNumberTo ? `-${item.address.houseNumberTo}` : ''}{item?.address?.houseNumberSuffix || ''} {item?.address?.streetName} {item?.address?.streetType},{" "}
                                                     {item?.address?.suburb} {item?.address?.postcode}
                                                 </p>
                                             </div>
@@ -3872,8 +3900,8 @@ export const CustomerFormPage = () => {
                                     <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Selected Property</p>
                                     <p className="font-bold text-sm text-primary">{selectedNmiForTariff.nmi}</p>
                                     <p className="text-xs text-muted-foreground">
-                                        {selectedNmiForTariff.address?.flatOrUnitNumber ? `Unit ${selectedNmiForTariff.address.flatOrUnitNumber}, ` : ''}
-                                        {selectedNmiForTariff.address?.houseNumber}{selectedNmiForTariff.address?.houseNumberSuffix || ''} {selectedNmiForTariff.address?.streetName} {selectedNmiForTariff.address?.streetType}, {selectedNmiForTariff.address?.suburb}
+                                        {selectedNmiForTariff.address?.flatOrUnitNumber ? `${selectedNmiForTariff.address.flatOrUnitType || 'Unit'} ${selectedNmiForTariff.address.flatOrUnitNumber}, ` : ''}
+                                        {selectedNmiForTariff.address?.houseNumber}{selectedNmiForTariff.address?.houseNumberTo ? `-${selectedNmiForTariff.address.houseNumberTo}` : ''}{selectedNmiForTariff.address?.houseNumberSuffix || ''} {selectedNmiForTariff.address?.streetName} {selectedNmiForTariff.address?.streetType}, {selectedNmiForTariff.address?.suburb}
                                     </p>
                                 </div>
 
@@ -3926,19 +3954,27 @@ export const CustomerFormPage = () => {
 
                                                             const addr = item.address;
                                                             if (addr) {
+                                                                const displayHouseNumber = addr.houseNumberTo
+                                                                    ? `${addr.houseNumber}-${addr.houseNumberTo}`
+                                                                    : addr.houseNumber || '';
+
                                                                 updateField('unitNumber', addr.flatOrUnitNumber || '');
-                                                                updateField('houseNumber', addr.houseNumber || '');
+                                                                updateField('houseNumber', displayHouseNumber);
                                                                 updateField('houseNumberSuffix', addr.houseNumberSuffix || '');
-                                                                updateField('streetNumber', addr.houseNumber || '');
+                                                                updateField('streetNumber', displayHouseNumber);
                                                                 updateField('streetName', addr.streetName || '');
                                                                 updateField('streetType', addr.streetType || '');
                                                                 updateField('suburb', addr.suburb || '');
                                                                 updateField('state', addr.state || '');
                                                                 updateField('postcode', addr.postcode || '');
+                                                                updateField('flatOrUnitType', addr.flatOrUnitType || '');
+                                                                updateField('gnafPid', addr.gnafPid || '');
 
                                                                 setAddressSearch([
-                                                                    addr.flatOrUnitNumber ? `Unit ${addr.flatOrUnitNumber}` : '',
-                                                                    (addr.houseNumber || '') + (addr.houseNumberSuffix || ''),
+                                                                    addr.flatOrUnitNumber ? `${addr.flatOrUnitType || 'Unit'} ${addr.flatOrUnitNumber}` : '',
+                                                                    addr.houseNumberTo
+                                                                        ? `${addr.houseNumber}-${addr.houseNumberTo}${addr.houseNumberSuffix || ''}`
+                                                                        : (addr.houseNumber || '') + (addr.houseNumberSuffix || ''),
                                                                     addr.streetName,
                                                                     addr.streetType,
                                                                     addr.suburb,

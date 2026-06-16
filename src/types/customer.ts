@@ -36,6 +36,8 @@ export interface CustomerFormData {
     nmi: string;
     isVppAndIsBattery?: boolean;
     ownershipStatus?: number;
+    flatOrUnitType?: string;
+    gnafPid?: string;
 
     // Solar Details
     hasSolar: boolean;
