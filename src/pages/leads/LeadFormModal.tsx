@@ -451,7 +451,7 @@ export default function LeadFormModal({ isOpen, onClose, uid }: LeadFormModalPro
 
         if (duplicateErrors.address || duplicateErrors.nmi || duplicateErrors.leadAddress || duplicateErrors.leadNumber) {
             if (!canCreateDuplicates) {
-                // Still let add/edit lead but clear duplicated fields
+                toast.info('Lead saved without duplicate data. To add duplicate data, please contact the master.');
                 await executeSubmit(0);
                 return;
             }
