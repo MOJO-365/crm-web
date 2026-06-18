@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLazyQuery } from '@apollo/client';
 import { GET_CUSTOMERS_CURSOR, GET_CUSTOMER_BY_CUSTOMER_ID } from '@/graphql';
-import { 
-    SearchIcon, 
-    XIcon, 
-    ChevronDownIcon, 
-    InfoIcon, 
-    SpinnerIcon 
+import {
+    SearchIcon,
+    XIcon,
+    ChevronDownIcon,
+    InfoIcon,
+    SpinnerIcon
 } from '@/components/icons';
 import { ProjectDetailsCard } from './components/ProjectDetailsCard';
 
@@ -44,11 +44,11 @@ export function DashboardPage() {
     const searchBarRef = useRef<HTMLDivElement>(null);
 
     // GraphQL search query
-    const [searchCustomers, { data: searchData, loading: searchLoading }] = 
+    const [searchCustomers, { data: searchData, loading: searchLoading }] =
         useLazyQuery<CustomersCursorResult>(GET_CUSTOMERS_CURSOR);
 
     // GraphQL fetch details query
-    const [fetchDetails, { data: detailsData, loading: detailsLoading }] = 
+    const [fetchDetails, { data: detailsData, loading: detailsLoading }] =
         useLazyQuery(GET_CUSTOMER_BY_CUSTOMER_ID);
 
     // Close dropdown on outside click
@@ -143,11 +143,11 @@ export function DashboardPage() {
     const activeSearchVal = activeColumn === 'id' ? searchId : activeColumn === 'contact' ? searchContact : searchAddress;
 
     return (
-        <div 
+        <div
             className="relative min-h-[calc(100vh-64px)] -m-4 p-8 flex flex-col items-center select-none"
         >
             {/* Background image layer - full vibrancy for Apple glassmorphism */}
-            <div 
+            <div
                 className="absolute inset-0 bg-cover bg-center pointer-events-none rounded-2xl md:rounded-none opacity-80 dark:opacity-100 transition-opacity"
                 style={{ backgroundImage: "url('/Gee-Dashboard-Bg.png')" }}
             />
@@ -155,20 +155,20 @@ export function DashboardPage() {
             <div className="absolute inset-0 bg-white/50 dark:bg-black/50 pointer-events-none rounded-2xl md:rounded-none transition-colors" />
 
             <div className="relative w-full max-w-[98%] xl:max-w-7xl z-10 flex flex-col items-center mt-12 space-y-6">
-                
+
                 {/* Heading */}
-                <h1 className="text-4xl md:text-[2.75rem] leading-tight font-medium tracking-tight text-center text-gray-900 dark:text-white drop-shadow-sm mb-2">
+                <h1 className="text-3xl md:text-4xl leading-tight font-medium tracking-tight text-center text-gray-900 dark:text-white drop-shadow-sm mb-2">
                     Welcome to <span className="font-bold bg-clip-text text-transparent bg-gradient-to-br from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">GEE Energy</span>
                 </h1>
 
                 {/* Floating Search Bar */}
                 <div ref={searchBarRef} className="relative w-full max-w-3xl">
                     <div className="flex items-center h-14 bg-white/75 dark:bg-[#1c1c1e]/75 backdrop-blur-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] rounded-full border border-white/40 dark:border-white/10 px-4 transition-all duration-300">
-                        
+
                         {/* Col 1: Search By Customer ID */}
                         <div className="relative flex-1 flex items-center px-4 gap-2.5 min-w-0">
                             <SearchIcon className="text-gray-400 dark:text-white/80 shrink-0" size={16} />
-                            <input 
+                            <input
                                 type="text"
                                 value={searchId}
                                 onFocus={() => {
@@ -192,7 +192,7 @@ export function DashboardPage() {
 
                         {/* Col 2: Search By Contact Details */}
                         <div className="relative flex-1 flex items-center px-4 gap-2.5 min-w-0">
-                            <input 
+                            <input
                                 type="text"
                                 value={searchContact}
                                 onFocus={() => {
@@ -216,7 +216,7 @@ export function DashboardPage() {
 
                         {/* Col 3: Search By Address */}
                         <div className="relative flex-1 flex items-center px-4 gap-2.5 min-w-0">
-                            <input 
+                            <input
                                 type="text"
                                 value={searchAddress}
                                 onFocus={() => {
@@ -238,7 +238,7 @@ export function DashboardPage() {
 
                     {/* Full-width Dropdown suggestion list */}
                     {showDropdown && activeColumn && (
-                        <div 
+                        <div
                             className="absolute left-0 right-0 z-50 mt-2 bg-white/85 dark:bg-[#1c1c1e]/85 backdrop-blur-2xl border border-white/40 dark:border-white/10 rounded-[24px] shadow-[0_10px_40px_rgb(0,0,0,0.1)] dark:shadow-[0_10px_40px_rgb(0,0,0,0.4)] overflow-hidden p-2 w-full"
                         >
                             {activeSearchVal.trim().length < 3 ? (
@@ -287,7 +287,7 @@ export function DashboardPage() {
                 {/* Search Text Link under search bar */}
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-neutral-300 hover:text-gray-900 dark:hover:text-white cursor-pointer transition-colors bg-white/60 dark:bg-[#1c1c1e]/60 backdrop-blur-xl border border-white/40 dark:border-white/10 shadow-sm px-4 py-2 rounded-full">
                     <InfoIcon size={14} className="text-gray-500 dark:text-white/70" />
-                    <span>Search For Projects & Contacts</span>
+                    <span>Search For Customers</span>
                 </div>
 
                 {/* Details Card */}
@@ -303,7 +303,7 @@ export function DashboardPage() {
                                 <ProjectDetailsCard customer={customer} />
 
                                 {/* Floating Close Button beside the card */}
-                                <button 
+                                <button
                                     onClick={() => setSelectedCustomer(null)}
                                     className="w-10 h-10 -mt-3 rounded-full bg-white dark:bg-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-700 active:scale-95 text-gray-400 dark:text-neutral-500 hover:text-gray-600 dark:hover:text-neutral-300 shadow-lg border border-gray-100 dark:border-neutral-800 flex items-center justify-center transition-all shrink-0"
                                 >

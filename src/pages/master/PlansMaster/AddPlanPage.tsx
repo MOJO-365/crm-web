@@ -84,6 +84,7 @@ export const AddPlanPage: React.FC = () => {
         propertyType: 0,
         isSolarRequired: false,
         isBatteryRequired: false,
+        attachNominationForm: false,
         contractTerm: '',
         exitFee: '' as number | string,
         bonusUids: [] as string[],
@@ -146,6 +147,7 @@ export const AddPlanPage: React.FC = () => {
                     propertyType: plan.propertyType ?? 0,
                     isSolarRequired: plan.isSolarRequired ?? false,
                     isBatteryRequired: plan.isBatteryRequired ?? false,
+                    attachNominationForm: plan.attachNominationForm ?? false,
                     contractTerm: plan.contractTerm || '',
                     exitFee: plan.exitFee ?? '',
                     bonusUids: plan.bonusUids || [],
@@ -337,6 +339,7 @@ export const AddPlanPage: React.FC = () => {
                             propertyType: formData.propertyType,
                             isSolarRequired: formData.isSolarRequired,
                             isBatteryRequired: formData.isBatteryRequired,
+                            attachNominationForm: formData.attachNominationForm,
                             contractTerm: formData.contractTerm,
                             exitFee: formData.exitFee === '' ? null : Number(formData.exitFee),
                             ratesJson: JSON.stringify(validComponents),
@@ -356,6 +359,7 @@ export const AddPlanPage: React.FC = () => {
                             propertyType: formData.propertyType,
                             isSolarRequired: formData.isSolarRequired,
                             isBatteryRequired: formData.isBatteryRequired,
+                            attachNominationForm: formData.attachNominationForm,
                             contractTerm: formData.contractTerm,
                             exitFee: formData.exitFee === '' ? null : Number(formData.exitFee),
                             ratesJson: JSON.stringify(validComponents),
@@ -534,6 +538,26 @@ export const AddPlanPage: React.FC = () => {
                                                 {formData.isBatteryRequired && <CheckIcon size={12} className="text-primary pointer-events-none" />}
                                             </div>
                                             <span className="text-sm text-foreground select-none">Battery Required</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 flex flex-col justify-start col-span-1">
+                                    <label className="text-sm font-medium text-foreground">
+                                        Attach
+                                    </label>
+                                    <div className="flex flex-row items-center gap-6 min-h-[40px] pt-1">
+                                        <label className="flex items-center gap-2 cursor-pointer group">
+                                            <div className="relative flex items-center justify-center w-4 h-4 border border-input rounded shadow-sm group-hover:border-primary transition-colors">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="absolute opacity-0 w-full h-full cursor-pointer"
+                                                    checked={formData.attachNominationForm}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, attachNominationForm: e.target.checked }))}
+                                                />
+                                                {formData.attachNominationForm && <CheckIcon size={12} className="text-primary pointer-events-none" />}
+                                            </div>
+                                            <span className="text-sm text-foreground select-none">Nomination Form</span>
                                         </label>
                                     </div>
                                 </div>

@@ -40,13 +40,46 @@ export const GET_CUSTOMER_DASHBOARD = gql`
           vppConnected
         }
       }
+      signaturePendingSummary {
+        count
+        customers {
+          uid
+          customerId
+          firstName
+          lastName
+          email
+          status
+        }
+      }
+      draftSummary {
+        count
+        customers {
+          uid
+          customerId
+          firstName
+          lastName
+          email
+          status
+        }
+      }
+      movedOnSummary {
+        count
+        customers {
+          uid
+          customerId
+          firstName
+          lastName
+          email
+          status
+        }
+      }
     }
   }
 `;
 
 export const GET_MONTHLY_ENROLLMENTS = gql`
-  query GetMonthlyEnrollments($months: Int) {
-    monthlyEnrollments(months: $months) {
+  query GetMonthlyEnrollments($months: Int, $interval: String) {
+    monthlyEnrollments(months: $months, interval: $interval) {
       month
       year
       count

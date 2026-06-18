@@ -14,6 +14,8 @@ import {
     CUSTOMER_STATUS_MAP
 } from '@/lib/constants';
 import { formatSydneyTime } from '@/lib/date';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { toast } from 'react-toastify';
 
 export interface ProjectDetailsCardProps {
     customer: {
@@ -25,6 +27,10 @@ export interface ProjectDetailsCardProps {
         number?: string;
         dob?: string;
         propertyType?: number;
+        tariffCode?: string;
+        plan?: {
+            title?: string;
+        };
         status?: number;
         source?: string;
         discount?: number;
@@ -35,6 +41,7 @@ export interface ProjectDetailsCardProps {
             nmi?: string;
         };
         assignedToUser?: {
+            uid?: string;
             name?: string;
         };
         enrollmentDetails?: {
@@ -70,13 +77,36 @@ export interface ProjectDetailsCardProps {
             snnumber?: string;
         };
         msatDetails?: {
+            msatConnected?: number | boolean;
             msatConnectedAt?: string | Date;
         };
+        utilmateDetails?: {
+            utilmateConnected?: number | boolean;
+        };
+        vppDetails?: {
+            vpp?: number | boolean;
+            vppConnected?: number | boolean;
+            vppApiPushed?: number | null;
+        };
+        signDate?: string | Date;
+        creditScore?: number;
+        isWithoutSignature?: number | boolean;
     };
 }
 
 export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
     const navigate = useNavigate();
+    
+    const canViewMenuCustomers = useAuthStore((state) => state.canViewMenu('customers'));
+    const canViewAllCustomers = useAuthStore((state) => state.hasFeatureAccess('feature_view_all_customers'));
+    const currentUser = useAuthStore((state) => state.user);
+
+    const canViewCustomerDetails = canViewMenuCustomers && (
+        canViewAllCustomers || 
+        customer.assignedToUser?.uid === currentUser?.uid ||
+        // Also allow if it's completely unassigned maybe? Usually yes, but let's strictly check assignment or view_all
+        false
+    );
 
     // Format helper to match CustomerDetailsPage
     const formatValDate = (dateString?: string | Date) => {
@@ -89,7 +119,6 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
         ? CUSTOMER_STATUS_MAP[customer.status]
         : null;
 
-    const hasDebitData = !!customer.debitDetails;
     const hasSystemData = !!(
         customer.solarDetails?.solarcapacity ||
         customer.batteryDetails?.inverterCapacity ||
@@ -99,11 +128,11 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
         customer.batteryDetails?.snnumber
     );
 
-    const visibleCards = 2 + (hasDebitData ? 1 : 0) + (hasSystemData ? 1 : 0);
-    const gridColsClass = 
-        visibleCards === 4 ? "xl:grid-cols-4" : 
-        visibleCards === 3 ? "xl:grid-cols-3" : 
-        "xl:grid-cols-2";
+    const visibleCards = 3 + (hasSystemData ? 1 : 0);
+    const gridColsClass =
+        visibleCards === 4 ? "xl:grid-cols-4" :
+            visibleCards === 3 ? "xl:grid-cols-3" :
+                "xl:grid-cols-2";
 
     return (
         <div className="flex-1 bg-white/80 dark:bg-[#1c1c1e]/80 backdrop-blur-2xl shadow-[0_12px_40px_rgb(0,0,0,0.08)] dark:shadow-[0_12px_40px_rgb(0,0,0,0.4)] border border-white/50 dark:border-white/5 rounded-[24px] p-8 flex flex-col gap-8 text-foreground transition-all duration-300 overflow-hidden">
@@ -120,6 +149,11 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
                                     style={{ backgroundColor: statusInfo.color + '20', color: statusInfo.color }}
                                 >
                                     {statusInfo.label}
+                                </span>
+                            )}
+                            {!!customer.vppDetails?.vpp && (
+                                <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full tracking-wider bg-purple-500/20 text-purple-600 dark:text-purple-400">
+                                    VPP
                                 </span>
                             )}
                         </h2>
@@ -158,15 +192,21 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
 
                 <div className="flex flex-col items-start md:items-end gap-3 shrink-0">
                     <button
-                        onClick={() => navigate(`/customers/${customer.uid}`)}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-5 py-2.5 rounded-full transition-all shadow-sm"
+                        onClick={() => {
+                            if (canViewCustomerDetails) {
+                                navigate(`/customers/${customer.uid}`);
+                            } else {
+                                toast.error('You do not have permission to view this customer\'s details');
+                            }
+                        }}
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-5 py-2.5 rounded-full transition-all shadow-sm cursor-pointer"
                     >
-                        View Full Profile
+                        {customer.customerId}
                     </button>
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-gray-400 dark:text-neutral-500">
-                        <span>Customer ID:</span>
-                        <span className="font-mono font-semibold text-gray-700 dark:text-neutral-300 bg-gray-100 dark:bg-neutral-800 px-2 py-0.5 rounded-md">
-                            {customer.customerId}
+                    <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-500 dark:text-neutral-400">Assigned To:</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                            {customer.assignedToUser?.name || 'Unassigned'}
                         </span>
                     </div>
                 </div>
@@ -187,6 +227,24 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
                         </div>
 
                         <div className="grid grid-cols-2 gap-y-4 gap-x-4">
+                            <div className="flex flex-col gap-1 col-span-2">
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Assigned Plan</span>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
+                                    {customer.plan?.title || '—'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Tariff Code</span>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 font-mono">
+                                    {customer.tariffCode || '—'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Lead Source</span>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 truncate">
+                                    {customer.source || '—'}
+                                </span>
+                            </div>
                             <div className="flex flex-col gap-1">
                                 <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">NMI</span>
                                 <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 font-mono">{customer.address?.nmi || '—'}</span>
@@ -209,65 +267,9 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
                                     {customer.enrollmentDetails?.billingpreference !== undefined ? BILLING_PREF_LABELS[customer.enrollmentDetails.billingpreference] : '—'}
                                 </span>
                             </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Life Support</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                    {customer.enrollmentDetails?.lifesupport ? 'Yes' : 'No'}
-                                </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Concession</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                    {customer.enrollmentDetails?.concession ? 'Yes' : 'No'}
-                                </span>
-                            </div>
                         </div>
                     </div>
 
-                    {/* Section 2: Billing & Direct Debit */}
-                    {hasDebitData && (
-                        <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-2xl p-6 border border-black/[0.03] dark:border-white/[0.04] flex flex-col gap-5 h-full transition-all hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
-                            <div className="flex items-center gap-3 mb-1">
-                                <div className="w-9 h-9 rounded-full bg-white dark:bg-[#2c2c2e] shadow-sm flex items-center justify-center text-emerald-500">
-                                    <IdCardIcon size={16} />
-                                </div>
-                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Direct Debit</h3>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-y-4 gap-x-4">
-                                <div className="flex flex-col gap-1 col-span-2">
-                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Account Holder</span>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 truncate">
-                                        {customer.debitDetails!.accountType === 0
-                                            ? customer.debitDetails!.companyName
-                                            : `${customer.debitDetails!.firstName || ''} ${customer.debitDetails!.lastName || ''}`.trim() || '—'}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Bank Name</span>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 truncate">{customer.debitDetails!.bankName || '—'}</span>
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Frequency</span>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                        {customer.debitDetails!.paymentFrequency === 0 ? 'Monthly' :
-                                            customer.debitDetails!.paymentFrequency === 1 ? 'Fortnightly' :
-                                                customer.debitDetails!.paymentFrequency === 2 ? 'Weekly' : '—'}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">BSB</span>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 font-mono">{customer.debitDetails!.bsb || '—'}</span>
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Account No.</span>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100 font-mono">
-                                        {customer.debitDetails!.accountNumber ? `•••• ${customer.debitDetails!.accountNumber.slice(-4)}` : '—'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                     {/* Section 3: Solar & Battery System */}
                     {hasSystemData && (
@@ -320,7 +322,53 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
                         </div>
                     )}
 
-                    {/* Section 4: Project Dates Timeline */}
+                    {/* Section 4: Status & Checks */}
+                    <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-2xl p-6 border border-black/[0.03] dark:border-white/[0.04] flex flex-col gap-5 h-full transition-all hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="w-9 h-9 rounded-full bg-white dark:bg-[#2c2c2e] shadow-sm flex items-center justify-center text-rose-500">
+                                <IdCardIcon size={16} />
+                            </div>
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Status & Checks</h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-y-4 gap-x-4">
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Credit Score</span>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
+                                    {customer.creditScore !== undefined && customer.creditScore !== null ? customer.creditScore : '—'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Signed</span>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
+                                    {customer.isWithoutSignature ? 'No Signature Req.' : (customer.signDate ? 'Yes' : 'No')}
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">MSAT Connected</span>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
+                                    {customer.msatDetails?.msatConnected ? 'Yes' : 'No'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Utilmate Connected</span>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
+                                    {customer.utilmateDetails?.utilmateConnected ? 'Yes' : 'No'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Push to Gsync</span>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
+                                    {!customer.vppDetails?.vpp ? '—' : 
+                                     customer.vppDetails.vppConnected !== 1 ? 'Not Connected' :
+                                     customer.vppDetails.vppApiPushed === 0 ? 'Skip & Connect' :
+                                     'Connected'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 5: Project Dates Timeline */}
                     <div className="bg-black/[0.02] dark:bg-white/[0.03] rounded-2xl p-6 border border-black/[0.03] dark:border-white/[0.04] flex flex-col gap-5 h-full transition-all hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
                         <div className="flex items-center gap-3 mb-1">
                             <div className="w-9 h-9 rounded-full bg-white dark:bg-[#2c2c2e] shadow-sm flex items-center justify-center text-indigo-500">
@@ -331,15 +379,9 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
 
                         <div className="grid grid-cols-2 gap-y-4 gap-x-4">
                             <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Connection</span>
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Connection Date</span>
                                 <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
                                     {customer.enrollmentDetails?.connectiondate ? formatValDate(customer.enrollmentDetails.connectiondate) : '—'}
-                                </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">First Debit</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                    {formatValDate(customer.debitDetails?.firstDebitDate)}
                                 </span>
                             </div>
                             <div className="flex flex-col gap-1">
@@ -347,15 +389,9 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
                                 <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">{formatValDate(customer.createdAt)}</span>
                             </div>
                             <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Meter App.</span>
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">MSAT Connected Date</span>
                                 <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                    {formatValDate(customer.msatDetails?.msatConnectedAt || customer.createdAt)}
-                                </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Activation</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                    {formatValDate(customer.phoneVerifiedAt || customer.createdAt)}
+                                    {formatValDate(customer.msatDetails?.msatConnectedAt)}
                                 </span>
                             </div>
                         </div>

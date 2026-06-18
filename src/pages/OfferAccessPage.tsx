@@ -1538,45 +1538,44 @@ export const OfferAccessPage = () => {
                                     >
                                         Disclosure Statement
                                     </a>
-                                    {customerData.vppDetails?.vpp === 1 && (
-                                        <>
-                                            {', '}
-                                            <a
-                                                href="/onboarding/Virtual Power Plant Program Terms and Conditions.pdf"
-                                                className="underline hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
-                                                style={{ color: '#4B8A10' }}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                            >
-                                                Virtual Power Plant Program Terms and Conditions
-                                            </a>
-                                            {(customerData.vppDetails?.vppConnected === 1 || customerData.vppDetails?.vpp === 1) && 
-                                             customerData.vppDetails?.vppSignupBonus === 600 && (
-                                                <>
-                                                    {', '}
-                                                    <a
-                                                        href="/onboarding/BESS2 and Nomination Form.pdf"
-                                                        className="underline hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
-                                                        style={{ color: '#4B8A10' }}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                    >
-                                                        BESS2 and Nomination Form
-                                                    </a>
-                                                </>
-                                            )}
-                                            {', '}
-                                            {/* <a
-                                                href="/onboarding/GEE-VPP-TC-Ver01.pdf"
-                                                className="underline hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
-                                                style={{ color: '#4B8A10' }}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                            >
-                                                VPP Terms & Conditions
-                                            </a> */}
-                                        </>
-                                    )}
+                                    {(() => {
+                                        const showVppTerms = customerData.vppDetails?.vpp === 1;
+                                        const requiresNominationForm = customerData.plan?.attachNominationForm === true || customerData.plan?.attach_nomination_form === 1 || customerData.plan?.attachNominationForm === 1;
+                                        const showNominationForm = ((customerData.vppDetails?.vppConnected === 1 || customerData.vppDetails?.vpp === 1) && customerData.vppDetails?.vppSignupBonus === 600) || requiresNominationForm;
+
+                                        return (
+                                            <>
+                                                {showVppTerms && (
+                                                    <>
+                                                        {', '}
+                                                        <a
+                                                            href="/onboarding/Virtual Power Plant Program Terms and Conditions.pdf"
+                                                            className="underline hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
+                                                            style={{ color: '#4B8A10' }}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            Virtual Power Plant Program Terms and Conditions
+                                                        </a>
+                                                    </>
+                                                )}
+                                                {showNominationForm && (
+                                                    <>
+                                                        {', '}
+                                                        <a
+                                                            href="/onboarding/BESS2 and Nomination Form.pdf"
+                                                            className="underline hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
+                                                            style={{ color: '#4B8A10' }}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            BESS2 and Nomination Form
+                                                        </a>
+                                                    </>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
                                     {' and '}
                                     <a
                                         href="/onboarding/GEE-Privacy-Policy.pdf"
