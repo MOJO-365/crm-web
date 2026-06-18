@@ -638,6 +638,14 @@ export const CustomerFormPage = () => {
         return prefillPortal === 'PEERLESSGROUP' || prefillPortal === 'PDRS';
     }, [prefillData, customerData, isEditMode]);
 
+    const requiresNominationForm = useMemo(() => {
+        if (!activePlansData?.activePlans || !formData.planUid) return false;
+        const selectedPlan = activePlansData.activePlans.find((p: any) => p.uid === formData.planUid);
+        return !!selectedPlan?.attachNominationForm;
+    }, [activePlansData, formData.planUid]);
+
+    const isPdrsOrNomination = isPdrs || requiresNominationForm;
+
     // Set Peerless Group defaults (VPP = true, Solar = true, VPP Bonus = $600) on initial load for new customers
     useEffect(() => {
         if (isPdrs && !isEditMode) {
@@ -1666,8 +1674,8 @@ export const CustomerFormPage = () => {
             finalStatus = 2;
         }
 
-        // If PDRS and sending email (not update only), set to Consent Pending (7)
-        if (isPdrs && isEditMode && !isUpdateOnly) {
+        // If PDRS or Nomination form required, and sending email (not update only), set to Consent Pending (7)
+        if (isPdrsOrNomination && isEditMode && !isUpdateOnly) {
             finalStatus = 7;
         }
 
@@ -1822,8 +1830,8 @@ export const CustomerFormPage = () => {
                 licenseDocument: formData.licenseDocument?.uid,
                 rateVersion: activeVersionForLookup || activeRateVersion,
                 customerId: isEditMode ? undefined : generatedCustomerId,
-                triggerWelcomeEmail: (isEditMode && !isUpdateOnly && !isPdrs) ? (finalStatus === 2 || isWithoutSignature) : undefined,
-                triggerUpdateEmail: (isEditMode && !isUpdateOnly && !isPdrs) ? (significantChanges || true) : undefined,
+                triggerWelcomeEmail: (isEditMode && !isUpdateOnly && !isPdrsOrNomination) ? (finalStatus === 2 || isWithoutSignature) : undefined,
+                triggerUpdateEmail: (isEditMode && !isUpdateOnly && !isPdrsOrNomination) ? (significantChanges || true) : undefined,
                 isWithoutSignature: isWithoutSignature || undefined,
                 selectedBonuses: formData.selectedBonuses,
                 leadUid: prefillLeadUid || undefined
@@ -1946,7 +1954,7 @@ export const CustomerFormPage = () => {
 
             // Trigger PDRS email if applicable (only on update as requested)
             // Send in background without awaiting so UI does not get stuck
-            if (isEditMode && !isUpdateOnly && isPdrs && savedCustomer?.uid && finalStatus === 7) {
+            if (isEditMode && !isUpdateOnly && isPdrsOrNomination && savedCustomer?.uid && finalStatus === 7) {
                 sendPdrsConsentEmail({ variables: { customerUid: savedCustomer.uid } })
                     .catch((emailErr) => {
                         console.error('[PDRS] Failed to send consent email in background:', emailErr);
@@ -4110,8 +4118,75 @@ export const CustomerFormPage = () => {
                         setIsLoadingPreview(false);
                         setPreviewStep('offer');
                     }}
-                    title={previewStep === 'offer' ? "Offer Preview" : ((isPdrs && isEditMode) ? "PDRS Consent Preview" : "Email Preview")}
+                    title={previewStep === 'offer' ? "Offer Preview" : ((isPdrsOrNomination && isEditMode) ? (isPdrs ? "PDRS Consent Preview" : "Nomination Form Email Preview") : "Email Preview")}
                     size="full"
+                    footer={
+                        <div className="flex justify-end gap-2 w-full">
+                            {previewStep === 'offer' ? (
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleDownloadPreview}
+                                        leftIcon={<DownloadIcon size={16} />}
+                                        isLoading={isDownloading}
+                                        disabled={!previewUrl || isLoadingPreview || isDownloading}
+                                    >
+                                        Download PDF
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setPreviewModalOpen(false);
+                                            setIsLoadingPreview(false);
+                                            setPreviewStep('offer');
+                                        }}
+                                    >
+                                        Close
+                                    </Button>
+                                    <Button
+                                        className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                        onClick={handleNextToEmailPreview}
+                                        isLoading={isLoadingEmailPreview}
+                                        disabled={!previewUrl || isLoadingPreview}
+                                        rightIcon={<ChevronRightIcon size={16} />}
+                                    >
+                                        Next (Email Preview)
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setPreviewModalOpen(false);
+                                            setIsLoadingPreview(false);
+                                            setPreviewStep('offer');
+                                        }}
+                                    >
+                                        Close
+                                    </Button>
+                                    <Button
+                                        className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                        isLoading={submittingStatus !== null}
+                                        onClick={async () => {
+                                            if (isPdrs && isEditMode) {
+                                                // For PDRS, keep modal open until process finishes
+                                                await handleSubmit(customerData?.customer?.status || 2);
+                                                setPreviewModalOpen(false);
+                                                setPreviewStep('offer');
+                                            } else {
+                                                setPreviewModalOpen(false);
+                                                setPreviewStep('offer');
+                                                handleSubmit(1);
+                                            }
+                                        }}
+                                    >
+                                        Confirm & Send
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    }
                 >
                     {previewStep === 'offer' ? (
                         <div className="flex-1 h-[70vh] w-full bg-muted/20 rounded-md border overflow-hidden mb-4 relative">
@@ -4172,8 +4247,8 @@ export const CustomerFormPage = () => {
                                 const isTransfer = isEditMode && !!(customerData as any)?.customer?.previousCustomerUid;
                                 const willAttachPdfs = isTransfer || isWithoutSignature;
 
-                                // BESS2 & Nomination Form for VPP+$600 customers
-                                if (isVpp && hasVppBonus) {
+                                // BESS2 & Nomination Form for VPP+$600 customers or if plan requires it
+                                if ((isVpp && hasVppBonus) || requiresNominationForm) {
                                     predictedAttachments.push('BESS2 and Nomination Form.pdf');
                                 }
 
@@ -4236,77 +4311,6 @@ export const CustomerFormPage = () => {
                         </div>
                     )}
 
-                    <div className="flex justify-end gap-2">
-                        {previewStep === 'offer' ? (
-                            <>
-                                <Button
-                                    variant="outline"
-                                    onClick={handleDownloadPreview}
-                                    leftIcon={<DownloadIcon size={16} />}
-                                    isLoading={isDownloading}
-                                    disabled={!previewUrl || isLoadingPreview || isDownloading}
-                                >
-                                    Download PDF
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        setPreviewModalOpen(false);
-                                        setIsLoadingPreview(false);
-                                        setPreviewStep('offer');
-                                    }}
-                                >
-                                    Close
-                                </Button>
-                                <Button
-                                    className="bg-neutral-900 text-white hover:bg-neutral-800"
-                                    onClick={handleNextToEmailPreview}
-                                    isLoading={isLoadingEmailPreview}
-                                    disabled={!previewUrl || isLoadingPreview}
-                                    rightIcon={<ChevronRightIcon size={16} />}
-                                >
-                                    Next (Email Preview)
-                                </Button>
-                            </>
-                        ) : (
-                            <>
-                                {/* <Button
-                                    variant="outline"
-                                    onClick={handleBackToOfferPreview}
-                                >
-                                    Back to Offer
-                                </Button> */}
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        setPreviewModalOpen(false);
-                                        setIsLoadingPreview(false);
-                                        setPreviewStep('offer');
-                                    }}
-                                >
-                                    Close
-                                </Button>
-                                <Button
-                                    className="bg-neutral-900 text-white hover:bg-neutral-800"
-                                    isLoading={submittingStatus !== null}
-                                    onClick={async () => {
-                                        if (isPdrs && isEditMode) {
-                                            // For PDRS, keep modal open until process finishes
-                                            await handleSubmit(customerData?.customer?.status || 2);
-                                            setPreviewModalOpen(false);
-                                            setPreviewStep('offer');
-                                        } else {
-                                            setPreviewModalOpen(false);
-                                            setPreviewStep('offer');
-                                            handleSubmit(1);
-                                        }
-                                    }}
-                                >
-                                    Confirm & Send
-                                </Button>
-                            </>
-                        )}
-                    </div>
                 </Modal>
 
                 {/* Sidebar: Live Summary */}

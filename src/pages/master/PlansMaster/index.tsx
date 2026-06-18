@@ -25,6 +25,7 @@ interface Plan {
     propertyType?: number;
     isSolarRequired?: boolean;
     isBatteryRequired?: boolean;
+    attachNominationForm?: boolean;
     contractTerm?: string;
     exitFee?: number;
     createdAt: string;
@@ -135,6 +136,21 @@ export const PlansMasterPage: React.FC = () => {
                     {item.isSolarRequired && <span className="text-[10px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full dark:bg-yellow-900/30 dark:text-yellow-400 font-medium whitespace-nowrap border border-yellow-200 dark:border-yellow-800">Solar Req.</span>}
                     {item.isBatteryRequired && <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded-full dark:bg-green-900/30 dark:text-green-400 font-medium whitespace-nowrap border border-green-200 dark:border-green-800">Battery Req.</span>}
                     {!item.isSolarRequired && !item.isBatteryRequired && <span className="text-muted-foreground">-</span>}
+                </div>
+            )
+        },
+        {
+            header: 'Attachments',
+            key: 'attachNominationForm' as any,
+            render: (item) => (
+                <div className="flex gap-2">
+                    {item.attachNominationForm ? (
+                        <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full dark:bg-blue-900/30 dark:text-blue-400 font-medium whitespace-nowrap border border-blue-200 dark:border-blue-800">
+                            Nom. Form
+                        </span>
+                    ) : (
+                        <span className="text-muted-foreground">-</span>
+                    )}
                 </div>
             )
         },

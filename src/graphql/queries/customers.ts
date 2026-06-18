@@ -1300,6 +1300,12 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
     query GetCustomerByCustomerId($customerId: String!) {
         customerByCustomerId(customerId: $customerId) {
             uid
+            assignedToUid
+            assignedToUser {
+                uid
+                name
+                email
+            }
             selectedBonuses
             customerId
             portalName
@@ -1363,7 +1369,14 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
             emailSent
             offerEmailSentAt
             utilmateStatus
+            creditScore
+            isCreditScoreFetched
+            isWithoutSignature
+            utilmateDetails {
+                utilmateConnected
+            }
             viewCode
+            source
             isActive
             isDeleted
             createdAt
@@ -1400,7 +1413,9 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
                 customerUid
                 vpp
                 vppConnected
+                vppApiPushed
                 vppSignupBonus
+                updatedAt
             }
             solarDetails {
                 id

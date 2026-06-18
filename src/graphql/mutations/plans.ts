@@ -11,6 +11,7 @@ export const CREATE_PLAN = gql`
       propertyType
       isSolarRequired
       isBatteryRequired
+      attachNominationForm
       contractTerm
       exitFee
       isActive
@@ -32,6 +33,7 @@ export const UPDATE_PLAN = gql`
       propertyType
       isSolarRequired
       isBatteryRequired
+      attachNominationForm
       contractTerm
       exitFee
       ratesJson
