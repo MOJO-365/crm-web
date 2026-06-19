@@ -17,6 +17,7 @@ const CustomerApprovalsPage = lazyWithRetry(() => import('@/pages/customer/Custo
 const InsightsPage = lazyWithRetry(() => import('@/pages/customer/InsightsPage'));
 const RatesPage = lazyWithRetry(() => import('@/pages/rates/RatesPage').then(m => ({ default: m.RatesPage })));
 const OfferAccessPage = lazyWithRetry(() => import('@/pages/OfferAccessPage').then(m => ({ default: m.OfferAccessPage })));
+const NominationFormPage = lazyWithRetry(() => import('@/pages/NominationFormPage').then(m => ({ default: m.NominationFormPage })));
 const NotFoundPage = lazyWithRetry(() => import('@/pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 const RolePage = lazyWithRetry(() => import('@/pages/role/RolePage').then(m => ({ default: m.RolePage })));
 const AuditLogsPage = lazyWithRetry(() => import('@/pages/logs/AuditLogsPage').then(m => ({ default: m.AuditLogsPage })));
@@ -58,6 +59,9 @@ const RootRouteHandler = () => {
     const [searchParams] = useSearchParams();
     if (searchParams.get('offer')) {
         return <OfferAccessPage />;
+    }
+    if (searchParams.get('nomination')) {
+        return <NominationFormPage />;
     }
     return (
         <ProtectedRoute>

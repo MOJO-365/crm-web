@@ -32,6 +32,7 @@ import {
     CREATE_NOTE_TYPE,
     CREATE_DOCUMENT_TYPE,
     SEND_REMINDER_EMAIL,
+    SEND_NOMINATION_FORM_EMAIL,
     CREATE_CUSTOMER,
     UPDATE_CUSTOMER,
     SEND_CUSTOMER_CREDENTIALS_EMAIL,
@@ -135,6 +136,7 @@ interface CustomerDetails {
         uid?: string;
         ratesJson?: string;
         discount?: number;
+        attachNominationForm?: number;
     };
     signDate?: string;
     signedPdfPath?: string;
@@ -231,6 +233,7 @@ interface CustomerDetails {
         invertercapacity?: number;
     };
     batteryDetails?: {
+        isbattery?: number;
         batterybrand?: string;
         snnumber?: string;
         batterycapacity?: number;
@@ -1269,11 +1272,14 @@ const InlineMaintenanceNotes = ({
     const previousBillInputRef = useRef<HTMLInputElement>(null);
     const identityProofInputRef = useRef<HTMLInputElement>(null);
     const licenseDocumentInputRef = useRef<HTMLInputElement>(null);
+    const nominationFormInputRef = useRef<HTMLInputElement>(null);
     const newDocumentInputRef = useRef<HTMLInputElement>(null);
 
     // Action states
     const [sendingReminder, setSendingReminder] = useState(false);
     const [reminderSent, setReminderSent] = useState(false);
+    const [sendingNominationFormEmailState, setSendingNominationFormEmailState] = useState(false);
+    const [nominationFormEmailSent, setNominationFormEmailSent] = useState(false);
     const [freezingCustomer, setFreezingCustomer] = useState(false);
     const [freezeModalOpen, setFreezeModalOpen] = useState(false);
     // const [customerToFreeze, setCustomerToFreeze] = useState<CustomerDetails | null>(null); 
@@ -1582,6 +1588,7 @@ const InlineMaintenanceNotes = ({
     const [createNoteType] = useMutation(CREATE_NOTE_TYPE);
     const [createDocumentTypeMutation] = useMutation(CREATE_DOCUMENT_TYPE);
     const [sendReminderEmail] = useMutation(SEND_REMINDER_EMAIL);
+    const [sendNominationFormEmail] = useMutation(SEND_NOMINATION_FORM_EMAIL);
     const [createCustomer] = useMutation(CREATE_CUSTOMER);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
     const [sendCustomerCredentialsEmail] = useMutation(SEND_CUSTOMER_CREDENTIALS_EMAIL);
@@ -1814,14 +1821,14 @@ const InlineMaintenanceNotes = ({
                 const billType = docTypeOptions.find(o => o.label === 'Previous Bill');
                 apiDocType = billType?.value || 'previous_bill';
                 docName = 'Previous Bill';
-            } else if (documentType === 'identityProof') {
-                const idType = docTypeOptions.find(o => o.label === 'Identity Proof');
-                apiDocType = idType?.value || 'identity_proof';
-                docName = 'Identity Proof';
             } else if (documentType === 'licenseDocument') {
                 const licType = docTypeOptions.find(o => o.label === 'Driver\'s License') || docTypeOptions.find(o => o.label === 'License');
                 apiDocType = licType?.value || 'license_document';
                 docName = 'Driver\'s License';
+            } else if (documentType === 'nominationForm') {
+                const nomType = docTypeOptions.find(o => o.label === 'BESS Nomination Form') || docTypeOptions.find(o => o.label === 'Nomination Form');
+                apiDocType = nomType?.value || 'nomination_form';
+                docName = 'BESS Nomination Form';
             } else {
                 docName = documentType;
             }
@@ -2875,6 +2882,28 @@ const InlineMaintenanceNotes = ({
             toast.error(error.message || 'Failed to send reminder');
         } finally {
             setSendingReminder(false);
+        }
+    };
+
+    const handleSendNominationFormEmail = async (customerUid: string) => {
+        setSendingNominationFormEmailState(true);
+        try {
+            const { data } = await sendNominationFormEmail({
+                variables: { customerUid }
+            });
+
+            if (data?.sendNominationFormEmail?.success) {
+                toast.success(data.sendNominationFormEmail.message || 'Nomination Form email sent successfully');
+                setNominationFormEmailSent(true);
+                setTimeout(() => setEmailLogsKey((prev) => prev + 1), 1500);
+            } else {
+                toast.error(data?.sendNominationFormEmail?.message || 'Failed to send Nomination Form email');
+            }
+        } catch (error: any) {
+            console.error('Error sending Nomination Form email:', error);
+            toast.error(error.message || 'Failed to send Nomination Form email');
+        } finally {
+            setSendingNominationFormEmailState(false);
         }
     };
 
@@ -4177,6 +4206,17 @@ const InlineMaintenanceNotes = ({
                                         type="file"
                                         accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
                                         className="hidden"
+                                        ref={nominationFormInputRef}
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleUploadDocument('nominationForm', file);
+                                            e.target.value = '';
+                                        }}
+                                    />
+                                    <input
+                                        type="file"
+                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                                        className="hidden"
                                         ref={newDocumentInputRef}
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
@@ -4323,11 +4363,22 @@ const InlineMaintenanceNotes = ({
                                                         category: '0',
                                                         show: !!selectedCustomerDetails.additionalDocument
                                                     },
+                                                    {
+                                                        doc: selectedCustomerDetails.documents?.find(d => d.documentType?.name?.includes('Nomination Form') || d.name?.includes('Nomination Form') || d.name?.includes('Nomination') || d.type === 'nominationForm'),
+                                                        label: 'BESS Nomination Form',
+                                                        type: 'nominationForm',
+                                                        category: '0',
+                                                        show: !!(selectedCustomerDetails.vppDetails?.vpp) || !!(selectedCustomerDetails.plan?.attachNominationForm)
+                                                    },
                                                     ...(selectedCustomerDetails?.documents?.filter(d =>
                                                         d.uid !== selectedCustomerDetails?.previousBill?.uid &&
                                                         d.uid !== selectedCustomerDetails?.identityProof?.uid &&
                                                         d.uid !== selectedCustomerDetails?.licenseDocument?.uid &&
                                                         d.uid !== selectedCustomerDetails?.additionalDocument?.uid &&
+                                                        !d.documentType?.name?.includes('Nomination Form') &&
+                                                        !d.name?.includes('Nomination Form') &&
+                                                        !d.name?.includes('Nomination') &&
+                                                        d.type !== 'nominationForm' &&
                                                         (d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2'))
                                                     ).map(d => ({
                                                         doc: d,
@@ -4375,6 +4426,21 @@ const InlineMaintenanceNotes = ({
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
                                                             <div className="flex items-center justify-end gap-2">
+                                                                {item.type === 'nominationForm' && !item.doc?.path && (
+                                                                    <Tooltip content="Send Email for Signature">
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-8 px-3 text-xs font-medium border-primary/50 text-primary hover:bg-primary/10"
+                                                                            onClick={() => handleSendNominationFormEmail(selectedCustomerDetails.uid)}
+                                                                            disabled={sendingNominationFormEmailState || nominationFormEmailSent || selectedCustomerDetails.isDeleted}
+                                                                            isLoading={sendingNominationFormEmailState}
+                                                                            loadingText="Sending..."
+                                                                        >
+                                                                            <MailIcon className="w-3.5 h-3.5" />
+                                                                        </Button>
+                                                                    </Tooltip>
+                                                                )}
                                                                 {item.doc?.path ? (
                                                                     <>
                                                                         <Button
@@ -4418,6 +4484,8 @@ const InlineMaintenanceNotes = ({
                                                                             if (item.type === 'previousBill') previousBillInputRef.current?.click();
                                                                             else if (item.type === 'identityProof') identityProofInputRef.current?.click();
                                                                             else if (item.type === 'licenseDocument') licenseDocumentInputRef.current?.click();
+                                                                            else if (item.type === 'nominationForm') nominationFormInputRef.current?.click();
+                                                                            else newDocumentInputRef.current?.click();
                                                                         }}
                                                                         disabled={isUploadingDocument === item.type}
                                                                         isLoading={isUploadingDocument === item.type}

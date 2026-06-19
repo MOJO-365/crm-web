@@ -759,6 +759,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 uid
                 ratesJson
                 discount
+                attachNominationForm
             }
             status
             discount
@@ -855,6 +856,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 invertercapacity
             }
             batteryDetails {
+                isbattery
                 batterybrand
                 snnumber
                 batterycapacity
@@ -1362,6 +1364,7 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
                 discount
                 title
                 bonusUids
+                attachNominationForm
             }
             status
             discount

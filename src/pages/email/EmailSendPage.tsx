@@ -108,6 +108,18 @@ export function EmailSendPage() {
             type: 'VERIFICATION_CODE',
             label: 'Customer Verification',
             description: 'Sent automatically when an external API requests a verification code for the customer',
+        },
+        {
+            type: 'NOMINATION_FORM',
+            label: 'Nomination Form',
+            description: 'Static image email for nomination form',
+            attachments: ['Nomination Form.pdf']
+        },
+        {
+            type: 'NOMINATION_FORM_SIGNED',
+            label: 'Nomination Form Signed',
+            description: 'Confirmation email sent after customer signs their BESS Nomination Form',
+            attachments: ['Signed_BESS_Nomination_Form.pdf']
         }
     ];
 
