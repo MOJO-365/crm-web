@@ -231,6 +231,24 @@ export const SEND_REMINDER_EMAIL = gql`
     }
 `;
 
+export const SEND_NOMINATION_FORM_EMAIL = gql`
+    mutation SendNominationFormEmail($customerUid: String!) {
+        sendNominationFormEmail(customerUid: $customerUid) {
+            success
+            message
+        }
+    }
+`;
+
+export const SUBMIT_NOMINATION_FORM = gql`
+    mutation SubmitNominationForm($customerUid: String!, $signatureBase64: String!) {
+        submitNominationForm(customerUid: $customerUid, signatureBase64: $signatureBase64) {
+            success
+            message
+        }
+    }
+`;
+
 export const UPLOAD_FILE = gql`
     mutation UploadFile($input: UploadFileInput!) {
         uploadFile(input: $input) {
