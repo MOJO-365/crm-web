@@ -1239,13 +1239,13 @@ const InlineMaintenanceNotes = ({
     const [searchParams] = useSearchParams();
     const sectionParam = searchParams.get('section');
     const initialSection = (sectionParam && [
-        'general', 'rates', 'vpp_certificate', 'debit', 'utilmate', 'notes', 'documents', 'electricity_bills', 'email_logs', 'activity_log', 'maintenance'
+        'general', 'rates', 'vpp_certificate', 'battery', 'debit', 'utilmate', 'notes', 'documents', 'electricity_bills', 'email_logs', 'activity_log', 'maintenance'
     ].includes(sectionParam))
         ? (sectionParam as any)
         : 'general';
 
     // Detail Section State
-    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log' | 'maintenance'>(initialSection);
+    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'battery' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log' | 'maintenance'>(initialSection);
 
     // Email Logs Refresh State
     const [emailLogsKey, setEmailLogsKey] = useState(0);
@@ -1296,6 +1296,7 @@ const InlineMaintenanceNotes = ({
 
     // VPP Form State
     const [isEditingVpp, setIsEditingVpp] = useState(false);
+    const [isEditingBatteryDetails, setIsEditingBatteryDetails] = useState(false);
     const [vppForm, setVppForm] = useState({
         vppSignupBonus: '',
         batteryBrand: '',
@@ -1440,7 +1441,7 @@ const InlineMaintenanceNotes = ({
     const batteryModelOptions = useMemo(() => {
         if (!batteryModelsData?.batteryModels) return [];
         return batteryModelsData.batteryModels.filter((m: any) => m.isActive).map((m: any) => ({
-            value: m.uid,
+            value: m.model,
             label: m.model
         }));
     }, [batteryModelsData]);
@@ -2326,7 +2327,12 @@ const InlineMaintenanceNotes = ({
                 throw new Error(secErr.response?.data?.message || 'Failed to sync with secondary system. VPP not connected.');
             }
 
+            const msatOn = selectedCustomerDetails.msatDetails?.msatConnected === 1;
+            const utilmateOn = selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1;
+            const newStatus = (msatOn && utilmateOn) ? 9 : undefined;
+
             const input: any = {
+                ...(newStatus !== undefined ? { status: newStatus } : {}),
                 vppDetails: {
                     vpp: 1,
                     vppConnected: 1,
@@ -2335,12 +2341,12 @@ const InlineMaintenanceNotes = ({
                 },
                 batteryDetails: vppForm.batteryBrand ? {
                     batterybrand: vppForm.batteryBrand,
-                    snnumber: vppForm.snNumber || undefined,
-                    batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : undefined,
-                    batterymodel: vppForm.batteryModel || undefined,
-                    inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : undefined,
-                    checkCode: vppForm.checkCode || undefined,
-                } : undefined,
+                    snnumber: vppForm.snNumber || null,
+                    batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : null,
+                    batterymodel: vppForm.batteryModel || null,
+                    inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : null,
+                    checkCode: vppForm.checkCode || null,
+                } : null,
                 skipStatusUpdate: true
             };
 
@@ -2367,6 +2373,43 @@ const InlineMaintenanceNotes = ({
         }
     };
 
+    const handleSaveBatteryDetails = async () => {
+        if (!selectedCustomerDetails) return;
+        setIsConnectingVpp(true);
+        try {
+            const input: any = {
+                batteryDetails: vppForm.batteryBrand ? {
+                    batterybrand: vppForm.batteryBrand,
+                    snnumber: vppForm.snNumber || null,
+                    batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : null,
+                    batterymodel: vppForm.batteryModel || null,
+                    inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : null,
+                    checkCode: vppForm.checkCode || null,
+                } : null,
+                skipStatusUpdate: true
+            };
+
+            await updateCustomer({
+                variables: {
+                    uid: selectedCustomerDetails.uid,
+                    input
+                }
+            });
+
+            const result = await refetchCustomer();
+            if (result.data?.customer) {
+                setSelectedCustomerDetails(result.data.customer);
+            }
+            toast.success('Battery details saved');
+            setIsEditingBatteryDetails(false);
+        } catch (error: any) {
+            console.error('Error saving battery details:', error);
+            toast.error(error.message || 'Failed to save battery details');
+        } finally {
+            setIsConnectingVpp(false);
+        }
+    };
+
     const handleSkipAndConnectVpp = async () => {
         if (!selectedCustomerDetails) return;
         setIsSkippingVpp(true);
@@ -2386,7 +2429,12 @@ const InlineMaintenanceNotes = ({
                 throw new Error(secErr.response?.data?.message || 'Failed to sync with secondary system. VPP not connected.');
             } */
 
+            const msatOn = selectedCustomerDetails.msatDetails?.msatConnected === 1;
+            const utilmateOn = selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1;
+            const newStatus = (msatOn && utilmateOn) ? 9 : undefined;
+
             const input: any = {
+                ...(newStatus !== undefined ? { status: newStatus } : {}),
                 vppDetails: {
                     vpp: 1,
                     vppConnected: 1,
@@ -2394,12 +2442,12 @@ const InlineMaintenanceNotes = ({
                 },
                 batteryDetails: vppForm.batteryBrand ? {
                     batterybrand: vppForm.batteryBrand,
-                    snnumber: vppForm.snNumber || undefined,
-                    batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : undefined,
-                    batterymodel: vppForm.batteryModel || undefined,
-                    inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : undefined,
-                    checkCode: vppForm.checkCode || undefined,
-                } : undefined,
+                    snnumber: vppForm.snNumber || null,
+                    batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : null,
+                    batterymodel: vppForm.batteryModel || null,
+                    inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : null,
+                    checkCode: vppForm.checkCode || null,
+                } : null,
                 skipStatusUpdate: true
             };
 
@@ -2438,8 +2486,14 @@ const InlineMaintenanceNotes = ({
 
         const previousValue = selectedCustomerDetails.msatDetails?.msatConnected;
         const now = new Date().toISOString();
+        
+        const vppOn = selectedCustomerDetails.vppDetails?.vppConnected === 1;
+        const utilmateOn = selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1;
+        const newStatus = (newValue && vppOn && utilmateOn) ? 9 : undefined;
+
         setSelectedCustomerDetails({
             ...selectedCustomerDetails,
+            ...(newStatus !== undefined ? { status: newStatus } : {}),
             msatDetails: {
                 ...selectedCustomerDetails.msatDetails,
                 msatConnected: newValue ? 1 : 0,
@@ -2453,6 +2507,7 @@ const InlineMaintenanceNotes = ({
                 variables: {
                     uid: customerUid,
                     input: {
+                        ...(newStatus !== undefined ? { status: newStatus } : {}),
                         msatDetails: {
                             msatConnected: newValue ? 1 : 0,
                             msatConnectedAt: newValue ? now : undefined,
@@ -2571,8 +2626,12 @@ const InlineMaintenanceNotes = ({
             }
 
             const now = new Date().toISOString();
+            const vppOn = selectedCustomerDetails.vppDetails?.vppConnected === 1;
+            const msatOn = selectedCustomerDetails.msatDetails?.msatConnected === 1;
+            const newStatus = (vppOn && msatOn) ? 9 : undefined;
+
             const input: any = {
-                status: 9,
+                ...(newStatus !== undefined ? { status: newStatus } : {}),
                 utilmateStatus: 1,
                 utilmateUpdatedAt: now,
                 utilmateDetails: {
@@ -2596,7 +2655,7 @@ const InlineMaintenanceNotes = ({
 
             setSelectedCustomerDetails({
                 ...selectedCustomerDetails,
-                status: 9,
+                ...(newStatus !== undefined ? { status: newStatus } : {}),
                 utilmateDetails: {
                     ...selectedCustomerDetails.utilmateDetails,
                     ...input.utilmateDetails
@@ -2614,8 +2673,12 @@ const InlineMaintenanceNotes = ({
         setIsSkippingUtilmate(true);
         try {
             const now = new Date().toISOString();
+            const vppOn = selectedCustomerDetails.vppDetails?.vppConnected === 1;
+            const msatOn = selectedCustomerDetails.msatDetails?.msatConnected === 1;
+            const newStatus = (vppOn && msatOn) ? 9 : undefined;
+
             const input: any = {
-                status: 9,
+                ...(newStatus !== undefined ? { status: newStatus } : {}),
                 utilmateStatus: 1,
                 utilmateUpdatedAt: now,
                 utilmateDetails: {
@@ -2639,7 +2702,7 @@ const InlineMaintenanceNotes = ({
 
             setSelectedCustomerDetails({
                 ...selectedCustomerDetails,
-                status: 9,
+                ...(newStatus !== undefined ? { status: newStatus } : {}),
                 utilmateDetails: {
                     ...selectedCustomerDetails.utilmateDetails,
                     ...input.utilmateDetails
@@ -3198,7 +3261,7 @@ const InlineMaintenanceNotes = ({
                                             // disabledReason: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? "VPP certificate fields are required" : undefined,
                                             step: 3
                                         },
-                                        {
+                                        /* {
                                             label: 'Vpp Certificate',
                                             date: null,
                                             completed: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 1 && selectedCustomerDetails.vppCertificateDetails?.isVppCertificateEmailSent === 1,
@@ -3209,7 +3272,7 @@ const InlineMaintenanceNotes = ({
                                             ,
                                             // disabledReason: selectedCustomerDetails.vppCertificateDetails?.isAllRequiredFilled === 0 ? "VPP certificate fields are required" : undefined,
                                             step: 3
-                                        },
+                                        }, */
                                     ] : []),
                                     { label: 'Connected to MSAT', date: null, completed: selectedCustomerDetails.msatDetails?.msatConnected === 1, showToggle: true, disabled: !selectedCustomerDetails.signDate && selectedCustomerDetails.isWithoutSignature !== 1, step: 4 },
                                     { label: 'Utilmate Connect', date: null, completed: selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1, showToggle: true, disabled: false, step: 5 },
@@ -3458,13 +3521,13 @@ const InlineMaintenanceNotes = ({
                                 const allTabs = [
                                     { id: 'general', label: 'General', icon: Settings2Icon },
                                     { id: 'rates', label: 'Rates', icon: PercentIcon },
-                                    ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [{
-                                        id: 'vpp_certificate',
-                                        label: 'Vpp Certificate',
-                                        icon: FileTextIcon,
-                                        highlight: !selectedCustomerDetails.vppCertificateDetails || selectedCustomerDetails.vppCertificateDetails.isAllRequiredFilled === 0,
-                                        tooltip: (!selectedCustomerDetails.vppCertificateDetails || selectedCustomerDetails.vppCertificateDetails.isAllRequiredFilled === 0) ? "VPP certificate fields are required" : undefined
-                                    }] : []),
+                                    ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
+                                        {
+                                            id: 'battery',
+                                            label: 'Battery',
+                                            icon: ZapIcon,
+                                        }
+                                    ] : []),
                                     { id: 'debit', label: 'Debit', icon: CreditCardIcon },
                                     { id: 'utilmate', label: 'Utilmate', icon: PlugIcon },
                                     {
@@ -3486,7 +3549,8 @@ const InlineMaintenanceNotes = ({
                                     { id: 'notes', label: 'Notes', icon: FileTextIcon, badge: notesData?.customerNotes?.length },
                                     { id: 'email_logs', label: 'Email Logs', icon: MailIcon },
                                     { id: 'activity_log', label: 'Activity Log', icon: ActivityIcon },
-                                    { id: 'maintenance', label: 'Maintenance', icon: RefreshCwIcon }
+                                    { id: 'maintenance', label: 'Maintenance', icon: RefreshCwIcon },
+                                    { id: 'vpp_certificate', label: 'Vpp Certificate', icon: FileTextIcon }
                                 ].filter(item => {
                                     if (item.id === 'vpp_certificate') {
                                         const hasSolar = selectedCustomerDetails.solarDetails?.hassolar === 1;
@@ -4150,6 +4214,128 @@ const InlineMaintenanceNotes = ({
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {selectedDetailSection === 'battery' && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    <div className="flex items-center justify-between border-b border-border pb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center text-yellow-600 dark:text-yellow-400">
+                                                <ZapIcon size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Connect VPP - Battery Details</h3>
+                                                <p className="text-xs text-muted-foreground">Please provide battery details to connect VPP.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4 pt-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Brand</label>
+                                                <Select
+                                                    options={BATTERY_BRAND_OPTIONS}
+                                                    value={vppForm.batteryBrand}
+                                                    onChange={(val) => setVppForm({ ...vppForm, batteryBrand: val as string, batteryModel: '' })}
+                                                    placeholder="Select Brand..."
+                                                    className="w-full"
+                                                    disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Model</label>
+                                                <Select
+                                                    options={batteryModelOptions}
+                                                    value={vppForm.batteryModel}
+                                                    onChange={(val) => {
+                                                        const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.model === val);
+                                                        setVppForm({
+                                                            ...vppForm,
+                                                            batteryModel: val as string,
+                                                            ...(modelObj?.capacity ? { batteryCapacity: modelObj.capacity.toString() } : {})
+                                                        });
+                                                    }}
+                                                    placeholder="Select Model..."
+                                                    className="w-full"
+                                                    isLoading={loadingBatteryModels}
+                                                    creatable
+                                                    disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
+                                                />
+                                            </div>
+                                            <div className="space-y-2 relative">
+                                                <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Capacity</label>
+                                                <div className="relative">
+                                                    <Input
+                                                        type="number"
+                                                        step="0.1"
+                                                        placeholder="13.5"
+                                                        value={vppForm.batteryCapacity}
+                                                        onChange={(e) => setVppForm({ ...vppForm, batteryCapacity: e.target.value })}
+                                                        disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
+                                                    />
+                                                    <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-semibold uppercase text-muted-foreground">SN Number</label>
+                                                <Input
+                                                    placeholder="e.g. SN12345678"
+                                                    value={vppForm.snNumber}
+                                                    onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
+                                                    disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
+                                                />
+                                            </div>
+                                            <div className="space-y-2 relative">
+                                                <label className="text-xs font-semibold uppercase text-muted-foreground">Inverter Capacity</label>
+                                                <div className="relative">
+                                                    <Input
+                                                        type="number"
+                                                        step="0.1"
+                                                        placeholder="6.0"
+                                                        value={vppForm.inverterCapacity}
+                                                        onChange={(e) => setVppForm({ ...vppForm, inverterCapacity: e.target.value })}
+                                                        disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
+                                                    />
+                                                    <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
+                                                </div>
+                                            </div>
+                                            {(vppForm.batteryBrand === 'Fox ESS' || vppForm.batteryBrand === 'NeoVolt' || vppForm.batteryBrand === 'AlphaESS' || vppForm.batteryBrand === 'Alpha ESS' || vppForm.batteryBrand === 'Aerl') && (
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold uppercase text-muted-foreground">Check Code</label>
+                                                    <Input
+                                                        placeholder="Verification Code"
+                                                        value={vppForm.checkCode}
+                                                        onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
+                                                        disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex justify-end gap-2 pt-4">
+                                            {(!selectedCustomerDetails.batteryDetails?.batterybrand || isEditingBatteryDetails) ? (
+                                                <>
+                                                    {!!selectedCustomerDetails.batteryDetails?.batterybrand && (
+                                                        <Button variant="outline" onClick={() => setIsEditingBatteryDetails(false)}>Cancel</Button>
+                                                    )}
+                                                    <Button
+                                                        className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                                        onClick={() => {
+                                                            handleSaveBatteryDetails();
+                                                        }}
+                                                        isLoading={isConnectingVpp}
+                                                    >
+                                                        Save Details
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                <Button variant="outline" onClick={() => setIsEditingBatteryDetails(true)}>
+                                                    <PencilIcon className="w-4 h-4 mr-2" />
+                                                    Edit Details
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -5058,7 +5244,7 @@ const InlineMaintenanceNotes = ({
                                 options={batteryModelOptions}
                                 value={vppForm.batteryModel}
                                 onChange={(val) => {
-                                    const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.uid === val);
+                                    const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.model === val);
                                     setVppForm({
                                         ...vppForm,
                                         batteryModel: val as string,
