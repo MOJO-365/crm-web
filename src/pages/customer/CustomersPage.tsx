@@ -59,6 +59,7 @@ interface Customer {
         vppSignupBonus?: number;
     };
     batteryDetails?: {
+        isbattery?: boolean | number;
         batterybrand?: string;
         snnumber?: string;
         batterycapacity?: number;
@@ -727,7 +728,7 @@ export function CustomersPage() {
                 </div>
             ),
             render: (row) => {
-                const hasBattery = !!(row.batteryDetails?.batterybrand || row.batteryDetails?.batterymodel || row.batteryDetails?.snnumber);
+                const hasBattery = !!(row.batteryDetails?.isbattery || row.batteryDetails?.batterybrand || row.batteryDetails?.batterymodel || row.batteryDetails?.snnumber);
                 return (
                     <div className="flex justify-center">
                         {hasBattery ? (
