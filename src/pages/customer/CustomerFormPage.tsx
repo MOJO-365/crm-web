@@ -333,6 +333,7 @@ const applyPlanOverridesToOffer = (offer: any, planRatesJson: any) => {
                     if (existingDyn) {
                         existingDyn.value = numericRate;
                         if (pr.unit) existingDyn.unitId = pr.unit;
+                        if (pr.dynamicType) existingDyn.type = String(pr.dynamicType).toLowerCase().replace(/\s+/g, '_');
                     } else {
                         dynamicRates.push({
                             name: pr.name,
