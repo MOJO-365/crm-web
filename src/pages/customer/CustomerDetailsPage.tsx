@@ -2486,7 +2486,7 @@ const InlineMaintenanceNotes = ({
 
         const previousValue = selectedCustomerDetails.msatDetails?.msatConnected;
         const now = new Date().toISOString();
-        
+
         const vppOn = selectedCustomerDetails.vppDetails?.vppConnected === 1;
         const utilmateOn = selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1;
         const newStatus = (newValue && vppOn && utilmateOn) ? 9 : undefined;
