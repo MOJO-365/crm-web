@@ -87,7 +87,13 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
         }).filter(Boolean) as any[];
 
         const tariffLabels = items.map(i => i.label.toUpperCase());
-        const fixedAdditions = planRates.filter((pr: any) => (pr.dynamicType === type || (!pr.dynamicType && type === 'energy_rates')) && pr.rateType === 'Fixed' && !tariffLabels.includes(pr.name.toUpperCase()));
+        const fixedAdditions = planRates.filter((pr: any) => {
+            const prDynType = String(pr.dynamicType || '').toLowerCase().replace(/\s+/g, '_');
+            const targetType = String(type || '').toLowerCase().replace(/\s+/g, '_');
+            return (prDynType === targetType || (!prDynType && targetType === 'energy_rates')) && 
+                   pr.rateType === 'Fixed' && 
+                   !tariffLabels.includes(pr.name.toUpperCase());
+        });
         
         fixedAdditions.forEach((fa: any) => {
             processed.push({
