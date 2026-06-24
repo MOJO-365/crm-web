@@ -497,6 +497,7 @@ export const GET_CUSTOMERS_CURSOR = gql`
                     accountNumber
                     utilmateConnectedAt
                     utilmateApiPushed
+                    meterSerial
                 }
                 address {
                     fullAddress
@@ -559,6 +560,7 @@ export const GET_CUSTOMER_BY_ID = gql`
             tariffCode
             ratePlanUid
             planUid
+            isAppTrack
             plan {
                 uid
                 ratesJson
@@ -667,6 +669,7 @@ export const GET_CUSTOMER_BY_ID = gql`
                 exportlimit
                 batterymodel
                 inverterCapacity
+                checkCode
             }
             enrollmentDetails {
                 saletype
@@ -700,6 +703,11 @@ export const GET_CUSTOMER_BY_ID = gql`
             }
             utilmateDetails {
                 utilmateConnected
+                siteIdentifier
+                accountNumber
+                utilmateConnectedAt
+                utilmateApiPushed
+                meterSerial
             }
             previousBill {
                 id
@@ -755,6 +763,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             tariffCode
             ratePlanUid
             planUid
+            isAppTrack
             plan {
                 uid
                 ratesJson
@@ -863,6 +872,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 exportlimit
                 batterymodel
                 inverterCapacity
+                checkCode
             }
             enrollmentDetails {
                 saletype
@@ -896,6 +906,11 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             }
             utilmateDetails {
                 utilmateConnected
+                siteIdentifier
+                accountNumber
+                utilmateConnectedAt
+                utilmateApiPushed
+                meterSerial
             }
             previousBill {
                 id
@@ -1149,6 +1164,7 @@ export const GET_CUSTOMER_UTILMATE_DETAILS = gql`
                 utilmateConnected
                 utilmateConnectedAt
                 utilmateApiPushed
+                meterSerial
             }
             msatDetails {
                 id

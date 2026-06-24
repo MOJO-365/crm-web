@@ -40,6 +40,7 @@ const CUSTOMER_FULL_RESPONSE = `
     creditScore
     isCreditScoreFetched
     isWithoutSignature
+    isAppTrack
     previousBill {
         uid
         path
@@ -136,6 +137,7 @@ const CUSTOMER_FULL_RESPONSE = `
         accountNumber
         utilmateConnected
         utilmateConnectedAt
+        meterSerial
     }
     debitDetails {
         id

@@ -128,6 +128,7 @@ interface CustomerDetails {
     creditScore?: number;
     isCreditScoreFetched?: number;
     isWithoutSignature?: number;
+    isAppTrack?: number;
     discount?: number;
     tariffCode?: string;
     ratePlanUid?: string;
@@ -249,6 +250,7 @@ interface CustomerDetails {
         accountNumber?: string;
         utilmateConnected?: number;
         utilmateConnectedAt?: string;
+        meterSerial?: string;
     };
     utilmateStatus?: string | number;
     vppCertificateDetails?: {
@@ -1239,13 +1241,13 @@ const InlineMaintenanceNotes = ({
     const [searchParams] = useSearchParams();
     const sectionParam = searchParams.get('section');
     const initialSection = (sectionParam && [
-        'general', 'rates', 'vpp_certificate', 'battery', 'debit', 'utilmate', 'notes', 'documents', 'electricity_bills', 'email_logs', 'activity_log', 'maintenance'
+        'general', 'rates', 'vpp_certificate', 'tracking', 'debit', 'notes', 'documents', 'electricity_bills', 'email_logs', 'activity_log', 'maintenance'
     ].includes(sectionParam))
         ? (sectionParam as any)
         : 'general';
 
     // Detail Section State
-    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'battery' | 'debit' | 'utilmate' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log' | 'maintenance'>(initialSection);
+    const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'tracking' | 'debit' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log' | 'maintenance'>(initialSection);
 
     // Email Logs Refresh State
     const [emailLogsKey, setEmailLogsKey] = useState(0);
@@ -1296,7 +1298,6 @@ const InlineMaintenanceNotes = ({
 
     // VPP Form State
     const [isEditingVpp, setIsEditingVpp] = useState(false);
-    const [isEditingBatteryDetails, setIsEditingBatteryDetails] = useState(false);
     const [vppForm, setVppForm] = useState({
         vppSignupBonus: '',
         batteryBrand: '',
@@ -1372,13 +1373,27 @@ const InlineMaintenanceNotes = ({
     const [isAddingCategory, setIsAddingCategory] = useState(false);
 
     // Utilmate Form State
-    const [isEditingUtilmate, setIsEditingUtilmate] = useState(false);
+    const [isEditingTracking, setIsEditingTracking] = useState(false);
     const [utilmateForm, setUtilmateForm] = useState({
         siteIdentifier: '',
         accountNumber: '',
         utilmateConnected: 0,
-        utilmateConnectedAt: ''
+        utilmateConnectedAt: '',
+        meterSerial: ''
     });
+    const [isAppTrack, setIsAppTrack] = useState(0);
+    const [isSavingTracking, setIsSavingTracking] = useState(false);
+
+    useEffect(() => {
+        const utilmateFilled = !!(utilmateForm.siteIdentifier && utilmateForm.accountNumber && utilmateForm.meterSerial);
+        const batteryFilled = !!(vppForm.batteryBrand && vppForm.batteryCapacity && vppForm.inverterCapacity && vppForm.snNumber);
+
+        if (utilmateFilled && batteryFilled) {
+            setIsAppTrack(1);
+        } else {
+            setIsAppTrack(0);
+        }
+    }, [utilmateForm, vppForm]);
 
     // Tabs responsive state
     const [maxVisibleTabs, setMaxVisibleTabs] = useState(100);
@@ -1540,7 +1555,7 @@ const InlineMaintenanceNotes = ({
 
     const { loading: loadingUtilmate } = useQuery(GET_CUSTOMER_UTILMATE_DETAILS, {
         variables: { uid },
-        skip: !uid || (selectedDetailSection !== 'utilmate' && !utilmateConnectModalOpen),
+        skip: !uid || (selectedDetailSection !== 'tracking' && !utilmateConnectModalOpen),
         onCompleted: (data) => {
             if (data?.customer) {
                 setSelectedCustomerDetails(prev => prev ? ({ ...prev, ...data.customer }) : data.customer);
@@ -1562,7 +1577,7 @@ const InlineMaintenanceNotes = ({
         (selectedDetailSection === 'general' && loadingGeneral) ||
         (selectedDetailSection === 'vpp_certificate' && loadingSolar) ||
         (selectedDetailSection === 'debit' && loadingDebit) ||
-        (selectedDetailSection === 'utilmate' && loadingUtilmate) ||
+        (selectedDetailSection === 'tracking' && loadingUtilmate) ||
         ((selectedDetailSection === 'documents' || selectedDetailSection === 'electricity_bills') && loadingDocuments);
 
     const docTypeOptions = [
@@ -1615,8 +1630,11 @@ const InlineMaintenanceNotes = ({
                 siteIdentifier: selectedCustomerDetails.utilmateDetails?.siteIdentifier || '',
                 accountNumber: selectedCustomerDetails.utilmateDetails?.accountNumber || '',
                 utilmateConnected: selectedCustomerDetails.utilmateDetails?.utilmateConnected || 0,
-                utilmateConnectedAt: selectedCustomerDetails.utilmateDetails?.utilmateConnectedAt || ''
+                utilmateConnectedAt: selectedCustomerDetails.utilmateDetails?.utilmateConnectedAt || '',
+                meterSerial: selectedCustomerDetails.utilmateDetails?.meterSerial || ''
             });
+            
+            setIsAppTrack(selectedCustomerDetails.isAppTrack || 0);
         }
     }, [selectedCustomerDetails]);
 
@@ -1918,8 +1936,9 @@ const InlineMaintenanceNotes = ({
         }
     };
 
-    const handleSaveUtilmateDetails = async () => {
+    const handleSaveTrackingDetails = async () => {
         if (!selectedCustomerDetails) return;
+        setIsSavingTracking(true);
 
         try {
             const input: any = {
@@ -1928,7 +1947,17 @@ const InlineMaintenanceNotes = ({
                     accountNumber: utilmateForm.accountNumber || undefined,
                     utilmateConnected: utilmateForm.utilmateConnected,
                     utilmateConnectedAt: utilmateForm.utilmateConnectedAt || undefined,
+                    meterSerial: utilmateForm.meterSerial || undefined,
                 },
+                batteryDetails: vppForm.batteryBrand ? {
+                    batterybrand: vppForm.batteryBrand,
+                    snnumber: vppForm.snNumber || null,
+                    batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : null,
+                    batterymodel: vppForm.batteryModel || null,
+                    inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : null,
+                    checkCode: vppForm.checkCode || null,
+                } : null,
+                isAppTrack: isAppTrack,
                 skipStatusUpdate: true
             };
 
@@ -1939,20 +1968,18 @@ const InlineMaintenanceNotes = ({
                 }
             });
 
-            toast.success('Utilmate details saved successfully');
-            setIsEditingUtilmate(false);
+            const result = await refetchCustomer();
+            if (result.data?.customer) {
+                setSelectedCustomerDetails(result.data.customer);
+            }
 
-            setSelectedCustomerDetails({
-                ...selectedCustomerDetails,
-                utilmateDetails: {
-                    ...selectedCustomerDetails.utilmateDetails,
-                    ...input.utilmateDetails
-                }
-            });
-
+            toast.success('Tracking details saved successfully');
+            setIsEditingTracking(false);
         } catch (error: any) {
-            console.error('Error saving Utilmate details:', error);
-            toast.error(error.message || 'Failed to save Utilmate details');
+            console.error('Error saving tracking details:', error);
+            toast.error(error.message || 'Failed to save tracking details');
+        } finally {
+            setIsSavingTracking(false);
         }
     };
 
@@ -2373,42 +2400,7 @@ const InlineMaintenanceNotes = ({
         }
     };
 
-    const handleSaveBatteryDetails = async () => {
-        if (!selectedCustomerDetails) return;
-        setIsConnectingVpp(true);
-        try {
-            const input: any = {
-                batteryDetails: vppForm.batteryBrand ? {
-                    batterybrand: vppForm.batteryBrand,
-                    snnumber: vppForm.snNumber || null,
-                    batterycapacity: vppForm.batteryCapacity ? parseFloat(vppForm.batteryCapacity) : null,
-                    batterymodel: vppForm.batteryModel || null,
-                    inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : null,
-                    checkCode: vppForm.checkCode || null,
-                } : null,
-                skipStatusUpdate: true
-            };
 
-            await updateCustomer({
-                variables: {
-                    uid: selectedCustomerDetails.uid,
-                    input
-                }
-            });
-
-            const result = await refetchCustomer();
-            if (result.data?.customer) {
-                setSelectedCustomerDetails(result.data.customer);
-            }
-            toast.success('Battery details saved');
-            setIsEditingBatteryDetails(false);
-        } catch (error: any) {
-            console.error('Error saving battery details:', error);
-            toast.error(error.message || 'Failed to save battery details');
-        } finally {
-            setIsConnectingVpp(false);
-        }
-    };
 
     const handleSkipAndConnectVpp = async () => {
         if (!selectedCustomerDetails) return;
@@ -2544,7 +2536,8 @@ const InlineMaintenanceNotes = ({
                 siteIdentifier: selectedCustomerDetails?.utilmateDetails?.siteIdentifier || '',
                 accountNumber: selectedCustomerDetails?.utilmateDetails?.accountNumber || '',
                 utilmateConnected: 1,
-                utilmateConnectedAt: selectedCustomerDetails?.utilmateDetails?.utilmateConnectedAt || ''
+                utilmateConnectedAt: selectedCustomerDetails?.utilmateDetails?.utilmateConnectedAt || '',
+                meterSerial: selectedCustomerDetails?.utilmateDetails?.meterSerial || ''
             });
             setUtilmateConnectModalOpen(true);
             return;
@@ -3248,6 +3241,12 @@ const InlineMaintenanceNotes = ({
                                         showReminder: (!!selectedCustomerDetails.offerEmailSentAt || selectedCustomerDetails.pdrsEmailSent === 1 || !!selectedCustomerDetails.pdrsEmailSentAt) && selectedCustomerDetails.isWithoutSignature !== 1,
                                         step: 2
                                     },
+                                    {
+                                        label: 'App Track',
+                                        date: null,
+                                        completed: selectedCustomerDetails.isAppTrack === 1,
+                                        step: 2.5
+                                    },
                                     ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
                                         {
                                             label: 'Push to Gsync',
@@ -3513,7 +3512,7 @@ const InlineMaintenanceNotes = ({
                 <div className="space-y-6">
 
                     {/* Horizontal Tabs Layout */}
-                    <div className="flex flex-col bg-card rounded-lg border border-border overflow-hidden min-h-[600px]">
+                    <div className="flex flex-col bg-card rounded-lg border border-border overflow-hidden h-[calc(100vh-320px)] min-h-[400px]">
                         {/* Tab Navigation */}
                         <div className="border-b border-border bg-muted/30 flex items-center px-2 gap-1">
                             {(() => {
@@ -3521,15 +3520,8 @@ const InlineMaintenanceNotes = ({
                                 const allTabs = [
                                     { id: 'general', label: 'General', icon: Settings2Icon },
                                     { id: 'rates', label: 'Rates', icon: PercentIcon },
-                                    ...(selectedCustomerDetails.vppDetails?.vpp === 1 ? [
-                                        {
-                                            id: 'battery',
-                                            label: 'Battery',
-                                            icon: ZapIcon,
-                                        }
-                                    ] : []),
+                                    { id: 'tracking', label: 'Tracking', icon: ZapIcon },
                                     { id: 'debit', label: 'Debit', icon: CreditCardIcon },
-                                    { id: 'utilmate', label: 'Utilmate', icon: PlugIcon },
                                     {
                                         id: 'documents', label: 'Documents', icon: UploadIcon, badge: [
                                             { doc: selectedCustomerDetails.previousBill, show: true },
@@ -3560,9 +3552,7 @@ const InlineMaintenanceNotes = ({
                                     if (item.id === 'debit') {
                                         return !!selectedCustomerDetails.debitDetails && selectedCustomerDetails.debitDetails.optIn === 1;
                                     }
-                                    if (item.id === 'utilmate') {
-                                        return !!selectedCustomerDetails.utilmateDetails && selectedCustomerDetails.utilmateDetails.utilmateConnected === 1;
-                                    }
+
                                     if (item.id === 'email_logs') {
                                         // Show email logs ONLY if there are any logs (count > 0)
                                         return (selectedCustomerDetails.emailLogCount || 0) > 0;
@@ -3723,7 +3713,7 @@ const InlineMaintenanceNotes = ({
                         </div>
 
                         {/* Content Area */}
-                        <div className="flex-1 p-6 overflow-y-auto relative">
+                        <div className="flex-1 p-6 pt-0 overflow-y-auto relative">
                             {isTabLoading && (
                                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-[1px] animate-in fade-in duration-300">
                                     <div className="flex flex-col items-center gap-3">
@@ -4135,28 +4125,58 @@ const InlineMaintenanceNotes = ({
 
 
 
-                            {selectedDetailSection === 'utilmate' && (
-                                <div className="space-y-6 animate-in fade-in duration-300">
-                                    <div className="flex items-center justify-between border-b border-border pb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400">
-                                                <PlugIcon size={20} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Utilmate Integration</h3>
-                                                <p className="text-xs text-muted-foreground">Utilmate & MSAT connection</p>
-                                            </div>
+                            {selectedDetailSection === 'tracking' && (
+                                <div className="flex flex-col gap-8">
+                                    <div className="sticky -top-6 -mx-6 px-6 pt-6 bg-card z-10 flex items-center justify-between border-b border-border pb-4 mb-4">
+                                        <div>
+                                            <h2 className="text-lg font-semibold tracking-tight text-foreground">Tracking Details</h2>
+                                            <p className="text-sm text-muted-foreground mt-1">Manage Utilmate integration and VPP battery settings.</p>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium text-muted-foreground">Utilmate Connected</span>
-                                            <ToggleSwitch
-                                                checked={selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1}
-                                                onChange={(checked) => handleUtilmateToggle(selectedCustomerDetails.uid, checked)}
-                                                disabled={false}
-                                            />
-                                        </div>
+                                        {!isEditingTracking ? (
+                                            <Button variant="outline" onClick={() => setIsEditingTracking(true)}>
+                                                <PencilIcon className="w-4 h-4 mr-2" />
+                                                Edit Details
+                                            </Button>
+                                        ) : (
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => setIsEditingTracking(false)}
+                                                    disabled={isSavingTracking}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button
+                                                    className="bg-neutral-900 text-white hover:bg-neutral-800"
+                                                    onClick={handleSaveTrackingDetails}
+                                                    isLoading={isSavingTracking}
+                                                >
+                                                    Save Tracking Details
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
-                                    {/* <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-6 animate-in fade-in duration-300">
+                                        <div className="flex items-center justify-between border-b border-border pb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400">
+                                                    <PlugIcon size={20} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-md font-semibold text-foreground tracking-tight">Utilmate Integration</h3>
+                                                    <p className="text-xs text-muted-foreground">Utilmate & MSAT connection</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium text-muted-foreground">Utilmate Connected</span>
+                                                <ToggleSwitch
+                                                    checked={selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1}
+                                                    onChange={(checked) => handleUtilmateToggle(selectedCustomerDetails.uid, checked)}
+                                                    disabled={!isEditingTracking}
+                                                />
+                                            </div>
+                                        </div>
+                                        {/* <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">MSAT Status</label>
                                             <div className="flex items-center gap-2 mt-1">
@@ -4171,171 +4191,137 @@ const InlineMaintenanceNotes = ({
                                         </div>
                                     </div> */}
 
-                                    {selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1 && (
                                         <div className="space-y-4 pt-4 border-t border-dashed">
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-2">
                                                     <label className="text-sm font-medium">Site Identifier</label>
                                                     <Input
+                                                        placeholder="e.g. SITE12345"
                                                         value={utilmateForm.siteIdentifier}
                                                         onChange={(e) => setUtilmateForm({ ...utilmateForm, siteIdentifier: e.target.value })}
-                                                        disabled={!isEditingUtilmate}
+                                                        disabled={!isEditingTracking}
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
                                                     <label className="text-sm font-medium">Account Number</label>
                                                     <Input
+                                                        placeholder="e.g. ACC987654"
                                                         value={utilmateForm.accountNumber}
                                                         onChange={(e) => setUtilmateForm({ ...utilmateForm, accountNumber: e.target.value })}
-                                                        disabled={!isEditingUtilmate}
+                                                        disabled={!isEditingTracking}
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <label className="text-sm font-medium">Connected At</label>
+                                                    <label className="text-sm font-medium">Meter Serial</label>
                                                     <Input
-                                                        value={utilmateForm.utilmateConnectedAt ? formatSydneyTime(utilmateForm.utilmateConnectedAt) : '-'}
-                                                        disabled={true}
+                                                        placeholder="e.g. METER001"
+                                                        value={utilmateForm.meterSerial}
+                                                        onChange={(e) => setUtilmateForm({ ...utilmateForm, meterSerial: e.target.value })}
+                                                        disabled={!isEditingTracking}
                                                     />
                                                 </div>
                                             </div>
+                                        </div>
+                                    </div>
 
-                                            <div className="flex justify-end gap-2 pt-4">
-                                                {isEditingUtilmate ? (
-                                                    <>
-                                                        <Button variant="outline" onClick={() => setIsEditingUtilmate(false)}>Cancel</Button>
-                                                        <Button onClick={handleSaveUtilmateDetails}>Save Utilmate Details</Button>
-                                                    </>
-                                                ) : (
-                                                    <Button variant="outline" onClick={() => setIsEditingUtilmate(true)}>
-                                                        <PencilIcon className="w-4 h-4 mr-2" />
-                                                        Edit Details
-                                                    </Button>
+                                    <div className="space-y-6 animate-in fade-in duration-300 border-t border-border pt-6">
+                                        <div className="flex items-center justify-between border-b border-border pb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center text-yellow-600 dark:text-yellow-400">
+                                                    <ZapIcon size={20} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-md font-semibold text-foreground tracking-tight">Connect VPP - Battery Details</h3>
+                                                    <p className="text-xs text-muted-foreground">Please provide battery details to connect VPP.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4 pt-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Brand</label>
+                                                    <Select
+                                                        options={BATTERY_BRAND_OPTIONS}
+                                                        value={vppForm.batteryBrand}
+                                                        onChange={(val) => setVppForm({ ...vppForm, batteryBrand: val as string, batteryModel: '' })}
+                                                        placeholder="Select Brand..."
+                                                        className="w-full"
+                                                        disabled={!isEditingTracking}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Model</label>
+                                                    <Select
+                                                        options={batteryModelOptions}
+                                                        value={vppForm.batteryModel}
+                                                        onChange={(val) => {
+                                                            const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.model === val);
+                                                            setVppForm({
+                                                                ...vppForm,
+                                                                batteryModel: val as string,
+                                                                ...(modelObj?.capacity ? { batteryCapacity: modelObj.capacity.toString() } : {})
+                                                            });
+                                                        }}
+                                                        placeholder="Select Model..."
+                                                        className="w-full"
+                                                        isLoading={loadingBatteryModels}
+                                                        creatable
+                                                        disabled={!isEditingTracking}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2 relative">
+                                                    <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Capacity</label>
+                                                    <div className="relative">
+                                                        <Input
+                                                            type="number"
+                                                            step="0.1"
+                                                            placeholder="13.5"
+                                                            value={vppForm.batteryCapacity}
+                                                            onChange={(e) => setVppForm({ ...vppForm, batteryCapacity: e.target.value })}
+                                                            disabled={!isEditingTracking}
+                                                        />
+                                                        <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold uppercase text-muted-foreground">SN Number</label>
+                                                    <Input
+                                                        placeholder="e.g. SN12345678"
+                                                        value={vppForm.snNumber}
+                                                        onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
+                                                        disabled={!isEditingTracking}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2 relative">
+                                                    <label className="text-xs font-semibold uppercase text-muted-foreground">Inverter Capacity</label>
+                                                    <div className="relative">
+                                                        <Input
+                                                            type="number"
+                                                            step="0.1"
+                                                            placeholder="6.0"
+                                                            value={vppForm.inverterCapacity}
+                                                            onChange={(e) => setVppForm({ ...vppForm, inverterCapacity: e.target.value })}
+                                                            disabled={!isEditingTracking}
+                                                        />
+                                                        <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
+                                                    </div>
+                                                </div>
+                                                {(vppForm.batteryBrand === 'NeoVolt' || vppForm.batteryBrand === 'AlphaESS' || vppForm.batteryBrand === 'Alpha ESS' || vppForm.batteryBrand === 'Aerl') && (
+                                                    <div className="space-y-2">
+                                                        <label className="text-xs font-semibold uppercase text-muted-foreground">Check Code</label>
+                                                        <Input
+                                                            placeholder="Verification Code"
+                                                            value={vppForm.checkCode}
+                                                            onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
+                                                            disabled={!isEditingTracking}
+                                                        />
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                            )}
+                                    </div>
 
-                            {selectedDetailSection === 'battery' && (
-                                <div className="space-y-6 animate-in fade-in duration-300">
-                                    <div className="flex items-center justify-between border-b border-border pb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center text-yellow-600 dark:text-yellow-400">
-                                                <ZapIcon size={20} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-md font-semibold text-foreground tracking-tight">Connect VPP - Battery Details</h3>
-                                                <p className="text-xs text-muted-foreground">Please provide battery details to connect VPP.</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-4 pt-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Brand</label>
-                                                <Select
-                                                    options={BATTERY_BRAND_OPTIONS}
-                                                    value={vppForm.batteryBrand}
-                                                    onChange={(val) => setVppForm({ ...vppForm, batteryBrand: val as string, batteryModel: '' })}
-                                                    placeholder="Select Brand..."
-                                                    className="w-full"
-                                                    disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Model</label>
-                                                <Select
-                                                    options={batteryModelOptions}
-                                                    value={vppForm.batteryModel}
-                                                    onChange={(val) => {
-                                                        const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.model === val);
-                                                        setVppForm({
-                                                            ...vppForm,
-                                                            batteryModel: val as string,
-                                                            ...(modelObj?.capacity ? { batteryCapacity: modelObj.capacity.toString() } : {})
-                                                        });
-                                                    }}
-                                                    placeholder="Select Model..."
-                                                    className="w-full"
-                                                    isLoading={loadingBatteryModels}
-                                                    creatable
-                                                    disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
-                                                />
-                                            </div>
-                                            <div className="space-y-2 relative">
-                                                <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Capacity</label>
-                                                <div className="relative">
-                                                    <Input
-                                                        type="number"
-                                                        step="0.1"
-                                                        placeholder="13.5"
-                                                        value={vppForm.batteryCapacity}
-                                                        onChange={(e) => setVppForm({ ...vppForm, batteryCapacity: e.target.value })}
-                                                        disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
-                                                    />
-                                                    <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-semibold uppercase text-muted-foreground">SN Number</label>
-                                                <Input
-                                                    placeholder="e.g. SN12345678"
-                                                    value={vppForm.snNumber}
-                                                    onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
-                                                    disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
-                                                />
-                                            </div>
-                                            <div className="space-y-2 relative">
-                                                <label className="text-xs font-semibold uppercase text-muted-foreground">Inverter Capacity</label>
-                                                <div className="relative">
-                                                    <Input
-                                                        type="number"
-                                                        step="0.1"
-                                                        placeholder="6.0"
-                                                        value={vppForm.inverterCapacity}
-                                                        onChange={(e) => setVppForm({ ...vppForm, inverterCapacity: e.target.value })}
-                                                        disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
-                                                    />
-                                                    <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
-                                                </div>
-                                            </div>
-                                            {(vppForm.batteryBrand === 'Fox ESS' || vppForm.batteryBrand === 'NeoVolt' || vppForm.batteryBrand === 'AlphaESS' || vppForm.batteryBrand === 'Alpha ESS' || vppForm.batteryBrand === 'Aerl') && (
-                                                <div className="space-y-2">
-                                                    <label className="text-xs font-semibold uppercase text-muted-foreground">Check Code</label>
-                                                    <Input
-                                                        placeholder="Verification Code"
-                                                        value={vppForm.checkCode}
-                                                        onChange={(e) => setVppForm({ ...vppForm, checkCode: e.target.value })}
-                                                        disabled={!isEditingBatteryDetails && !!selectedCustomerDetails.batteryDetails?.batterybrand}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex justify-end gap-2 pt-4">
-                                            {(!selectedCustomerDetails.batteryDetails?.batterybrand || isEditingBatteryDetails) ? (
-                                                <>
-                                                    {!!selectedCustomerDetails.batteryDetails?.batterybrand && (
-                                                        <Button variant="outline" onClick={() => setIsEditingBatteryDetails(false)}>Cancel</Button>
-                                                    )}
-                                                    <Button
-                                                        className="bg-neutral-900 text-white hover:bg-neutral-800"
-                                                        onClick={() => {
-                                                            handleSaveBatteryDetails();
-                                                        }}
-                                                        isLoading={isConnectingVpp}
-                                                    >
-                                                        Save Details
-                                                    </Button>
-                                                </>
-                                            ) : (
-                                                <Button variant="outline" onClick={() => setIsEditingBatteryDetails(true)}>
-                                                    <PencilIcon className="w-4 h-4 mr-2" />
-                                                    Edit Details
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
+
                                 </div>
                             )}
 
