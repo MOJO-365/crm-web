@@ -23,7 +23,12 @@ const axiosInstance = axios.create({
 });
 
 // Add auth interceptor
-axiosInstance.interceptors.request.use((config) => {
+axiosInstance.interceptors.request.use((config: any) => {
+    // Strip /graphql from baseURL for REST endpoints
+    if (!config.isGraphql && config.baseURL?.endsWith('/graphql')) {
+        config.baseURL = config.baseURL.replace(/\/graphql$/, '');
+    }
+
     const token = getAccessToken();
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -76,7 +81,9 @@ const axiosLink = new ApolloLink((operation) => {
                 query: print(query),
                 variables,
                 operationName,
-            })
+            }, {
+                isGraphql: true
+            } as any)
             .then((response) => {
                 observer.next(response.data);
                 observer.complete();
