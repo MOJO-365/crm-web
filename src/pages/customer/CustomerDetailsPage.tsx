@@ -1633,7 +1633,7 @@ const InlineMaintenanceNotes = ({
                 utilmateConnectedAt: selectedCustomerDetails.utilmateDetails?.utilmateConnectedAt || '',
                 meterSerial: selectedCustomerDetails.utilmateDetails?.meterSerial || ''
             });
-            
+
             setIsAppTrack(selectedCustomerDetails.isAppTrack || 0);
         }
     }, [selectedCustomerDetails]);
@@ -3713,7 +3713,7 @@ const InlineMaintenanceNotes = ({
                         </div>
 
                         {/* Content Area */}
-                        <div className="flex-1 p-6 pt-0 overflow-y-auto relative">
+                        <div className="flex-1 p-6 overflow-y-auto relative">
                             {isTabLoading && (
                                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-[1px] animate-in fade-in duration-300">
                                     <div className="flex flex-col items-center gap-3">
