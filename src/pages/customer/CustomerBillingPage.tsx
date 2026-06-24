@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useLazyQuery } from '@apollo/client';
 import { GET_CUSTOMER_BILLING_INFO, SEARCH_CUSTOMERS_BASIC, GET_RISK_STATUSES } from '@/graphql';
 import { SearchIcon, XIcon, SpinnerIcon, PhoneIcon, MailIcon, MapPinIcon, CreditCardIcon, UserIcon, HashIcon, BuildingIcon, EyeIcon, EyeOffIcon, DownloadIcon } from '@/components/icons';
-import { secondaryApiAxios } from '@/lib/apollo';
+import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
 import { Modal, StatusField, DataTable, type Column } from '@/components/common';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -57,6 +57,7 @@ interface CustomersCursorResult {
 }
 
 interface AccountRecord {
+    uid: string;
     account_number: string;
     account_name: string;
     transaction_type: string;
@@ -67,7 +68,7 @@ interface AccountRecord {
     description: string;
     transaction_date: string;
     invoice_due_date: string;
-    show_to_customer: string;
+    show_to_customer: string | boolean | number;
     notes: string;
 }
 
@@ -150,32 +151,29 @@ export function CustomerBillingPage() {
     const [searchCustomers, { data: searchData, loading: searchLoading }] = useLazyQuery<CustomersCursorResult>(SEARCH_CUSTOMERS_BASIC);
 
     // Fetch account records when a customer is selected
-    const fetchAccountRecords = useCallback(async (accountNumber: string) => {
+    const fetchAccountRecords = useCallback(async (customerUid: string) => {
         if (!dateRange.from || !dateRange.to) return;
         setRecordsLoading(true);
         setRecordsError(null);
         try {
-            // First, generate credentials / get token for this customer
-            // const tokenResponse = await secondaryApiAxios.post(`/api/v1/utilmate/user/generate-credentials/${accountNumber}`);
-            // const response = {
-            //     data: STATIC_ACCOUNT_RECORDS
-            // }
             const from = formatDateToYYYYMMDD(dateRange.from);
             const to = formatDateToYYYYMMDD(dateRange.to);
 
-            const response = await secondaryApiAxios.get('/v1/utilmate/user/data/records', {
+            const response = await apiAxios.get('/myAccountcrm/user/records/all', {
                 params: {
-                    account_number: accountNumber,
                     from,
                     to,
+                    customer_uid: customerUid,
                 },
                 headers: {
-                    'x-api-key': import.meta.env.VITE_UTILMATE_API_KEY,
-                },
+                    'x-web-token': import.meta.env.VITE_MACRM_TOKEN,
+                }
             });
 
-            if (response?.data && Array.isArray(response?.data)) {
-                setAccountRecords(response?.data);
+            const records = response?.data?.data || response?.data;
+
+            if (Array.isArray(records)) {
+                setAccountRecords(records);
             } else {
                 setAccountRecords([]);
             }
@@ -194,7 +192,7 @@ export function CustomerBillingPage() {
             const initialVisible = new Set<string>();
             accountRecords.forEach(record => {
                 const rowId = `${record.transaction_type}-${record.transaction_date}`;
-                if (record.show_to_customer === 'true') {
+                if (String(record.show_to_customer) === 'true' || record.show_to_customer === 1 || record.show_to_customer === true) {
                     initialVisible.add(rowId);
                 }
             });
@@ -219,13 +217,11 @@ export function CustomerBillingPage() {
 
     // Fetch account records when customer detail is available
     useEffect(() => {
-        if (customerData?.customer?.customerId) {
-            const accountNumber = customerData?.customer?.utilmateDetails?.accountNumber;
-            if (accountNumber) {
-                fetchAccountRecords(accountNumber);
-            }
+        const customerUid = customerData?.customer?.uid;
+        if (customerUid) {
+            fetchAccountRecords(customerUid);
         }
-    }, [customerData?.customer?.customerId, customerData?.customer?.utilmateDetails?.accountNumber, fetchAccountRecords]);
+    }, [customerData?.customer?.uid, fetchAccountRecords]);
 
     // Debounce search input
     useEffect(() => {
@@ -287,10 +283,9 @@ export function CustomerBillingPage() {
 
     const handleToggleVisibility = useCallback(async (record: AccountRecord, nextVisible: boolean) => {
         const rowId = `${record.transaction_type}-${record.transaction_date}`;
-        const accountNumber = customerData?.customer?.utilmateDetails?.accountNumber;
 
-        if (!accountNumber) {
-            toast.error('Account number not found');
+        if (!record.uid) {
+            toast.error('Record UID not found');
             return;
         }
 
@@ -303,21 +298,14 @@ export function CustomerBillingPage() {
         });
 
         try {
-            await secondaryApiAxios.post('/v1/utilmate/user/data/invoice', {
-                account_number: accountNumber,
-                invoice_display: [
-                    {
-                        invoice_no: record.transaction_type,
-                        show_to_customer: nextVisible
-                    }
-                ]
-            },
-                {
-                    headers: {
-                        'x-api-key': import.meta.env.VITE_UTILMATE_API_KEY,
-                    },
+            await apiAxios.put('/myAccountcrm/user/records/visibility', {
+                uid: record.uid,
+                show_to_customer: nextVisible
+            }, {
+                headers: {
+                    'x-web-token': import.meta.env.VITE_MACRM_TOKEN,
                 }
-            );
+            });
             // toast.success(`Visibility updated for ${record.transaction_type}`);
         } catch (err) {
             console.error('Failed to update visibility:', err);
@@ -330,7 +318,7 @@ export function CustomerBillingPage() {
                 return next;
             });
         }
-    }, [customerData?.customer?.utilmateDetails?.accountNumber]);
+    }, []);
 
     const handleReceiptSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -581,12 +569,12 @@ export function CustomerBillingPage() {
                         className={cn(
                             "h-8 px-4 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all duration-300 shadow-sm hover:shadow-md active:scale-95 flex items-center gap-2",
                             isVisible
-                                ? "bg-rose-50/80 backdrop-blur-sm text-rose-700 hover:bg-rose-100 border border-rose-200/50"
-                                : "bg-indigo-50/80 backdrop-blur-sm text-indigo-700 hover:bg-indigo-100 border border-indigo-200/50"
+                                ? "bg-emerald-50/80 backdrop-blur-sm text-emerald-700 hover:bg-emerald-100 border border-emerald-200/50"
+                                : "bg-zinc-50/80 backdrop-blur-sm text-zinc-700 hover:bg-zinc-100 border border-zinc-200/50"
                         )}
-                        leftIcon={isVisible ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}
+                        leftIcon={isVisible ? <EyeIcon size={14} /> : <EyeOffIcon size={14} />}
                     >
-                        {isVisible ? 'Hide' : 'View'}
+                        {isVisible ? 'Visible' : 'Hidden'}
                     </Button>
                 );
             }
@@ -893,12 +881,12 @@ export function CustomerBillingPage() {
                                                             className={cn(
                                                                 "h-7 px-3 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all duration-300 shadow-sm active:scale-95 flex items-center gap-1.5",
                                                                 isVisible
-                                                                    ? "bg-rose-50 text-rose-700 border border-rose-200/50"
-                                                                    : "bg-indigo-50 text-indigo-700 border border-indigo-200/50"
+                                                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200/50"
+                                                                    : "bg-zinc-50 text-zinc-700 border border-zinc-200/50"
                                                             )}
-                                                            leftIcon={isVisible ? <EyeOffIcon size={12} /> : <EyeIcon size={12} />}
+                                                            leftIcon={isVisible ? <EyeIcon size={12} /> : <EyeOffIcon size={12} />}
                                                         >
-                                                            {isVisible ? 'Hide' : 'Show'}
+                                                            {isVisible ? 'Visible' : 'Hidden'}
                                                         </Button>
                                                     </div>
                                                     <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${record.allocated === 'Y'
