@@ -61,15 +61,17 @@ interface AccountRecord {
     account_number: string;
     account_name: string;
     transaction_type: string;
-    posted_date: string;
+    posted_at: string;
     amount: number;
     running_balance: number;
-    allocated: string;
+    allocation_status: string;
     description: string;
-    transaction_date: string;
-    invoice_due_date: string;
-    show_to_customer: string | boolean | number;
+    transaction_at: string;
+    due_at: string;
+    show_to_customer: boolean;
     notes: string;
+    created_at: string;
+    invoice_number: number;
 }
 
 function InfoRow({ label, value, icon: Icon, valueClassName }: { label: string; value: string | undefined | null, icon?: React.ElementType, valueClassName?: string }) {
@@ -191,8 +193,8 @@ export function CustomerBillingPage() {
         if (accountRecords.length > 0) {
             const initialVisible = new Set<string>();
             accountRecords.forEach(record => {
-                const rowId = `${record.transaction_type}-${record.transaction_date}`;
-                if (String(record.show_to_customer) === 'true' || record.show_to_customer === 1 || record.show_to_customer === true) {
+                const rowId = `${record.transaction_type}-${record.transaction_at}`;
+                if (record.show_to_customer) {
                     initialVisible.add(rowId);
                 }
             });
@@ -282,7 +284,7 @@ export function CustomerBillingPage() {
     }, [setSearchParams]);
 
     const handleToggleVisibility = useCallback(async (record: AccountRecord, nextVisible: boolean) => {
-        const rowId = `${record.transaction_type}-${record.transaction_date}`;
+        const rowId = `${record.transaction_type}-${record.transaction_at}`;
 
         if (!record.uid) {
             toast.error('Record UID not found');
@@ -428,7 +430,7 @@ export function CustomerBillingPage() {
             r.transaction_type.toLowerCase().includes(q) ||
             r.description.toLowerCase().includes(q) ||
             r.notes.toLowerCase().includes(q) ||
-            r.transaction_date.toLowerCase().includes(q)
+            r.transaction_at.toLowerCase().includes(q)
         );
     }, [accountRecords, searchFilter]);
 
@@ -443,8 +445,8 @@ export function CustomerBillingPage() {
         if (accountRecords.length === 0) return 0;
         // Sort by transaction_date descending
         const sorted = [...accountRecords].sort((a, b) => {
-            const dateA = new Date(a.transaction_date).getTime();
-            const dateB = new Date(b.transaction_date).getTime();
+            const dateA = new Date(a.transaction_at).getTime();
+            const dateB = new Date(b.transaction_at).getTime();
             return dateB - dateA;
         });
         return sorted[0].running_balance;
@@ -461,9 +463,9 @@ export function CustomerBillingPage() {
             )
         },
         {
-            key: 'posted_date',
+            key: 'posted_at',
             header: 'Posted Date',
-            render: (record) => record.transaction_date
+            render: (record) => record.posted_at ? new Date(record.posted_at).toLocaleDateString() : (record.transaction_at ? new Date(record.transaction_at).toLocaleDateString() : '')
         },
         {
             key: 'amount',
@@ -477,15 +479,15 @@ export function CustomerBillingPage() {
             )
         },
         {
-            key: 'allocated',
+            key: 'allocation_status',
             header: 'Allocated',
             render: (record) => (
                 <div className="text-center">
-                    <span className={`text-xs font-medium ${record.allocated === 'Y'
+                    <span className={`text-xs font-medium ${record.allocation_status === 'Y'
                         ? 'text-green-600 dark:text-green-400'
                         : 'text-amber-600 dark:text-amber-400'
                         }`}>
-                        {record.allocated}
+                        {record.allocation_status}
                     </span>
                 </div>
             )
@@ -524,20 +526,20 @@ export function CustomerBillingPage() {
             )
         },
         {
-            key: 'transaction_date',
+            key: 'transaction_at',
             header: 'Transaction Date',
             render: (record) => (
                 <span className="whitespace-nowrap">
-                    {record.transaction_date}
+                    {record.transaction_at}
                 </span>
             )
         },
         {
-            key: 'invoice_due_date',
+            key: 'due_at',
             header: 'Due Date',
             render: (record) => (
                 <span className="whitespace-nowrap">
-                    {record.invoice_due_date || '—'}
+                    {record.due_at || '—'}
                 </span>
             )
         },
@@ -556,7 +558,7 @@ export function CustomerBillingPage() {
             width: 'w-[100px]',
             sticky: 'right',
             render: (record) => {
-                const rowId = `${record.transaction_type}-${record.transaction_date}`;
+                const rowId = `${record.transaction_type}-${record.transaction_at}`;
                 const isVisible = visibleRows.has(rowId);
                 return (
                     <Button
@@ -766,7 +768,7 @@ export function CustomerBillingPage() {
                         {/* Header with Add Receipt Button & Date Range Picker */}
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                             <h2 className="text-lg font-semibold text-foreground">Transaction List</h2>
-                            
+
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
                                 {/* Date Range Picker */}
                                 <DateRangePicker
@@ -824,13 +826,13 @@ export function CustomerBillingPage() {
                                     <DataTable
                                         columns={columns}
                                         data={paginatedRecords}
-                                        rowKey={(record) => `${record.transaction_type}-${record.transaction_date}`}
+                                        rowKey={(record) => `${record.transaction_type}-${record.transaction_at}`}
                                         loading={recordsLoading}
                                         emptyMessage="No transactions found"
                                         className="border border-border rounded-lg overflow-hidden"
                                         maxHeightClass="max-h-none"
                                         rowClassName={(record) => {
-                                            const rowId = `${record.transaction_type}-${record.transaction_date}`;
+                                            const rowId = `${record.transaction_type}-${record.transaction_at}`;
                                             const isVisible = visibleRows.has(rowId);
                                             return cn(
                                                 "transition-all duration-200",
@@ -843,7 +845,7 @@ export function CustomerBillingPage() {
                                 {/* Mobile Card Layout */}
                                 <div className="md:hidden space-y-3">
                                     {paginatedRecords.map((record, idx) => {
-                                        const rowId = `${record.transaction_type}-${record.transaction_date}`;
+                                        const rowId = `${record.transaction_type}-${record.transaction_at}`;
                                         const isVisible = visibleRows.has(rowId);
                                         return (
                                             <div key={idx} className={cn(
@@ -889,11 +891,11 @@ export function CustomerBillingPage() {
                                                             {isVisible ? 'Visible' : 'Hidden'}
                                                         </Button>
                                                     </div>
-                                                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${record.allocated === 'Y'
+                                                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${record.allocation_status === 'Y'
                                                         ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                                         : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                                                         }`}>
-                                                        {record.allocated === 'Y' ? 'Allocated' : 'Unallocated'}
+                                                        {record.allocation_status === 'Y' ? 'Allocated' : 'Unallocated'}
                                                     </span>
                                                 </div>
                                                 <p className="text-sm text-green-600 dark:text-green-400 mb-2 break-words">
@@ -914,11 +916,11 @@ export function CustomerBillingPage() {
                                                     </div>
                                                     <div>
                                                         <span className="text-muted-foreground">Date: </span>
-                                                        <span className="text-foreground">{record.transaction_date}</span>
+                                                        <span className="text-foreground">{record.transaction_at}</span>
                                                     </div>
                                                     <div>
                                                         <span className="text-muted-foreground">Due: </span>
-                                                        <span className="text-foreground">{record.invoice_due_date || '—'}</span>
+                                                        <span className="text-foreground">{record.due_at || '—'}</span>
                                                     </div>
                                                 </div>
                                                 {record.notes && (
