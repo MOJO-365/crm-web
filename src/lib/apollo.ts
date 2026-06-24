@@ -24,9 +24,9 @@ const axiosInstance = axios.create({
 
 // Add auth interceptor
 axiosInstance.interceptors.request.use((config: any) => {
-    // Strip /graphql from baseURL for REST endpoints
+    // Replace /graphql with /api for REST endpoints
     if (!config.isGraphql && config.baseURL?.endsWith('/graphql')) {
-        config.baseURL = config.baseURL.replace(/\/graphql$/, '');
+        config.baseURL = config.baseURL.replace(/\/graphql$/, '/api');
     }
 
     const token = getAccessToken();
