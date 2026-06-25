@@ -106,7 +106,7 @@ return `
                             <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
                                 <tr>
                                     <td>
-                                        <img src="https://gee.com.au/images/gee-energy-logo.svg" alt="GEE Energy"
+                                        <img src="https://go.gsync.com.au/main-logo-dark%206.png" alt="GEE Energy"
                                             height="36" style="display:block; border:0;" />
                                     </td>
                                 </tr>

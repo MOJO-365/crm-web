@@ -243,12 +243,16 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
             isOpen ? "w-64" : "w-16 items-center",
             className
         )}>
-            {/* Header / Logo Area */}
             <div className={cn(
                 "h-14 flex items-center border-b border-border transition-all overflow-hidden",
                 isOpen ? "px-4 justify-between" : "px-0 justify-center w-full"
             )}>
-                {isOpen && <img src={logo} alt="Logo" className="h-8 transition-all" />}
+                {isOpen && (
+                    <>
+                        <img src="/main-logo-dark 6.png" alt="Logo" className="h-8 transition-all block dark:hidden" />
+                        <img src="/main-logo 6.png" alt="Logo" className="h-8 transition-all hidden dark:block" />
+                    </>
+                )}
 
                 {!isOpen && (
                     <div className="w-full h-full flex items-center justify-center p-2">

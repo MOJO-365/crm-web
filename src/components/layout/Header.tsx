@@ -159,7 +159,8 @@ export function Header({ className, toggleSidebar }: HeaderProps) {
 
                 {/* GEE Logo - hidden on desktop as it is redundant with sidebar logo */}
                 <div className="flex items-center md:hidden">
-                    <img src={logo} alt="GEE Energy" className="h-6 dark:invert" />
+                    <img src="/main-logo-dark 6.png" alt="GEE Energy" className="h-6 block dark:hidden" />
+                    <img src="/main-logo 6.png" alt="GEE Energy" className="h-6 hidden dark:block" />
                 </div>
             </div>
 
