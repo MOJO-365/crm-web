@@ -148,8 +148,8 @@ const BulkEmailModal: React.FC<BulkEmailModalProps> = ({ isOpen, onClose, select
             body = replaceEmailVariables(body, previewCustomer);
         }
         // Ensure relative logo path and any legacy/broken absolute logo URLs are replaced with the correct working URL for preview
-        body = body.replace(/src=["']\/gee-energy-logo\.svg["']/gi, 'src="https://gee.com.au/images/gee-energy-logo.svg"');
-        body = body.replace(/https:\/\/gee\.com\.au\/images\/GEE(?:%20|\s)+Energy(?:%20|\s)+Logo\.svg/gi, 'https://gee.com.au/images/gee-energy-logo.svg');
+        body = body.replace(/<img[^>]*src=["']\/gee-energy-logo\.svg["'][^>]*>/gi, '<img src="https://go.gsync.com.au/main-logo-dark%206.png" alt="GEE Energy" height="36" style="display:block; border:0;">');
+        body = body.replace(/<img[^>]*src=["']https:\/\/gee\.com\.au\/images\/GEE(?:%20|\s)+Energy(?:%20|\s)+Logo\.svg["'][^>]*>/gi, '<img src="https://go.gsync.com.au/main-logo-dark%206.png" alt="GEE Energy" height="36" style="display:block; border:0;">');
         return body;
     }, [selectedTemplate?.body, previewCustomer, isSingleCustomer]);
 
