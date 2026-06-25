@@ -50,7 +50,6 @@ const pathMap: Record<string, string> = {
     audit_logs: '/audit-logs',
 };
 
-import logo from '@/assets/main-logo-dark-1.png';
 
 export function Header({ className, toggleSidebar }: HeaderProps) {
     const accessibleMenus = useAccessibleMenus();

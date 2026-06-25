@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import logo from '@/assets/main-logo-dark-1.png';
 import { useAccessibleMenus, useUser } from '@/stores/useAuthStore';
 import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon, ListIcon, ActivityIcon, UploadIcon, PlugIcon } from '@/components/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
