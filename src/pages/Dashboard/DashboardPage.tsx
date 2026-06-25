@@ -94,7 +94,8 @@ export function DashboardPage() {
                         searchId: column === 'id' ? val : undefined,
                         searchName: column === 'contact' ? val : undefined,
                         searchAddress: column === 'address' ? val : undefined,
-                        includeDeleted: "true"
+                        includeDeleted: "true",
+                        isGlobalSearch: true
                     }
                 });
                 setShowDropdown(true);
