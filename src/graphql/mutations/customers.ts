@@ -357,6 +357,18 @@ export const UPDATE_WEB_ENROLLMENT_CONSENT = gql`
     }
 `;
 
+export const MARK_CONSENT_ACKNOWLEDGED = gql`
+    mutation MarkConsentAcknowledged($uid: String!) {
+        markConsentAcknowledged(uid: $uid)
+    }
+`;
+
+export const MARK_CONSENT_NOT_INTERESTED = gql`
+    mutation MarkConsentNotInterested($uid: String!) {
+        markConsentNotInterested(uid: $uid)
+    }
+`;
+
 export const COMPLETE_WEB_ENROLLMENT = gql`
     mutation CompleteWebEnrollment($uid: String!, $enrollmentData: String!) {
         completeWebEnrollment(uid: $uid, enrollmentData: $enrollmentData)

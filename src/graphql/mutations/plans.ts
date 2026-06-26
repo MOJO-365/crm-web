@@ -6,6 +6,7 @@ export const CREATE_PLAN = gql`
       uid
       tenant
       title
+      state
       description
       discount
       propertyType
@@ -28,6 +29,7 @@ export const UPDATE_PLAN = gql`
       uid
       tenant
       title
+      state
       description
       discount
       propertyType

@@ -6,6 +6,7 @@ export const GET_PLANS = gql`
       uid
       tenant
       title
+      state
       description
       discount
       propertyType
@@ -29,6 +30,7 @@ export const GET_ACTIVE_PLANS = gql`
       uid
       tenant
       title
+      state
       description
       discount
       propertyType
@@ -52,6 +54,7 @@ export const GET_PLAN = gql`
       uid
       tenant
       title
+      state
       description
       discount
       propertyType

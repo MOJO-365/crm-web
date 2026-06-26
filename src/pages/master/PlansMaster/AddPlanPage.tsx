@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/Select';
 import { toast } from 'react-toastify';
 import { ChevronRightIcon, CheckIcon } from '@/components/icons';
 import Modal from '@/components/common/Modal';
+import { STATE_OPTIONS } from '@/lib/constants';
 
 const TARIFF_COMPONENTS = [
     'SUPPLY CHARGE', 'ANYTIME', 'PEAK', 'SHOULDER', 'OFF-PEAK',
@@ -79,6 +80,7 @@ export const AddPlanPage: React.FC = () => {
 
     const [formData, setFormData] = useState({
         title: '',
+        state: '',
         description: '',
         discount: 0,
         propertyType: 0,
@@ -142,6 +144,7 @@ export const AddPlanPage: React.FC = () => {
 
                 return {
                     title: plan.title || '',
+                    state: plan.state || '',
                     description: plan.description || '',
                     discount: plan.discount || 0,
                     propertyType: plan.propertyType ?? 0,
@@ -334,6 +337,7 @@ export const AddPlanPage: React.FC = () => {
                         uid,
                         input: {
                             title: formData.title,
+                            state: formData.state,
                             description: formData.description,
                             discount: Number(formData.discount) || 0,
                             propertyType: formData.propertyType,
@@ -354,6 +358,7 @@ export const AddPlanPage: React.FC = () => {
                     variables: {
                         input: {
                             title: formData.title,
+                            state: formData.state,
                             description: formData.description,
                             discount: Number(formData.discount) || 0,
                             propertyType: formData.propertyType,
@@ -394,7 +399,7 @@ export const AddPlanPage: React.FC = () => {
                     <div className="flex-1 overflow-y-auto p-5 space-y-4">
                         <div className="space-y-6">
                             {/* Section 1: General Information */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 bg-neutral-50/40 dark:bg-neutral-900/10 border border-border/70 rounded-xl">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 p-5 bg-neutral-50/40 dark:bg-neutral-900/10 border border-border/70 rounded-xl">
                                 <div className="space-y-2 flex flex-col justify-start">
                                     <label className="text-sm font-medium text-foreground">
                                         Plan Title <span className="text-destructive">*</span>
@@ -428,8 +433,24 @@ export const AddPlanPage: React.FC = () => {
                                     />
                                 </div>
 
+                                <div className="space-y-2 flex flex-col justify-start">
+                                    <label className="text-sm font-medium text-foreground">
+                                        State
+                                    </label>
+                                    <Select
+                                        value={formData.state || ''}
+                                        onChange={(val) => {
+                                            setFormData(prev => ({ ...prev, state: Array.isArray(val) ? val[0] : val }));
+                                        }}
+                                        options={[
+                                            { label: 'Select State', value: '' },
+                                            ...STATE_OPTIONS
+                                        ]}
+                                        className="w-full h-[38px]"
+                                    />
+                                </div>
 
-                                <div className="space-y-2 flex flex-col justify-start col-span-1 md:col-span-2">
+                                <div className="space-y-2 flex flex-col justify-start col-span-1 md:col-span-3">
                                     <label className="text-sm font-medium text-foreground">
                                         Description <span className="text-destructive">*</span>
                                     </label>
