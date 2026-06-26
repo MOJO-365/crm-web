@@ -13,13 +13,14 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { DataTable, type Column, Modal, StatusField } from '@/components/common';
-import { PlusIcon, PencilIcon, TrashIcon, SpinnerIcon, StarIcon, TagIcon, CheckCircleIcon } from '@/components/icons';
+import { PlusIcon, PencilIcon, TrashIcon, SpinnerIcon, StarIcon, CheckCircleIcon, AndroidIcon, AppleIcon } from '@/components/icons';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 interface AppVersion {
     uid: string;
+    platform: string;
     versionNumber: string;
     title: string;
     description: string;
@@ -38,6 +39,7 @@ export const AppVersionsPage = () => {
     // Filter & Search State
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+    const [platformFilter, setPlatformFilter] = useState<'ALL' | 'android' | 'ios'>('ALL');
     const [filteredData, setFilteredData] = useState<AppVersion[]>([]);
 
     // Delete Modal State
@@ -48,8 +50,8 @@ export const AppVersionsPage = () => {
     const [currentModalOpen, setCurrentModalOpen] = useState(false);
     const [versionToSetCurrent, setVersionToSetCurrent] = useState<AppVersion | null>(null);
 
-    // Form State
     const [formData, setFormData] = useState({
+        platform: 'android',
         versionNumber: '',
         title: '',
         description: '',
@@ -90,6 +92,11 @@ export const AppVersionsPage = () => {
                 result = result.filter(item => !item.isActive);
             }
 
+            // Filter by Platform
+            if (platformFilter !== 'ALL') {
+                result = result.filter(item => item.platform === platformFilter);
+            }
+
             // Filter by Search
             if (searchQuery) {
                 const lowerQuery = searchQuery.toLowerCase();
@@ -102,11 +109,12 @@ export const AppVersionsPage = () => {
 
             setFilteredData(result);
         }
-    }, [data, statusFilter, searchQuery]);
+    }, [data, statusFilter, platformFilter, searchQuery]);
 
     const handleEdit = (version: AppVersion) => {
         setEditingVersion(version);
         setFormData({
+            platform: version.platform || 'android',
             versionNumber: version.versionNumber,
             title: version.title,
             description: version.description || '',
@@ -121,6 +129,7 @@ export const AppVersionsPage = () => {
     const handleCreate = () => {
         setEditingVersion(null);
         setFormData({
+            platform: 'android',
             versionNumber: '',
             title: '',
             description: '',
@@ -170,7 +179,7 @@ export const AppVersionsPage = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!formData.versionNumber.trim()) {
             toast.error("Version Number is required");
             return;
@@ -182,6 +191,7 @@ export const AppVersionsPage = () => {
 
         try {
             const input: any = {
+                platform: formData.platform,
                 versionNumber: formData.versionNumber,
                 title: formData.title,
                 description: formData.description || null,
@@ -218,8 +228,8 @@ export const AppVersionsPage = () => {
         });
     };
 
-    // Find the current version for the hero card
-    const currentVersion = data?.appVersions?.find((v: AppVersion) => v.isCurrent);
+    // Find the current versions for the hero card
+    const currentVersions = data?.appVersions?.filter((v: AppVersion) => v.isCurrent) || [];
 
     const columns: Column<AppVersion>[] = [
         {
@@ -230,8 +240,15 @@ export const AppVersionsPage = () => {
                     <span className="font-mono font-semibold text-foreground text-sm tracking-wide">
                         v{item.versionNumber}
                     </span>
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${item.platform === 'android'
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                        }`}>
+                        {item.platform === 'android' ? <AndroidIcon size={12} /> : <AppleIcon size={12} />}
+                        {item.platform}
+                    </span>
                     {item.isCurrent && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shadow-sm">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400 border border-purple-200 dark:border-purple-800 shadow-sm">
                             <CheckCircleIcon size={12} />
                             Current
                         </span>
@@ -337,42 +354,61 @@ export const AppVersionsPage = () => {
             </div>
 
             {/* Current Version Hero Card */}
-            {currentVersion && (
-                <div className="relative overflow-hidden rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-gradient-to-r from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-950/40 dark:via-green-950/30 dark:to-teal-950/40 p-5">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-200/20 dark:bg-emerald-700/10 rounded-full -translate-y-8 translate-x-8" />
-                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-teal-200/20 dark:bg-teal-700/10 rounded-full translate-y-6 -translate-x-6" />
-                    <div className="relative flex items-center gap-4">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 shadow-sm">
-                            <TagIcon size={24} />
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                                    Current Active Version
-                                </span>
-                            </div>
-                            <div className="flex items-baseline gap-3">
-                                <span className="text-2xl font-bold font-mono text-emerald-800 dark:text-emerald-300">
-                                    v{currentVersion.versionNumber}
-                                </span>
-                                <span className="text-lg font-medium text-foreground">
-                                    {currentVersion.title}
-                                </span>
-                            </div>
-                            {currentVersion.description && (
-                                <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-                                    {currentVersion.description}
-                                </p>
-                            )}
-                        </div>
-                        <div className="text-right">
-                            {currentVersion.releaseDate && (
-                                <div className="text-sm text-muted-foreground">
-                                    Released {formatDate(currentVersion.releaseDate)}
+            {currentVersions.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {currentVersions.map((currentVersion: AppVersion) => {
+                        const isAndroid = currentVersion.platform === 'android';
+                        const PlatformIcon = isAndroid ? AndroidIcon : AppleIcon;
+
+                        return (
+                            <div key={currentVersion.uid} className={`relative overflow-hidden rounded-xl border p-5 ${isAndroid
+                                    ? 'border-emerald-200 dark:border-emerald-800/60 bg-gradient-to-r from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-950/40 dark:via-green-950/30 dark:to-teal-950/40'
+                                    : 'border-blue-200 dark:border-blue-800/60 bg-gradient-to-r from-blue-50 via-indigo-50 to-sky-50 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-sky-950/40'
+                                }`}>
+                                <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -translate-y-8 translate-x-8 ${isAndroid ? 'bg-emerald-200/20 dark:bg-emerald-700/10' : 'bg-blue-200/20 dark:bg-blue-700/10'
+                                    }`} />
+                                <div className={`absolute bottom-0 left-0 w-24 h-24 rounded-full translate-y-6 -translate-x-6 ${isAndroid ? 'bg-teal-200/20 dark:bg-teal-700/10' : 'bg-sky-200/20 dark:bg-sky-700/10'
+                                    }`} />
+                                <div className="relative flex items-center gap-4">
+                                    <div className={`flex items-center justify-center w-12 h-12 rounded-xl shadow-sm ${isAndroid
+                                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400'
+                                            : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
+                                        }`}>
+                                        <PlatformIcon size={28} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`text-xs font-semibold uppercase tracking-wider ${isAndroid ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'
+                                                }`}>
+                                                Current {currentVersion.platform} Version
+                                            </span>
+                                        </div>
+                                        <div className="flex items-baseline gap-3">
+                                            <span className={`text-2xl font-bold font-mono ${isAndroid ? 'text-emerald-800 dark:text-emerald-300' : 'text-blue-800 dark:text-blue-300'
+                                                }`}>
+                                                v{currentVersion.versionNumber}
+                                            </span>
+                                            <span className="text-lg font-medium text-foreground truncate max-w-[200px]">
+                                                {currentVersion.title}
+                                            </span>
+                                        </div>
+                                        {currentVersion.description && (
+                                            <p className="text-sm text-muted-foreground mt-1 max-w-sm truncate">
+                                                {currentVersion.description}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="text-right whitespace-nowrap">
+                                        {currentVersion.releaseDate && (
+                                            <div className="text-sm text-muted-foreground">
+                                                Released {formatDate(currentVersion.releaseDate)}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-                    </div>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
@@ -387,6 +423,16 @@ export const AppVersionsPage = () => {
                             value={statusFilter}
                             onChange={(val) => setStatusFilter(val as 'ALL' | 'ACTIVE' | 'INACTIVE')}
                             placeholder="All Status"
+                            className="w-[150px]"
+                        />
+                        <Select
+                            options={[
+                                { label: 'All Platforms', value: 'ALL' },
+                                { label: 'Android', value: 'android' },
+                                { label: 'iOS', value: 'ios' }
+                            ]}
+                            value={platformFilter}
+                            onChange={(val) => setPlatformFilter(val as 'ALL' | 'android' | 'ios')}
                             className="w-[150px]"
                         />
                         <Input
@@ -421,6 +467,18 @@ export const AppVersionsPage = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
+                            <label className="text-sm font-medium">Platform</label>
+                            <Select
+                                options={[
+                                    { label: 'Android', value: 'android' },
+                                    { label: 'iOS', value: 'ios' }
+                                ]}
+                                value={formData.platform}
+                                onChange={(val) => setFormData({ ...formData, platform: val as 'android' | 'ios' })}
+                                disabled={!isCreating} // Usually don't change platform after creation
+                            />
+                        </div>
+                        <div className="space-y-2">
                             <label className="text-sm font-medium">Version Number</label>
                             <Input
                                 value={formData.versionNumber}
@@ -433,9 +491,9 @@ export const AppVersionsPage = () => {
                             <label className="text-sm font-medium">Release Date</label>
                             <DatePicker
                                 value={formData.releaseDate ? new Date(formData.releaseDate) : null}
-                                onChange={(date) => setFormData({ 
-                                    ...formData, 
-                                    releaseDate: date ? date.toISOString().split('T')[0] : '' 
+                                onChange={(date) => setFormData({
+                                    ...formData,
+                                    releaseDate: date ? date.toISOString().split('T')[0] : ''
                                 })}
                                 placeholder="Select release date"
                                 dateFormat="yyyy-MM-dd"
