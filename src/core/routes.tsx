@@ -47,6 +47,7 @@ const PushToGsyncPage = lazyWithRetry(() => import('@/pages/trackers/PushToGsync
 const PushToMsatPage = lazyWithRetry(() => import('@/pages/trackers/PushToMsatPage').then(m => ({ default: m.PushToMsatPage })));
 const PushToUtilmatePage = lazyWithRetry(() => import('@/pages/trackers/PushToUtilmatePage').then(m => ({ default: m.PushToUtilmatePage })));
 const MaintenanceTrackerPage = lazyWithRetry(() => import('@/pages/trackers/MaintenanceTrackerPage').then(m => ({ default: m.MaintenanceTrackerPage })));
+const AppVersionsPage = lazyWithRetry(() => import('@/pages/master/AppVersionsPage').then(m => ({ default: m.AppVersionsPage })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -134,6 +135,7 @@ const router = createBrowserRouter(
                 <Route path="/plans-master/:uid/edit" element={<RequirePermission menuCode="plans_master"><AddPlanPage /></RequirePermission>} />
 
                 <Route path="/master-data" element={<RequirePermission menuCode="document_types"><MasterDataPage /></RequirePermission>} />
+                <Route path="/app-versions" element={<RequirePermission menuCode="app_versions"><AppVersionsPage /></RequirePermission>} />
 
                 {/* General authenticated routes */}
                 <Route path="/change-password" element={<ChangePasswordPage />} />

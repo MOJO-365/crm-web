@@ -65,3 +65,6 @@ export * from './mutations/inverter';
 // Leads
 export * from './queries/leads';
 export * from './mutations/leads';
+
+// App Versions
+export * from './queries/appVersions';
