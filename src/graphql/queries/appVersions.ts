@@ -4,6 +4,7 @@ export const GET_ALL_APP_VERSIONS = gql`
   query GetAllAppVersions {
     appVersions {
       uid
+      platform
       versionNumber
       title
       description
@@ -20,6 +21,7 @@ export const GET_CURRENT_APP_VERSION = gql`
   query GetCurrentAppVersion {
     currentAppVersion {
       uid
+      platform
       versionNumber
       title
       description
