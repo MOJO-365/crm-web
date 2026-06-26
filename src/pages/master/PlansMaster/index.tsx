@@ -20,6 +20,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 interface Plan {
     uid: string;
     title: string;
+    state?: string;
     description?: string;
     isActive?: boolean;
     propertyType?: number;
@@ -113,6 +114,11 @@ export const PlansMasterPage: React.FC = () => {
             header: 'Plan Title',
             key: 'title',
             render: (item) => <span className="font-medium">{item.title}</span>
+        },
+        {
+            header: 'State',
+            key: 'state' as any,
+            render: (item) => <span className="font-medium">{item.state || '-'}</span>
         },
         {
             header: 'Description',

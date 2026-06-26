@@ -1,20 +1,41 @@
 import React from 'react';
 import { CheckIcon } from '@/components/icons';
 import { CustomerViewLayout } from './CustomerViewLayout';
+import { Button } from '@/components/ui';
 
 interface ConsentStepProps {
     isChecked: boolean;
     onToggleConsent: (checked: boolean) => void;
-    onNext: () => void;
+    onAcknowledge: () => void;
+    onNotInterested: () => void;
     companyName?: string;
+    isSubmitting?: boolean;
 }
 
-export const ConsentStep: React.FC<ConsentStepProps> = ({ isChecked, onToggleConsent, onNext, companyName }) => {
+export const ConsentStep: React.FC<ConsentStepProps> = ({ isChecked, onToggleConsent, onAcknowledge, onNotInterested, companyName, isSubmitting }) => {
     return (
         <CustomerViewLayout
-            footerButtonLabel="Next"
-            onFooterButtonClick={onNext}
-            isFooterButtonDisabled={!isChecked}
+            footerContent={
+                <div className="flex flex-col sm:flex-row gap-4 w-full">
+                    <Button
+                        variant="outline"
+                        className="flex-1 h-14 text-lg font-bold rounded-2xl transition-all duration-300 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        onClick={onNotInterested}
+                        disabled={isSubmitting}
+                    >
+                        Not Interested
+                    </Button>
+                    <Button
+                        className={`flex-1 h-14 text-lg font-bold rounded-2xl transition-all duration-300 ${!isChecked ? '' : 'shadow-lg shadow-primary/20'}`}
+                        disabled={!isChecked || isSubmitting}
+                        isLoading={isSubmitting}
+                        loadingText="Saving..."
+                        onClick={onAcknowledge}
+                    >
+                        I Acknowledge
+                    </Button>
+                </div>
+            }
         >
             <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-100">
                 <div className="space-y-8">

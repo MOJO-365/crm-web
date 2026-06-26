@@ -458,6 +458,13 @@ export const CustomerFormPage = () => {
                 if (formData.planUid && plan.uid === formData.planUid) {
                     return true;
                 }
+                // Match state if the plan has a state defined and a state is selected
+                if (plan.state && formData.state) {
+                    const planStates = plan.state.split(',').map((s: string) => s.trim().toUpperCase());
+                    if (!planStates.includes(formData.state.toUpperCase())) {
+                        return false;
+                    }
+                }
                 // Match property type (0 = residential, 1 = commercial)
                 if (plan.propertyType !== undefined && plan.propertyType !== null && plan.propertyType !== formData.propertyType) {
                     return false;
@@ -483,7 +490,7 @@ export const CustomerFormPage = () => {
                 label: plan.title,
                 value: plan.uid
             }));
-    }, [activePlansData, formData.hasSolar, formData.hasBattery, formData.propertyType, formData.planUid, formData.isVppAndIsBattery]);
+    }, [activePlansData, formData.hasSolar, formData.hasBattery, formData.propertyType, formData.planUid, formData.isVppAndIsBattery, formData.state]);
 
     const selectedPlan = useMemo(() => {
         if (!activePlansData?.activePlans || !formData.planUid) return null;

@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_WEB_ENROLLMENT_BY_UID, GET_CUSTOMER_BY_ID } from '@/graphql/queries/customers';
 import { GET_MEASUREMENT_UNITS, GET_RATE_PLAN_BY_CODE } from '@/graphql/queries/rates';
-import { UPDATE_WEB_ENROLLMENT_CONSENT, COMPLETE_WEB_ENROLLMENT } from '@/graphql/mutations/customers';
+import { UPDATE_WEB_ENROLLMENT_CONSENT, COMPLETE_WEB_ENROLLMENT, MARK_CONSENT_ACKNOWLEDGED, MARK_CONSENT_NOT_INTERESTED } from '@/graphql/mutations/customers';
 import { ID_TYPE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { getData as getCountries } from 'country-list';
 
@@ -53,6 +53,7 @@ export const CustomerViewPage: React.FC = () => {
     const [idFormInit, setIdFormInit] = useState(false);
     const [isFinished, setIsFinished] = useState(false);
     const [consentSignatureBase64, setConsentSignatureBase64] = useState<string | null>(null);
+    const [isSubmittingConsent, setIsSubmittingConsent] = useState(false);
 
     // Data Fetching
     const { data: enrollmentData, loading: enrollmentLoading, error: enrollmentError } = useQuery(GET_WEB_ENROLLMENT_BY_UID, {
@@ -83,6 +84,8 @@ export const CustomerViewPage: React.FC = () => {
     // Mutations
     const [updateConsent] = useMutation(UPDATE_WEB_ENROLLMENT_CONSENT);
     const [completeEnrollment, { loading: completingEnrollment }] = useMutation(COMPLETE_WEB_ENROLLMENT);
+    const [markAcknowledged] = useMutation(MARK_CONSENT_ACKNOWLEDGED);
+    const [markNotInterested] = useMutation(MARK_CONSENT_NOT_INTERESTED);
 
     // Side Effects
     useEffect(() => {
@@ -170,6 +173,16 @@ export const CustomerViewPage: React.FC = () => {
     if (isFinished || enrollment.isEnrollmentFinished === 1 || customerData?.customer?.status === 8) {
         return <SuccessStep customerIdDisplay={customerIdDisplay} />;
     }
+    if (payload.NotIntrestedConsent === 1 || payload.NotIntrestedConsent === '1' || customerData?.customer?.status === 5) {
+        return (
+            <div className="h-screen flex flex-col bg-slate-50/50 items-center justify-center p-4">
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 max-w-md w-full text-center space-y-4">
+                    <h2 className="text-2xl font-bold text-slate-800">Consent Not Available</h2>
+                    <p className="text-slate-600">You have previously indicated that you are not interested. This enrollment form is no longer available.</p>
+                </div>
+            </div>
+        );
+    }
 
     const ratePlan = customerData?.customer?.ratePlan || ratesData?.ratePlanByCode;
     const mainOffer = ratePlan?.offers?.[0];
@@ -180,8 +193,32 @@ export const CustomerViewPage: React.FC = () => {
                 <ConsentStep
                     isChecked={isChecked}
                     onToggleConsent={handleToggleConsent}
-                    onNext={() => setStep('rates')}
+                    onAcknowledge={async () => {
+                        if (!uid) return;
+                        setIsSubmittingConsent(true);
+                        try {
+                            await markAcknowledged({ variables: { uid } });
+                            setStep('rates');
+                        } catch (e) {
+                            toast.error('Failed to save consent');
+                        } finally {
+                            setIsSubmittingConsent(false);
+                        }
+                    }}
+                    onNotInterested={async () => {
+                        if (!uid) return;
+                        setIsSubmittingConsent(true);
+                        try {
+                            await markNotInterested({ variables: { uid } });
+                            window.location.reload();
+                        } catch (e) {
+                            toast.error('Failed to save choice');
+                        } finally {
+                            setIsSubmittingConsent(false);
+                        }
+                    }}
                     companyName={companyName}
+                    isSubmitting={isSubmittingConsent}
                 />
             );
         case 'rates':
@@ -246,7 +283,7 @@ export const CustomerViewPage: React.FC = () => {
                 />
             );
         default:
-            return <ConsentStep isChecked={isChecked} onToggleConsent={handleToggleConsent} onNext={() => setStep('rates')} companyName={companyName} />;
+            return <ConsentStep isChecked={isChecked} onToggleConsent={handleToggleConsent} onAcknowledge={() => {}} onNotInterested={() => {}} companyName={companyName} />;
     }
 };
 
