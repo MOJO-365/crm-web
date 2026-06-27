@@ -162,6 +162,7 @@ export const AddPlanPage: React.FC = () => {
 
     const [customRateDraft, setCustomRateDraft] = useState({
         name: '',
+        description: '',
         rate: '',
         unit: '',
         planType: 'fixed',
@@ -682,7 +683,7 @@ export const AddPlanPage: React.FC = () => {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                        setCustomRateDraft({ name: '', rate: '', unit: '', planType: 'fixed', tariffUid: '', dynamicType: '', rateType: 'Fixed' });
+                                        setCustomRateDraft({ name: '', description: '', rate: '', unit: '', planType: 'fixed', tariffUid: '', dynamicType: '', rateType: 'Fixed' });
                                         setIsCustomModalOpen(true);
                                     }}
                                     className="flex items-center gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20"
@@ -820,6 +821,9 @@ export const AddPlanPage: React.FC = () => {
                                                             <td className="px-3 py-1.5 align-middle">
                                                                 <div className="flex flex-col">
                                                                     <span className="font-bold text-foreground text-xs tracking-wide">{comp.name}</span>
+                                                                    {comp.description && (
+                                                                        <span className="text-[10px] text-muted-foreground leading-tight my-0.5">{comp.description}</span>
+                                                                    )}
                                                                     <span className="text-[9px] uppercase font-bold text-blue-600/80 tracking-wider">
                                                                         {comp.dynamicType ? String(comp.dynamicType).replace(/_/g, ' ') : 'DYNAMIC RATE'}
                                                                     </span>
@@ -942,6 +946,14 @@ export const AddPlanPage: React.FC = () => {
                             value={customRateDraft.name}
                             onChange={(e) => setCustomRateDraft({ ...customRateDraft, name: e.target.value })}
                             placeholder="e.g. Special Discount Rate"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Description</label>
+                        <Input
+                            value={customRateDraft.description}
+                            onChange={(e) => setCustomRateDraft({ ...customRateDraft, description: e.target.value })}
+                            placeholder="Optional description"
                         />
                     </div>
                     <div className="space-y-2">
