@@ -121,3 +121,13 @@ export const DELETE_MEASUREMENT_UNIT = gql`
         deleteMeasurementUnit(uid: $uid)
     }
 `;
+
+export const SAVE_COLUMN_METADATA = gql`
+    mutation SaveColumnMetadata($columnName: String!, $description: String!) {
+        saveColumnMetadata(columnName: $columnName, description: $description) {
+            id
+            columnName
+            description
+        }
+    }
+`;

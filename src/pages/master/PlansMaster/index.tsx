@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import {
     GET_PLANS,
     DELETE_PLAN
 } from '@/graphql';
+import { GET_RATE_PLANS } from '@/graphql/queries/rates';
 import { UPDATE_PLAN } from '@/graphql/mutations/plans';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,7 +17,7 @@ import { toast } from 'react-toastify';
 import { formatSydneyTime } from '@/lib/date';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { Tooltip } from '@/components/ui/Tooltip';
-
+import { ColumnMetadataModal } from '@/pages/rates/components/ColumnMetadataModal';
 interface Plan {
     uid: string;
     title: string;
@@ -36,6 +37,7 @@ interface Plan {
 export const PlansMasterPage: React.FC = () => {
     const navigate = useNavigate();
     const { data, loading, error, refetch } = useQuery(GET_PLANS);
+    const { data: ratePlansData } = useQuery(GET_RATE_PLANS, { variables: { limit: 1000 } });
     const [deletePlan, { loading: deleting }] = useMutation(DELETE_PLAN);
     const [updatePlan] = useMutation(UPDATE_PLAN);
 
@@ -47,6 +49,27 @@ export const PlansMasterPage: React.FC = () => {
 
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [planToDelete, setPlanToDelete] = useState<Plan | null>(null);
+    const [columnModalOpen, setColumnModalOpen] = useState(false);
+
+    const dynamicFieldNames = useMemo(() => {
+        const names = new Set<string>();
+        if (ratePlansData?.ratePlans?.data) {
+            ratePlansData.ratePlans.data.forEach((plan: any) => {
+                plan.offers?.forEach((offer: any) => {
+                    let parsedDynamic: any[] = [];
+                    if (typeof offer.dynamicRates === 'string') {
+                        try { parsedDynamic = JSON.parse(offer.dynamicRates); } catch { }
+                    } else if (offer.dynamicRates) {
+                        parsedDynamic = offer.dynamicRates;
+                    }
+                    parsedDynamic.forEach((rate: any) => {
+                        if (rate.name) names.add(rate.name.toLowerCase());
+                    });
+                });
+            });
+        }
+        return Array.from(names).sort();
+    }, [ratePlansData]);
 
     useEffect(() => {
         if (data?.plans) {
@@ -246,10 +269,15 @@ export const PlansMasterPage: React.FC = () => {
                         </p>
                     </div>
                     {canManage && (
-                        <Button onClick={() => navigate('/plans-master/new')}>
-                            <PlusIcon className="w-4 h-4 mr-2" />
-                            Add New Plan
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" onClick={() => setColumnModalOpen(true)}>
+                                Column Definitions
+                            </Button>
+                            <Button onClick={() => navigate('/plans-master/new')}>
+                                <PlusIcon className="w-4 h-4 mr-2" />
+                                Add New Plan
+                            </Button>
+                        </div>
                     )}
                 </div>
             </div>
@@ -310,6 +338,15 @@ export const PlansMasterPage: React.FC = () => {
             >
                 <p>Are you sure you want to delete <span className="font-bold">{planToDelete?.title}</span>? This action cannot be undone.</p>
             </Modal>
+
+            <ColumnMetadataModal 
+                isOpen={columnModalOpen} 
+                onClose={() => setColumnModalOpen(false)} 
+                availableColumns={[
+                    'anytime', 'cl1Supply', 'cl1Usage', 'cl2Supply', 'cl2Usage', 'demand', 'demandOp', 'demandP', 'demandS', 'fit', 'fitPeak', 'fitCritical', 'fitVpp', 'offPeak', 'peak', 'shoulder', 'supplyCharge', 'vppOrcharge',
+                    ...dynamicFieldNames
+                ]}
+            />
         </div>
     );
 };

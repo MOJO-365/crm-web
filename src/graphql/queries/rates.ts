@@ -191,3 +191,13 @@ export const GET_RATE_PLAN_BY_CODE = gql`
         }
     }
 `;
+
+export const GET_COLUMN_METADATA = gql`
+    query GetColumnMetadata {
+        getColumnMetadata {
+            id
+            columnName
+            description
+        }
+    }
+`;

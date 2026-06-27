@@ -21,6 +21,7 @@ import { StatusField } from '@/components/common';
 import { STATE_OPTIONS, DNSP_OPTIONS, DNSP_MAP, RATE_TYPE_MAP } from '@/lib/constants';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { RatesHistoryModal } from './components/RatesHistoryModal';
+import { ColumnMetadataModal } from './components/ColumnMetadataModal';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -169,6 +170,7 @@ export function RatesPage() {
 
     // Manage Units state
     const [unitsModalOpen, setUnitsModalOpen] = useState(false);
+    const [columnModalOpen, setColumnModalOpen] = useState(false);
     const [newUnitName, setNewUnitName] = useState('');
     const [isCreatingUnit, setIsCreatingUnit] = useState(false);
     const [deletingUnitUid, setDeletingUnitUid] = useState<string | null>(null);
@@ -2090,12 +2092,20 @@ export function RatesPage() {
                 </div>
                 <div className="flex items-center gap-2">
                     {canEdit && (
-                        <Button
-                            variant="outline"
-                            onClick={() => setUnitsModalOpen(true)}
-                        >
-                            Manage Units
-                        </Button>
+                        <>
+                            <Button
+                                variant="outline"
+                                onClick={() => setUnitsModalOpen(true)}
+                            >
+                                Manage Units
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => setColumnModalOpen(true)}
+                            >
+                                Column Definitions
+                            </Button>
+                        </>
                     )}
                     {canCreate && (
                         <Tooltip content={isGSTInclusive ? "Adding rates is disabled in GST Inclusive mode" : ""}>
@@ -3907,6 +3917,15 @@ export function RatesPage() {
                     refetch();
                 }}
                 onApplyLocalSnapshot={handleApplyLocalSnapshot}
+            />
+
+            <ColumnMetadataModal
+                isOpen={columnModalOpen}
+                onClose={() => setColumnModalOpen(false)}
+                availableColumns={[
+                    'anytime', 'cl1Supply', 'cl1Usage', 'cl2Supply', 'cl2Usage', 'demand', 'demandOp', 'demandP', 'demandS', 'fit', 'fitPeak', 'fitCritical', 'fitVpp', 'offPeak', 'peak', 'shoulder', 'supplyCharge', 'vppOrcharge',
+                    ...dynamicFieldNames
+                ]}
             />
 
             {/* Manage Units Modal */}
