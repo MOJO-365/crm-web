@@ -141,7 +141,15 @@ export const PlansMasterPage: React.FC = () => {
         {
             header: 'State',
             key: 'state' as any,
-            render: (item) => <span className="font-medium">{item.state || '-'}</span>
+            render: (item) => (
+                <div className="flex flex-wrap gap-1">
+                    {item.state ? item.state.split(',').map((s: string, idx: number) => (
+                        <span key={idx} className="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full dark:bg-purple-900/30 dark:text-purple-400 font-medium whitespace-nowrap border border-purple-200 dark:border-purple-800">
+                            {s.trim()}
+                        </span>
+                    )) : <span className="text-muted-foreground">-</span>}
+                </div>
+            )
         },
         {
             header: 'Description',

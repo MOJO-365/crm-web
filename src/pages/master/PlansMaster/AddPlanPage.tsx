@@ -439,14 +439,13 @@ export const AddPlanPage: React.FC = () => {
                                         State
                                     </label>
                                     <Select
-                                        value={formData.state || ''}
+                                        multiple
+                                        value={formData.state ? formData.state.split(',').map(s => s.trim()).filter(Boolean) : []}
                                         onChange={(val) => {
-                                            setFormData(prev => ({ ...prev, state: Array.isArray(val) ? val[0] : val }));
+                                            setFormData(prev => ({ ...prev, state: Array.isArray(val) ? val.join(', ') : val }));
                                         }}
-                                        options={[
-                                            { label: 'Select State', value: '' },
-                                            ...STATE_OPTIONS
-                                        ]}
+                                        options={STATE_OPTIONS}
+                                        placeholder="Select states..."
                                         className="w-full h-[38px]"
                                     />
                                 </div>
