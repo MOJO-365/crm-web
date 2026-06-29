@@ -1,8 +1,8 @@
 import { gql } from '@apollo/client';
 
 export const GET_PLANS = gql`
-  query GetPlans($limit: Int, $offset: Int) {
-    plans(limit: $limit, offset: $offset) {
+  query GetPlans($limit: Int, $offset: Int, $state: String) {
+    plans(limit: $limit, offset: $offset, state: $state) {
       uid
       tenant
       title
@@ -25,8 +25,8 @@ export const GET_PLANS = gql`
 `;
 
 export const GET_ACTIVE_PLANS = gql`
-  query GetActivePlans {
-    activePlans {
+  query GetActivePlans($state: String) {
+    activePlans(state: $state) {
       uid
       tenant
       title

@@ -458,8 +458,11 @@ export const CustomerFormPage = () => {
                 if (formData.planUid && plan.uid === formData.planUid) {
                     return true;
                 }
-                // Match state if the plan has a state defined and a state is selected
-                if (plan.state && formData.state) {
+                // Match state if a state is selected
+                if (formData.state) {
+                    if (!plan.state) {
+                        return false; // Filter out plans without a state
+                    }
                     const planStates = plan.state.split(',').map((s: string) => s.trim().toUpperCase());
                     if (!planStates.includes(formData.state.toUpperCase())) {
                         return false;
