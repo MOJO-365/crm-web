@@ -1302,6 +1302,7 @@ const InlineMaintenanceNotes = ({
         vppSignupBonus: '',
         batteryBrand: '',
         snNumber: '',
+        inverterSnNumber: '',
         batteryCapacity: '',
         exportLimit: '',
         batteryModel: '',
@@ -1315,6 +1316,7 @@ const InlineMaintenanceNotes = ({
                 vppSignupBonus: selectedCustomerDetails.vppDetails?.vppSignupBonus?.toString() || '',
                 batteryBrand: selectedCustomerDetails.batteryDetails?.batterybrand || selectedCustomerDetails.vppCertificateDetails?.batteryManufacturer || '',
                 snNumber: selectedCustomerDetails.batteryDetails?.snnumber || selectedCustomerDetails.vppCertificateDetails?.batterySerialNumber || '',
+                inverterSnNumber: selectedCustomerDetails.vppCertificateDetails?.inverterSnNumbers || '',
                 batteryCapacity: selectedCustomerDetails.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.batteryUsableCapacity?.toString() || '',
                 exportLimit: selectedCustomerDetails.batteryDetails?.exportlimit?.toString() || '',
                 batteryModel: selectedCustomerDetails.batteryDetails?.batterymodel || selectedCustomerDetails.vppCertificateDetails?.batteryModel || '',
@@ -1619,6 +1621,7 @@ const InlineMaintenanceNotes = ({
                 vppSignupBonus: selectedCustomerDetails.vppDetails?.vppSignupBonus?.toString() || '',
                 batteryBrand: selectedCustomerDetails.batteryDetails?.batterybrand || '',
                 snNumber: selectedCustomerDetails.batteryDetails?.snnumber || '',
+                inverterSnNumber: selectedCustomerDetails.vppCertificateDetails?.inverterSnNumbers || '',
                 batteryCapacity: selectedCustomerDetails.batteryDetails?.batterycapacity?.toString() || '',
                 exportLimit: selectedCustomerDetails.batteryDetails?.exportlimit?.toString() || '',
                 batteryModel: selectedCustomerDetails.batteryDetails?.batterymodel || '',
@@ -1912,6 +1915,9 @@ const InlineMaintenanceNotes = ({
                     inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : undefined,
                     checkCode: vppForm.checkCode || undefined,
                 } : undefined,
+                vppCertificateDetails: {
+                    inverterSnNumbers: vppForm.inverterSnNumber || null,
+                },
                 skipStatusUpdate: true
             };
 
@@ -1957,6 +1963,9 @@ const InlineMaintenanceNotes = ({
                     inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : null,
                     checkCode: vppForm.checkCode || null,
                 } : null,
+                vppCertificateDetails: {
+                    inverterSnNumbers: vppForm.inverterSnNumber || null,
+                },
                 isAppTrack: isAppTrack,
                 skipStatusUpdate: true
             };
@@ -2269,6 +2278,7 @@ const InlineMaintenanceNotes = ({
                     vppSignupBonus: latestDetails?.vppDetails?.vppSignupBonus?.toString() || selectedCustomerDetails?.vppDetails?.vppSignupBonus?.toString() || '',
                     batteryBrand: latestDetails?.batteryDetails?.batterybrand || latestDetails?.vppCertificateDetails?.batteryManufacturer || selectedCustomerDetails?.batteryDetails?.batterybrand || selectedCustomerDetails.vppCertificateDetails?.batteryManufacturer || '',
                     snNumber: latestDetails?.batteryDetails?.snnumber || latestDetails?.vppCertificateDetails?.batterySerialNumber || selectedCustomerDetails?.batteryDetails?.snnumber || selectedCustomerDetails.vppCertificateDetails?.batterySerialNumber || '',
+                    inverterSnNumber: latestDetails?.vppCertificateDetails?.inverterSnNumbers || selectedCustomerDetails?.vppCertificateDetails?.inverterSnNumbers || '',
                     batteryCapacity: latestDetails?.batteryDetails?.batterycapacity?.toString() || latestDetails?.vppCertificateDetails?.batteryUsableCapacity?.toString() || selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.batteryUsableCapacity?.toString() || '',
                     exportLimit: latestDetails?.batteryDetails?.exportlimit?.toString() || selectedCustomerDetails?.batteryDetails?.exportlimit?.toString() || '',
                     batteryModel: latestDetails?.batteryDetails?.batterymodel || selectedCustomerDetails?.batteryDetails?.batterymodel || '',
@@ -2282,6 +2292,7 @@ const InlineMaintenanceNotes = ({
                     vppSignupBonus: selectedCustomerDetails?.vppDetails?.vppSignupBonus?.toString() || '',
                     batteryBrand: selectedCustomerDetails?.batteryDetails?.batterybrand || selectedCustomerDetails.vppCertificateDetails?.batteryManufacturer || '',
                     snNumber: selectedCustomerDetails?.batteryDetails?.snnumber || selectedCustomerDetails.vppCertificateDetails?.batterySerialNumber || '',
+                    inverterSnNumber: selectedCustomerDetails?.vppCertificateDetails?.inverterSnNumbers || '',
                     batteryCapacity: selectedCustomerDetails?.batteryDetails?.batterycapacity?.toString() || selectedCustomerDetails.vppCertificateDetails?.batteryUsableCapacity?.toString() || '',
                     exportLimit: selectedCustomerDetails?.batteryDetails?.exportlimit?.toString() || '',
                     batteryModel: selectedCustomerDetails?.batteryDetails?.batterymodel || '',
@@ -2374,6 +2385,9 @@ const InlineMaintenanceNotes = ({
                     inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : null,
                     checkCode: vppForm.checkCode || null,
                 } : null,
+                vppCertificateDetails: {
+                    inverterSnNumbers: vppForm.inverterSnNumber || null,
+                },
                 skipStatusUpdate: true
             };
 
@@ -2440,6 +2454,9 @@ const InlineMaintenanceNotes = ({
                     inverterCapacity: vppForm.inverterCapacity ? parseFloat(vppForm.inverterCapacity) : null,
                     checkCode: vppForm.checkCode || null,
                 } : null,
+                vppCertificateDetails: {
+                    inverterSnNumbers: vppForm.inverterSnNumber || null,
+                },
                 skipStatusUpdate: true
             };
 
@@ -3242,7 +3259,7 @@ const InlineMaintenanceNotes = ({
                                         step: 2
                                     },
                                     {
-                                        label: 'App Track',
+                                        label: 'Customer Track',
                                         date: null,
                                         completed: selectedCustomerDetails.isAppTrack === 1,
                                         step: 2.5
@@ -4284,11 +4301,20 @@ const InlineMaintenanceNotes = ({
                                                     </div>
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <label className="text-xs font-semibold uppercase text-muted-foreground">SN Number</label>
+                                                    <label className="text-xs font-semibold uppercase text-muted-foreground">Battery SN Number</label>
                                                     <Input
                                                         placeholder="e.g. SN12345678"
                                                         value={vppForm.snNumber}
                                                         onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
+                                                        disabled={!isEditingTracking}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold uppercase text-muted-foreground">Inverter SN Number</label>
+                                                    <Input
+                                                        placeholder="e.g. INV12345678"
+                                                        value={vppForm.inverterSnNumber}
+                                                        onChange={(e) => setVppForm({ ...vppForm, inverterSnNumber: e.target.value })}
                                                         disabled={!isEditingTracking}
                                                     />
                                                 </div>
@@ -5257,11 +5283,19 @@ const InlineMaintenanceNotes = ({
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase text-muted-foreground">SN Number</label>
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Battery SN Number</label>
                             <Input
                                 placeholder="e.g. SN12345678"
                                 value={vppForm.snNumber}
                                 onChange={(e) => setVppForm({ ...vppForm, snNumber: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase text-muted-foreground">Inverter SN Number</label>
+                            <Input
+                                placeholder="e.g. INV12345678"
+                                value={vppForm.inverterSnNumber}
+                                onChange={(e) => setVppForm({ ...vppForm, inverterSnNumber: e.target.value })}
                             />
                         </div>
                         <div className="space-y-2 relative">

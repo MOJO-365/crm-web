@@ -130,6 +130,18 @@ const CUSTOMER_FULL_RESPONSE = `
         vppConnected
         vppSignupBonus
     }
+    vppCertificateDetails {
+        id
+        certificateNo
+        isAllRequiredFilled
+        isVppCertificateEmailSent
+        batteryManufacturer
+        batterySerialNumber
+        batteryUsableCapacity
+        inverterManufacturer
+        inverterSnNumbers
+        inverterCapacity
+    }
     utilmateDetails {
         id
         customerUid

@@ -1004,6 +1004,8 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 }
             }
             vppCertificateDetails {
+                id
+                certificateNo
                 isAllRequiredFilled
                 isVppCertificateEmailSent
                 isVppCertificateEmailSentAt
@@ -1018,12 +1020,6 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
                 msatConnected
                 msatConnectedAt
                 msatUpdatedAt
-            }
-            vppCertificateDetails {
-                id
-                certificateNo
-                isAllRequiredFilled
-                isVppCertificateEmailSent
             }
         }
     }
