@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { toast } from 'react-toastify';
-import { ChevronRightIcon, CheckIcon } from '@/components/icons';
+import { ChevronRightIcon, CheckIcon, SpinnerIcon, PencilIcon } from '@/components/icons';
 import Modal from '@/components/common/Modal';
 import { STATE_OPTIONS } from '@/lib/constants';
 
@@ -96,6 +96,7 @@ export const AddPlanPage: React.FC = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
     const [isCustomDiscountMode, setIsCustomDiscountMode] = useState(false);
+    const [editingCustomRateIndex, setEditingCustomRateIndex] = useState<number | null>(null);
 
     React.useEffect(() => {
         if (planData?.plan) {
@@ -383,7 +384,17 @@ export const AddPlanPage: React.FC = () => {
     };
 
     if (isEditMode && planLoading) {
-        return <div className="p-8 flex justify-center text-muted-foreground">Loading plan details...</div>;
+        return (
+            <div className="h-[calc(100vh-120px)] flex flex-col items-center justify-center gap-4 bg-card border border-border rounded-xl shadow-sm">
+                <div className="p-4 bg-primary/10 rounded-full">
+                    <SpinnerIcon size={32} className="text-primary" />
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                    <h3 className="text-lg font-semibold text-foreground">Loading Plan</h3>
+                    <p className="text-sm text-muted-foreground animate-pulse">Please wait while we fetch the plan details...</p>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -682,6 +693,7 @@ export const AddPlanPage: React.FC = () => {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
+                                        setEditingCustomRateIndex(null);
                                         setCustomRateDraft({ name: '', description: '', rate: '', unit: '', planType: 'fixed', tariffUid: '', dynamicType: '', rateType: 'Fixed' });
                                         setIsCustomModalOpen(true);
                                     }}
@@ -713,6 +725,9 @@ export const AddPlanPage: React.FC = () => {
                                                         <td className="px-3 py-1.5 align-middle">
                                                             <div className="flex flex-col">
                                                                 <span className="font-bold text-foreground text-xs tracking-wide">{comp.name}</span>
+                                                                {comp.description && (
+                                                                    <span className="text-[10px] text-muted-foreground leading-tight my-0.5">{comp.description}</span>
+                                                                )}
                                                                 <span className="text-[9px] uppercase font-bold text-muted-foreground/70 tracking-wider">
                                                                     {(() => {
                                                                         const name = comp.name.toUpperCase();
@@ -788,6 +803,29 @@ export const AddPlanPage: React.FC = () => {
                                                             </td>
                                                         )}
                                                         <td className="px-3 py-1.5 align-middle text-right">
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setEditingCustomRateIndex(index);
+                                                                        setCustomRateDraft({
+                                                                            name: comp.name || '',
+                                                                            description: comp.description || '',
+                                                                            rate: comp.rate || '',
+                                                                            unit: comp.unit || '',
+                                                                            planType: comp.planType || 'fixed',
+                                                                            tariffUid: comp.tariffUid || '',
+                                                                            dynamicType: comp.dynamicType || '',
+                                                                            rateType: comp.rateType || 'Fixed'
+                                                                        });
+                                                                        setIsCustomModalOpen(true);
+                                                                    }}
+                                                                    className="text-muted-foreground hover:text-primary transition-colors p-1"
+                                                                    title="Edit Rate Details"
+                                                                >
+                                                                    <PencilIcon size={14} />
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ) : null)}
@@ -890,19 +928,42 @@ export const AddPlanPage: React.FC = () => {
                                                                 </td>
                                                             )}
                                                             <td className="px-3 py-1.5 align-middle text-right">
-                                                                {comp.isCustom && (
+                                                                <div className="flex items-center justify-end gap-1">
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => {
-                                                                            const newComps = formData.components.filter((_, i) => i !== index);
-                                                                            setFormData({ ...formData, components: newComps });
+                                                                            setEditingCustomRateIndex(index);
+                                                                            setCustomRateDraft({
+                                                                                name: comp.name || '',
+                                                                                description: comp.description || '',
+                                                                                rate: comp.rate || '',
+                                                                                unit: comp.unit || '',
+                                                                                planType: comp.planType || 'fixed',
+                                                                                tariffUid: comp.tariffUid || '',
+                                                                                dynamicType: comp.dynamicType || '',
+                                                                                rateType: comp.rateType || 'Fixed'
+                                                                            });
+                                                                            setIsCustomModalOpen(true);
                                                                         }}
-                                                                        className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                                                                        title="Remove Rate"
+                                                                        className="text-muted-foreground hover:text-primary transition-colors p-1"
+                                                                        title="Edit Rate"
                                                                     >
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                                                        <PencilIcon size={14} />
                                                                     </button>
-                                                                )}
+                                                                    {comp.isCustom && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const newComps = formData.components.filter((_, i) => i !== index);
+                                                                                setFormData({ ...formData, components: newComps });
+                                                                            }}
+                                                                            className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                                                                            title="Remove Rate"
+                                                                        >
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     ) : null)}
@@ -935,7 +996,7 @@ export const AddPlanPage: React.FC = () => {
             <Modal
                 isOpen={isCustomModalOpen}
                 onClose={() => setIsCustomModalOpen(false)}
-                title="Add Custom Dynamic Rate"
+                title={editingCustomRateIndex !== null ? "Edit Rate" : "Add Custom Dynamic Rate"}
                 size="md"
             >
                 <div className="space-y-4 py-2">
@@ -945,6 +1006,7 @@ export const AddPlanPage: React.FC = () => {
                             value={customRateDraft.name}
                             onChange={(e) => setCustomRateDraft({ ...customRateDraft, name: e.target.value })}
                             placeholder="e.g. Special Discount Rate"
+                            disabled={editingCustomRateIndex !== null && !formData.components[editingCustomRateIndex]?.isCustom && !formData.components[editingCustomRateIndex]?.isDynamic}
                         />
                     </div>
                     <div className="space-y-2">
@@ -971,38 +1033,41 @@ export const AddPlanPage: React.FC = () => {
                                 { label: 'Demand Charges', value: 'Demand Charges' },
                             ]}
                             placeholder="Select type"
+                            disabled={editingCustomRateIndex !== null && !formData.components[editingCustomRateIndex]?.isCustom && !formData.components[editingCustomRateIndex]?.isDynamic}
                         />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Rate <span className="text-destructive">*</span></label>
-                            <Input
-                                type="number"
-                                step="any"
-                                min="0"
-                                value={customRateDraft.rate}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                        setCustomRateDraft({ ...customRateDraft, rate: val });
-                                    }
-                                }}
-                                onKeyDown={(e) => {
-                                    if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-                                }}
-                                placeholder="0.00"
-                            />
+                    {!(editingCustomRateIndex !== null && !formData.components[editingCustomRateIndex]?.isCustom && !formData.components[editingCustomRateIndex]?.isDynamic) && (
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Rate <span className="text-destructive">*</span></label>
+                                <Input
+                                    type="number"
+                                    step="any"
+                                    min="0"
+                                    value={customRateDraft.rate}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                            setCustomRateDraft({ ...customRateDraft, rate: val });
+                                        }
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+                                    }}
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Unit <span className="text-destructive">*</span></label>
+                                <Select
+                                    value={customRateDraft.unit}
+                                    onChange={(val) => setCustomRateDraft({ ...customRateDraft, unit: Array.isArray(val) ? val[0] : val })}
+                                    options={unitOptions}
+                                    placeholder="Select Unit"
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Unit <span className="text-destructive">*</span></label>
-                            <Select
-                                value={customRateDraft.unit}
-                                onChange={(val) => setCustomRateDraft({ ...customRateDraft, unit: Array.isArray(val) ? val[0] : val })}
-                                options={unitOptions}
-                                placeholder="Select Unit"
-                            />
-                        </div>
-                    </div>
+                    )}
 
                     <div className="flex justify-end gap-3 pt-4 mt-4">
                         <Button type="button" variant="outline" onClick={() => setIsCustomModalOpen(false)}>
@@ -1011,25 +1076,40 @@ export const AddPlanPage: React.FC = () => {
                         <Button
                             type="button"
                             onClick={() => {
+                                const isStatic = editingCustomRateIndex !== null && !formData.components[editingCustomRateIndex]?.isCustom && !formData.components[editingCustomRateIndex]?.isDynamic;
+                                
                                 if (!customRateDraft.name) return toast.error('Rate Name is required');
-                                if (!customRateDraft.rate) return toast.error('Rate is required');
-                                if (!customRateDraft.unit) return toast.error('Unit is required');
+                                if (!isStatic) {
+                                    if (!customRateDraft.rate) return toast.error('Rate is required');
+                                    if (!customRateDraft.unit) return toast.error('Unit is required');
+                                }
 
-                                setFormData(prev => ({
-                                    ...prev,
-                                    components: [
-                                        ...prev.components,
-                                        {
-                                            ...customRateDraft,
-                                            isDynamic: true,
-                                            isCustom: true
-                                        }
-                                    ]
-                                }));
+                                if (editingCustomRateIndex !== null) {
+                                    setFormData(prev => {
+                                        const newComps = [...prev.components];
+                                        newComps[editingCustomRateIndex] = {
+                                            ...newComps[editingCustomRateIndex],
+                                            ...customRateDraft
+                                        };
+                                        return { ...prev, components: newComps };
+                                    });
+                                } else {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        components: [
+                                            ...prev.components,
+                                            {
+                                                ...customRateDraft,
+                                                isDynamic: true,
+                                                isCustom: true
+                                            }
+                                        ]
+                                    }));
+                                }
                                 setIsCustomModalOpen(false);
                             }}
                         >
-                            Add Rate
+                            {editingCustomRateIndex !== null ? 'Save Changes' : 'Add Rate'}
                         </Button>
                     </div>
                 </div>
