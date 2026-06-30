@@ -24,6 +24,7 @@ export const CustomerViewPage: React.FC = () => {
     const [step, setStep] = useState<'consent' | 'rates' | 'nomination' | 'review' | 'idcheck'>('consent');
     const [idConfirmed, setIdConfirmed] = useState(false);
     const [isChecked, setIsChecked] = useState(false);
+    const [initialConsentLoaded, setInitialConsentLoaded] = useState(false);
     const [isNominationConfirmed, setIsNominationConfirmed] = useState(false);
     const [consents, setConsents] = useState({
         infoConfirm: false,
@@ -90,11 +91,14 @@ export const CustomerViewPage: React.FC = () => {
     // Side Effects
     useEffect(() => {
         // Read consent state from enrollment (web_enrollments) since customer isn't created until approval
-        const consentRead = enrollment?.isConsentRead ?? customerData?.customer?.isConsentRead;
-        if (consentRead !== undefined && consentRead !== null) {
-            setIsChecked(!!consentRead);
+        if (!initialConsentLoaded) {
+            const consentRead = enrollment?.isConsentRead ?? customerData?.customer?.isConsentRead;
+            if (consentRead !== undefined && consentRead !== null) {
+                setIsChecked(!!consentRead);
+                setInitialConsentLoaded(true);
+            }
         }
-    }, [enrollment, customerData]);
+    }, [enrollment, customerData, initialConsentLoaded]);
 
     useEffect(() => {
         if (!idFormInit && payload && Object.keys(payload).length > 0) {
