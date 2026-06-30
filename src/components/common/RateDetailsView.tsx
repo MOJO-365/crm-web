@@ -1,6 +1,8 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@apollo/client';
+import { GET_COLUMN_METADATA } from '@/graphql';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
 import {
     ZapIcon,
@@ -23,43 +25,26 @@ export interface RateDetailsViewProps {
 }
 
 export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan, className, planRatesJson }: RateDetailsViewProps) => {
-    const getTooltipText = (label: string) => {
-        const lower = (label || '').toLowerCase();
-        if (lower.includes('discounted usage') || lower.includes('discounted rate')) return "First 10 kWh/day";
-        if (lower.includes('standard usage') || lower.includes('standard rate')) return "After 10 kWh/day";
-        if (lower.includes('premium feed-in tariff') || lower.includes('premium fit')) return "The first 10kWh exported between 5:00pm and 9:00pm";
-        if (lower.includes('critical event bonus') || lower.includes('critical event')) return "When electricity cost is more than $1/kwh at AEMO and we trigger the batteries to discharge";
-        if (lower.includes('zero evening')) return "If your grid import is effectively zero—defined as less than 0.03 kWh per hour from the grid, during the 5–8 pm evening peak every day.";
-        if (lower.includes('base fit')) {
-            return (
-                <div className="space-y-1.5 text-[11px] leading-normal font-sans text-left text-white p-1">
-                    <div className="font-bold border-b border-gray-700 pb-1 mb-1.5 uppercase tracking-wider text-xs">Base FIT</div>
-                    <div className="flex flex-col gap-0.5">
-                        <div className="flex justify-between items-center gap-2">
-                            <span className="text-gray-400 font-medium">Standard Hours:</span>
-                            <span className="font-semibold">5:00pm to 9:00pm</span>
-                        </div>
-                    </div>
-                    <div className="flex flex-col gap-0.5 border-t border-gray-700/50 pt-1">
-                        <div className="flex justify-between items-center gap-2">
-                            <span className="text-gray-400 font-medium">Seasonal Bonus Hours:</span>
-                            <span className="font-semibold">5:00am to 8:00am</span>
-                        </div>
-                        <span className="text-[10px] text-gray-400 italic text-right mt-0.5">(1 March to 31 August)</span>
-                    </div>
-                </div>
-            );
+    const { data: columnMetadataData } = useQuery(GET_COLUMN_METADATA, { fetchPolicy: 'cache-first' });
+
+    const dynamicRateInfoMap = React.useMemo(() => {
+        const map = new Map<string, string>();
+        if (columnMetadataData?.getColumnMetadata) {
+            columnMetadataData.getColumnMetadata.forEach((row: any) => {
+                if (row.columnName && row.description) {
+                    map.set(row.columnName.toUpperCase(), row.description);
+                }
+            });
         }
-        if (lower === 'anytime') return "Flat usage rate charged at all times.";
-        if (lower === 'peak') return "Usage rate charged during peak periods of high demand.";
-        if (lower === 'shoulder') return "Usage rate charged during shoulder transition periods.";
-        if (lower === 'off-peak') return "Usage rate charged during off-peak periods (typically overnight).";
-        if (lower === 'supply' || lower === 'supply charge') return "Daily service charge for connection to the grid.";
-        return null;
+        return map;
+    }, [columnMetadataData]);
+
+    const getTooltipText = (label: string) => {
+        return dynamicRateInfoMap.get((label || '').toUpperCase()) || "";
     };
 
-    const renderLabelWithTooltip = (label: string, textClass?: string) => {
-        const tooltipContent = getTooltipText(label);
+    const renderLabelWithTooltip = (label: string, explicitTooltip?: React.ReactNode | string, textClass?: string) => {
+        const tooltipContent = explicitTooltip || getTooltipText(label);
         return (
             <div className={cn("text-[10px] font-bold uppercase tracking-wider opacity-80 flex items-center justify-center gap-1", textClass)}>
                 <span>{label}</span>
@@ -95,10 +80,10 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
             const matchingPlanRate = planRates.find((pr) => pr.name.toUpperCase() === item.label.toUpperCase());
             if (!matchingPlanRate) return null;
             if (matchingPlanRate.rateType === 'Fixed') {
-                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit };
+                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description };
             }
             if (matchingPlanRate.rateType === 'According to Tariff') {
-                return item;
+                return { ...item, description: matchingPlanRate.info || matchingPlanRate.description || item.description };
             }
             return null;
         }).filter(Boolean) as any[];
@@ -119,7 +104,8 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                 value: fa.rate,
                 type: 'dynamic',
                 unitId: fa.unit,
-                applyDiscount: fa.applyDiscount !== false
+                applyDiscount: fa.applyDiscount !== false,
+                description: fa.info || fa.description
             });
         });
 
@@ -153,13 +139,13 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
         { label: 'Off-Peak', value: offer.offPeak, type: 'offPeak', applyDiscount: true },
         { label: 'Shoulder', value: offer.shoulder, type: 'shoulder', applyDiscount: true },
         { label: 'Anytime', value: offer.anytime, type: 'anytime', applyDiscount: true },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false, description: r.description || r.info }))
     ], 'energy_rates');
 
     // Supply Charges Items
     const supplyChargesItems = processItems([
         { label: 'Supply Charge', value: offer.supplyCharge, type: 'supplyCharge' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount, description: r.description || r.info }))
     ], 'supply_charges');
 
     // Demand Charges Items
@@ -168,13 +154,13 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
         { label: 'Demand(Op)', value: offer.demandOp, type: 'demandOp', applyDiscount: true },
         { label: 'Demand(P)', value: offer.demandP, type: 'demandP', applyDiscount: true },
         { label: 'Demand(S)', value: offer.demandS, type: 'demandS', applyDiscount: true },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false, description: r.description || r.info }))
     ], 'demand_charges');
 
     // VPP Orchestration Charges Items
     const vppChargesItems = processItems([
         { label: 'VPP Orchestration', value: offer.vppOrcharge, type: 'vppOrcharge', applyDiscount: false },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: false }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: false, description: r.description || r.info }))
     ], 'vpp_charges');
 
     const hasColumn2 = supplyChargesItems.length > 0 || demandChargesItems.length > 0 || vppChargesItems.length > 0;
@@ -191,7 +177,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
         { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
         { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
         { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount, description: r.description || r.info }))
     ];
     const solarFitItems = processItems(rawSolarFitItems, 'solar_fit').filter(rate => {
         if (rate.type === 'fit') return !vpp;
@@ -211,7 +197,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
         { label: 'CL2 Usage', value: offer.cl2Usage, type: 'cl2_usage', applyDiscount: true },
         { label: 'CL1 Supply', value: offer.cl1Supply, type: 'cl1_supply', applyDiscount: true },
         { label: 'CL2 Supply', value: offer.cl2Supply, type: 'cl2_supply', applyDiscount: true },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false, description: r.description || r.info }))
     ], 'controlled_load');
 
     // Remaining dynamic rates
@@ -220,10 +206,10 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
 
     const fitRates = processItems(remainingDynamicRates
         .filter((r: any) => r.type === 'fit' || r.type === 'extra_fit' || (!r.type && (vpp || isVppPlan)))
-        .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount })), 'extra_fit');
+        .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info })), 'extra_fit');
     const chargeRates = processItems(remainingDynamicRates
         .filter((r: any) => r.type === 'charges' || r.type === 'extra_charges' || (!r.type && !(vpp || isVppPlan)))
-        .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount })), 'extra_charges');
+        .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info })), 'extra_charges');
 
     const renderRatesColumn = (rates: any[], label: string, colorClass: string, icon: any = ActivityIcon) => {
         if (rates.length === 0) return null;
@@ -248,7 +234,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                 <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-sm")}>
                                     ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
                                 </div>
-                                {renderLabelWithTooltip(dRate.name, colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400")}
+                                {renderLabelWithTooltip(dRate.name, dRate.description, colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400")}
                             </div>
                         );
                     })}
@@ -285,7 +271,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                             "font-bold text-sm",
                                             isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
                                         )}>${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                        {renderLabelWithTooltip(rate.label, isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400")}
+                                        {renderLabelWithTooltip(rate.label, rate.description, isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400")}
                                     </div>
                                 );
                             })}
@@ -309,7 +295,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                     return (
                                         <div key={id} className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                             <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                            {renderLabelWithTooltip(r.label, "text-purple-600 dark:text-purple-400")}
+                                            {renderLabelWithTooltip(r.label, r.description, "text-purple-600 dark:text-purple-400")}
                                         </div>
                                     );
                                 })}
@@ -331,7 +317,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                     return (
                                         <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                             <div className="text-rose-600 dark:text-rose-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                            {renderLabelWithTooltip(d.label, "text-rose-600 dark:text-rose-400")}
+                                            {renderLabelWithTooltip(d.label, d.description, "text-rose-600 dark:text-rose-400")}
                                         </div>
                                     );
                                 })}
@@ -365,7 +351,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                                     )}
                                                 </div>
                                             </div>
-                                            {renderLabelWithTooltip(r.label, "text-amber-600 dark:text-amber-400")}
+                                            {renderLabelWithTooltip(r.label, r.description, "text-amber-600 dark:text-amber-400")}
                                         </div>
                                     );
                                 })}
@@ -390,7 +376,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                 return (
                                     <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                         <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
-                                        {renderLabelWithTooltip(rate.label, "text-teal-800 dark:text-teal-300")}
+                                        {renderLabelWithTooltip(rate.label, rate.description, "text-teal-800 dark:text-teal-300")}
                                     </div>
                                 );
                             })}
@@ -413,7 +399,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                             return (
                                 <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
                                     <div className="text-green-600 dark:text-green-400 font-bold text-sm">${price.toFixed(4)}{unitStr.startsWith('/') ? unitStr : `/${unitStr}`}</div>
-                                    {renderLabelWithTooltip(rate.label, "text-green-600 dark:text-green-400")}
+                                    {renderLabelWithTooltip(rate.label, rate.description, "text-green-600 dark:text-green-400")}
                                 </div>
                             );
                         })}
