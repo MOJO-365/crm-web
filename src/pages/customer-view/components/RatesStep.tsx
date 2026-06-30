@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery } from '@apollo/client';
 import { GET_ALL_BONUSES } from '@/graphql/queries/bonus';
+import { GET_COLUMN_METADATA } from '@/graphql/queries/rates';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
 import { ZapIcon, InfoIcon, PhoneIcon, MailIcon } from '@/components/icons';
 import { CustomerViewLayout } from './CustomerViewLayout';
@@ -30,7 +31,21 @@ export const RatesStep: React.FC<RatesStepProps> = ({
 }) => {
     const [hoveredTooltip, setHoveredTooltip] = React.useState<{ text: React.ReactNode; x: number; y: number; position: 'right' | 'left' | 'top' | 'bottom' } | null>(null);
     const { data: bonusesData } = useQuery(GET_ALL_BONUSES);
+    const { data: colData } = useQuery(GET_COLUMN_METADATA, { fetchPolicy: 'cache-first' });
     const allBonuses = bonusesData?.bonuses || [];
+    
+    const dynamicRateInfoMap = React.useMemo(() => {
+        const map = new Map<string, string>();
+        if (colData?.getColumnMetadata) {
+            colData.getColumnMetadata.forEach((col: any) => {
+                if (col.columnName && col.description) {
+                    map.set(col.columnName.toUpperCase(), col.description);
+                }
+            });
+        }
+        return map;
+    }, [colData]);
+
     const unitMap = React.useMemo(() => {
         const map: Record<string, string> = {};
         measurementUnits?.forEach((u: any) => {
@@ -71,10 +86,10 @@ export const RatesStep: React.FC<RatesStepProps> = ({
             const matchingPlanRate = planRates.find((pr: any) => pr.name.replace(/\s+/g, '').toUpperCase() === item.label.replace(/\s+/g, '').toUpperCase());
             if (!matchingPlanRate) return null;
             if (matchingPlanRate.rateType === 'Fixed') {
-                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit };
+                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info };
             }
             if (matchingPlanRate.rateType === 'According to Tariff') {
-                return item;
+                return { ...item, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info };
             }
             return null;
         }).filter(Boolean) as any[];
@@ -91,10 +106,12 @@ export const RatesStep: React.FC<RatesStepProps> = ({
         fixedAdditions.forEach((fa: any) => {
             processed.push({
                 label: fa.name,
+                name: fa.name,
                 value: fa.rate,
                 type: 'dynamic',
                 unitId: fa.unit,
-                applyDiscount: false
+                applyDiscount: fa.applyDiscount !== false,
+                description: fa.info || fa.description
             });
         });
 
@@ -127,13 +144,13 @@ export const RatesStep: React.FC<RatesStepProps> = ({
             { label: 'Peak', value: mainOffer.peak, type: 'peak' },
             { label: 'Shoulder', value: mainOffer.shoulder, type: 'shoulder' },
             { label: 'Off-Peak', value: mainOffer.offPeak, type: 'offPeak' },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId }))
+            ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false, description: r.description || r.info }))
         ], 'energy_rates');
     }, [mainOffer, parsedDynamicRates, processItems]); const supplyChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
             { label: 'Supply Charge', value: mainOffer.supplyCharge, type: 'supplyCharge' },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
+            ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
         ], 'supply_charges');
     }, [mainOffer, parsedDynamicRates, processItems]); const demandChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
@@ -142,13 +159,13 @@ export const RatesStep: React.FC<RatesStepProps> = ({
             { label: 'Demand(Op)', value: mainOffer.demandOp, type: 'demandOp' },
             { label: 'Demand(P)', value: mainOffer.demandP, type: 'demandP' },
             { label: 'Demand(S)', value: mainOffer.demandS, type: 'demandS' },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
+            ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
         ], 'demand_charges');
     }, [mainOffer, parsedDynamicRates, processItems]); const vppChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
             { label: 'VPP Orchestration', value: mainOffer.vppOrcharge, type: 'vppOrcharge', applyDiscount: true },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
+            ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
         ], 'vpp_charges');
     }, [mainOffer, parsedDynamicRates, processItems]); const solarFitItems = React.useMemo(() => {
         if (!mainOffer || !hasFiT) return [];
@@ -157,7 +174,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
             { label: 'PREMIUM FIT', value: mainOffer.fitPeak, type: 'fitPeak' },
             { label: 'CRITICAL EVENT FIT', value: mainOffer.fitCritical, type: 'fitCritical' },
             { label: 'BASE FIT', value: mainOffer.fitVpp, type: 'fitVpp' },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
+            ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
         ], 'solar_fit').filter(rate => {
             const numericValue = parseFloat(String(rate.value || 0));
             if (numericValue <= 0) return false;
@@ -173,7 +190,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
         if (!mainOffer) return [];
         const items = parsedDynamicRates
             .filter((r: any) => (r.type === 'fit' || r.type === 'extra_fit') && !handledTypes.includes(r.type))
-            .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }));
+            .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }));
         return processItems(items, 'extra_fit');
     }, [mainOffer, parsedDynamicRates, handledTypes, processItems]); const controlledLoadItems = React.useMemo(() => {
         if (!mainOffer || !hasCL) return [];
@@ -182,7 +199,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
             { label: 'CL2 Usage', value: mainOffer.cl2Usage, type: 'cl2_usage' },
             { label: 'CL1 Supply', value: mainOffer.cl1Supply, type: 'cl1_supply' },
             { label: 'CL2 Supply', value: mainOffer.cl2Supply, type: 'cl2_supply' },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }))
+            ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false && r.name.toLowerCase().includes('usage'), description: r.description || r.info }))
         ], 'controlled_load');
     }, [mainOffer, parsedDynamicRates, hasCL, processItems]);
 
@@ -191,7 +208,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
         const handledAll = [...handledTypes, 'fit', 'extra_fit'];
         const items = parsedDynamicRates
             .filter((r: any) => !handledAll.includes(r.type) && (!r.type || r.type === 'charges' || r.type === 'extra_charges'))
-            .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount }));
+            .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }));
         return processItems(items, 'extra_charges');
     }, [mainOffer, parsedDynamicRates, handledTypes, processItems]);
 
@@ -233,37 +250,9 @@ export const RatesStep: React.FC<RatesStepProps> = ({
             if (unit && !unit.startsWith('/')) unit = '/' + unit;
 
             const tooltipText = (() => {
-                const lower = (item.label || item.name || '').toLowerCase();
-                if (lower.includes('discounted usage') || lower.includes('discounted rate')) return "First 10 kWh/day";
-                if (lower.includes('standard usage') || lower.includes('standard rate')) return "After 10 kWh/day";
-                if (lower.includes('premium feed-in tariff') || lower.includes('premium fit')) return "The first 10kWh exported between 5:00pm and 9:00pm";
-                if (lower.includes('critical event bonus') || lower.includes('critical event')) return "When electricity cost is more than $1/kwh at AEMO and we trigger the batteries to discharge";
-                if (lower.includes('zero evening')) return "If your grid import is effectively zero—defined as less than 0.03 kWh per hour from the grid, during the 5–8 pm evening peak every day.";
-                if (lower.includes('base fit')) {
-                    return (
-                        <div className="space-y-1.5 text-[11px] leading-normal font-sans text-left">
-                            <div className="font-bold text-slate-100 border-b border-slate-700 pb-1 mb-1.5 uppercase tracking-wider text-xs">Base FIT</div>
-                            <div className="flex flex-col gap-0.5">
-                                <div className="flex justify-between items-center gap-2">
-                                    <span className="text-slate-400 font-medium">Standard Hours:</span>
-                                    <span className="font-semibold text-slate-200">5:00pm to 9:00pm</span>
-                                </div>
-                            </div>
-                            <div className="flex flex-col gap-0.5 border-t border-slate-800/50 pt-1">
-                                <div className="flex justify-between items-center gap-2">
-                                    <span className="text-slate-400 font-medium">Seasonal Bonus Hours:</span>
-                                    <span className="font-semibold text-slate-200 font-sans">5:00am to 8:00am</span>
-                                </div>
-                                <span className="text-[10px] text-slate-400 italic text-right mt-0.5 font-sans">(1 March to 31 August)</span>
-                            </div>
-                        </div>
-                    );
-                }
-                if (lower === 'anytime') return "Flat usage rate charged at all times.";
-                if (lower === 'peak') return "Usage rate charged during peak periods of high demand.";
-                if (lower === 'shoulder') return "Usage rate charged during shoulder transition periods.";
-                if (lower === 'off-peak') return "Usage rate charged during off-peak periods (typically overnight).";
-                if (lower === 'supply' || lower === 'supply charge') return "Daily service charge for connection to the grid.";
+                if (item.description || item.info) return item.description || item.info;
+                const fromDb = dynamicRateInfoMap.get((item.label || item.name || '').toUpperCase());
+                if (fromDb) return fromDb;
                 return null;
             })();
 
@@ -277,7 +266,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
                 tooltipText
             };
         });
-    }, [energyRatesItems, supplyChargesItems, demandChargesItems, vppChargesItems, solarFitItems, extraFitItems, controlledLoadItems, extraChargesItems, discount, unitMap, parsedPriceUnits]);
+    }, [energyRatesItems, supplyChargesItems, demandChargesItems, vppChargesItems, solarFitItems, extraFitItems, controlledLoadItems, extraChargesItems, discount, unitMap, parsedPriceUnits, dynamicRateInfoMap]);
 
     const activeBonusesList = React.useMemo(() => {
         const list: Array<{ name: string; description: string; displayValue: string }> = [];
