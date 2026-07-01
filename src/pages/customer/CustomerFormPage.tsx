@@ -277,7 +277,7 @@ const StepBadge: React.FC<StepBadgeProps> = ({ index, label, active, done, statu
 
 
 // ============================================================================
-const applyPlanOverridesToOffer = (offer: any, planRatesJson: any) => {
+const applyPlanOverridesToOffer = (offer: any, planRatesJson: any, isDnspBased?: boolean, selectedDnsp?: any) => {
     if (!offer || !planRatesJson) return offer;
     try {
         let planRates;
@@ -287,6 +287,10 @@ const applyPlanOverridesToOffer = (offer: any, planRatesJson: any) => {
             planRates = JSON.parse(planRatesJson);
         }
         if (!Array.isArray(planRates) || planRates.length === 0) return offer;
+
+        if (isDnspBased && selectedDnsp !== undefined && selectedDnsp !== null) {
+            planRates = planRates.filter((r: any) => String(r.dnsp) === String(selectedDnsp));
+        }
 
         const newOffer = { ...offer };
         let dynamicRates = typeof newOffer.dynamicRates === 'string'
@@ -2034,7 +2038,9 @@ export const CustomerFormPage = () => {
         try {
             const offer = selectedRatePlan?.offers?.[0];
             const discount = formData.discount ?? selectedPlan?.discount ?? 0;
-            const overriddenOffer = offer ? applyPlanOverridesToOffer(offer, selectedPlan?.ratesJson || customerData?.plan?.ratesJson) : null;
+            const isDnspBased = selectedPlan?.isDnspBased ?? customerData?.plan?.isDnspBased;
+            const dnsp = selectedRatePlan?.dnsp;
+            const overriddenOffer = offer ? applyPlanOverridesToOffer(offer, selectedPlan?.ratesJson || customerData?.plan?.ratesJson, isDnspBased, dnsp) : null;
             const charges = overriddenOffer ? {
                 supplyCharge: overriddenOffer.supplyCharge,
                 anytime: overriddenOffer.anytime,
