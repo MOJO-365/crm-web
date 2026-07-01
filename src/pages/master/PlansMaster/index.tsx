@@ -24,6 +24,7 @@ interface Plan {
     state?: string;
     description?: string;
     isActive?: boolean;
+    isDnspBased?: boolean;
     propertyType?: number;
     isSolarRequired?: boolean;
     isBatteryRequired?: boolean;

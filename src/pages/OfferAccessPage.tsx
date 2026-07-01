@@ -1072,6 +1072,8 @@ export const OfferAccessPage = () => {
                                     units={unitMap}
                                     isVppPlan={ratePlan?.vpp === 1}
                                     planRatesJson={customerData.plan?.ratesJson}
+                                    isDnspBased={customerData.plan?.isDnspBased}
+                                    selectedDnsp={ratePlan?.dnsp}
                                     className="border-none shadow-none bg-transparent p-0"
                                 />
                             );

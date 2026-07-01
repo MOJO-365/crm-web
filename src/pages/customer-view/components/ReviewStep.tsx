@@ -75,15 +75,22 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
     const planRates = React.useMemo(() => {
         const planRatesJson = customer?.plan?.ratesJson;
         if (!planRatesJson) return [];
+        let parsed = [];
         if (typeof planRatesJson === 'object') {
-            return Array.isArray(planRatesJson) ? planRatesJson : [];
+            parsed = Array.isArray(planRatesJson) ? planRatesJson : [];
+        } else {
+            try {
+                parsed = JSON.parse(planRatesJson);
+            } catch {
+                parsed = [];
+            }
         }
-        try {
-            return JSON.parse(planRatesJson);
-        } catch {
-            return [];
+        
+        if (customer?.plan?.isDnspBased && ratePlan?.dnsp !== undefined && ratePlan?.dnsp !== null) {
+            return parsed.filter((r: any) => String(r.dnsp) === String(ratePlan.dnsp));
         }
-    }, [customer?.plan?.ratesJson]);
+        return parsed;
+    }, [customer?.plan?.ratesJson, customer?.plan?.isDnspBased, ratePlan?.dnsp]);
 
     const processItems = React.useCallback((items: any[], type: string) => {
         if (!planRates || planRates.length === 0) {

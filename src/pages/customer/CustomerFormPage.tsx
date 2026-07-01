@@ -3053,6 +3053,8 @@ export const CustomerFormPage = () => {
                                                 units={unitMap}
                                                 isVppPlan={selectedRatePlan?.vpp === 1}
                                                 planRatesJson={selectedPlan?.ratesJson}
+                                                isDnspBased={selectedPlan?.isDnspBased}
+                                                selectedDnsp={selectedRatePlan?.dnsp}
                                             />
                                         ))}
                                     </div>
@@ -3623,6 +3625,8 @@ export const CustomerFormPage = () => {
                                                 units={unitMap}
                                                 isVppPlan={selectedRatePlan?.vpp === 1}
                                                 planRatesJson={selectedPlan?.ratesJson}
+                                                isDnspBased={selectedPlan?.isDnspBased}
+                                                selectedDnsp={selectedRatePlan?.dnsp}
                                                 className="md:col-span-2"
                                             />
                                         )}

@@ -5,7 +5,7 @@ import { GET_COLUMN_METADATA } from '@/graphql/queries/rates';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
 import { ZapIcon, InfoIcon, PhoneIcon, MailIcon } from '@/components/icons';
 import { CustomerViewLayout } from './CustomerViewLayout';
-
+import { DNSP_LABELS } from '@/lib/constants';
 interface RatesStepProps {
     ratesLoading: boolean;
     mainOffer: any;
@@ -67,15 +67,22 @@ export const RatesStep: React.FC<RatesStepProps> = ({
     const planRates = React.useMemo(() => {
         const planRatesJson = customer?.plan?.ratesJson;
         if (!planRatesJson) return [];
+        let parsed = [];
         if (typeof planRatesJson === 'object') {
-            return Array.isArray(planRatesJson) ? planRatesJson : [];
+            parsed = Array.isArray(planRatesJson) ? planRatesJson : [];
+        } else {
+            try {
+                parsed = JSON.parse(planRatesJson);
+            } catch {
+                parsed = [];
+            }
         }
-        try {
-            return JSON.parse(planRatesJson);
-        } catch {
-            return [];
+        
+        if (customer?.plan?.isDnspBased && ratePlan?.dnsp !== undefined && ratePlan?.dnsp !== null) {
+            return parsed.filter((r: any) => String(r.dnsp) === String(ratePlan.dnsp));
         }
-    }, [customer?.plan?.ratesJson]);
+        return parsed;
+    }, [customer?.plan?.ratesJson, customer?.plan?.isDnspBased, ratePlan?.dnsp]);
 
     const processItems = React.useCallback((items: any[], type: string) => {
         if (!planRates || planRates.length === 0) {
@@ -377,17 +384,19 @@ export const RatesStep: React.FC<RatesStepProps> = ({
                                         <p className="text-xs text-muted-foreground">Energy rate plan & offers</p>
                                     </div>
                                 </div>
-                                {/* <div className="flex flex-wrap items-center gap-2">
-                                <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-muted text-muted-foreground rounded-lg">DNSP: {DNSP_LABELS[ratePlan?.dnsp as keyof typeof DNSP_LABELS] || 'Unknown'}</span>
-                                {customer?.rateVersion && (
-                                    <div className="px-2 py-0.5 text-[10px] font-bold uppercase bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg">
-                                        Ver: {customer.rateVersion}
-                                    </div>
-                                )}
-                                {customer?.vppDetails?.vpp === 1 && (
-                                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-lg">VPP Active</span>
-                                )}
-                            </div> */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-muted text-muted-foreground rounded-lg">
+                                        DNSP: {DNSP_LABELS[ratePlan?.dnsp as keyof typeof DNSP_LABELS] || 'Unknown'}
+                                    </span>
+                                    {customer?.rateVersion && (
+                                        <div className="px-2 py-0.5 text-[10px] font-bold uppercase bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg">
+                                            Ver: {customer.rateVersion}
+                                        </div>
+                                    )}
+                                    {customer?.vppDetails?.vpp === 1 && (
+                                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-lg">VPP Active</span>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="p-0">

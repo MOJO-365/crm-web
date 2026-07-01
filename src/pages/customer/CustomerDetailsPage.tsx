@@ -135,9 +135,12 @@ interface CustomerDetails {
     planUid?: string;
     plan?: {
         uid?: string;
+        title?: string;
         ratesJson?: string;
         discount?: number;
         attachNominationForm?: number;
+        isDnspBased?: boolean;
+        dnsp?: number;
     };
     signDate?: string;
     signedPdfPath?: string;
@@ -3986,7 +3989,9 @@ const InlineMaintenanceNotes = ({
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground rounded-lg">DNSP: {DNSP_LABELS[selectedCustomerDetails.ratePlan.dnsp as keyof typeof DNSP_LABELS] || 'Unknown'}</span>
+                                            <span className="px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground rounded-lg">
+                                                DNSP: {DNSP_LABELS[selectedCustomerDetails.ratePlan.dnsp as keyof typeof DNSP_LABELS] || 'Unknown'}
+                                            </span>
                                             {selectedCustomerDetails.rateVersion && (
                                                 <div className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg flex items-center gap-1">
                                                     <span>Ver:</span>
@@ -4028,6 +4033,8 @@ const InlineMaintenanceNotes = ({
                                                         units={unitMap}
                                                         isVppPlan={isVppPlan}
                                                         planRatesJson={selectedCustomerDetails.plan?.ratesJson}
+                                                        isDnspBased={selectedCustomerDetails.plan?.isDnspBased}
+                                                        selectedDnsp={snapshotRatePlan ? snapshotRatePlan.dnsp : selectedCustomerDetails.ratePlan?.dnsp}
                                                     />
                                                 ))}
                                             </div>

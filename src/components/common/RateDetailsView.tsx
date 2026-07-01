@@ -22,9 +22,11 @@ export interface RateDetailsViewProps {
     isVppPlan: boolean;
     className?: string;
     planRatesJson?: string | null;
+    isDnspBased?: boolean;
+    selectedDnsp?: string | number;
 }
 
-export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan, className, planRatesJson }: RateDetailsViewProps) => {
+export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan, className, planRatesJson, isDnspBased, selectedDnsp }: RateDetailsViewProps) => {
     const { data: columnMetadataData } = useQuery(GET_COLUMN_METADATA, { fetchPolicy: 'cache-first' });
 
     const dynamicRateInfoMap = React.useMemo(() => {
@@ -61,15 +63,22 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
 
     const planRates: any[] = React.useMemo(() => {
         if (!planRatesJson) return [];
+        let parsed = [];
         if (typeof planRatesJson === 'object') {
-            return Array.isArray(planRatesJson) ? planRatesJson : [];
+            parsed = Array.isArray(planRatesJson) ? planRatesJson : [];
+        } else {
+            try {
+                parsed = JSON.parse(planRatesJson);
+            } catch {
+                parsed = [];
+            }
         }
-        try {
-            return JSON.parse(planRatesJson);
-        } catch {
-            return [];
+        
+        if (isDnspBased && selectedDnsp !== undefined && selectedDnsp !== null) {
+            return parsed.filter((r: any) => String(r.dnsp) === String(selectedDnsp));
         }
-    }, [planRatesJson]);
+        return parsed;
+    }, [planRatesJson, isDnspBased, selectedDnsp]);
 
     const processItems = (items: any[], type: string) => {
         if (!planRates || planRates.length === 0) {
