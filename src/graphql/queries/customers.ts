@@ -565,6 +565,10 @@ export const GET_CUSTOMER_BY_ID = gql`
                 uid
                 ratesJson
                 discount
+                title
+                attachNominationForm
+                isDnspBased
+                dnsp
             }
             status
             discount
@@ -766,9 +770,12 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             isAppTrack
             plan {
                 uid
+                title
                 ratesJson
                 discount
                 attachNominationForm
+                isDnspBased
+                dnsp
             }
             status
             discount
@@ -1377,6 +1384,8 @@ export const GET_CUSTOMER_BY_CUSTOMER_ID = gql`
                 title
                 bonusUids
                 attachNominationForm
+                isDnspBased
+                dnsp
             }
             status
             discount

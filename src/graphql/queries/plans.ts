@@ -9,6 +9,7 @@ export const GET_PLANS = gql`
       state
       description
       discount
+      isDnspBased
       propertyType
       isSolarRequired
       isBatteryRequired
@@ -33,6 +34,7 @@ export const GET_ACTIVE_PLANS = gql`
       state
       description
       discount
+      isDnspBased
       propertyType
       isSolarRequired
       isBatteryRequired
@@ -57,6 +59,7 @@ export const GET_PLAN = gql`
       state
       description
       discount
+      isDnspBased
       propertyType
       isSolarRequired
       isBatteryRequired

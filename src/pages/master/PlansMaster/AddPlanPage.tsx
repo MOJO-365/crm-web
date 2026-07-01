@@ -12,7 +12,7 @@ import { Select } from '@/components/ui/Select';
 import { toast } from 'react-toastify';
 import { ChevronRightIcon, CheckIcon, SpinnerIcon, PencilIcon } from '@/components/icons';
 import Modal from '@/components/common/Modal';
-import { STATE_OPTIONS } from '@/lib/constants';
+import { STATE_OPTIONS, DNSP_OPTIONS } from '@/lib/constants';
 
 const TARIFF_COMPONENTS = [
     'SUPPLY CHARGE', 'ANYTIME', 'PEAK', 'SHOULDER', 'OFF-PEAK',
@@ -57,6 +57,7 @@ export const AddPlanPage: React.FC = () => {
     const navigate = useNavigate();
     const { uid } = useParams();
     const isEditMode = !!uid;
+    const [activeDnspTab, setActiveDnspTab] = useState<string>(DNSP_OPTIONS[0].value);
     const [createPlan, { loading: creating }] = useMutation(CREATE_PLAN);
     const [updatePlan, { loading: updating }] = useMutation(UPDATE_PLAN);
     const { data: unitsData, loading: unitsLoading } = useQuery(GET_MEASUREMENT_UNITS);
@@ -83,6 +84,7 @@ export const AddPlanPage: React.FC = () => {
         state: '',
         description: '',
         discount: 0,
+        isDnspBased: false,
         propertyType: 0,
         isSolarRequired: false,
         isBatteryRequired: false,
@@ -90,7 +92,12 @@ export const AddPlanPage: React.FC = () => {
         contractTerm: '',
         exitFee: '' as number | string,
         bonusUids: [] as string[],
-        components: TARIFF_COMPONENTS.map(name => ({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false as boolean | undefined, rateType: 'None' }))
+        components: [
+            ...TARIFF_COMPONENTS.map(name => ({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false as boolean | undefined, rateType: 'None', dnsp: 'default' })),
+            ...DNSP_OPTIONS.flatMap(dnsp => 
+                TARIFF_COMPONENTS.map(name => ({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false as boolean | undefined, rateType: 'None', dnsp: dnsp.value }))
+            )
+        ]
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -111,34 +118,43 @@ export const AddPlanPage: React.FC = () => {
             }
 
             setFormData((prev) => {
-                const baseComponents = [...TARIFF_COMPONENTS.map(name => ({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false as boolean | undefined, rateType: 'None' }))];
-                
+                const baseComponents: any[] = [];
+                const addBase = (dnspVal: string) => {
+                    TARIFF_COMPONENTS.forEach(name => {
+                        baseComponents.push({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false, rateType: 'None', dnsp: dnspVal });
+                    });
+                };
+                addBase('default');
+                DNSP_OPTIONS.forEach(dnsp => addBase(dnsp.value));
+
                 // Preserve dynamically loaded rates from ratePlansData that might have already populated
                 prev.components.forEach(c => {
-                    if (c.isDynamic && !baseComponents.some(bc => bc.name.toUpperCase() === c.name.toUpperCase())) {
+                    if (c.isDynamic && !baseComponents.some(bc => bc.name.toUpperCase() === c.name.toUpperCase() && bc.dnsp === c.dnsp)) {
                         baseComponents.push({ ...c, rate: '', unit: '', rateType: 'None' });
                     }
                 });
 
                 existingRates.forEach(rateComp => {
-                    const existingIndex = baseComponents.findIndex(c => c.name.toUpperCase() === rateComp.name.toUpperCase());
+                    const compDnsp = rateComp.dnsp || 'default';
+                    const existingIndex = baseComponents.findIndex(c => c.name.toUpperCase() === rateComp.name.toUpperCase() && c.dnsp === compDnsp);
                     const defaultRateType = (rateComp.rate || rateComp.unit) ? 'Fixed' : 'According to Tariff';
                     const rateType = rateComp.rateType || defaultRateType;
 
                     if (existingIndex >= 0) {
-                        baseComponents[existingIndex] = { 
-                            ...baseComponents[existingIndex], 
-                            ...rateComp, 
+                        baseComponents[existingIndex] = {
+                            ...baseComponents[existingIndex],
+                            ...rateComp,
                             rateType,
                             dynamicType: rateComp.dynamicType || baseComponents[existingIndex].dynamicType || COMPONENT_DYNAMIC_TYPE_MAP[rateComp.name.toUpperCase()] || ''
                         };
                     } else {
                         // If it's not a known default or dynamic, it's a custom or dynamic rate
-                        baseComponents.push({ 
-                            ...rateComp, 
-                            isCustom: !rateComp.isDynamic, 
+                        baseComponents.push({
+                            ...rateComp,
+                            isCustom: !rateComp.isDynamic,
                             rateType,
-                            dynamicType: rateComp.dynamicType || COMPONENT_DYNAMIC_TYPE_MAP[rateComp.name.toUpperCase()] || ''
+                            dynamicType: rateComp.dynamicType || COMPONENT_DYNAMIC_TYPE_MAP[rateComp.name.toUpperCase()] || '',
+                            dnsp: compDnsp
                         });
                     }
                 });
@@ -148,6 +164,7 @@ export const AddPlanPage: React.FC = () => {
                     state: plan.state || '',
                     description: plan.description || '',
                     discount: plan.discount || 0,
+                    isDnspBased: plan.isDnspBased ?? false,
                     propertyType: plan.propertyType ?? 0,
                     isSolarRequired: plan.isSolarRequired ?? false,
                     isBatteryRequired: plan.isBatteryRequired ?? false,
@@ -198,16 +215,9 @@ export const AddPlanPage: React.FC = () => {
 
                     dynamicNames.forEach((type, name) => {
                         if (!existingNames.has(name)) {
-                            newComps.push({
-                                name,
-                                rate: '',
-                                unit: '',
-                                planType: 'fixed',
-                                tariffUid: '',
-                                isDynamic: true,
-                                dynamicType: type,
-                                isCustom: false,
-                                rateType: 'None'
+                            newComps.push({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: true, dynamicType: type, isCustom: false, rateType: 'None', dnsp: 'default' });
+                            DNSP_OPTIONS.forEach(dnsp => {
+                                newComps.push({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: true, dynamicType: type, isCustom: false, rateType: 'None', dnsp: dnsp.value });
                             });
                             changed = true;
                         }
@@ -284,7 +294,7 @@ export const AddPlanPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         const newErrors: Record<string, string> = {};
 
         if (!formData.title.trim()) {
@@ -299,11 +309,16 @@ export const AddPlanPage: React.FC = () => {
         let validComponents: any[] = [];
 
         formData.components.forEach((comp: any, index: number) => {
+            if (formData.isDnspBased && comp.dnsp === 'default') return;
+            if (!formData.isDnspBased && comp.dnsp !== 'default') return;
             if (comp.rateType === 'None' || !comp.rateType) return;
-            
+
             // Remove UI-specific and legacy fields so they don't pollute the JSON
             const { planType, tariffUid, isCustom, isDynamic, ...cleanComp } = comp;
-            
+            if (!formData.isDnspBased) {
+                delete cleanComp.dnsp;
+            }
+
             if (cleanComp.rateType === 'Fixed') {
                 const hasRate = cleanComp.rate && String(cleanComp.rate).trim() !== '' && Number(cleanComp.rate) !== 0;
                 if (hasRate && (!cleanComp.unit || cleanComp.unit.trim() === '')) {
@@ -311,7 +326,7 @@ export const AddPlanPage: React.FC = () => {
                     hasComponentError = true;
                 }
                 if (hasRate) {
-                   validComponents.push(cleanComp);
+                    validComponents.push(cleanComp);
                 }
             } else if (cleanComp.rateType === 'According to Tariff') {
                 const { rate, unit, ...rest } = cleanComp;
@@ -342,6 +357,7 @@ export const AddPlanPage: React.FC = () => {
                             state: formData.state,
                             description: formData.description,
                             discount: Number(formData.discount) || 0,
+                            isDnspBased: formData.isDnspBased,
                             propertyType: formData.propertyType,
                             isSolarRequired: formData.isSolarRequired,
                             isBatteryRequired: formData.isBatteryRequired,
@@ -363,6 +379,7 @@ export const AddPlanPage: React.FC = () => {
                             state: formData.state,
                             description: formData.description,
                             discount: Number(formData.discount) || 0,
+                            isDnspBased: formData.isDnspBased,
                             propertyType: formData.propertyType,
                             isSolarRequired: formData.isSolarRequired,
                             isBatteryRequired: formData.isBatteryRequired,
@@ -447,6 +464,28 @@ export const AddPlanPage: React.FC = () => {
 
                                 <div className="space-y-2 flex flex-col justify-start">
                                     <label className="text-sm font-medium text-foreground">
+                                        Pricing Basis
+                                    </label>
+                                    <div className="flex bg-muted/50 p-1 rounded-md border border-input/50 h-[38px] items-center">
+                                        <button
+                                            type="button"
+                                            className={`flex-1 text-sm font-medium py-1 rounded transition-all duration-200 ${!formData.isDnspBased ? 'bg-primary shadow-sm text-primary-foreground scale-[1.02]' : 'text-muted-foreground hover:bg-muted/80'}`}
+                                            onClick={() => setFormData(prev => ({ ...prev, isDnspBased: false }))}
+                                        >
+                                            Tariff Based
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`flex-1 text-sm font-medium py-1 rounded transition-all duration-200 ${formData.isDnspBased ? 'bg-primary shadow-sm text-primary-foreground scale-[1.02]' : 'text-muted-foreground hover:bg-muted/80'}`}
+                                            onClick={() => setFormData(prev => ({ ...prev, isDnspBased: true }))}
+                                        >
+                                            DNSP Based
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 flex flex-col justify-start">
+                                    <label className="text-sm font-medium text-foreground">
                                         State
                                     </label>
                                     <Select
@@ -493,11 +532,10 @@ export const AddPlanPage: React.FC = () => {
                                                         setIsCustomDiscountMode(false);
                                                         setFormData(prev => ({ ...prev, discount: parseFloat(opt) }));
                                                     }}
-                                                    className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${
-                                                        isActive
-                                                            ? "bg-neutral-900 text-white border-neutral-900 shadow-sm"
-                                                            : "bg-white text-neutral-600 border-border hover:border-neutral-400 hover:text-neutral-900"
-                                                    }`}
+                                                    className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${isActive
+                                                        ? "bg-neutral-900 text-white border-neutral-900 shadow-sm"
+                                                        : "bg-white text-neutral-600 border-border hover:border-neutral-400 hover:text-neutral-900"
+                                                        }`}
                                                 >
                                                     {opt}%
                                                 </button>
@@ -510,21 +548,19 @@ export const AddPlanPage: React.FC = () => {
                                             onClick={() => {
                                                 setIsCustomDiscountMode(true);
                                             }}
-                                            className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${
-                                                (isCustomDiscountMode || (formData.discount !== undefined && !['0', '5', '7', '10', '13', '15'].includes(formData.discount?.toString() || '')))
-                                                    ? "bg-neutral-900 text-white border-neutral-900 shadow-sm"
-                                                    : "bg-white text-neutral-600 border-border hover:border-neutral-400 hover:text-neutral-900"
-                                            }`}
+                                            className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${(isCustomDiscountMode || (formData.discount !== undefined && !['0', '5', '7', '10', '13', '15'].includes(formData.discount?.toString() || '')))
+                                                ? "bg-neutral-900 text-white border-neutral-900 shadow-sm"
+                                                : "bg-white text-neutral-600 border-border hover:border-neutral-400 hover:text-neutral-900"
+                                                }`}
                                         >
                                             Custom
                                         </button>
 
                                         {/* Custom Input - Inline */}
-                                        <div className={`overflow-hidden transition-all duration-300 ease-in-out flex items-center gap-2 ${
-                                            (isCustomDiscountMode || (formData.discount !== undefined && !['0', '5', '7', '10', '13', '15'].includes(formData.discount?.toString() || '')))
-                                                ? "w-[120px] opacity-100"
-                                                : "w-0 opacity-0"
-                                        }`}>
+                                        <div className={`overflow-hidden transition-all duration-300 ease-in-out flex items-center gap-2 ${(isCustomDiscountMode || (formData.discount !== undefined && !['0', '5', '7', '10', '13', '15'].includes(formData.discount?.toString() || '')))
+                                            ? "w-[120px] opacity-100"
+                                            : "w-0 opacity-0"
+                                            }`}>
                                             <div className="relative w-full">
                                                 <Input
                                                     type="number"
@@ -549,8 +585,8 @@ export const AddPlanPage: React.FC = () => {
                                     <div className="flex flex-row items-center gap-6 min-h-[40px] pt-1">
                                         <label className="flex items-center gap-2 cursor-pointer group">
                                             <div className="relative flex items-center justify-center w-4 h-4 border border-input rounded shadow-sm group-hover:border-primary transition-colors">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     className="absolute opacity-0 w-full h-full cursor-pointer"
                                                     checked={formData.isSolarRequired}
                                                     onChange={(e) => setFormData(prev => ({ ...prev, isSolarRequired: e.target.checked }))}
@@ -561,8 +597,8 @@ export const AddPlanPage: React.FC = () => {
                                         </label>
                                         <label className="flex items-center gap-2 cursor-pointer group">
                                             <div className="relative flex items-center justify-center w-4 h-4 border border-input rounded shadow-sm group-hover:border-primary transition-colors">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     className="absolute opacity-0 w-full h-full cursor-pointer"
                                                     checked={formData.isBatteryRequired}
                                                     onChange={(e) => setFormData(prev => ({ ...prev, isBatteryRequired: e.target.checked }))}
@@ -581,8 +617,8 @@ export const AddPlanPage: React.FC = () => {
                                     <div className="flex flex-row items-center gap-6 min-h-[40px] pt-1">
                                         <label className="flex items-center gap-2 cursor-pointer group">
                                             <div className="relative flex items-center justify-center w-4 h-4 border border-input rounded shadow-sm group-hover:border-primary transition-colors">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     className="absolute opacity-0 w-full h-full cursor-pointer"
                                                     checked={formData.attachNominationForm}
                                                     onChange={(e) => setFormData(prev => ({ ...prev, attachNominationForm: e.target.checked }))}
@@ -637,19 +673,18 @@ export const AddPlanPage: React.FC = () => {
                                     {activeBonuses.map((bonus: any) => {
                                         const isChecked = formData.bonusUids.includes(bonus.uid);
                                         return (
-                                            <div 
-                                                key={bonus.uid} 
+                                            <div
+                                                key={bonus.uid}
                                                 onClick={() => {
                                                     const newUids = isChecked
                                                         ? formData.bonusUids.filter(uid => uid !== bonus.uid)
                                                         : [...formData.bonusUids, bonus.uid];
                                                     setFormData(prev => ({ ...prev, bonusUids: newUids }));
                                                 }}
-                                                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between group ${
-                                                    isChecked 
-                                                        ? 'border-primary bg-primary/5 shadow-sm' 
-                                                        : 'border-border bg-background hover:border-neutral-400 hover:bg-neutral-50/50'
-                                                }`}
+                                                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between group ${isChecked
+                                                    ? 'border-primary bg-primary/5 shadow-sm'
+                                                    : 'border-border bg-background hover:border-neutral-400 hover:bg-neutral-50/50'
+                                                    }`}
                                             >
                                                 <div className="flex flex-col">
                                                     <span className={`text-sm font-semibold transition-colors ${isChecked ? 'text-primary' : 'text-foreground'}`}>
@@ -661,11 +696,10 @@ export const AddPlanPage: React.FC = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
-                                                    isChecked 
-                                                        ? 'border-primary bg-primary text-white' 
-                                                        : 'border-input bg-card group-hover:border-neutral-400'
-                                                }`}>
+                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isChecked
+                                                    ? 'border-primary bg-primary text-white'
+                                                    : 'border-input bg-card group-hover:border-neutral-400'
+                                                    }`}>
                                                     {isChecked && <CheckIcon size={12} className="text-white" />}
                                                 </div>
                                             </div>
@@ -680,6 +714,21 @@ export const AddPlanPage: React.FC = () => {
 
                         {/* Divider */}
                         <div className="h-[1px] bg-border my-6"></div>
+
+                        {formData.isDnspBased && (
+                            <div className="flex gap-2 border-b border-border mb-4">
+                                {DNSP_OPTIONS.map(dnsp => (
+                                    <button
+                                        key={dnsp.value}
+                                        type="button"
+                                        className={`px-4 py-2 text-sm font-medium transition-colors ${activeDnspTab === dnsp.value ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                                        onClick={() => setActiveDnspTab(dnsp.value)}
+                                    >
+                                        {dnsp.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
                         <div className="flex flex-col h-full gap-4">
                             <div className="flex items-center justify-between">
@@ -720,7 +769,10 @@ export const AddPlanPage: React.FC = () => {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-border">
-                                                {formData.components.map((comp: any, index) => (!comp.isDynamic && !comp.isCustom) ? (
+                                                {formData.components.map((comp: any, index) => {
+                                                    const currentDnsp = formData.isDnspBased ? activeDnspTab : 'default';
+                                                    if (comp.dnsp !== currentDnsp || comp.isDynamic || comp.isCustom) return null;
+                                                    return (
                                                     <tr key={`${comp.name}-${index}`} className="hover:bg-muted/30 bg-card">
                                                         <td className="px-3 py-1.5 align-middle">
                                                             <div className="flex flex-col">
@@ -828,7 +880,8 @@ export const AddPlanPage: React.FC = () => {
                                                             </div>
                                                         </td>
                                                     </tr>
-                                                ) : null)}
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
@@ -840,7 +893,7 @@ export const AddPlanPage: React.FC = () => {
                                         <h3 className="text-sm font-medium text-foreground leading-none">Custom / Dynamic Rates</h3>
                                     </div>
 
-                                    {formData.components.some((comp: any) => comp.isDynamic || comp.isCustom) ? (
+                                    {formData.components.some((comp: any) => (comp.isDynamic || comp.isCustom) && comp.dnsp === (formData.isDnspBased ? activeDnspTab : 'default')) ? (
                                         <div className="overflow-x-auto rounded-md border border-blue-200">
                                             <table className="w-full text-sm text-left">
                                                 <thead className="bg-blue-500/10 text-xs uppercase text-blue-700">
@@ -853,7 +906,10 @@ export const AddPlanPage: React.FC = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-blue-100">
-                                                    {formData.components.map((comp: any, index) => (comp.isDynamic || comp.isCustom) ? (
+                                                    {formData.components.map((comp: any, index) => {
+                                                        const currentDnsp = formData.isDnspBased ? activeDnspTab : 'default';
+                                                        if (comp.dnsp !== currentDnsp || (!comp.isDynamic && !comp.isCustom)) return null;
+                                                        return (
                                                         <tr key={`${comp.name}-${index}`} className="hover:bg-blue-500/10 bg-blue-500/5">
                                                             <td className="px-3 py-1.5 align-middle">
                                                                 <div className="flex flex-col">
@@ -966,7 +1022,8 @@ export const AddPlanPage: React.FC = () => {
                                                                 </div>
                                                             </td>
                                                         </tr>
-                                                    ) : null)}
+                                                    );
+                                                })}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -1077,7 +1134,7 @@ export const AddPlanPage: React.FC = () => {
                             type="button"
                             onClick={() => {
                                 const isStatic = editingCustomRateIndex !== null && !formData.components[editingCustomRateIndex]?.isCustom && !formData.components[editingCustomRateIndex]?.isDynamic;
-                                
+
                                 if (!customRateDraft.name) return toast.error('Rate Name is required');
                                 if (!isStatic) {
                                     if (!customRateDraft.rate) return toast.error('Rate is required');
@@ -1094,17 +1151,14 @@ export const AddPlanPage: React.FC = () => {
                                         return { ...prev, components: newComps };
                                     });
                                 } else {
-                                    setFormData(prev => ({
-                                        ...prev,
-                                        components: [
-                                            ...prev.components,
-                                            {
-                                                ...customRateDraft,
-                                                isDynamic: true,
-                                                isCustom: true
-                                            }
-                                        ]
-                                    }));
+                                    setFormData(prev => {
+                                        const newComps = [...prev.components];
+                                        newComps.push({ ...customRateDraft, isDynamic: true, isCustom: true, dnsp: 'default' });
+                                        DNSP_OPTIONS.forEach(dnsp => {
+                                            newComps.push({ ...customRateDraft, isDynamic: true, isCustom: true, dnsp: dnsp.value });
+                                        });
+                                        return { ...prev, components: newComps };
+                                    });
                                 }
                                 setIsCustomModalOpen(false);
                             }}
