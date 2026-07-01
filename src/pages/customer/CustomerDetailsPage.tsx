@@ -53,7 +53,7 @@ import { getName } from 'country-list';
 import type { MaintenanceRecord, MaintenanceResponse } from '@/types';
 
 import {
-    SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS, BATTERY_BRAND_OPTIONS,
+    SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS,
     ID_TYPE_MAP, GENDER_LABELS, RELATIONSHIP_STATUS_LABELS,
     EMAIL_STATUS_MAP, EMAIL_TYPE_LABELS
 } from '@/lib/constants';
@@ -1449,6 +1449,16 @@ const InlineMaintenanceNotes = ({
         return makesData.batteryMakes.find((m: any) => m.make?.toLowerCase() === vppForm.batteryBrand?.toLowerCase());
     }, [makesData, vppForm.batteryBrand]);
 
+    const dynamicBatteryBrandOptions = useMemo(() => {
+        if (!makesData?.batteryMakes) return [];
+        const options = makesData.batteryMakes.map((m: any) => ({
+            label: m.make,
+            value: m.make
+        }));
+        options.push({ label: 'Unknown', value: 'Unknown' });
+        return options;
+    }, [makesData]);
+
     const { data: batteryModelsData, loading: loadingBatteryModels } = useQuery(GET_BATTERY_MODELS, {
         variables: { makeUid: selectedBatteryMake?.uid },
         skip: !selectedBatteryMake?.uid,
@@ -1458,7 +1468,7 @@ const InlineMaintenanceNotes = ({
     const batteryModelOptions = useMemo(() => {
         if (!batteryModelsData?.batteryModels) return [];
         return batteryModelsData.batteryModels.filter((m: any) => m.isActive).map((m: any) => ({
-            value: m.model,
+            value: m.uid,
             label: m.model
         }));
     }, [batteryModelsData]);
@@ -4258,7 +4268,7 @@ const InlineMaintenanceNotes = ({
                                                 <div className="space-y-2">
                                                     <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Brand</label>
                                                     <Select
-                                                        options={BATTERY_BRAND_OPTIONS}
+                                                        options={dynamicBatteryBrandOptions}
                                                         value={vppForm.batteryBrand}
                                                         onChange={(val) => setVppForm({ ...vppForm, batteryBrand: val as string, batteryModel: '' })}
                                                         placeholder="Select Brand..."
@@ -4272,7 +4282,7 @@ const InlineMaintenanceNotes = ({
                                                         options={batteryModelOptions}
                                                         value={vppForm.batteryModel}
                                                         onChange={(val) => {
-                                                            const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.model === val);
+                                                            const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.uid === val || m.model === val);
                                                             setVppForm({
                                                                 ...vppForm,
                                                                 batteryModel: val as string,
@@ -5243,7 +5253,7 @@ const InlineMaintenanceNotes = ({
                         <div className="space-y-2">
                             <label className="text-xs font-semibold uppercase text-muted-foreground">Battery Brand</label>
                             <Select
-                                options={BATTERY_BRAND_OPTIONS}
+                                options={dynamicBatteryBrandOptions}
                                 value={vppForm.batteryBrand}
                                 onChange={(val) => setVppForm({ ...vppForm, batteryBrand: val as string, batteryModel: '' })}
                                 placeholder="Select Brand..."
@@ -5256,7 +5266,7 @@ const InlineMaintenanceNotes = ({
                                 options={batteryModelOptions}
                                 value={vppForm.batteryModel}
                                 onChange={(val) => {
-                                    const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.model === val);
+                                    const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.uid === val || m.model === val);
                                     setVppForm({
                                         ...vppForm,
                                         batteryModel: val as string,
