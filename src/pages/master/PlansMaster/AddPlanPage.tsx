@@ -105,6 +105,21 @@ export const AddPlanPage: React.FC = () => {
     const [isCustomDiscountMode, setIsCustomDiscountMode] = useState(false);
     const [editingCustomRateIndex, setEditingCustomRateIndex] = useState<number | null>(null);
 
+    const selectedStates = React.useMemo(() => {
+        return formData.state ? formData.state.split(',').map(s => s.trim()).filter(Boolean) : [];
+    }, [formData.state]);
+
+    const filteredDnspOptions = React.useMemo(() => {
+        if (selectedStates.length === 0) return DNSP_OPTIONS;
+        return DNSP_OPTIONS.filter((dnsp: any) => selectedStates.includes(dnsp.state));
+    }, [selectedStates]);
+
+    React.useEffect(() => {
+        if (filteredDnspOptions.length > 0 && !filteredDnspOptions.some(d => d.value === activeDnspTab)) {
+            setActiveDnspTab(filteredDnspOptions[0].value);
+        }
+    }, [filteredDnspOptions, activeDnspTab]);
+
     React.useEffect(() => {
         if (planData?.plan) {
             const plan = planData.plan;
@@ -716,8 +731,8 @@ export const AddPlanPage: React.FC = () => {
                         <div className="h-[1px] bg-border my-6"></div>
 
                         {formData.isDnspBased && (
-                            <div className="flex gap-2 border-b border-border mb-4">
-                                {DNSP_OPTIONS.map(dnsp => (
+                            <div className="flex gap-2 border-b border-border mb-4 overflow-x-auto pb-1">
+                                {filteredDnspOptions.map(dnsp => (
                                     <button
                                         key={dnsp.value}
                                         type="button"

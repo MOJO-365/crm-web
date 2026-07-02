@@ -46,8 +46,8 @@ export const GET_EMAIL_TEMPLATE = gql`
 `;
 
 export const PREVIEW_SYSTEM_TEMPLATE = gql`
-    query PreviewSystemTemplate($eventType: String!, $isWithoutSignature: Boolean) {
-        previewSystemTemplate(eventType: $eventType, isWithoutSignature: $isWithoutSignature) {
+    query PreviewSystemTemplate($eventType: String!, $isWithoutSignature: Boolean, $isPlanUpdated: Boolean) {
+        previewSystemTemplate(eventType: $eventType, isWithoutSignature: $isWithoutSignature, isPlanUpdated: $isPlanUpdated) {
             subject
             body
             isCustom

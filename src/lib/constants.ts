@@ -96,15 +96,35 @@ export const DNSP_MAP: Record<string, string> = {
     '1': 'Endeavour',
     '2': 'Essential',
     '3': 'Energex',
-    '4': 'Ergon - East'
+    '4': 'Ergon - East',
+    '5': 'Evo Energy',
+    '6': 'Power and Water',
+    '7': 'SA Power Networks',
+    '8': 'TasNetworks',
+    '9': 'Citipower/Powercor',
+    '10': 'Jemena',
+    '11': 'AusNet Services',
+    '12': 'United Energy',
+    '13': 'Western Power',
+    '14': 'Horizon Power'
 };
 
 export const DNSP_OPTIONS = [
-    { value: '0', label: 'Ausgrid' },
-    { value: '1', label: 'Endeavour' },
-    { value: '2', label: 'Essential' },
-    { value: '3', label: 'Energex' },
-    { value: '4', label: 'Ergon - East' },
+    { value: '0', label: 'Ausgrid', state: 'NSW' },
+    { value: '1', label: 'Endeavour', state: 'NSW' },
+    { value: '2', label: 'Essential', state: 'NSW' },
+    { value: '3', label: 'Energex', state: 'QLD' },
+    { value: '4', label: 'Ergon - East', state: 'QLD' },
+    { value: '5', label: 'Evo Energy', state: 'ACT' },
+    { value: '6', label: 'Power and Water', state: 'NT' },
+    { value: '7', label: 'SA Power Networks', state: 'SA' },
+    { value: '8', label: 'TasNetworks', state: 'TAS' },
+    { value: '9', label: 'Citipower/Powercor', state: 'VIC' },
+    { value: '10', label: 'Jemena', state: 'VIC' },
+    { value: '11', label: 'AusNet Services', state: 'VIC' },
+    { value: '12', label: 'United Energy', state: 'VIC' },
+    { value: '13', label: 'Western Power', state: 'WA' },
+    { value: '14', label: 'Horizon Power', state: 'WA' }
 ];
 export const DISCOUNT_OPTIONS = [0, 5, 7, 10, 13, 15].map(i => ({
     value: i.toString(),
@@ -199,6 +219,16 @@ export const DNSP_LABELS: Record<number, string> = {
     2: 'Essential',
     3: 'Energex',
     4: 'Ergon - East',
+    5: 'Evo Energy',
+    6: 'Power and Water',
+    7: 'SA Power Networks',
+    8: 'TasNetworks',
+    9: 'Citipower/Powercor',
+    10: 'Jemena',
+    11: 'AusNet Services',
+    12: 'United Energy',
+    13: 'Western Power',
+    14: 'Horizon Power'
 };
 
 // --- Options Helpers (derived from labels) ---

@@ -659,8 +659,7 @@ export const CustomerFormPage = () => {
         return !!selectedPlan?.attachNominationForm;
     }, [activePlansData, formData.planUid]);
 
-    const isPdrsOrNomination = isPdrs || requiresNominationForm;
-
+    // isPdrsOrNomination removed, using isPdrs directly
     // Set Peerless Group defaults (VPP = true, Solar = true, VPP Bonus = $600) on initial load for new customers
     useEffect(() => {
         if (isPdrs && !isEditMode) {
@@ -1581,6 +1580,30 @@ export const CustomerFormPage = () => {
             }
         }
 
+        // Clear phone verification if phone number changes from the original
+        if (field === 'phone') {
+            const originalPhone = customerData?.customer?.number;
+            const currentPhone = typeof value === 'string' ? value.replace(/\D/g, '') : value;
+            // Also account for the leading 0 removal
+            let normalizedCurrent = currentPhone;
+            if (typeof normalizedCurrent === 'string' && normalizedCurrent.startsWith('0')) {
+                normalizedCurrent = normalizedCurrent.substring(1);
+            }
+            let normalizedOriginal = originalPhone?.replace(/\D/g, '');
+            if (normalizedOriginal?.startsWith('0')) {
+                normalizedOriginal = normalizedOriginal.substring(1);
+            }
+
+            if (normalizedCurrent !== normalizedOriginal) {
+                setPhoneVerified(false);
+                setPhoneVerifiedAt(null);
+            } else if (customerData?.customer?.phoneVerifiedAt) {
+                // If they change it back to the original verified number, restore verification
+                setPhoneVerified(true);
+                setPhoneVerifiedAt(customerData.customer.phoneVerifiedAt);
+            }
+        }
+
         // Standardize Email to lowercase and trimmed
         if (field === 'email') {
             if (typeof value === 'string') {
@@ -1681,16 +1704,16 @@ export const CustomerFormPage = () => {
         const loadingStatus = isUpdateOnly ? 3 : (isWithoutSignature ? 4 : targetStatus);
         setSubmittingStatus(loadingStatus);
 
-        // If phone is verified and we are submitting as active (1), set status to 2 (Signature Pending)
+        // If we are submitting as active (1), set status to 2 (Signature Pending)
         let finalStatus = targetStatus;
         if (isUpdateOnly && customerData?.customer?.status !== undefined) {
             finalStatus = customerData.customer.status;
-        } else if (targetStatus === 1 && phoneVerified && !isWithoutSignature) {
+        } else if (targetStatus === 1 && !isWithoutSignature) {
             finalStatus = 2;
         }
 
-        // If PDRS or Nomination form required, and sending email (not update only), set to Consent Pending (7)
-        if (isPdrsOrNomination && isEditMode && !isUpdateOnly) {
+        // If PDRS, and sending email (not update only), set to Consent Pending (7)
+        if (isPdrs && isEditMode && !isUpdateOnly) {
             finalStatus = 7;
         }
 
@@ -1760,6 +1783,18 @@ export const CustomerFormPage = () => {
             };
 
             const significantChanges = hasSignificantChanges();
+
+            let signatureClears = {};
+            if (isEditMode && significantChanges) {
+                signatureClears = {
+                    signDate: null,
+                    signedPdfPath: null,
+                    signatureUrl: null,
+                    consentSignatureBase64: null,
+                    signedConsent: null,
+                    signedConsentAt: null,
+                };
+            }
 
             const input = {
                 title: formData.title,
@@ -1845,11 +1880,12 @@ export const CustomerFormPage = () => {
                 licenseDocument: formData.licenseDocument?.uid,
                 rateVersion: activeVersionForLookup || activeRateVersion,
                 customerId: isEditMode ? undefined : generatedCustomerId,
-                triggerWelcomeEmail: (isEditMode && !isUpdateOnly && !isPdrsOrNomination) ? (finalStatus === 2 || isWithoutSignature) : undefined,
-                triggerUpdateEmail: (isEditMode && !isUpdateOnly && !isPdrsOrNomination) ? (significantChanges || true) : undefined,
+                triggerWelcomeEmail: (!isEditMode && !isUpdateOnly && !isPdrs) ? (finalStatus === 2 || isWithoutSignature) : undefined,
+                triggerUpdateEmail: (isEditMode && !isPdrs) ? (isUpdateOnly ? significantChanges : true) : undefined,
                 isWithoutSignature: isWithoutSignature || undefined,
                 selectedBonuses: formData.selectedBonuses,
-                leadUid: prefillLeadUid || undefined
+                leadUid: prefillLeadUid || undefined,
+                ...signatureClears
             };
 
             let savedCustomer;
@@ -1969,7 +2005,7 @@ export const CustomerFormPage = () => {
 
             // Trigger PDRS email if applicable (only on update as requested)
             // Send in background without awaiting so UI does not get stuck
-            if (isEditMode && !isUpdateOnly && isPdrsOrNomination && savedCustomer?.uid && finalStatus === 7) {
+            if (isEditMode && !isUpdateOnly && isPdrs && savedCustomer?.uid && finalStatus === 7) {
                 sendPdrsConsentEmail({ variables: { customerUid: savedCustomer.uid } })
                     .catch((emailErr) => {
                         console.error('[PDRS] Failed to send consent email in background:', emailErr);
@@ -2174,10 +2210,18 @@ export const CustomerFormPage = () => {
         try {
             const eventType = isPdrs ? 'CUSTOMER_DRAFT' : (isWithoutSignature ? 'AGREEMENT_SIGNED' : (isEditMode ? 'CUSTOMER_UPDATED' : 'CUSTOMER_CREATED'));
 
+            const currentRatePlanUid = formData.ratePlanUid || selectedRatePlan?.uid || null;
+            const currentPlanUid = formData.planUid ? formData.planUid : null;
+            const isPlanUpdated = Boolean(isEditMode && customerData?.customer && (
+                (customerData.customer.planUid !== currentPlanUid) || 
+                (customerData.customer.ratePlanUid !== currentRatePlanUid)
+            ));
+
             const { data } = await fetchSystemTemplate({
                 variables: {
                     eventType,
-                    isWithoutSignature: !!isWithoutSignature
+                    isWithoutSignature: !!isWithoutSignature,
+                    isPlanUpdated
                 },
                 fetchPolicy: 'network-only'
             });
@@ -3698,7 +3742,7 @@ export const CustomerFormPage = () => {
                                                         <div className="space-y-1 text-sm bg-card p-3 rounded border border-border">
                                                             <p className="font-medium text-xs uppercase text-muted-foreground mb-1">Battery System</p>
                                                             <p className="flex justify-between"><span className="text-muted-foreground">Has Battery:</span> <span className="font-medium">Yes</span></p>
-                                                            {formData.batteryBrand && <p className="flex justify-between"><span className="text-muted-foreground">Battery Brand:</span> <span className="font-medium">{formData.batteryBrand}</span></p>}
+                                                            {formData.batteryBrand && <p className="flex justify-between"><span className="text-muted-foreground">Battery Brand:</span> <span className="font-medium">{batteryMakesData?.batteryMakes?.find((m: any) => m.uid === formData.batteryBrand)?.make || formData.batteryBrand}</span></p>}
                                                             {formData.snNumber && <p className="flex justify-between"><span className="text-muted-foreground">SN Number:</span> <span className="font-medium">{formData.snNumber}</span></p>}
                                                             {formData.batteryCapacity && <p className="flex justify-between"><span className="text-muted-foreground">Battery Capacity:</span> <span className="font-medium">{formData.batteryCapacity} kW</span></p>}
                                                             {formData.exportLimit && <p className="flex justify-between"><span className="text-muted-foreground">Export Limit:</span> <span className="font-medium">{formData.exportLimit} kW</span></p>}
@@ -4139,7 +4183,7 @@ export const CustomerFormPage = () => {
                         setIsLoadingPreview(false);
                         setPreviewStep('offer');
                     }}
-                    title={previewStep === 'offer' ? "Offer Preview" : ((isPdrsOrNomination && isEditMode) ? (isPdrs ? "PDRS Consent Preview" : "Nomination Form Email Preview") : "Email Preview")}
+                    title={previewStep === 'offer' ? "Offer Preview" : ((isPdrs && isEditMode) ? "PDRS Consent Preview" : "Email Preview")}
                     size="full"
                     footer={
                         <div className="flex justify-end gap-2 w-full">

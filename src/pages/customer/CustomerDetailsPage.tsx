@@ -4349,7 +4349,7 @@ const InlineMaintenanceNotes = ({
                                                         <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
                                                     </div>
                                                 </div>
-                                                {(vppForm.batteryBrand === 'NeoVolt' || vppForm.batteryBrand === 'AlphaESS' || vppForm.batteryBrand === 'Alpha ESS' || vppForm.batteryBrand === 'Aerl') && (
+                                                {['NeoVolt', 'AlphaESS', 'Alpha ESS', 'Aerl'].includes(makesData?.batteryMakes?.find((m: any) => m.uid === vppForm.batteryBrand)?.make || vppForm.batteryBrand) && (
                                                     <div className="space-y-2">
                                                         <label className="text-xs font-semibold uppercase text-muted-foreground">Check Code</label>
                                                         <Input
@@ -4363,8 +4363,6 @@ const InlineMaintenanceNotes = ({
                                             </div>
                                         </div>
                                     </div>
-
-
                                 </div>
                             )}
 
@@ -5328,7 +5326,7 @@ const InlineMaintenanceNotes = ({
                                 <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">kW</span>
                             </div>
                         </div>
-                        {(vppForm.batteryBrand === 'Fox ESS' || vppForm.batteryBrand === 'NeoVolt' || vppForm.batteryBrand === 'AlphaESS' || vppForm.batteryBrand === 'Alpha ESS' || vppForm.batteryBrand === 'Aerl') && (
+                        {['Fox ESS', 'NeoVolt', 'AlphaESS', 'Alpha ESS', 'Aerl'].includes(makesData?.batteryMakes?.find((m: any) => m.uid === vppForm.batteryBrand)?.make || vppForm.batteryBrand) && (
                             <div className="space-y-2">
                                 <label className="text-xs font-semibold uppercase text-muted-foreground">Check Code</label>
                                 <Input
