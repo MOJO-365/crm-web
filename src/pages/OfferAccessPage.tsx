@@ -4,6 +4,7 @@ import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
 import { GET_CUSTOMER_BY_CUSTOMER_ID } from '@/graphql/queries/customers';
 import { GET_MEASUREMENT_UNITS, GET_RATE_PLAN_BY_CODE } from '@/graphql/queries/rates';
 import { GET_ALL_BONUSES } from '@/graphql/queries/bonus';
+import { GET_BATTERY_MAKES } from '@/graphql';
 import {
     UPDATE_CUSTOMER,
     //  UPLOAD_FILE 
@@ -114,6 +115,10 @@ export const OfferAccessPage = () => {
         fetchPolicy: 'cache-and-network'
     });
     const allBonuses = bonusesData?.bonuses || [];
+
+    const { data: batteryMakesData } = useQuery(GET_BATTERY_MAKES, {
+        fetchPolicy: 'cache-first'
+    });
 
     // Memoize the mapping so we do not recalculate on every render
     const unitMap = React.useMemo(() => {
@@ -939,7 +944,7 @@ export const OfferAccessPage = () => {
                                                 fullWidth: true
                                             },
                                             ...(customerData.batteryDetails ? [
-                                                { label: 'Battery Brand', value: customerData.batteryDetails.batterybrand || null },
+                                                { label: 'Battery Brand', value: batteryMakesData?.batteryMakes?.find((m: any) => m.uid === customerData.batteryDetails.batterybrand)?.make || customerData.batteryDetails.batterybrand || null },
                                                 { label: 'SN Number', value: customerData.batteryDetails.snnumber || null },
                                                 { label: 'Battery Capacity', value: customerData.batteryDetails.batterycapacity ? `${customerData.batteryDetails.batterycapacity} kW` : null },
                                                 { label: 'Export Limit', value: customerData.batteryDetails.exportlimit ? `${customerData.batteryDetails.exportlimit} kW` : null },
