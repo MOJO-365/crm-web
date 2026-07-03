@@ -328,9 +328,22 @@ const applyPlanOverridesToOffer = (offer: any, planRatesJson: any, isDnspBased?:
                 const standardKey = labelToKeyMap[upperName];
                 const numericRate = parseFloat(String(pr.rate)) || 0;
                 if (standardKey) {
-                    newOffer[standardKey] = numericRate;
-                    if (pr.unit) {
-                        priceUnits[standardKey] = pr.unit;
+                    const clKeys = ['cl1Usage', 'cl2Usage', 'cl1Supply', 'cl2Supply'];
+                    if (clKeys.includes(standardKey)) {
+                        const originalValue = parseFloat(String(offer[standardKey])) || 0;
+                        if (originalValue === 0) {
+                            newOffer[standardKey] = 0;
+                        } else {
+                            newOffer[standardKey] = numericRate;
+                            if (pr.unit) {
+                                priceUnits[standardKey] = pr.unit;
+                            }
+                        }
+                    } else {
+                        newOffer[standardKey] = numericRate;
+                        if (pr.unit) {
+                            priceUnits[standardKey] = pr.unit;
+                        }
                     }
                 } else {
                     const existingDyn = dynamicRates.find((dr: any) => dr.name.toUpperCase() === upperName);

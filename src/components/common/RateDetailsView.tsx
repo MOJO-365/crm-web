@@ -88,6 +88,15 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
         const processed = items.map(item => {
             const matchingPlanRate = planRates.find((pr) => pr.name.toUpperCase() === item.label.toUpperCase());
             if (!matchingPlanRate) return null;
+            
+            const clLabels = ['CL1 USAGE', 'CL2 USAGE', 'CL1 SUPPLY', 'CL2 SUPPLY'];
+            if (clLabels.includes(item.label.toUpperCase())) {
+                const originalValue = parseFloat(String(item.value || 0)) || 0;
+                if (originalValue === 0) {
+                    return null;
+                }
+            }
+
             if (matchingPlanRate.rateType === 'Fixed') {
                 return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description };
             }
