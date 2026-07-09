@@ -1721,11 +1721,12 @@ export const CustomerFormPage = () => {
         setSubmittingStatus(loadingStatus);
 
         // If we are submitting as active (1), set status to 2 (Signature Pending)
+        // If submitting without signature, set status to 3 (Signed)
         let finalStatus = targetStatus;
         if (isUpdateOnly && customerData?.customer?.status !== undefined) {
             finalStatus = customerData.customer.status;
-        } else if (targetStatus === 1 && !isWithoutSignature) {
-            finalStatus = 2;
+        } else if (targetStatus === 1) {
+            finalStatus = isWithoutSignature ? 3 : 2;
         }
 
         // If PDRS, and sending email (not update only), set to Consent Pending (7)
