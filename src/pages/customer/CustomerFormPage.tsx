@@ -1626,7 +1626,10 @@ export const CustomerFormPage = () => {
 
         // Handle Date objects from DatePicker
         if (value instanceof Date) {
-            finalValue = formatSydneyTime(value, 'YYYY-MM-DD');
+            const year = value.getFullYear();
+            const month = String(value.getMonth() + 1).padStart(2, '0');
+            const day = String(value.getDate()).padStart(2, '0');
+            finalValue = `${year}-${month}-${day}`;
         }
 
         setFormData(prev => ({ ...prev, [field]: finalValue }));
@@ -1893,8 +1896,8 @@ export const CustomerFormPage = () => {
                 licenseDocument: formData.licenseDocument?.uid,
                 rateVersion: activeVersionForLookup || activeRateVersion,
                 customerId: isEditMode ? undefined : generatedCustomerId,
-                triggerWelcomeEmail: (!isEditMode && !isUpdateOnly && !isPdrs) ? (finalStatus === 2 || isWithoutSignature) : undefined,
-                triggerUpdateEmail: (isEditMode && !isPdrs) ? (isUpdateOnly ? significantChanges : true) : undefined,
+                triggerWelcomeEmail: (!isUpdateOnly && !isPdrs) ? ((!isEditMode && finalStatus === 2) || isWithoutSignature) : undefined,
+                triggerUpdateEmail: (isEditMode && !isPdrs) ? (isUpdateOnly ? significantChanges : !isWithoutSignature) : undefined,
                 isWithoutSignature: isWithoutSignature || undefined,
                 selectedBonuses: formData.selectedBonuses,
                 leadUid: prefillLeadUid || undefined,
