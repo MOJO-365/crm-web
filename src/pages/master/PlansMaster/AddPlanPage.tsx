@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { toast } from 'react-toastify';
-import { ChevronRightIcon, CheckIcon, SpinnerIcon, PencilIcon } from '@/components/icons';
+import { ChevronRightIcon, CheckIcon, SpinnerIcon, PencilIcon, UploadIcon } from '@/components/icons';
 import Modal from '@/components/common/Modal';
 import { STATE_OPTIONS, DNSP_OPTIONS } from '@/lib/constants';
+import { apiAxios, BASE_API_URL } from '@/lib/apollo';
 
 const TARIFF_COMPONENTS = [
     'SUPPLY CHARGE', 'ANYTIME', 'PEAK', 'SHOULDER', 'OFF-PEAK',
@@ -89,6 +90,7 @@ export const AddPlanPage: React.FC = () => {
         isSolarRequired: false,
         isBatteryRequired: false,
         attachNominationForm: false,
+        planTcPath: '',
         contractTerm: '',
         exitFee: '' as number | string,
         bonusUids: [] as string[],
@@ -104,6 +106,55 @@ export const AddPlanPage: React.FC = () => {
     const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
     const [isCustomDiscountMode, setIsCustomDiscountMode] = useState(false);
     const [editingCustomRateIndex, setEditingCustomRateIndex] = useState<number | null>(null);
+    const [tcFile, setTcFile] = useState<File | null>(null);
+    const [tcUploading, setTcUploading] = useState(false);
+    const [tcUploadedPath, setTcUploadedPath] = useState<string>('');
+    const tcFileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleTcFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.type !== 'application/pdf') {
+            toast.error('Only PDF files are allowed for Terms & Conditions');
+            return;
+        }
+
+        setTcFile(file);
+        setTcUploading(true);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await apiAxios.post('/plans/upload-tc', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
+            if (response.data.success) {
+                const uploadedPath = response.data.data.path;
+                setTcUploadedPath(uploadedPath);
+                setFormData(prev => ({ ...prev, planTcPath: uploadedPath }));
+                toast.success('T&C PDF uploaded successfully');
+            } else {
+                toast.error(response.data.error || 'Upload failed');
+                setTcFile(null);
+            }
+        } catch (error: any) {
+            toast.error(error?.response?.data?.error || error.message || 'Upload failed');
+            setTcFile(null);
+        } finally {
+            setTcUploading(false);
+            if (tcFileInputRef.current) tcFileInputRef.current.value = '';
+        }
+    };
+
+    const handleTcFileRemove = () => {
+        setTcFile(null);
+        setTcUploadedPath('');
+        setFormData(prev => ({ ...prev, planTcPath: '' }));
+        if (tcFileInputRef.current) tcFileInputRef.current.value = '';
+    };
 
     const selectedStates = React.useMemo(() => {
         return formData.state ? formData.state.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -184,12 +235,17 @@ export const AddPlanPage: React.FC = () => {
                     isSolarRequired: plan.isSolarRequired ?? false,
                     isBatteryRequired: plan.isBatteryRequired ?? false,
                     attachNominationForm: plan.attachNominationForm ?? false,
+                    planTcPath: plan.planTcPath || '',
                     contractTerm: plan.contractTerm || '',
                     exitFee: plan.exitFee ?? '',
                     bonusUids: plan.bonusUids || [],
                     components: baseComponents
                 };
             });
+            // Set the uploaded T&C path if it exists
+            if (plan.planTcPath) {
+                setTcUploadedPath(plan.planTcPath);
+            }
         }
     }, [planData]);
 
@@ -377,6 +433,7 @@ export const AddPlanPage: React.FC = () => {
                             isSolarRequired: formData.isSolarRequired,
                             isBatteryRequired: formData.isBatteryRequired,
                             attachNominationForm: formData.attachNominationForm,
+                            planTcPath: formData.planTcPath || null,
                             contractTerm: formData.contractTerm,
                             exitFee: formData.exitFee === '' ? null : Number(formData.exitFee),
                             ratesJson: JSON.stringify(validComponents),
@@ -399,6 +456,7 @@ export const AddPlanPage: React.FC = () => {
                             isSolarRequired: formData.isSolarRequired,
                             isBatteryRequired: formData.isBatteryRequired,
                             attachNominationForm: formData.attachNominationForm,
+                            planTcPath: formData.planTcPath || null,
                             contractTerm: formData.contractTerm,
                             exitFee: formData.exitFee === '' ? null : Number(formData.exitFee),
                             ratesJson: JSON.stringify(validComponents),
@@ -643,6 +701,78 @@ export const AddPlanPage: React.FC = () => {
                                             <span className="text-sm text-foreground select-none">Nomination Form</span>
                                         </label>
                                     </div>
+                                </div>
+
+                                <div className="space-y-2 flex flex-col justify-start col-span-1 md:col-span-3">
+                                    <label className="text-sm font-medium text-foreground">
+                                        Plan T&C Document
+                                    </label>
+                                    <input
+                                        ref={tcFileInputRef}
+                                        type="file"
+                                        accept=".pdf"
+                                        onChange={handleTcFileSelect}
+                                        className="hidden"
+                                    />
+                                    {tcUploading ? (
+                                        <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30">
+                                            <SpinnerIcon size={18} className="text-primary" />
+                                            <span className="text-sm text-muted-foreground">Uploading T&C document...</span>
+                                        </div>
+                                    ) : (tcUploadedPath || formData.planTcPath) ? (
+                                        <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="flex-shrink-0 w-8 h-8 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-600 dark:text-red-400"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                                </div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="text-sm font-medium text-foreground truncate">
+                                                        {tcFile?.name || (tcUploadedPath || formData.planTcPath).split('/').pop() || 'T&C Document'}
+                                                    </span>
+                                                    <a
+                                                        href={`${BASE_API_URL}/documents/${tcUploadedPath || formData.planTcPath}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-xs text-primary hover:underline"
+                                                    >
+                                                        View PDF
+                                                    </a>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => tcFileInputRef.current?.click()}
+                                                    className="px-3 py-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:bg-muted/50 transition-colors"
+                                                >
+                                                    Replace
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleTcFileRemove}
+                                                    className="p-1.5 text-muted-foreground hover:text-destructive rounded-md hover:bg-destructive/10 transition-colors"
+                                                    title="Remove T&C"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => tcFileInputRef.current?.click()}
+                                            className="flex items-center gap-2 p-3 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer group"
+                                        >
+                                            <div className="flex-shrink-0 w-8 h-8 rounded-md bg-muted/50 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                                                <UploadIcon size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                                            </div>
+                                            <div className="flex flex-col items-start">
+                                                <span className="text-sm font-medium text-foreground">Upload T&C PDF</span>
+                                                <span className="text-xs text-muted-foreground">Click to upload a PDF file (max 10MB)</span>
+                                            </div>
+                                        </button>
+                                    )}
+                                    <span className="text-xs text-muted-foreground">If no file is uploaded, the default Terms & Conditions PDF will be used.</span>
                                 </div>
                             </div>
 

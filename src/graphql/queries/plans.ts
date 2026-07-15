@@ -14,6 +14,7 @@ export const GET_PLANS = gql`
       isSolarRequired
       isBatteryRequired
       attachNominationForm
+      planTcPath
       contractTerm
       exitFee
       ratesJson
@@ -39,6 +40,7 @@ export const GET_ACTIVE_PLANS = gql`
       isSolarRequired
       isBatteryRequired
       attachNominationForm
+      planTcPath
       contractTerm
       exitFee
       ratesJson
@@ -64,6 +66,7 @@ export const GET_PLAN = gql`
       isSolarRequired
       isBatteryRequired
       attachNominationForm
+      planTcPath
       contractTerm
       exitFee
       ratesJson
