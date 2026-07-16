@@ -54,6 +54,125 @@ const COMPONENT_DYNAMIC_TYPE_MAP: Record<string, string> = {
     'DEMAND(S)': 'demand_charges'
 };
 
+const BaseRateInput: React.FC<{
+    rate: string;
+    onRateChange: (val: string) => void;
+    isCents?: boolean;
+    className?: string;
+}> = ({ rate, onRateChange, isCents, className }) => {
+    const [localValue, setLocalValue] = React.useState('');
+    const [isFocused, setIsFocused] = React.useState(false);
+
+    React.useEffect(() => {
+        if (!isFocused) {
+            if (!rate) {
+                setLocalValue('');
+            } else {
+                setLocalValue(isCents ? parseFloat((Number(rate) * 100).toFixed(6)).toString() : rate);
+            }
+        }
+    }, [rate, isCents, isFocused]);
+
+    return (
+        <div className="relative w-full">
+            {!isCents && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground/80 z-10 text-xs font-medium select-none pointer-events-none">$</span>}
+            <Input
+                type="number"
+                step="any"
+                min="0"
+                value={localValue}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => {
+                    setIsFocused(false);
+                    if (localValue && !isNaN(Number(localValue))) {
+                        const divisor = isCents ? 100 : 1;
+                        const val = Number(localValue) / divisor;
+                        setLocalValue(isCents ? parseFloat((val * 100).toFixed(6)).toString() : val.toString());
+                    }
+                }}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    setLocalValue(val);
+                    if (val === '') {
+                        onRateChange('');
+                    } else if (/^\d*\.?\d*$/.test(val)) {
+                        const divisor = isCents ? 100 : 1;
+                        onRateChange(parseFloat((Number(val) / divisor).toFixed(6)).toString());
+                    }
+                }}
+                onKeyDown={(e) => {
+                    if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+                }}
+                placeholder="0.00"
+                className={`${className || ''} ${!isCents ? 'pl-6' : 'pr-6'} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            />
+            {isCents && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/80 z-10 text-xs font-medium select-none pointer-events-none">¢</span>}
+        </div>
+    );
+};
+
+/** Self-contained inclusive rate input that holds its own typing state to avoid round-trip jitter */
+const InclusiveRateInput: React.FC<{
+    exclusiveRate: string;
+    onExclusiveChange: (val: string) => void;
+    isCents?: boolean;
+    className?: string;
+}> = ({ exclusiveRate, onExclusiveChange, isCents, className }) => {
+    const [localValue, setLocalValue] = React.useState('');
+    const [isFocused, setIsFocused] = React.useState(false);
+
+    // Sync from external exclusive rate changes (e.g. user typed in exclusive field)
+    React.useEffect(() => {
+        if (!isFocused) {
+            if (!exclusiveRate) {
+                setLocalValue('');
+            } else {
+                const excl = Number(exclusiveRate);
+                const multiplier = isCents ? 100 : 1;
+                setLocalValue((excl * 1.1 * multiplier).toFixed(4).replace(/\.?0+$/, ''));
+            }
+        }
+    }, [exclusiveRate, isFocused, isCents]);
+
+    return (
+        <div className="relative w-full">
+            {!isCents && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-600/80 z-10 text-xs font-medium select-none pointer-events-none">$</span>}
+            <Input
+                type="number"
+                step="any"
+                min="0"
+                value={localValue}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => {
+                    setIsFocused(false);
+                    // Re-sync display on blur to show clean value
+                    if (localValue && !isNaN(Number(localValue))) {
+                        const divisor = isCents ? 100 : 1;
+                        const excl = (Number(localValue) / divisor) / 1.1;
+                        setLocalValue((excl * 1.1 * divisor).toFixed(4).replace(/\.?0+$/, ''));
+                    }
+                }}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    setLocalValue(val);
+                    if (val === '') {
+                        onExclusiveChange('');
+                    } else if (/^\d*\.?\d*$/.test(val)) {
+                        const divisor = isCents ? 100 : 1;
+                        onExclusiveChange((Number(val) / divisor / 1.1).toFixed(4).replace(/\.?0+$/, ''));
+                    }
+                }}
+                onKeyDown={(e) => {
+                    if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+                }}
+                placeholder="0.00"
+                className={`${className || ''} ${!isCents ? 'pl-6' : 'pr-6'} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            />
+            {isCents && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-600/80 z-10 text-xs font-medium select-none pointer-events-none">¢</span>}
+        </div>
+    );
+};
+
 export const AddPlanPage: React.FC = () => {
     const navigate = useNavigate();
     const { uid } = useParams();
@@ -109,6 +228,8 @@ export const AddPlanPage: React.FC = () => {
     const [tcFile, setTcFile] = useState<File | null>(null);
     const [tcUploading, setTcUploading] = useState(false);
     const [tcUploadedPath, setTcUploadedPath] = useState<string>('');
+    const [showInclusivePrice, setShowInclusivePrice] = useState(false);
+    const [inputUnit, setInputUnit] = useState<'$' | '¢'>('$');
     const tcFileInputRef = React.useRef<HTMLInputElement>(null);
 
     const handleTcFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -879,22 +1000,55 @@ export const AddPlanPage: React.FC = () => {
                             <div className="flex items-center justify-between">
                                 <div className="flex flex-col">
                                     <h2 className="text-lg font-semibold text-foreground">Rate Components</h2>
-                                    <p className="text-sm text-muted-foreground">Define rates and components for this plan. Enter rates without tax. At least one rate must be added.</p>
+                                    <p className="text-sm text-muted-foreground">Define rates and components for this plan. {showInclusivePrice ? 'Enter inclusive or exclusive rates. Inclusive = Exclusive × 1.1. Only exclusive rate is saved.' : 'Enter rates without tax. At least one rate must be added.'}</p>
                                     {errors.components && <span className="text-xs text-destructive mt-1 font-medium bg-destructive/10 px-2 py-1 rounded w-fit">{errors.components}</span>}
                                 </div>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                        setEditingCustomRateIndex(null);
-                                        setCustomRateDraft({ name: '', description: '', rate: '', unit: '', planType: 'fixed', tariffUid: '', dynamicType: '', rateType: 'Fixed' });
-                                        setIsCustomModalOpen(true);
-                                    }}
-                                    className="flex items-center gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20"
-                                >
-                                    <span className="text-lg leading-none">+</span> Add Custom Rate
-                                </Button>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex bg-muted/30 p-1 rounded-md border border-border/50 items-center" title="Toggle between $ and ¢ for input (always saves in $)">
+                                        <button
+                                            type="button"
+                                            className={`flex-1 text-xs font-medium py-1 px-3 rounded transition-all duration-200 ${inputUnit === '$' ? 'bg-primary shadow-sm text-primary-foreground scale-[1.02]' : 'text-muted-foreground hover:bg-muted/80'}`}
+                                            onClick={() => setInputUnit('$')}
+                                        >
+                                            $
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`flex-1 text-xs font-medium py-1 px-3 rounded transition-all duration-200 ${inputUnit === '¢' ? 'bg-primary shadow-sm text-primary-foreground scale-[1.02]' : 'text-muted-foreground hover:bg-muted/80'}`}
+                                            onClick={() => setInputUnit('¢')}
+                                        >
+                                            ¢
+                                        </button>
+                                    </div>
+                                    <label className="flex items-center gap-2 cursor-pointer group bg-muted/30 px-3 py-1.5 rounded-md border border-border/50 hover:bg-muted/50 transition-colors">
+                                        <div className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${showInclusivePrice ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only"
+                                                checked={showInclusivePrice}
+                                                onChange={(e) => setShowInclusivePrice(e.target.checked)}
+                                            />
+                                            <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${showInclusivePrice ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                                        </div>
+                                        <div className="flex flex-col leading-none">
+                                            <span className="text-xs font-medium text-foreground">Inclusive Pricing</span>
+                                            <span className="text-[9px] text-muted-foreground">Show price with tax (x1.1)</span>
+                                        </div>
+                                    </label>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setEditingCustomRateIndex(null);
+                                            setCustomRateDraft({ name: '', description: '', rate: '', unit: '', planType: 'fixed', tariffUid: '', dynamicType: '', rateType: 'Fixed' });
+                                            setIsCustomModalOpen(true);
+                                        }}
+                                        className="flex items-center gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20 h-[38px]"
+                                    >
+                                        <span className="text-lg leading-none">+</span> Add Custom Rate
+                                    </Button>
+                                </div>
                             </div>
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
                                 {/* Left Side: Default Components */}
@@ -908,7 +1062,8 @@ export const AddPlanPage: React.FC = () => {
                                                 <tr>
                                                     <th className="px-3 py-2 font-medium w-[35%]">Component</th>
                                                     <th className="px-3 py-2 font-medium w-[160px]">Type</th>
-                                                    <th className="px-3 py-2 font-medium">Rate</th>
+                                                    <th className="px-3 py-2 font-medium">{showInclusivePrice ? 'Excl. Rate' : 'Rate'}</th>
+                                                    {showInclusivePrice && <th className="px-3 py-2 font-medium">Incl. Rate</th>}
                                                     <th className="px-3 py-2 font-medium">Unit</th>
                                                     <th className="px-3 py-2 font-medium w-10"></th>
                                                 </tr>
@@ -953,24 +1108,31 @@ export const AddPlanPage: React.FC = () => {
                                                         {comp.rateType === 'Fixed' ? (
                                                             <>
                                                                 <td className="px-3 py-1.5 align-middle">
-                                                                    <Input
-                                                                        type="number"
-                                                                        step="any"
-                                                                        min="0"
-                                                                        value={comp.rate}
-                                                                        onChange={(e) => {
-                                                                            const val = e.target.value;
-                                                                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                                                                handleComponentChange(index, 'rate', val);
-                                                                            }
-                                                                        }}
-                                                                        onKeyDown={(e) => {
-                                                                            if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-                                                                        }}
-                                                                        placeholder="0.00"
-                                                                        className="h-7 text-xs font-medium min-w-[80px]"
-                                                                    />
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <BaseRateInput
+                                                                            rate={comp.rate}
+                                                                            isCents={inputUnit === '¢'}
+                                                                            onRateChange={(val) => handleComponentChange(index, 'rate', val)}
+                                                                            className="h-7 text-xs font-medium min-w-[80px]"
+                                                                        />
+                                                                        {showInclusivePrice && (
+                                                                            <span className="text-[9px] text-muted-foreground/60 font-medium">Excl. (saved)</span>
+                                                                        )}
+                                                                    </div>
                                                                 </td>
+                                                                {showInclusivePrice && (
+                                                                    <td className="px-3 py-1.5 align-middle">
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <InclusiveRateInput
+                                                                                exclusiveRate={comp.rate}
+                                                                                isCents={inputUnit === '¢'}
+                                                                                onExclusiveChange={(val) => handleComponentChange(index, 'rate', val)}
+                                                                                className="h-7 text-xs font-medium min-w-[80px] border-emerald-300 bg-emerald-50/50 focus:border-emerald-500"
+                                                                            />
+                                                                            <span className="text-[9px] text-emerald-600/70 font-medium">Incl. (×1.1)</span>
+                                                                        </div>
+                                                                    </td>
+                                                                )}
                                                                 <td className="px-3 py-1.5 align-middle">
                                                                     <div className="flex items-center gap-2 relative min-w-[100px]">
                                                                         <Select
@@ -993,7 +1155,7 @@ export const AddPlanPage: React.FC = () => {
                                                                 </td>
                                                             </>
                                                         ) : (
-                                                            <td colSpan={2} className="px-3 py-1.5 align-middle text-center">
+                                                            <td colSpan={showInclusivePrice ? 3 : 2} className="px-3 py-1.5 align-middle text-center">
                                                                 <span className="text-xs text-muted-foreground italic">
                                                                     {comp.rateType === 'None' ? '- Not Included -' : '- From Tariff -'}
                                                                 </span>
@@ -1045,7 +1207,8 @@ export const AddPlanPage: React.FC = () => {
                                                     <tr>
                                                         <th className="px-3 py-2 font-medium w-[35%]">Component</th>
                                                         <th className="px-3 py-2 font-medium w-[160px]">Type</th>
-                                                        <th className="px-3 py-2 font-medium">Rate</th>
+                                                        <th className="px-3 py-2 font-medium">{showInclusivePrice ? 'Excl. Rate' : 'Rate'}</th>
+                                                        {showInclusivePrice && <th className="px-3 py-2 font-medium">Incl. Rate</th>}
                                                         <th className="px-3 py-2 font-medium">Unit</th>
                                                         <th className="px-3 py-2 font-medium w-10"></th>
                                                     </tr>
@@ -1082,24 +1245,31 @@ export const AddPlanPage: React.FC = () => {
                                                             {comp.rateType === 'Fixed' ? (
                                                                 <>
                                                                     <td className="px-3 py-1.5 align-middle">
-                                                                        <Input
-                                                                            type="number"
-                                                                            step="any"
-                                                                            min="0"
-                                                                            value={comp.rate}
-                                                                            onChange={(e) => {
-                                                                                const val = e.target.value;
-                                                                                if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                                                                    handleComponentChange(index, 'rate', val);
-                                                                                }
-                                                                            }}
-                                                                            onKeyDown={(e) => {
-                                                                                if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-                                                                            }}
-                                                                            placeholder="0.00"
-                                                                            className="h-7 text-xs font-medium border-blue-200 focus:border-blue-500 min-w-[80px]"
-                                                                        />
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <BaseRateInput
+                                                                                rate={comp.rate}
+                                                                                isCents={inputUnit === '¢'}
+                                                                                onRateChange={(val) => handleComponentChange(index, 'rate', val)}
+                                                                                className="h-7 text-xs font-medium border-blue-200 focus:border-blue-500 min-w-[80px]"
+                                                                            />
+                                                                            {showInclusivePrice && (
+                                                                                <span className="text-[9px] text-blue-600/60 font-medium">Excl. (saved)</span>
+                                                                            )}
+                                                                        </div>
                                                                     </td>
+                                                                    {showInclusivePrice && (
+                                                                        <td className="px-3 py-1.5 align-middle">
+                                                                            <div className="flex flex-col gap-0.5">
+                                                                                <InclusiveRateInput
+                                                                                    exclusiveRate={comp.rate}
+                                                                                    isCents={inputUnit === '¢'}
+                                                                                    onExclusiveChange={(val) => handleComponentChange(index, 'rate', val)}
+                                                                                    className="h-7 text-xs font-medium min-w-[80px] border-emerald-300 bg-emerald-50/50 focus:border-emerald-500"
+                                                                                />
+                                                                                <span className="text-[9px] text-emerald-600/70 font-medium">Incl. (×1.1)</span>
+                                                                            </div>
+                                                                        </td>
+                                                                    )}
                                                                     <td className="px-3 py-1.5 align-middle">
                                                                         <div className="flex items-center gap-2 relative min-w-[100px]">
                                                                             <Select
@@ -1122,7 +1292,7 @@ export const AddPlanPage: React.FC = () => {
                                                                     </td>
                                                                 </>
                                                             ) : (
-                                                                <td colSpan={2} className="px-3 py-1.5 align-middle text-center">
+                                                                <td colSpan={showInclusivePrice ? 3 : 2} className="px-3 py-1.5 align-middle text-center">
                                                                     <span className="text-xs text-blue-600/60 italic">
                                                                         {comp.rateType === 'None' ? '- Not Included -' : '- From Tariff -'}
                                                                     </span>
@@ -1242,21 +1412,10 @@ export const AddPlanPage: React.FC = () => {
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Rate <span className="text-destructive">*</span></label>
-                                <Input
-                                    type="number"
-                                    step="any"
-                                    min="0"
-                                    value={customRateDraft.rate}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                            setCustomRateDraft({ ...customRateDraft, rate: val });
-                                        }
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-                                    }}
-                                    placeholder="0.00"
+                                <BaseRateInput
+                                    rate={customRateDraft.rate}
+                                    isCents={inputUnit === '¢'}
+                                    onRateChange={(val) => setCustomRateDraft({ ...customRateDraft, rate: val })}
                                 />
                             </div>
                             <div className="space-y-2">
