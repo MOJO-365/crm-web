@@ -33,6 +33,7 @@ import {
     CREATE_DOCUMENT_TYPE,
     SEND_REMINDER_EMAIL,
     SEND_NOMINATION_FORM_EMAIL,
+    SEND_VPP_PUSH_TO_GSYNC_EMAIL,
     CREATE_CUSTOMER,
     UPDATE_CUSTOMER,
     SEND_CUSTOMER_CREDENTIALS_EMAIL,
@@ -1285,6 +1286,8 @@ const InlineMaintenanceNotes = ({
     const [reminderSent, setReminderSent] = useState(false);
     const [sendingNominationFormEmailState, setSendingNominationFormEmailState] = useState(false);
     const [nominationFormEmailSent, setNominationFormEmailSent] = useState(false);
+    const [sendingVppPushToGsyncEmailState, setSendingVppPushToGsyncEmailState] = useState(false);
+    const [vppPushToGsyncEmailSent, setVppPushToGsyncEmailSent] = useState(false);
     const [freezingCustomer, setFreezingCustomer] = useState(false);
     const [freezeModalOpen, setFreezeModalOpen] = useState(false);
     // const [customerToFreeze, setCustomerToFreeze] = useState<CustomerDetails | null>(null); 
@@ -1620,6 +1623,7 @@ const InlineMaintenanceNotes = ({
     const [createDocumentTypeMutation] = useMutation(CREATE_DOCUMENT_TYPE);
     const [sendReminderEmail] = useMutation(SEND_REMINDER_EMAIL);
     const [sendNominationFormEmail] = useMutation(SEND_NOMINATION_FORM_EMAIL);
+    const [sendVppPushToGsyncEmail] = useMutation(SEND_VPP_PUSH_TO_GSYNC_EMAIL);
     const [createCustomer] = useMutation(CREATE_CUSTOMER);
     const [updateCustomer] = useMutation(UPDATE_CUSTOMER);
     const [sendCustomerCredentialsEmail] = useMutation(SEND_CUSTOMER_CREDENTIALS_EMAIL);
@@ -2990,6 +2994,34 @@ const InlineMaintenanceNotes = ({
             toast.error(error.message || 'Failed to send Nomination Form email');
         } finally {
             setSendingNominationFormEmailState(false);
+        }
+    };
+
+    const handleSendVppPushToGsyncEmail = async (customerUid: string) => {
+        setSendingVppPushToGsyncEmailState(true);
+        try {
+            const { data } = await sendVppPushToGsyncEmail({
+                variables: { customerUid }
+            });
+
+            if (data?.sendVppPushToGsyncEmail?.success) {
+                toast.success(data.sendVppPushToGsyncEmail.message || 'VPP Terms email sent successfully');
+                setVppPushToGsyncEmailSent(true);
+                setTimeout(() => setEmailLogsKey((prev) => prev + 1), 1500);
+
+                // Refetch customer to update documents list
+                const { data: updatedData } = await refetchCustomer();
+                if (updatedData?.customer) {
+                    setSelectedCustomerDetails(updatedData.customer);
+                }
+            } else {
+                toast.error(data?.sendVppPushToGsyncEmail?.message || 'Failed to send VPP Terms email');
+            }
+        } catch (error: any) {
+            console.error('Error sending VPP Terms email:', error);
+            toast.error(error.message || 'Failed to send VPP Terms email');
+        } finally {
+            setSendingVppPushToGsyncEmailState(false);
         }
     };
 
@@ -4583,6 +4615,13 @@ const InlineMaintenanceNotes = ({
                                                         category: '0',
                                                         show: !!(selectedCustomerDetails.vppDetails?.vpp) || !!(selectedCustomerDetails.plan?.attachNominationForm)
                                                     },
+                                                    {
+                                                        doc: selectedCustomerDetails.documents?.find(d => d.documentType?.name?.includes('VPP Terms') || d.name?.includes('VPP Terms') || d.documentType?.name?.includes('VPP Push to Gsync') || d.name?.includes('VPP Push to Gsync') || d.type === 'vppPushToGsync'),
+                                                        label: 'VPP Push to Gsync',
+                                                        type: 'vppPushToGsync',
+                                                        category: '0',
+                                                        show: !!(selectedCustomerDetails.vppDetails?.vpp)
+                                                    },
                                                     ...(selectedCustomerDetails?.documents?.filter(d =>
                                                         d.uid !== selectedCustomerDetails?.previousBill?.uid &&
                                                         d.uid !== selectedCustomerDetails?.identityProof?.uid &&
@@ -4592,6 +4631,11 @@ const InlineMaintenanceNotes = ({
                                                         !d.name?.includes('Nomination Form') &&
                                                         !d.name?.includes('Nomination') &&
                                                         d.type !== 'nominationForm' &&
+                                                        !d.documentType?.name?.includes('VPP Terms') &&
+                                                        !d.name?.includes('VPP Terms') &&
+                                                        !d.documentType?.name?.includes('VPP Push to Gsync') &&
+                                                        !d.name?.includes('VPP Push to Gsync') &&
+                                                        d.type !== 'vppPushToGsync' &&
                                                         (d.documentType?.category === '0' || d.documentType?.category === '1' || (!d.documentType?.category && d.type !== '2'))
                                                     ).map(d => ({
                                                         doc: d,
@@ -4639,7 +4683,7 @@ const InlineMaintenanceNotes = ({
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
                                                             <div className="flex items-center justify-end gap-2">
-                                                                {item.type === 'nominationForm' && !item.doc?.path && (
+                                                                {item.type === 'nominationForm' && !item.doc?.path && selectedCustomerDetails.status > 2 && !!(selectedCustomerDetails.vppDetails?.vpp) && (
                                                                     <Tooltip content="Send Email for Signature">
                                                                         <Button
                                                                             variant="outline"
@@ -4648,6 +4692,21 @@ const InlineMaintenanceNotes = ({
                                                                             onClick={() => handleSendNominationFormEmail(selectedCustomerDetails.uid)}
                                                                             disabled={sendingNominationFormEmailState || nominationFormEmailSent || selectedCustomerDetails.isDeleted}
                                                                             isLoading={sendingNominationFormEmailState}
+                                                                            loadingText="Sending..."
+                                                                        >
+                                                                            <MailIcon className="w-3.5 h-3.5" />
+                                                                        </Button>
+                                                                    </Tooltip>
+                                                                )}
+                                                                {item.type === 'vppPushToGsync' && !item.doc?.path && selectedCustomerDetails.status > 2 && !!(selectedCustomerDetails.vppDetails?.vpp) && (
+                                                                    <Tooltip content="Send VPP Terms Email">
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-8 px-3 text-xs font-medium border-primary/50 text-primary hover:bg-primary/10"
+                                                                            onClick={() => handleSendVppPushToGsyncEmail(selectedCustomerDetails.uid)}
+                                                                            disabled={sendingVppPushToGsyncEmailState || vppPushToGsyncEmailSent || selectedCustomerDetails.isDeleted}
+                                                                            isLoading={sendingVppPushToGsyncEmailState}
                                                                             loadingText="Sending..."
                                                                         >
                                                                             <MailIcon className="w-3.5 h-3.5" />
@@ -4698,6 +4757,7 @@ const InlineMaintenanceNotes = ({
                                                                             else if (item.type === 'identityProof') identityProofInputRef.current?.click();
                                                                             else if (item.type === 'licenseDocument') licenseDocumentInputRef.current?.click();
                                                                             else if (item.type === 'nominationForm') nominationFormInputRef.current?.click();
+                                                                            else if (item.type === 'vppPushToGsync') newDocumentInputRef.current?.click(); // For now, we fallback to new document input since there's no specific hidden input for this
                                                                             else newDocumentInputRef.current?.click();
                                                                         }}
                                                                         disabled={isUploadingDocument === item.type}
