@@ -39,8 +39,9 @@ export const NominationFormPage = () => {
     const [typed, setTyped] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
-    const [isNominationExpanded, setIsNominationExpanded] = useState(false);
+    const [isNominationExpanded, setIsNominationExpanded] = useState(true);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [showSignModal, setShowSignModal] = useState(false);
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sigPadRef = useRef<any>(null);
@@ -81,7 +82,7 @@ export const NominationFormPage = () => {
     // Initialize Signature Pad
     useEffect(() => {
         let active = true;
-        if (!fetchingCustomer && customerData && !formSigned && mode === 'pad') {
+        if (!fetchingCustomer && customerData && !formSigned && mode === 'pad' && showSignModal) {
             const initPad = async () => {
                 await loadSignaturePad();
                 if (!active) return;
@@ -130,11 +131,11 @@ export const NominationFormPage = () => {
                 sigPadRef.current = null;
             }
         };
-    }, [fetchingCustomer, customerData, formSigned, mode]);
+    }, [fetchingCustomer, customerData, formSigned, mode, showSignModal]);
 
     // Handle Type Mode Rendering
     useEffect(() => {
-        if (!fetchingCustomer && customerData && !formSigned && mode === 'type' && canvasRef.current) {
+        if (!fetchingCustomer && customerData && !formSigned && mode === 'type' && canvasRef.current && showSignModal) {
             const canvas = canvasRef.current;
             const ctx = canvas.getContext('2d');
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -161,7 +162,7 @@ export const NominationFormPage = () => {
                 }
             }
         }
-    }, [fetchingCustomer, customerData, formSigned, mode, typed]);
+    }, [fetchingCustomer, customerData, formSigned, mode, typed, showSignModal]);
 
     if (!customerId) {
         return <div className="min-h-screen flex items-center justify-center">Invalid Link</div>;
@@ -335,99 +336,156 @@ export const NominationFormPage = () => {
                     )}
                 </div>
 
-                <div className="bg-card rounded-xl shadow-sm border border-border p-6">
-                    <h2 className="text-lg font-semibold text-foreground border-b border-border pb-3 mb-4">Sign Your Agreement</h2>
-                    <p className="text-sm text-muted-foreground mb-6">
-                        By signing below, I nominate my battery energy storage system (BESS) for participation in the Virtual Power Plant (VPP) program.
-                    </p>
+            </div>
 
-                    {submitError && (
-                        <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">
-                            {submitError}
+            {/* Sticky Bottom Sign Button */}
+            <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.1)]">
+                <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
                         </div>
-                    )}
-
-                    <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
-                            <input
-                                type="text"
-                                className="w-full h-10 px-3 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                value={signatoryName}
-                                onChange={(e) => setSignatoryName(e.target.value)}
-                                placeholder="Enter your full name"
-                            />
-                        </div>
-
-                        <div className="pt-2 border-t border-border mt-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <label className="block text-sm font-medium text-foreground">Signature</label>
-                                <div className="flex bg-muted rounded-lg p-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => setMode('pad')}
-                                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'pad' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                                    >
-                                        Draw
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setMode('type')}
-                                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'type' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                                    >
-                                        Type
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="relative">
-                                {mode === 'type' && (
-                                    <input
-                                        type="text"
-                                        value={typed}
-                                        onChange={(e) => setTyped(e.target.value)}
-                                        placeholder="Type your signature here..."
-                                        className="absolute inset-x-0 top-2 mx-auto w-3/4 h-10 px-3 text-center border-b border-dashed border-input focus:border-primary focus:outline-none bg-transparent z-10"
-                                        style={{ fontStyle: 'italic' }}
-                                    />
-                                )}
-                                <div className="border-2 border-dashed border-input rounded-xl bg-card overflow-hidden h-48 flex items-center justify-center cursor-crosshair">
-                                    <canvas
-                                        ref={canvasRef}
-                                        className="w-full h-full"
-                                        style={{ touchAction: 'none' }}
-                                    />
-                                </div>
-                                {mode === 'pad' && (
-                                    <button
-                                        type="button"
-                                        onClick={() => sigPadRef.current?.clear()}
-                                        className="absolute bottom-2 right-2 px-2 py-1 bg-muted/80 hover:bg-muted text-muted-foreground rounded text-xs transition-colors"
-                                    >
-                                        Clear
-                                    </button>
-                                )}
-                            </div>
+                            <p className="text-sm font-semibold text-slate-900 dark:text-white">Ready to sign?</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Review complete — sign your agreement</p>
                         </div>
                     </div>
-
-                    <div className="mt-8 pt-6 border-t border-border flex justify-end">
-                        <Button
-                            onClick={handleSave}
-                            disabled={submitting}
-                            isLoading={submitting}
-                            loadingText="Submitting..."
-                            className="w-full sm:w-auto px-8"
-                        >
-                            Submit Nomination Form
-                        </Button>
-                    </div>
+                    <button
+                        onClick={() => setShowSignModal(true)}
+                        className="px-6 py-2.5 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                        Sign & Submit
+                    </button>
                 </div>
             </div>
 
+            {/* Sign Modal */}
+            {showSignModal && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300 border border-slate-200 dark:border-slate-800 max-h-[90vh] flex flex-col">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Sign Your Agreement</h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Complete your BESS nomination</p>
+                            </div>
+                            <button
+                                onClick={() => setShowSignModal(false)}
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="overflow-y-auto p-6 flex-1">
+                            <p className="text-sm text-muted-foreground mb-6">
+                                By signing below, I nominate my battery energy storage system (BESS) for participation in the Virtual Power Plant (VPP) program.
+                            </p>
+
+                            {submitError && (
+                                <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">
+                                    {submitError}
+                                </div>
+                            )}
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
+                                    <input
+                                        type="text"
+                                        className="w-full h-10 px-3 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        value={signatoryName}
+                                        onChange={(e) => setSignatoryName(e.target.value)}
+                                        placeholder="Enter your full name"
+                                    />
+                                </div>
+
+                                <div className="pt-2 border-t border-border mt-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-sm font-medium text-foreground">Signature</label>
+                                        <div className="flex bg-muted rounded-lg p-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setMode('pad')}
+                                                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'pad' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                            >
+                                                Draw
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setMode('type')}
+                                                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'type' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                            >
+                                                Type
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="relative">
+                                        {mode === 'type' && (
+                                            <input
+                                                type="text"
+                                                value={typed}
+                                                onChange={(e) => setTyped(e.target.value)}
+                                                placeholder="Type your signature here..."
+                                                className="absolute inset-x-0 top-2 mx-auto w-3/4 h-10 px-3 text-center border-b border-dashed border-input focus:border-primary focus:outline-none bg-transparent z-10"
+                                                style={{ fontStyle: 'italic' }}
+                                            />
+                                        )}
+                                        <div className="border-2 border-dashed border-input rounded-xl bg-card overflow-hidden h-48 flex items-center justify-center cursor-crosshair">
+                                            <canvas
+                                                ref={canvasRef}
+                                                className="w-full h-full"
+                                                style={{ touchAction: 'none' }}
+                                            />
+                                        </div>
+                                        {mode === 'pad' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => sigPadRef.current?.clear()}
+                                                className="absolute bottom-2 right-2 px-2 py-1 bg-muted/80 hover:bg-muted text-muted-foreground rounded text-xs transition-colors"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 shrink-0 flex gap-3">
+                            <button
+                                onClick={() => setShowSignModal(false)}
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <Button
+                                onClick={handleSave}
+                                disabled={submitting}
+                                isLoading={submitting}
+                                loadingText="Submitting..."
+                                className="flex-1 px-4 !rounded-xl"
+                            >
+                                Submit Nomination
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Custom Confirm Modal */}
             {showConfirmModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
                         <div className="p-6 text-center">
                             <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">

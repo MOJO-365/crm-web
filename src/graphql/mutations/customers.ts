@@ -401,3 +401,12 @@ export const SEND_PDRS_CONSENT_EMAIL = gql`
         }
     }
 `;
+
+export const SEND_VPP_PUSH_TO_GSYNC_EMAIL = gql`
+    mutation SendVppPushToGsyncEmail($customerUid: String!) {
+        sendVppPushToGsyncEmail(customerUid: $customerUid) {
+            success
+            message
+        }
+    }
+`;
