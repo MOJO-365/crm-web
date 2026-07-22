@@ -213,6 +213,7 @@ export const AddPlanPage: React.FC = () => {
         contractTerm: '',
         exitFee: '' as number | string,
         bonusUids: [] as string[],
+        isActive: true,
         components: [
             ...TARIFF_COMPONENTS.map(name => ({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false as boolean | undefined, rateType: 'None', dnsp: 'default' })),
             ...DNSP_OPTIONS.flatMap(dnsp => 
@@ -360,6 +361,7 @@ export const AddPlanPage: React.FC = () => {
                     contractTerm: plan.contractTerm || '',
                     exitFee: plan.exitFee ?? '',
                     bonusUids: plan.bonusUids || [],
+                    isActive: plan.isActive ?? true,
                     components: baseComponents
                 };
             });
@@ -558,7 +560,7 @@ export const AddPlanPage: React.FC = () => {
                             contractTerm: formData.contractTerm,
                             exitFee: formData.exitFee === '' ? null : Number(formData.exitFee),
                             ratesJson: JSON.stringify(validComponents),
-                            isActive: true,
+                            isActive: formData.isActive,
                             bonusUids: formData.bonusUids
                         }
                     }
@@ -581,7 +583,7 @@ export const AddPlanPage: React.FC = () => {
                             contractTerm: formData.contractTerm,
                             exitFee: formData.exitFee === '' ? null : Number(formData.exitFee),
                             ratesJson: JSON.stringify(validComponents),
-                            isActive: true,
+                            isActive: formData.isActive,
                             bonusUids: formData.bonusUids
                         }
                     }

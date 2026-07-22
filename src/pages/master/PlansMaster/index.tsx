@@ -43,6 +43,7 @@ export const PlansMasterPage: React.FC = () => {
     const [updatePlan] = useMutation(UPDATE_PLAN);
 
     const canManage = useAuthStore((state) => state.canEditInMenu('plans_master'));
+    const canChangeStatus = useAuthStore((state) => state.hasFeatureAccess('feature_change_plan_status'));
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ACTIVE');
@@ -211,15 +212,15 @@ export const PlansMasterPage: React.FC = () => {
                         title="Confirm Status Change"
                         description={`Are you sure you want to mark this plan as ${item.isActive === false ? 'Active' : 'Inactive'}?`}
                         onConfirm={() => handleToggleStatus(item)}
-                        enabled={canManage}
+                        enabled={canChangeStatus}
                         confirmVariant="default"
                         placement="left"
                     >
-                        <div className={!canManage ? 'pointer-events-none opacity-50' : ''}>
+                        <div className={!canChangeStatus ? 'pointer-events-none opacity-50' : ''}>
                             <Switch
                                 checked={item.isActive !== false}
                                 onChange={() => { }}
-                                disabled={!canManage}
+                                disabled={!canChangeStatus}
                             />
                         </div>
                     </ConfirmationPopover>
