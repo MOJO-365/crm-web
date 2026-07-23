@@ -4753,7 +4753,7 @@ const InlineMaintenanceNotes = ({
                                                                             </ConfirmationPopover>
                                                                         )}
                                                                     </>
-                                                                ) : item.type !== 'vppPushToGsync' && (
+                                                                ) : (item.type !== 'vppPushToGsync' || !!selectedCustomerDetails.vppEmailSentAt) && (
                                                                     <Button
                                                                         variant="outline"
                                                                         size="sm"
