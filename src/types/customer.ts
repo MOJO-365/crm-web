@@ -110,6 +110,7 @@ export interface CustomerFormData {
     assignedToUid?: string;
     pdrsEmailSent?: number;
     pdrsEmailSentAt?: string;
+    vppEmailSentAt?: string;
 }
 
 export interface CustomerDocument {
