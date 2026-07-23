@@ -149,6 +149,7 @@ interface CustomerDetails {
     offerEmailSentAt?: string;
     pdrsEmailSent?: number;
     pdrsEmailSentAt?: string;
+    vppEmailSentAt?: string;
     emailLogCount?: number;
     phoneVerifiedAt?: string;
     isActive?: boolean;
@@ -3009,7 +3010,10 @@ const InlineMaintenanceNotes = ({
                 setVppPushToGsyncEmailSent(true);
                 setTimeout(() => setEmailLogsKey((prev) => prev + 1), 1500);
 
-                // Refetch customer to update documents list
+                // Immediately update local state to reflect sent status
+                setSelectedCustomerDetails(prev => prev ? { ...prev, vppEmailSentAt: new Date().toISOString() } : prev);
+
+                // Refetch customer to get server-confirmed data
                 const { data: updatedData } = await refetchCustomer();
                 if (updatedData?.customer) {
                     setSelectedCustomerDetails(updatedData.customer);
@@ -4678,7 +4682,9 @@ const InlineMaintenanceNotes = ({
                                                         <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                                                             {item.doc?.path && item.doc.createdAt
                                                                 ? formatSydneyTime(item.doc.createdAt)
-                                                                : <span className="text-muted-foreground italic">—</span>
+                                                                : item.type === 'vppPushToGsync' && selectedCustomerDetails.vppEmailSentAt
+                                                                    ? formatSydneyTime(selectedCustomerDetails.vppEmailSentAt)
+                                                                    : <span className="text-muted-foreground italic">—</span>
                                                             }
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
@@ -4699,17 +4705,17 @@ const InlineMaintenanceNotes = ({
                                                                     </Tooltip>
                                                                 )}
                                                                 {item.type === 'vppPushToGsync' && !item.doc?.path && selectedCustomerDetails.status > 2 && !!(selectedCustomerDetails.vppDetails?.vpp) && (
-                                                                    <Tooltip content="Send VPP Terms Email">
+                                                                    <Tooltip content={selectedCustomerDetails.vppEmailSentAt ? `Sent at ${formatSydneyTime(selectedCustomerDetails.vppEmailSentAt)}` : "Send VPP Terms Email"}>
                                                                         <Button
                                                                             variant="outline"
                                                                             size="sm"
                                                                             className="h-8 px-3 text-xs font-medium border-primary/50 text-primary hover:bg-primary/10"
                                                                             onClick={() => handleSendVppPushToGsyncEmail(selectedCustomerDetails.uid)}
-                                                                            disabled={sendingVppPushToGsyncEmailState || vppPushToGsyncEmailSent || selectedCustomerDetails.isDeleted}
+                                                                            disabled={sendingVppPushToGsyncEmailState || vppPushToGsyncEmailSent || selectedCustomerDetails.isDeleted || !!selectedCustomerDetails.vppEmailSentAt}
                                                                             isLoading={sendingVppPushToGsyncEmailState}
                                                                             loadingText="Sending..."
                                                                         >
-                                                                            <MailIcon className="w-3.5 h-3.5" />
+                                                                            {selectedCustomerDetails.vppEmailSentAt ? "Sent" : "Send"}
                                                                         </Button>
                                                                     </Tooltip>
                                                                 )}
@@ -4747,7 +4753,7 @@ const InlineMaintenanceNotes = ({
                                                                             </ConfirmationPopover>
                                                                         )}
                                                                     </>
-                                                                ) : (
+                                                                ) : item.type !== 'vppPushToGsync' && (
                                                                     <Button
                                                                         variant="outline"
                                                                         size="sm"
@@ -4757,7 +4763,6 @@ const InlineMaintenanceNotes = ({
                                                                             else if (item.type === 'identityProof') identityProofInputRef.current?.click();
                                                                             else if (item.type === 'licenseDocument') licenseDocumentInputRef.current?.click();
                                                                             else if (item.type === 'nominationForm') nominationFormInputRef.current?.click();
-                                                                            else if (item.type === 'vppPushToGsync') newDocumentInputRef.current?.click(); // For now, we fallback to new document input since there's no specific hidden input for this
                                                                             else newDocumentInputRef.current?.click();
                                                                         }}
                                                                         disabled={isUploadingDocument === item.type}

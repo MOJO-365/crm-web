@@ -47,6 +47,7 @@ export const GET_CUSTOMERS = gql`
                 offerEmailSentAt
                 pdrsEmailSent
                 pdrsEmailSentAt
+                vppEmailSentAt
                 updatedAt
                 leadUid
                 portalName
@@ -469,6 +470,7 @@ export const GET_CUSTOMERS_CURSOR = gql`
                 discount
                 pdrsEmailSent
                 pdrsEmailSentAt
+                vppEmailSentAt
                 isWithoutSignature
                 ratePlan {
                     id
@@ -599,6 +601,7 @@ export const GET_CUSTOMER_BY_ID = gql`
             referralName
             pdrsEmailSent
             pdrsEmailSentAt
+            vppEmailSentAt
             address {
                 id
                 customerUid
@@ -802,6 +805,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             offerEmailSentAt
             pdrsEmailSent
             pdrsEmailSentAt
+            vppEmailSentAt
             updatedAt
             portalName
             source
