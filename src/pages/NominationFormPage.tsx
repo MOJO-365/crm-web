@@ -148,7 +148,14 @@ export const NominationFormPage = () => {
             if (ctx) {
                 ctx.clearRect(0, 0, canvas.width / ratio, canvas.height / ratio);
                 if (typed) {
-                    ctx.font = '72px cursive';
+                    let fontSize = 64;
+                    ctx.font = `${fontSize}px cursive`;
+                    const padding = 40;
+                    const maxWidth = (canvas.width / ratio) - padding;
+                    while (ctx.measureText(typed).width > maxWidth && fontSize > 16) {
+                        fontSize -= 2;
+                        ctx.font = `${fontSize}px cursive`;
+                    }
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
