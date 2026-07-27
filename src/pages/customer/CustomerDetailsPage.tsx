@@ -4621,7 +4621,7 @@ const InlineMaintenanceNotes = ({
                                                     },
                                                     {
                                                         doc: selectedCustomerDetails.documents?.find(d => d.documentType?.name?.includes('VPP Terms') || d.name?.includes('VPP Terms') || d.documentType?.name?.includes('VPP Push to Gsync') || d.name?.includes('VPP Push to Gsync') || d.type === 'vppPushToGsync'),
-                                                        label: 'VPP Push to Gsync',
+                                                        label: 'GEE Welcome Letter',
                                                         type: 'vppPushToGsync',
                                                         category: '0',
                                                         show: !!(selectedCustomerDetails.vppDetails?.vpp)
