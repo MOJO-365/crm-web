@@ -2385,7 +2385,8 @@ const InlineMaintenanceNotes = ({
 
             const msatOn = selectedCustomerDetails.msatDetails?.msatConnected === 1;
             const utilmateOn = selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1;
-            const newStatus = (msatOn && utilmateOn) ? 9 : undefined;
+            const isSigned = (!!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2) || selectedCustomerDetails.isWithoutSignature === 1;
+            const newStatus = (msatOn && utilmateOn && isSigned) ? 9 : undefined;
 
             const input: any = {
                 ...(newStatus !== undefined ? { status: newStatus } : {}),
@@ -2455,7 +2456,8 @@ const InlineMaintenanceNotes = ({
 
             const msatOn = selectedCustomerDetails.msatDetails?.msatConnected === 1;
             const utilmateOn = selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1;
-            const newStatus = (msatOn && utilmateOn) ? 9 : undefined;
+            const isSigned = (!!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2) || selectedCustomerDetails.isWithoutSignature === 1;
+            const newStatus = (msatOn && utilmateOn && isSigned) ? 9 : undefined;
 
             const input: any = {
                 ...(newStatus !== undefined ? { status: newStatus } : {}),
@@ -2516,7 +2518,8 @@ const InlineMaintenanceNotes = ({
 
         const vppOn = selectedCustomerDetails.vppDetails?.vppConnected === 1;
         const utilmateOn = selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1;
-        const newStatus = (newValue && vppOn && utilmateOn) ? 9 : undefined;
+        const isSigned = (!!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2) || selectedCustomerDetails.isWithoutSignature === 1;
+        const newStatus = (newValue && vppOn && utilmateOn && isSigned) ? 9 : undefined;
 
         setSelectedCustomerDetails({
             ...selectedCustomerDetails,
@@ -2656,7 +2659,8 @@ const InlineMaintenanceNotes = ({
             const now = new Date().toISOString();
             const vppOn = selectedCustomerDetails.vppDetails?.vppConnected === 1;
             const msatOn = selectedCustomerDetails.msatDetails?.msatConnected === 1;
-            const newStatus = (vppOn && msatOn) ? 9 : undefined;
+            const isSigned = (!!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2) || selectedCustomerDetails.isWithoutSignature === 1;
+            const newStatus = (vppOn && msatOn && isSigned) ? 9 : undefined;
 
             const input: any = {
                 ...(newStatus !== undefined ? { status: newStatus } : {}),
@@ -2703,7 +2707,8 @@ const InlineMaintenanceNotes = ({
             const now = new Date().toISOString();
             const vppOn = selectedCustomerDetails.vppDetails?.vppConnected === 1;
             const msatOn = selectedCustomerDetails.msatDetails?.msatConnected === 1;
-            const newStatus = (vppOn && msatOn) ? 9 : undefined;
+            const isSigned = (!!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2) || selectedCustomerDetails.isWithoutSignature === 1;
+            const newStatus = (vppOn && msatOn && isSigned) ? 9 : undefined;
 
             const input: any = {
                 ...(newStatus !== undefined ? { status: newStatus } : {}),
