@@ -413,7 +413,7 @@ export const OfferAccessPage = () => {
     }
 
     // Success Page for Signed Customers
-    if (customerData?.signDate && customerData?.status === 3) {
+    if (customerData?.signDate && customerData?.status >= 3) {
         return (
             <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
                 <div className="w-full max-w-md">
