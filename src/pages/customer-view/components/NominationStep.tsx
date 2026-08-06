@@ -45,6 +45,8 @@ export const NominationStep: React.FC<NominationStepProps> = ({
     // Accordion state
     const [isOfferExpanded, setIsOfferExpanded] = useState(false);
     const [isNominationExpanded, setIsNominationExpanded] = useState(false);
+    const [isOfferLoading, setIsOfferLoading] = useState(true);
+    const [isNominationLoading, setIsNominationLoading] = useState(true);
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sigPadRef = useRef<any>(null);
@@ -148,7 +150,10 @@ export const NominationStep: React.FC<NominationStepProps> = ({
                         {uid && (
                             <div className={`bg-white rounded-2xl shadow-sm border transition-all duration-300 overflow-hidden ${isOfferExpanded ? 'border-primary/40 ring-4 ring-primary/5' : 'border-slate-200 hover:border-slate-300'}`}>
                                 <button
-                                    onClick={() => setIsOfferExpanded(!isOfferExpanded)}
+                                    onClick={() => {
+                                        setIsOfferExpanded(!isOfferExpanded);
+                                        if (!isOfferExpanded) setIsOfferLoading(true);
+                                    }}
                                     className={`w-full flex items-center justify-between px-6 py-5 transition-colors ${isOfferExpanded ? 'bg-primary/5' : 'bg-white hover:bg-slate-50'}`}
                                 >
                                     <div className="flex items-center gap-4">
@@ -167,10 +172,17 @@ export const NominationStep: React.FC<NominationStepProps> = ({
                                 {isOfferExpanded && (
                                     <div className="border-t border-primary/10 bg-slate-50 p-2 sm:p-4">
                                         <div className="rounded-xl overflow-hidden border border-slate-200 bg-white relative aspect-[1/1.414] md:aspect-auto md:h-[700px] shadow-inner">
+                                            {isOfferLoading && (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 gap-3">
+                                                    <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-primary" />
+                                                    <p className="text-sm text-slate-500 font-medium">Loading preview...</p>
+                                                </div>
+                                            )}
                                             <iframe
                                                 src={`${apiAxios.defaults.baseURL?.replace(/\/$/, '') || ''}/agreement/preview/${uid}?format=pdf#view=Fit`}
                                                 className="absolute inset-0 w-full h-full border-0"
                                                 title="Offer Summary Preview"
+                                                onLoad={() => setIsOfferLoading(false)}
                                             />
                                         </div>
                                     </div>
@@ -181,7 +193,10 @@ export const NominationStep: React.FC<NominationStepProps> = ({
                         {/* PDF Preview Accordion */}
                         <div className={`bg-white rounded-2xl shadow-sm border transition-all duration-300 overflow-hidden ${isNominationExpanded ? 'border-primary/40 ring-4 ring-primary/5' : 'border-slate-200 hover:border-slate-300'}`}>
                             <button
-                                onClick={() => setIsNominationExpanded(!isNominationExpanded)}
+                                onClick={() => {
+                                    setIsNominationExpanded(!isNominationExpanded);
+                                    if (!isNominationExpanded) setIsNominationLoading(true);
+                                }}
                                 className={`w-full flex items-center justify-between px-6 py-5 transition-colors ${isNominationExpanded ? 'bg-primary/5' : 'bg-white hover:bg-slate-50'}`}
                             >
                                 <div className="flex items-center gap-4">
@@ -200,10 +215,17 @@ export const NominationStep: React.FC<NominationStepProps> = ({
                             {isNominationExpanded && (
                                 <div className="border-t border-primary/10 bg-slate-50 p-2 sm:p-4">
                                     <div className="rounded-xl overflow-hidden border border-slate-200 bg-white relative aspect-[1/1.414] md:aspect-auto md:h-[700px] shadow-inner">
+                                        {isNominationLoading && (
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 gap-3">
+                                                <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-primary" />
+                                                <p className="text-sm text-slate-500 font-medium">Loading preview...</p>
+                                            </div>
+                                        )}
                                         <iframe
-                                            src="/onboarding/BESS2 and Nomination Form.pdf#view=Fit"
+                                            src={`${apiAxios.defaults.baseURL?.replace(/\/$/, '') || ''}/agreement/nomination-preview/${uid}?format=pdf#view=Fit`}
                                             className="absolute inset-0 w-full h-full border-0"
                                             title="Nomination Form Preview"
+                                            onLoad={() => setIsNominationLoading(false)}
                                         />
                                     </div>
                                 </div>

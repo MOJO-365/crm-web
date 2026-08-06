@@ -114,7 +114,8 @@ export function CustomerApprovalsPage() {
         return [
             { value: '', label: 'All Portals' },
             { value: 'Gee Energy', label: 'Gee Energy' },
-            { value: 'PEERLESSGROUP', label: 'Peer Less Group' }
+            { value: 'PEERLESSGROUP', label: 'Peer Less Group' },
+            { value: 'BESS2', label: 'BESS2' }
         ];
     }, []);
 
@@ -501,6 +502,13 @@ export function CustomerApprovalsPage() {
                 </div>
             ),
             render: (row) => {
+                if (row.payload?.acpDetails) {
+                    return (
+                        <span className="text-foreground font-medium text-xs">
+                            BESS2
+                        </span>
+                    );
+                }
                 const rawPortal = row.payload?.portalname || row.payload?.portalName;
                 let displayPortal = rawPortal ? String(rawPortal) : '-';
                 if (displayPortal.toUpperCase() === 'PEERLESSGROUP') {
@@ -515,6 +523,27 @@ export function CustomerApprovalsPage() {
                 );
             }
         },
+        ...(filters.portal === 'BESS2' ? [{
+            key: 'acName',
+            header: (
+                <div className="flex flex-col gap-1">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            Ac Name
+                        </span>
+                    </div>
+                    <div className="h-7" />
+                </div>
+            ),
+            render: (row: WebEnrollment) => {
+                const acpName = row.payload?.acpDetails?.acpDisplayName || '-';
+                return (
+                    <span className="text-foreground font-medium text-xs">
+                        {acpName}
+                    </span>
+                );
+            }
+        }] : []),
         ...(filters.portal === 'PEERLESSGROUP' ? [{
             key: 'companyname',
             header: (
@@ -786,9 +815,9 @@ export function CustomerApprovalsPage() {
                                     <span className="text-muted-foreground">Plan Name</span>
                                     <span className="font-medium">
                                         {renderPayloadField(
-                                            selectedEnrollment.payload.planDetails?.planName || 
-                                            selectedEnrollment.payload.planName || 
-                                            selectedEnrollment.payload.plan_name || 
+                                            selectedEnrollment.payload.planDetails?.planName ||
+                                            selectedEnrollment.payload.planName ||
+                                            selectedEnrollment.payload.plan_name ||
                                             selectedEnrollment.payload.ratePlan?.title ||
                                             selectedEnrollment.payload.ratePlan?.name
                                         )}
@@ -827,67 +856,67 @@ export function CustomerApprovalsPage() {
                             </div>
 
                             {/* Identification */}
-                            {(selectedEnrollment.payload.idType === 0 || 
-                              selectedEnrollment.payload.idType === 1 || 
-                              selectedEnrollment.payload.idType === 2 || 
-                              (selectedEnrollment.payload.idnumber && selectedEnrollment.payload.idnumber !== '-')) && (
-                            <div className="space-y-3 bg-muted/30 p-4 rounded-lg border">
-                                <h3 className="font-semibold text-sm border-b pb-2">Identification Identity</h3>
-                                <div className="grid grid-cols-2 gap-y-2 text-sm">
-                                    <span className="text-muted-foreground">ID Type</span>
-                                    <span className="font-medium">
-                                        {selectedEnrollment.payload.idType === 0 ? 'Driver License' : selectedEnrollment.payload.idType === 1 ? 'Medicare' : selectedEnrollment.payload.idType === 2 ? 'Passport' : 'Unknown'}
-                                    </span>
-
-                                    {/* Conditional fields based on ID Type */}
-                                    {selectedEnrollment.payload.idType === 0 && (
-                                        <>
-                                            <span className="text-muted-foreground">ID Number</span>
-                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
-                                            <span className="text-muted-foreground">Issue State</span>
-                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idstate)}</span>
-                                            <span className="text-muted-foreground">Card Number</span>
-                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idcardnumber || selectedEnrollment.payload.licenseCardNumber || selectedEnrollment.payload.license_card_number || selectedEnrollment.payload.cardnumber || selectedEnrollment.payload.cardNumber)}</span>
-                                        </>
-                                    )}
-
-                                    {selectedEnrollment.payload.idType === 1 && (
-                                        <>
-                                            <span className="text-muted-foreground">Card Type</span>
+                            {(selectedEnrollment.payload.idType === 0 ||
+                                selectedEnrollment.payload.idType === 1 ||
+                                selectedEnrollment.payload.idType === 2 ||
+                                (selectedEnrollment.payload.idnumber && selectedEnrollment.payload.idnumber !== '-')) && (
+                                    <div className="space-y-3 bg-muted/30 p-4 rounded-lg border">
+                                        <h3 className="font-semibold text-sm border-b pb-2">Identification Identity</h3>
+                                        <div className="grid grid-cols-2 gap-y-2 text-sm">
+                                            <span className="text-muted-foreground">ID Type</span>
                                             <span className="font-medium">
-                                                {(selectedEnrollment.payload.medicareCardType === 0 || selectedEnrollment.payload.medicare_card_type === 0) ? 'Standard (Green)' :
-                                                    (selectedEnrollment.payload.medicareCardType === 1 || selectedEnrollment.payload.medicare_card_type === 1) ? 'Interim (Blue)' :
-                                                        (selectedEnrollment.payload.medicareCardType === 2 || selectedEnrollment.payload.medicare_card_type === 2) ? 'Reciprocal (Yellow)' :
-                                                            renderPayloadField(selectedEnrollment.payload.medicareCardType || selectedEnrollment.payload.medicare_card_type || selectedEnrollment.payload.cardtype)}
+                                                {selectedEnrollment.payload.idType === 0 ? 'Driver License' : selectedEnrollment.payload.idType === 1 ? 'Medicare' : selectedEnrollment.payload.idType === 2 ? 'Passport' : 'Unknown'}
                                             </span>
-                                            <span className="text-muted-foreground">Card Number</span>
-                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
-                                            <span className="text-muted-foreground">Expiry Date</span>
-                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idexpiary || selectedEnrollment.payload.idexpiry || selectedEnrollment.payload.expiarydate)}</span>
-                                        </>
-                                    )}
 
-                                    {selectedEnrollment.payload.idType === 2 && (
-                                        <>
-                                            <span className="text-muted-foreground">Passport Number</span>
-                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
-                                            <span className="text-muted-foreground">Expiry Date</span>
-                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idexpiary || selectedEnrollment.payload.idexpiry)}</span>
-                                        </>
-                                    )}
+                                            {/* Conditional fields based on ID Type */}
+                                            {selectedEnrollment.payload.idType === 0 && (
+                                                <>
+                                                    <span className="text-muted-foreground">ID Number</span>
+                                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
+                                                    <span className="text-muted-foreground">Issue State</span>
+                                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idstate)}</span>
+                                                    <span className="text-muted-foreground">Card Number</span>
+                                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idcardnumber || selectedEnrollment.payload.licenseCardNumber || selectedEnrollment.payload.license_card_number || selectedEnrollment.payload.cardnumber || selectedEnrollment.payload.cardNumber)}</span>
+                                                </>
+                                            )}
 
-                                    {/* Fallback for other types or missing type */}
-                                    {selectedEnrollment.payload.idType !== 0 && selectedEnrollment.payload.idType !== 1 && selectedEnrollment.payload.idType !== 2 && (
-                                        <>
-                                            <span className="text-muted-foreground">ID Number</span>
-                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
-                                            <span className="text-muted-foreground">Expiry Date</span>
-                                            <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idexpiary || selectedEnrollment.payload.idexpiry)}</span>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                            )}
+                                            {selectedEnrollment.payload.idType === 1 && (
+                                                <>
+                                                    <span className="text-muted-foreground">Card Type</span>
+                                                    <span className="font-medium">
+                                                        {(selectedEnrollment.payload.medicareCardType === 0 || selectedEnrollment.payload.medicare_card_type === 0) ? 'Standard (Green)' :
+                                                            (selectedEnrollment.payload.medicareCardType === 1 || selectedEnrollment.payload.medicare_card_type === 1) ? 'Interim (Blue)' :
+                                                                (selectedEnrollment.payload.medicareCardType === 2 || selectedEnrollment.payload.medicare_card_type === 2) ? 'Reciprocal (Yellow)' :
+                                                                    renderPayloadField(selectedEnrollment.payload.medicareCardType || selectedEnrollment.payload.medicare_card_type || selectedEnrollment.payload.cardtype)}
+                                                    </span>
+                                                    <span className="text-muted-foreground">Card Number</span>
+                                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
+                                                    <span className="text-muted-foreground">Expiry Date</span>
+                                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idexpiary || selectedEnrollment.payload.idexpiry || selectedEnrollment.payload.expiarydate)}</span>
+                                                </>
+                                            )}
+
+                                            {selectedEnrollment.payload.idType === 2 && (
+                                                <>
+                                                    <span className="text-muted-foreground">Passport Number</span>
+                                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
+                                                    <span className="text-muted-foreground">Expiry Date</span>
+                                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idexpiary || selectedEnrollment.payload.idexpiry)}</span>
+                                                </>
+                                            )}
+
+                                            {/* Fallback for other types or missing type */}
+                                            {selectedEnrollment.payload.idType !== 0 && selectedEnrollment.payload.idType !== 1 && selectedEnrollment.payload.idType !== 2 && (
+                                                <>
+                                                    <span className="text-muted-foreground">ID Number</span>
+                                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idnumber)}</span>
+                                                    <span className="text-muted-foreground">Expiry Date</span>
+                                                    <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.idexpiary || selectedEnrollment.payload.idexpiry)}</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                         </div>
                     ) : (
                         <div className="text-center p-8 text-muted-foreground">No payload data available for this enrollment.</div>

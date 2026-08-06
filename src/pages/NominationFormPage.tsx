@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { toast } from 'react-toastify';
 import { CheckIcon, ChevronDownIcon } from '@/components/icons';
 import MainLogo from '@/assets/main-logo-dark-1.png';
+import { apiAxios } from '@/lib/apollo';
 
 async function loadSignaturePad(): Promise<void> {
     if ((window as any).SignaturePad) return;
@@ -42,6 +43,7 @@ export const NominationFormPage = () => {
     const [isNominationExpanded, setIsNominationExpanded] = useState(true);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [showSignModal, setShowSignModal] = useState(false);
+    const [isNominationLoading, setIsNominationLoading] = useState(true);
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sigPadRef = useRef<any>(null);
@@ -333,10 +335,17 @@ export const NominationFormPage = () => {
                     {isNominationExpanded && (
                         <div className="border-t border-primary/10 bg-slate-50 p-2 sm:p-4">
                             <div className="rounded-xl overflow-hidden border border-slate-200 bg-white relative aspect-[1/1.414] md:aspect-auto md:h-[700px] shadow-inner">
+                                {isNominationLoading && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 gap-3">
+                                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-primary" />
+                                        <p className="text-sm text-slate-500 font-medium">Loading preview...</p>
+                                    </div>
+                                )}
                                 <iframe
-                                    src="/onboarding/BESS2 and Nomination Form.pdf#view=Fit"
+                                    src={`${apiAxios.defaults.baseURL?.replace(/\/$/, '') || ''}/agreement/nomination-preview/${customerData.uid}?format=pdf#view=Fit`}
                                     className="absolute inset-0 w-full h-full border-0"
                                     title="Nomination Form Preview"
+                                    onLoad={() => setIsNominationLoading(false)}
                                 />
                             </div>
                         </div>
