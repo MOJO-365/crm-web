@@ -25,6 +25,8 @@ export const GET_USERS = gql`
                 createdAt
                 isMaster
                 branchTenant
+                ipAddress
+                isAllowedWithoutIp
             }
         }
     }

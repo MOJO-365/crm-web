@@ -218,7 +218,8 @@ export function CustomersPage() {
         const baseOptions = [
             { value: '', label: 'All' },
             { value: 'Gee Energy', label: 'Gee Energy' },
-            { value: 'PEERLESSGROUP', label: 'Peer Less Group' }
+            { value: 'PEERLESSGROUP', label: 'Peer Less Group' },
+            { value: 'BESS2', label: 'BESS2' }
         ];
         const leadOptions = (sourcesData?.leadSources || []).map((s: any) => ({
             value: s.name,
