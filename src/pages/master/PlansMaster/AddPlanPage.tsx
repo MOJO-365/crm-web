@@ -92,10 +92,11 @@ const BaseRateInput: React.FC<{
                 }}
                 onChange={(e) => {
                     const val = e.target.value;
-                    setLocalValue(val);
                     if (val === '') {
+                        setLocalValue(val);
                         onRateChange('');
-                    } else if (/^\d*\.?\d*$/.test(val)) {
+                    } else if (/^\d*\.?\d{0,4}$/.test(val)) {
+                        setLocalValue(val);
                         const divisor = isCents ? 100 : 1;
                         onRateChange(parseFloat((Number(val) / divisor).toFixed(6)).toString());
                     }
@@ -129,7 +130,8 @@ const InclusiveRateInput: React.FC<{
             } else {
                 const excl = Number(exclusiveRate);
                 const multiplier = isCents ? 100 : 1;
-                setLocalValue((excl * 1.1 * multiplier).toFixed(4).replace(/\.?0+$/, ''));
+                const decimalPlaces = isCents ? 2 : 4;
+                setLocalValue(parseFloat((excl * 1.1 * multiplier).toFixed(decimalPlaces)).toString());
             }
         }
     }, [exclusiveRate, isFocused, isCents]);
@@ -149,17 +151,19 @@ const InclusiveRateInput: React.FC<{
                     if (localValue && !isNaN(Number(localValue))) {
                         const divisor = isCents ? 100 : 1;
                         const excl = (Number(localValue) / divisor) / 1.1;
-                        setLocalValue((excl * 1.1 * divisor).toFixed(4).replace(/\.?0+$/, ''));
+                        const decimalPlaces = isCents ? 2 : 4;
+                        setLocalValue(parseFloat((excl * 1.1 * divisor).toFixed(decimalPlaces)).toString());
                     }
                 }}
                 onChange={(e) => {
                     const val = e.target.value;
-                    setLocalValue(val);
                     if (val === '') {
+                        setLocalValue(val);
                         onExclusiveChange('');
-                    } else if (/^\d*\.?\d*$/.test(val)) {
+                    } else if (/^\d*\.?\d{0,4}$/.test(val)) {
+                        setLocalValue(val);
                         const divisor = isCents ? 100 : 1;
-                        onExclusiveChange((Number(val) / divisor / 1.1).toFixed(4).replace(/\.?0+$/, ''));
+                        onExclusiveChange((Number(val) / divisor / 1.1).toFixed(6).replace(/\.?0+$/, ''));
                     }
                 }}
                 onKeyDown={(e) => {
@@ -232,7 +236,7 @@ export const AddPlanPage: React.FC = () => {
     const [showInclusivePrice, setShowInclusivePrice] = useState(false);
     const [inputUnit, setInputUnit] = useState<'$' | '¢'>('$');
     const tcFileInputRef = React.useRef<HTMLInputElement>(null);
-
+    
     const handleTcFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
