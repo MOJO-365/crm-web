@@ -70,18 +70,37 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         const isSearch = type === 'search';
         const inputType = isPassword && showPassword ? 'text' : isSearch ? 'text' : type;
 
+        const internalRef = React.useRef<HTMLInputElement | null>(null);
+
+        const handleRef = React.useCallback((node: HTMLInputElement | null) => {
+            internalRef.current = node;
+            if (typeof ref === 'function') {
+                ref(node);
+            } else if (ref) {
+                (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
+            }
+        }, [ref]);
+
+        React.useEffect(() => {
+            const input = internalRef.current;
+            if (!input || inputType !== 'number') return;
+
+            const handleNativeWheel = (e: WheelEvent) => {
+                if (document.activeElement === input) {
+                    e.preventDefault();
+                    input.blur();
+                }
+            };
+            
+            input.addEventListener('wheel', handleNativeWheel, { passive: false });
+            return () => input.removeEventListener('wheel', handleNativeWheel);
+        }, [inputType]);
+
         const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
             if (isSearch && e.key === 'Enter' && onSearch) {
                 onSearch();
             }
             onKeyDown?.(e);
-        };
-
-        const handleWheel = (e: React.WheelEvent<HTMLInputElement>) => {
-            if (inputType === 'number') {
-                (e.target as HTMLInputElement).blur();
-            }
-            onWheel?.(e);
         };
 
         if (unstyled) {
@@ -90,10 +109,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                     type={inputType}
                     id={inputId}
                     className={className}
-                    ref={ref}
+                    ref={handleRef}
                     disabled={disabled || isLoading}
                     onKeyDown={handleKeyDown}
-                    onWheel={handleWheel}
+                    onWheel={onWheel}
                     required={required}
                     {...props}
                 />
@@ -133,12 +152,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                             hasRightElement && 'pr-10',
                             className
                         )}
-                        ref={ref}
+                        ref={handleRef}
                         disabled={disabled || isLoading}
                         aria-invalid={!!error}
                         aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
                         onKeyDown={handleKeyDown}
-                        onWheel={handleWheel}
+                        onWheel={onWheel}
                         required={required}
                         {...props}
                     />
