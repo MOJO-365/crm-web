@@ -61,6 +61,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         disabled,
         onSearch,
         onKeyDown,
+        onWheel,
         ...props
     }, ref) => {
         const inputId = id || React.useId();
@@ -76,6 +77,13 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             onKeyDown?.(e);
         };
 
+        const handleWheel = (e: React.WheelEvent<HTMLInputElement>) => {
+            if (inputType === 'number') {
+                (e.target as HTMLInputElement).blur();
+            }
+            onWheel?.(e);
+        };
+
         if (unstyled) {
             return (
                 <input
@@ -85,6 +93,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                     ref={ref}
                     disabled={disabled || isLoading}
                     onKeyDown={handleKeyDown}
+                    onWheel={handleWheel}
                     required={required}
                     {...props}
                 />
@@ -129,6 +138,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                         aria-invalid={!!error}
                         aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
                         onKeyDown={handleKeyDown}
+                        onWheel={handleWheel}
                         required={required}
                         {...props}
                     />

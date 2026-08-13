@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Popover } from './Popover';
 import { Button } from './Button';
+import { DatePicker } from './DatePicker';
 import { CalendarIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
@@ -10,12 +11,14 @@ export interface DateRange {
 }
 
 export interface DateRangePickerProps {
-    value: DateRange;
-    onChange: (range: DateRange) => void;
+    value?: DateRange | null;
+    onChange: (range: DateRange | null) => void;
     className?: string;
+    placeholder?: string;
+    isClearable?: boolean;
 }
 
-export function DateRangePicker({ value, onChange, className }: DateRangePickerProps) {
+export function DateRangePicker({ value, onChange, className, placeholder = "Select date range", isClearable = false }: DateRangePickerProps) {
     const [isOpen, setIsOpen] = useState(false);
 
     // Helper to format Date as YYYY-MM-DD local string
@@ -26,8 +29,8 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
         return `${year}-${month}-${day}`;
     }, []);
 
-    const [tempFrom, setTempFrom] = useState<string>(() => toDateString(value.from));
-    const [tempTo, setTempTo] = useState<string>(() => toDateString(value.to));
+    const [tempFrom, setTempFrom] = useState<string>(() => value?.from ? toDateString(value.from) : '');
+    const [tempTo, setTempTo] = useState<string>(() => value?.to ? toDateString(value.to) : '');
 
     // Helper to format Date for display, e.g., "18 Jan 2026"
     const toDisplayString = (date: Date) => {
@@ -126,9 +129,14 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
 
     const handleOpenChange = (open: boolean) => {
         setIsOpen(open);
-        if (open && value.from && value.to) {
-            setTempFrom(toDateString(value.from));
-            setTempTo(toDateString(value.to));
+        if (open) {
+            if (value?.from && value?.to) {
+                setTempFrom(toDateString(value.from));
+                setTempTo(toDateString(value.to));
+            } else {
+                setTempFrom('');
+                setTempTo('');
+            }
         }
     };
 
@@ -140,13 +148,31 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
                 className
             )}
         >
-            <CalendarIcon size={16} className="text-muted-foreground" />
-            <span>
-                {toDisplayString(value.from)} — {toDisplayString(value.to)}
+            <CalendarIcon size={16} className="text-muted-foreground shrink-0" />
+            <span className="truncate">
+                {value?.from && value?.to 
+                    ? `${toDisplayString(value.from)} — ${toDisplayString(value.to)}` 
+                    : placeholder}
             </span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground ml-1.5 opacity-80">
-                <path d="m6 9 6 6 6-6"/>
-            </svg>
+            {isClearable && value?.from && value?.to ? (
+                <div 
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onChange(null);
+                    }}
+                    className="ml-1.5 opacity-60 hover:opacity-100 hover:text-foreground transition-all rounded-full hover:bg-accent p-0.5 shrink-0"
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6 6 18M6 6l12 12"/>
+                    </svg>
+                </div>
+            ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground ml-1.5 opacity-80 shrink-0">
+                    <path d="m6 9 6 6 6-6"/>
+                </svg>
+            )}
         </button>
     );
 
@@ -179,25 +205,19 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
                     
                     <div className="space-y-2">
                         <label className="text-[11px] font-medium text-muted-foreground block">Start Date</label>
-                        <input
-                            type="date"
-                            value={tempFrom}
-                            onChange={(e) => {
-                                setTempFrom(e.target.value);
-                            }}
-                            className="w-full text-xs font-medium bg-background border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                        <DatePicker
+                            value={tempFrom ? new Date(tempFrom + 'T12:00:00') : null}
+                            onChange={(d) => setTempFrom(d ? toDateString(d) : '')}
+                            placeholder="Select start date"
                         />
                     </div>
 
                     <div className="space-y-2">
                         <label className="text-[11px] font-medium text-muted-foreground block">End Date</label>
-                        <input
-                            type="date"
-                            value={tempTo}
-                            onChange={(e) => {
-                                setTempTo(e.target.value);
-                            }}
-                            className="w-full text-xs font-medium bg-background border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                        <DatePicker
+                            value={tempTo ? new Date(tempTo + 'T12:00:00') : null}
+                            onChange={(d) => setTempTo(d ? toDateString(d) : '')}
+                            placeholder="Select end date"
                         />
                     </div>
                 </div>

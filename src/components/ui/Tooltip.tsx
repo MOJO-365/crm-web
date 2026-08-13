@@ -135,7 +135,7 @@ export function Tooltip({
             {isVisible && content && createPortal(
                 <div
                     className={cn(
-                        'fixed z-[9999] px-2 py-1 text-xs font-medium text-white bg-gray-800 rounded shadow-lg whitespace-nowrap pointer-events-none',
+                        'fixed z-[9999] px-2 py-1 text-xs font-medium text-popover-foreground bg-white dark:bg-slate-900 border border-border rounded-md shadow-lg whitespace-nowrap pointer-events-none',
                         'animate-in fade-in zoom-in-95 duration-150',
                         className
                     )}
@@ -147,16 +147,6 @@ export function Tooltip({
                     role="tooltip"
                 >
                     {content}
-                    {/* Arrow */}
-                    <span
-                        className={cn(
-                            'absolute w-0 h-0 border-4',
-                            position === 'top' ? 'top-full left-1/2 -translate-x-1/2 border-t-gray-800 border-x-transparent border-b-transparent' :
-                                position === 'bottom' ? 'bottom-full left-1/2 -translate-x-1/2 border-b-gray-800 border-x-transparent border-t-transparent' :
-                                    position === 'left' ? 'left-full top-1/2 -translate-y-1/2 border-l-gray-800 border-y-transparent border-r-transparent' :
-                                        'right-full top-1/2 -translate-y-1/2 border-r-gray-800 border-y-transparent border-l-transparent'
-                        )}
-                    />
                 </div>,
                 document.body
             )}
