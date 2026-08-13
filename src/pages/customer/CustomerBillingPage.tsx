@@ -124,7 +124,7 @@ export function CustomerBillingPage() {
     const [currentInvoiceRecord, setCurrentInvoiceRecord] = useState<AccountRecord | null>(null);
     const [visibleRows, setVisibleRows] = useState<Set<string>>(new Set());
 
-    const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
+    const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(() => {
         const from = new Date();
         from.setFullYear(from.getFullYear() - 1);
         const to = new Date();
@@ -154,7 +154,7 @@ export function CustomerBillingPage() {
 
     // Fetch account records when a customer is selected
     const fetchAccountRecords = useCallback(async (customerUid: string) => {
-        if (!dateRange.from || !dateRange.to) return;
+        if (!dateRange || !dateRange.from || !dateRange.to) return;
         setRecordsLoading(true);
         setRecordsError(null);
         try {
