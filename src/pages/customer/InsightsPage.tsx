@@ -8,6 +8,8 @@ import {
 import { useState, useEffect } from 'react';
 import { Modal } from '@/components/common';
 import { Select } from '@/components/ui/Select';
+import { DateRangePicker, type DateRange } from '@/components/ui/DateRangePicker';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 import { CUSTOMER_STATUS_MAP } from '@/lib/constants';
 
@@ -43,25 +45,73 @@ interface ExpandableCardProps {
     isExpanded: boolean;
     onToggle: () => void;
 }
-const ExpandableCard = ({ title, count, items, tabs, type, icon, iconBgColor, iconTextColor, isExpanded, onToggle }: ExpandableCardProps) => {
+const ExpandableCard = ({ id, title, count, items, tabs, type, icon, iconBgColor, iconTextColor, isExpanded, onToggle }: ExpandableCardProps) => {
     const [activeTab, setActiveTab] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
+    const [dateRange, setDateRange] = useState<DateRange | null>(null);
 
-    const baseItems = tabs ? tabs[activeTab].items : (items || []);
-    const displayItems = baseItems.filter(item => {
-        if (!searchQuery) return true;
-        const q = searchQuery.toLowerCase();
-        const idDisplay = type === 'customer' ? item.customerId : item.nmi;
-        const name = type === 'customer'
-            ? [item.firstName, item.lastName].filter(Boolean).join(' ')
-            : [item.firstname, item.lastname].filter(Boolean).join(' ');
+    const filterItems = (itemsToFilter: any[]) => {
+        return itemsToFilter.filter(item => {
+            let matchesSearch = true;
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const idDisplay = type === 'customer' ? item.customerId : item.nmi;
+                const name = type === 'customer'
+                    ? [item.firstName, item.lastName].filter(Boolean).join(' ')
+                    : [item.firstname, item.lastname].filter(Boolean).join(' ');
 
-        return (
-            (idDisplay && idDisplay.toLowerCase().includes(q)) ||
-            (name && name.toLowerCase().includes(q)) ||
-            (item.email && item.email.toLowerCase().includes(q))
-        );
-    });
+                matchesSearch = !!(
+                    (idDisplay && idDisplay.toLowerCase().includes(q)) ||
+                    (name && name.toLowerCase().includes(q)) ||
+                    (item.email && item.email.toLowerCase().includes(q))
+                );
+            }
+
+            let matchesDate = true;
+            if (dateRange?.from && dateRange?.to) {
+                let targetDate = item.createdAt;
+                
+                if (type === 'customer') {
+                    targetDate = item.statusUpdatedAt;
+                    if (item.statusTimeline) {
+                        try {
+                            const timeline = typeof item.statusTimeline === 'string' ? JSON.parse(item.statusTimeline) : item.statusTimeline;
+                            if (timeline[String(item.status)]) {
+                                targetDate = timeline[String(item.status)];
+                            }
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }
+                }
+
+                if (targetDate) {
+                    let d;
+                    if (typeof targetDate === 'string' && /^\d+$/.test(targetDate)) {
+                        d = new Date(Number(targetDate));
+                    } else {
+                        d = new Date(targetDate);
+                    }
+                    
+                    // Set hours to 0 to compare dates safely
+                    const itemDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                    const fromDate = new Date(dateRange.from.getFullYear(), dateRange.from.getMonth(), dateRange.from.getDate());
+                    const toDate = new Date(dateRange.to.getFullYear(), dateRange.to.getMonth(), dateRange.to.getDate());
+                    
+                    if (itemDate < fromDate || itemDate > toDate) {
+                        matchesDate = false;
+                    }
+                } else {
+                    matchesDate = false;
+                }
+            }
+
+            return matchesSearch && matchesDate;
+        });
+    };
+
+    const displayTabs = tabs ? tabs.map(tab => ({ ...tab, items: filterItems(tab.items) })) : undefined;
+    const displayItems = displayTabs ? displayTabs[activeTab].items : filterItems(items || []);
 
     return (
         <div className="flex flex-col">
@@ -112,9 +162,9 @@ const ExpandableCard = ({ title, count, items, tabs, type, icon, iconBgColor, ic
                 size="4xl"
             >
                 <div className="bg-card dark:bg-card rounded-xl overflow-hidden mt-4">
-                    {tabs && tabs.length > 0 && (
+                    {displayTabs && displayTabs.length > 0 && (
                         <div className="flex items-center gap-2 mb-4 px-2">
-                            {tabs.map((tab, idx) => (
+                            {displayTabs.map((tab, idx) => (
                                 <button
                                     key={idx}
                                     onClick={() => setActiveTab(idx)}
@@ -130,15 +180,25 @@ const ExpandableCard = ({ title, count, items, tabs, type, icon, iconBgColor, ic
                     )}
 
                     <div className="px-4 pb-4">
-                        <div className="relative">
-                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <input
-                                type="text"
-                                placeholder={`Search ${title.toLowerCase()}...`}
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                            />
+                        <div className="flex gap-4">
+                            <div className="relative flex-1">
+                                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                                <input
+                                    type="text"
+                                    placeholder={`Search ${title.toLowerCase()}...`}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                                />
+                            </div>
+                            <div className="shrink-0 flex items-center">
+                                <DateRangePicker 
+                                    value={dateRange} 
+                                    onChange={setDateRange} 
+                                    placeholder={type === 'customer' ? (id === 'movedOn' ? 'Filter by moved on date' : 'Filter by status date') : 'Filter by created date'}
+                                    isClearable={true}
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -151,6 +211,8 @@ const ExpandableCard = ({ title, count, items, tabs, type, icon, iconBgColor, ic
                                         <th className="px-4 py-3">Name</th>
                                         <th className="px-4 py-3">Email</th>
                                         <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3">Created</th>
+                                        {type === 'customer' && <th className="px-4 py-3">{id === 'movedOn' ? 'Moved On Date' : 'Status Changed'}</th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border dark:divide-border/50">
@@ -166,6 +228,36 @@ const ExpandableCard = ({ title, count, items, tabs, type, icon, iconBgColor, ic
                                         const idDisplay = type === 'customer' ? item.customerId : item.nmi;
                                         const key = item.uid || idx;
 
+                                        let dateDisplay = '-';
+                                        if (item.createdAt) {
+                                            const d = typeof item.createdAt === 'string' && /^\d+$/.test(item.createdAt) 
+                                                ? new Date(Number(item.createdAt)) 
+                                                : new Date(item.createdAt);
+                                            dateDisplay = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                                        }
+
+                                        let statusDateDisplay = '-';
+                                        let targetStatusDate = item.statusUpdatedAt;
+                                        let parsedTimeline: Record<string, any> = {};
+
+                                        if (item.statusTimeline) {
+                                            try {
+                                                parsedTimeline = typeof item.statusTimeline === 'string' ? JSON.parse(item.statusTimeline) : item.statusTimeline;
+                                                if (parsedTimeline[String(item.status)]) {
+                                                    targetStatusDate = parsedTimeline[String(item.status)];
+                                                }
+                                            } catch (e) {
+                                                console.error(e);
+                                            }
+                                        }
+
+                                        if (type === 'customer' && targetStatusDate) {
+                                            const d = typeof targetStatusDate === 'string' && /^\d+$/.test(targetStatusDate) 
+                                                ? new Date(Number(targetStatusDate)) 
+                                                : new Date(targetStatusDate);
+                                            statusDateDisplay = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                                        }
+
                                         return (
                                             <tr key={key} className="hover:bg-accent/50 dark:hover:bg-accent/50 text-sm">
                                                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground dark:text-muted-foreground">
@@ -178,6 +270,47 @@ const ExpandableCard = ({ title, count, items, tabs, type, icon, iconBgColor, ic
                                                         {badge.label}
                                                     </span>
                                                 </td>
+                                                <td className="px-4 py-3 text-muted-foreground dark:text-muted-foreground text-xs whitespace-nowrap">
+                                                    {dateDisplay}
+                                                </td>
+                                                {type === 'customer' && (
+                                                    <td className="px-4 py-3 text-muted-foreground dark:text-muted-foreground text-xs whitespace-nowrap">
+                                                        <div className="flex items-center gap-1.5">
+                                                            {Object.keys(parsedTimeline).length > 0 ? (
+                                                                <Tooltip
+                                                                    position="bottom"
+                                                                    content={
+                                                                        <div className="p-2 min-w-[220px]">
+                                                                            <div className="text-xs font-semibold mb-2.5 border-b border-border/50 pb-1.5 text-foreground">Status History</div>
+                                                                            <div className="space-y-2">
+                                                                                {Object.entries(parsedTimeline)
+                                                                                    .sort(([, dateA], [, dateB]) => new Date(dateB as string).getTime() - new Date(dateA as string).getTime())
+                                                                                    .map(([statusId, date]) => {
+                                                                                        const d = typeof date === 'string' && /^\d+$/.test(date) ? new Date(Number(date)) : new Date(date as string);
+                                                                                        const b = getStatusBadge(Number(statusId));
+                                                                                        return (
+                                                                                            <div key={statusId} className="flex items-center justify-between gap-4 text-xs">
+                                                                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${b.bg}`}>{b.label}</span>
+                                                                                                <span className="text-muted-foreground font-mono text-[10px]">{d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
+                                                                            </div>
+                                                                        </div>
+                                                                    }
+                                                                >
+                                                                    <div className="p-1 rounded-full hover:bg-muted dark:hover:bg-muted/50 cursor-help transition-colors text-muted-foreground">
+                                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                </Tooltip>
+                                                            ) : (
+                                                                <span>{statusDateDisplay}</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                )}
                                             </tr>
                                         );
                                     })}

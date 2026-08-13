@@ -214,7 +214,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
         }, [isOpen, selectedDate, maxDate]);
 
         // Calculate popup position when opening
-        React.useEffect(() => {
+        React.useLayoutEffect(() => {
             if (isOpen && inputRef.current) {
                 const updatePosition = () => {
                     if (!inputRef.current) return;
@@ -559,6 +559,8 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                                 top: `${popupPosition.top}px`,
                                 left: `${popupPosition.left}px`
                             }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
                         >
                             {isYearSelection ? (
                                 <div className="h-64 overflow-y-auto grid grid-cols-4 gap-2">

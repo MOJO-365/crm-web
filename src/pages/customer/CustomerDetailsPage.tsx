@@ -56,7 +56,7 @@ import type { MaintenanceRecord, MaintenanceResponse } from '@/types';
 import {
     SALE_TYPE_LABELS, BILLING_PREF_LABELS, DNSP_LABELS,
     ID_TYPE_MAP, GENDER_LABELS, RELATIONSHIP_STATUS_LABELS,
-    EMAIL_STATUS_MAP, EMAIL_TYPE_LABELS
+    EMAIL_STATUS_MAP, EMAIL_TYPE_LABELS, CUSTOMER_STATUS_MAP
 } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -158,6 +158,7 @@ interface CustomerDetails {
     referralName?: string;
     address?: CustomerAddress;
     riskStatus?: string;
+    statusTimeline?: any;
     enrollmentDetails?: {
         saletype?: number;
         connectiondate?: string;
@@ -3082,25 +3083,93 @@ const InlineMaintenanceNotes = ({
                                             {selectedCustomerDetails ? `${selectedCustomerDetails.title ? selectedCustomerDetails.title + ' ' : ''}${selectedCustomerDetails.firstName} ${selectedCustomerDetails.lastName}` : 'Customer Details'}
                                         </h1>
                                         {selectedCustomerDetails && (
-                                            <StatusField
-                                                value={selectedCustomerDetails.status}
-                                                type="customer_status"
-                                                mode="badge"
-                                                onChange={async (newStatus: any) => {
-                                                    try {
-                                                        await updateCustomer({
-                                                            variables: {
-                                                                uid: selectedCustomerDetails.uid,
-                                                                input: { status: Number(newStatus) }
-                                                            }
-                                                        });
-                                                        toast.success('Status updated');
-                                                        setSelectedCustomerDetails({ ...selectedCustomerDetails, status: Number(newStatus) });
-                                                    } catch (error) {
-                                                        toast.error('Failed to update status');
+                                            <div className="flex items-center gap-1.5">
+                                                {(() => {
+                                                    let parsedTimeline: Record<string, any> = {};
+                                                    if (selectedCustomerDetails.statusTimeline) {
+                                                        try {
+                                                            parsedTimeline = typeof selectedCustomerDetails.statusTimeline === 'string' 
+                                                                ? JSON.parse(selectedCustomerDetails.statusTimeline) 
+                                                                : selectedCustomerDetails.statusTimeline;
+                                                        } catch (e) {
+                                                            console.error(e);
+                                                        }
                                                     }
-                                                }}
-                                            />
+                                                    
+                                                    if (Object.keys(parsedTimeline).length === 0) {
+                                                        // Fallback to just showing the current status and creation date
+                                                        parsedTimeline = {
+                                                            [String(selectedCustomerDetails.status)]: selectedCustomerDetails.createdAt
+                                                        };
+                                                    }
+                                                    
+                                                    return (
+                                                        <>
+                                                            <Tooltip
+                                                            position="bottom"
+                                                            content={
+                                                                <div className="p-2 min-w-[220px]">
+                                                                    <div className="text-xs font-semibold mb-2.5 border-b border-border/50 pb-1.5 text-foreground">Status History</div>
+                                                                    <div className="space-y-2">
+                                                                        {Object.entries(parsedTimeline)
+                                                                            .sort(([, dateA], [, dateB]) => new Date(dateB as string).getTime() - new Date(dateA as string).getTime())
+                                                                            .map(([statusId, date]) => {
+                                                                                const d = typeof date === 'string' && /^\d+$/.test(date) ? new Date(Number(date)) : new Date(date as string);
+                                                                                // Getting label directly if possible, or fallback to statusId
+                                                                                const label = CUSTOMER_STATUS_MAP[Number(statusId)]?.label || statusId;
+                                                                                
+                                                                                // Standard dynamic colors for the badge based on status
+                                                                                const statusNum = Number(statusId);
+                                                                                let bg = 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400';
+                                                                                if (statusNum === 0) bg = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+                                                                                else if (statusNum === 1) bg = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+                                                                                else if (statusNum === 2) bg = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400';
+                                                                                else if (statusNum === 3) bg = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+                                                                                else if (statusNum === 6) bg = 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400';
+                                                                                else if (statusNum === 9) bg = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+                                                                                
+                                                                                return (
+                                                                                    <div key={statusId} className="flex items-center justify-between gap-4 text-xs">
+                                                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${bg}`}>{label}</span>
+                                                                                        <span className="text-muted-foreground font-mono text-[10px]">
+                                                                                            {d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                    </div>
+                                                                </div>
+                                                            }
+                                                        >
+                                                            <div className="p-1 rounded-full hover:bg-muted dark:hover:bg-muted/50 cursor-help transition-colors text-muted-foreground flex items-center justify-center">
+                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                            </div>
+                                                        </Tooltip>
+                                                        <StatusField
+                                                            value={selectedCustomerDetails.status}
+                                                            type="customer_status"
+                                                            mode="badge"
+                                                            onChange={async (newStatus: any) => {
+                                                                try {
+                                                                    await updateCustomer({
+                                                                        variables: {
+                                                                            uid: selectedCustomerDetails.uid,
+                                                                            input: { status: Number(newStatus) }
+                                                                        }
+                                                                    });
+                                                                    toast.success('Status updated');
+                                                                    setSelectedCustomerDetails({ ...selectedCustomerDetails, status: Number(newStatus) });
+                                                                } catch (error) {
+                                                                    toast.error('Failed to update status');
+                                                                }
+                                                            }}
+                                                        />
+                                                    </>
+                                                    );
+                                                })()}
+                                            </div>
                                         )}
                                         {selectedCustomerDetails?.riskStatus !== undefined && selectedCustomerDetails.riskStatus !== null && (
                                             <StatusField

@@ -796,6 +796,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             isCreditScoreFetched
             isWithoutSignature
             riskStatus
+            statusTimeline
             emailLogCount
             offerVersion
             viewCode

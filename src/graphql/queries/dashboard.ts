@@ -15,6 +15,9 @@ export const GET_CUSTOMER_DASHBOARD = gql`
           utilmateStatus
           vppConnected
           vpp
+          createdAt
+          statusUpdatedAt
+          statusTimeline
         }
       }
       signedStatusSummary {
@@ -26,6 +29,9 @@ export const GET_CUSTOMER_DASHBOARD = gql`
           lastName
           email
           status
+          createdAt
+          statusUpdatedAt
+          statusTimeline
         }
       }
       vppPendingSummary {
@@ -38,6 +44,9 @@ export const GET_CUSTOMER_DASHBOARD = gql`
           email
           status
           vppConnected
+          createdAt
+          statusUpdatedAt
+          statusTimeline
         }
       }
       signaturePendingSummary {
@@ -49,6 +58,9 @@ export const GET_CUSTOMER_DASHBOARD = gql`
           lastName
           email
           status
+          createdAt
+          statusUpdatedAt
+          statusTimeline
         }
       }
       draftSummary {
@@ -60,6 +72,9 @@ export const GET_CUSTOMER_DASHBOARD = gql`
           lastName
           email
           status
+          createdAt
+          statusUpdatedAt
+          statusTimeline
         }
       }
       movedOnSummary {
@@ -71,6 +86,9 @@ export const GET_CUSTOMER_DASHBOARD = gql`
           lastName
           email
           status
+          createdAt
+          statusUpdatedAt
+          statusTimeline
         }
       }
     }
