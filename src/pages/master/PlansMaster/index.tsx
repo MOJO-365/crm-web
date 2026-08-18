@@ -6,13 +6,13 @@ import {
     DELETE_PLAN
 } from '@/graphql';
 import { GET_RATE_PLANS } from '@/graphql/queries/rates';
-import { UPDATE_PLAN } from '@/graphql/mutations/plans';
+import { UPDATE_PLAN, CREATE_PLAN } from '@/graphql/mutations/plans';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
 import { ConfirmationPopover } from '@/components/ui';
 import { DataTable, type Column, Modal, StatusField } from '@/components/common';
-import { PlusIcon, TrashIcon, PencilIcon } from '@/components/icons';
+import { PlusIcon, TrashIcon, PencilIcon, CopyIcon } from '@/components/icons';
 import { toast } from 'react-toastify';
 import { formatSydneyTime } from '@/lib/date';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -41,6 +41,7 @@ export const PlansMasterPage: React.FC = () => {
     const { data: ratePlansData } = useQuery(GET_RATE_PLANS, { variables: { limit: 1000 } });
     const [deletePlan, { loading: deleting }] = useMutation(DELETE_PLAN);
     const [updatePlan] = useMutation(UPDATE_PLAN);
+    const [createPlan, { loading: creating }] = useMutation(CREATE_PLAN);
 
     const canManage = useAuthStore((state) => state.canEditInMenu('plans_master'));
     const canChangeStatus = useAuthStore((state) => state.hasFeatureAccess('feature_change_plan_status'));
@@ -109,11 +110,26 @@ export const PlansMasterPage: React.FC = () => {
         try {
             await deletePlan({ variables: { uid: planToDelete.uid } });
             toast.success('Plan deleted successfully');
-            refetch();
             setDeleteModalOpen(false);
             setPlanToDelete(null);
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to delete plan');
+            refetch();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to delete plan');
+        }
+    };
+
+    const handleDuplicateClick = async (item: Plan) => {
+        try {
+            const { uid, tenant, createdAt, updatedAt, __typename, ...rest } = item as any;
+            const input = {
+                ...rest,
+                title: `${item.title} copy`
+            };
+            await createPlan({ variables: { input } });
+            toast.success('Plan duplicated successfully');
+            refetch();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to duplicate plan');
         }
     };
 
@@ -247,6 +263,23 @@ export const PlansMasterPage: React.FC = () => {
                                 >
                                     <PencilIcon size={16} />
                                 </button>
+                            </Tooltip>
+                            <Tooltip content="Duplicate Plan">
+                                <ConfirmationPopover
+                                    title="Duplicate Plan"
+                                    description={`Are you sure you want to duplicate "${item.title}"?`}
+                                    onConfirm={() => handleDuplicateClick(item)}
+                                    confirmVariant="default"
+                                    placement="left"
+                                    enabled={canManage}
+                                >
+                                    <button
+                                        className="p-2 border border-border rounded-lg bg-card hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                                        disabled={creating}
+                                    >
+                                        <CopyIcon size={16} />
+                                    </button>
+                                </ConfirmationPopover>
                             </Tooltip>
                             <Tooltip content="Delete Plan">
                                 <button
