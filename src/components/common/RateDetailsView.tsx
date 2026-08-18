@@ -86,33 +86,32 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
         }
 
         const processed = items.map(item => {
-            const matchingPlanRate = planRates.find((pr) => pr.name.toUpperCase() === item.label.toUpperCase());
-            if (!matchingPlanRate) return null;
-            
-            const clLabels = ['CL1 USAGE', 'CL2 USAGE', 'CL1 SUPPLY', 'CL2 SUPPLY'];
-            if (clLabels.includes(item.label.toUpperCase())) {
+            if (item.type !== 'dynamic') {
                 const originalValue = parseFloat(String(item.value || 0)) || 0;
                 if (originalValue === 0) {
                     return null;
                 }
             }
 
+            const matchingPlanRate = planRates.find((pr) => pr.name.toUpperCase() === item.label.toUpperCase());
+            if (!matchingPlanRate) return null;
+
             if (matchingPlanRate.rateType === 'Fixed') {
-                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description };
+                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description, applyDiscount: matchingPlanRate.applyDiscount };
             }
             if (matchingPlanRate.rateType === 'According to Tariff') {
-                return { ...item, description: matchingPlanRate.info || matchingPlanRate.description || item.description };
+                return { ...item, description: matchingPlanRate.info || matchingPlanRate.description || item.description, applyDiscount: matchingPlanRate.applyDiscount };
             }
             return null;
         }).filter(Boolean) as any[];
 
-        const tariffLabels = items.map(i => i.label.toUpperCase());
+        const tariffLabels = items.map(i => i.label.replace(/\s+/g, '').toUpperCase());
         const fixedAdditions = planRates.filter(pr => {
             const prDynType = String(pr.dynamicType || '').toLowerCase().replace(/\s+/g, '_');
             const targetType = String(type || '').toLowerCase().replace(/\s+/g, '_');
             return (prDynType === targetType || (!prDynType && targetType === 'energy_rates')) && 
                    pr.rateType === 'Fixed' && 
-                   !tariffLabels.includes(pr.name.toUpperCase());
+                   !tariffLabels.includes(pr.name.replace(/\s+/g, '').toUpperCase());
         });
         
         fixedAdditions.forEach(fa => {
