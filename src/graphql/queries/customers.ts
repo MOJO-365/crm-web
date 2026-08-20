@@ -461,6 +461,8 @@ export const GET_CUSTOMERS_CURSOR = gql`
                 riskStatus
                 leadUid
                 portalName
+                hasAcpDetails
+                isPartner
                 source
                 referralName
                 msatDetails {
@@ -598,6 +600,7 @@ export const GET_CUSTOMER_BY_ID = gql`
             updatedAt
             portalName
             source
+            ratesHistory
             referralName
             pdrsEmailSent
             pdrsEmailSentAt
@@ -811,6 +814,7 @@ export const GET_CUSTOMER_GENERAL_DETAILS = gql`
             portalName
             source
             referralName
+            ratesHistory
             address {
                 id
                 customerUid

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
-import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, SEND_OFFER_EMAIL, SEND_PDRS_CONSENT_EMAIL, GET_PEERLESS_COMPANY_NAMES } from '@/graphql';
+import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, SEND_OFFER_EMAIL, SEND_PDRS_CONSENT_EMAIL, GET_PEERLESS_COMPANY_NAMES, GET_WEB_API_CREDENTIALS } from '@/graphql';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -110,14 +110,37 @@ export function CustomerApprovalsPage() {
         ];
     }, [companiesData]);
 
+    const { data: webApiCredsData } = useQuery(GET_WEB_API_CREDENTIALS, {
+        fetchPolicy: 'network-only'
+    });
+
     const portalOptions = React.useMemo(() => {
-        return [
+        const defaultOptions = [
             { value: '', label: 'All Portals' },
             { value: 'Gee Energy', label: 'Gee Energy' },
             { value: 'PEERLESSGROUP', label: 'Peer Less Group' },
             { value: 'BESS2', label: 'BESS2' }
         ];
-    }, []);
+
+        if (webApiCredsData?.webApiCredentials) {
+            const dynamicOptions = webApiCredsData.webApiCredentials
+                .filter((cred: any) => cred.isActive && cred.isPDRS && cred.portalName)
+                .map((cred: any) => ({
+                    value: cred.portalName,
+                    label: cred.name
+                }));
+            
+            const existingValues = new Set(defaultOptions.map(o => o.value));
+            for (const option of dynamicOptions) {
+                if (!existingValues.has(option.value)) {
+                    defaultOptions.push(option);
+                    existingValues.add(option.value);
+                }
+            }
+        }
+
+        return defaultOptions;
+    }, [webApiCredsData]);
 
     const enrollments = data?.webEnrollments?.data || [];
     const meta = data?.webEnrollments?.meta;
@@ -502,20 +525,26 @@ export function CustomerApprovalsPage() {
                 </div>
             ),
             render: (row) => {
-                if (row.payload?.acpDetails) {
-                    return (
-                        <span className="text-foreground font-medium text-xs">
-                            BESS2
-                        </span>
-                    );
-                }
                 const rawPortal = row.payload?.portalname || row.payload?.portalName;
                 let displayPortal = rawPortal ? String(rawPortal) : '-';
-                if (displayPortal.toUpperCase() === 'PEERLESSGROUP') {
-                    displayPortal = 'Peer Less Group';
-                } else if (displayPortal.toUpperCase().includes('GEE')) {
-                    displayPortal = 'Gee Energy';
+                
+                if (webApiCredsData?.webApiCredentials && rawPortal) {
+                    const matchedCred = webApiCredsData.webApiCredentials.find((c: any) => c.portalName === rawPortal);
+                    if (matchedCred && matchedCred.name) {
+                        displayPortal = matchedCred.name;
+                    }
                 }
+
+                if (row.payload?.acpDetails && !row.payload?.is_partner) {
+                    displayPortal = 'BESS2';
+                } else if (displayPortal === String(rawPortal)) {
+                    if (displayPortal.toUpperCase() === 'PEERLESSGROUP') {
+                        displayPortal = 'Peer Less Group';
+                    } else if (displayPortal.toUpperCase().includes('GEE')) {
+                        displayPortal = 'Gee Energy';
+                    }
+                }
+
                 return (
                     <span className="text-foreground font-medium text-xs">
                         {displayPortal}

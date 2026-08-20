@@ -109,10 +109,10 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
             if (!matchingPlanRate) return null;
 
             if (matchingPlanRate.rateType === 'Fixed') {
-                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info };
+                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info, applyDiscount: matchingPlanRate.applyDiscount };
             }
             if (matchingPlanRate.rateType === 'According to Tariff') {
-                return { ...item, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info };
+                return { ...item, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info, applyDiscount: matchingPlanRate.applyDiscount };
             }
             return null;
         }).filter(Boolean) as any[];

@@ -21,6 +21,13 @@ const TARIFF_COMPONENTS = [
     'DEMAND', 'DEMAND(OP)', 'DEMAND(P)', 'DEMAND(S)'
 ];
 
+/** Components that should have discount applied by default */
+const DEFAULT_DISCOUNT_COMPONENTS = new Set([
+    'ANYTIME', 'PEAK', 'SHOULDER', 'OFF-PEAK',
+    'CL1 USAGE', 'CL2 USAGE',
+    'DEMAND', 'DEMAND(OP)', 'DEMAND(P)', 'DEMAND(S)'
+]);
+
 const COMPONENT_OFFER_MAP: Record<string, string> = {
     'ANYTIME': 'anytime',
     'PEAK': 'peak',
@@ -219,9 +226,9 @@ export const AddPlanPage: React.FC = () => {
         bonusUids: [] as string[],
         isActive: true,
         components: [
-            ...TARIFF_COMPONENTS.map(name => ({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false as boolean | undefined, rateType: 'None', dnsp: 'default' })),
+            ...TARIFF_COMPONENTS.map(name => ({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false as boolean | undefined, rateType: 'None', dnsp: 'default', applyDiscount: DEFAULT_DISCOUNT_COMPONENTS.has(name) })),
             ...DNSP_OPTIONS.flatMap(dnsp => 
-                TARIFF_COMPONENTS.map(name => ({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false as boolean | undefined, rateType: 'None', dnsp: dnsp.value }))
+                TARIFF_COMPONENTS.map(name => ({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false as boolean | undefined, rateType: 'None', dnsp: dnsp.value, applyDiscount: DEFAULT_DISCOUNT_COMPONENTS.has(name) }))
             )
         ]
     });
@@ -313,7 +320,7 @@ export const AddPlanPage: React.FC = () => {
                 const baseComponents: any[] = [];
                 const addBase = (dnspVal: string) => {
                     TARIFF_COMPONENTS.forEach(name => {
-                        baseComponents.push({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false, rateType: 'None', dnsp: dnspVal });
+                        baseComponents.push({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: false, dynamicType: COMPONENT_DYNAMIC_TYPE_MAP[name] || '', isCustom: false, rateType: 'None', dnsp: dnspVal, applyDiscount: DEFAULT_DISCOUNT_COMPONENTS.has(name) });
                     });
                 };
                 addBase('default');
@@ -384,7 +391,8 @@ export const AddPlanPage: React.FC = () => {
         planType: 'fixed',
         tariffUid: '',
         dynamicType: '',
-        rateType: 'Fixed'
+        rateType: 'Fixed',
+        applyDiscount: false
     });
 
     React.useEffect(() => {
@@ -413,9 +421,9 @@ export const AddPlanPage: React.FC = () => {
 
                     dynamicNames.forEach((type, name) => {
                         if (!existingNames.has(name)) {
-                            newComps.push({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: true, dynamicType: type, isCustom: false, rateType: 'None', dnsp: 'default' });
+                            newComps.push({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: true, dynamicType: type, isCustom: false, rateType: 'None', dnsp: 'default', applyDiscount: DEFAULT_DISCOUNT_COMPONENTS.has(name) });
                             DNSP_OPTIONS.forEach(dnsp => {
-                                newComps.push({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: true, dynamicType: type, isCustom: false, rateType: 'None', dnsp: dnsp.value });
+                                newComps.push({ name, rate: '', unit: '', planType: 'fixed', tariffUid: '', isDynamic: true, dynamicType: type, isCustom: false, rateType: 'None', dnsp: dnsp.value, applyDiscount: DEFAULT_DISCOUNT_COMPONENTS.has(name) });
                             });
                             changed = true;
                         }
@@ -430,7 +438,7 @@ export const AddPlanPage: React.FC = () => {
         }
     }, [ratePlansData]);
 
-    const handleComponentChange = (index: number, field: 'rate' | 'unit' | 'planType' | 'tariffUid' | 'rateType', value: string) => {
+    const handleComponentChange = (index: number, field: 'rate' | 'unit' | 'planType' | 'tariffUid' | 'rateType' | 'applyDiscount', value: string | boolean) => {
         const newComps = [...formData.components];
         (newComps[index] as any)[field] = value;
 
@@ -516,6 +524,8 @@ export const AddPlanPage: React.FC = () => {
             if (!formData.isDnspBased) {
                 delete cleanComp.dnsp;
             }
+            // Always include applyDiscount in saved data
+            cleanComp.applyDiscount = comp.applyDiscount !== false;
 
             if (cleanComp.rateType === 'Fixed') {
                 const hasRate = cleanComp.rate && String(cleanComp.rate).trim() !== '' && Number(cleanComp.rate) !== 0;
@@ -1047,7 +1057,7 @@ export const AddPlanPage: React.FC = () => {
                                         size="sm"
                                         onClick={() => {
                                             setEditingCustomRateIndex(null);
-                                            setCustomRateDraft({ name: '', description: '', rate: '', unit: '', planType: 'fixed', tariffUid: '', dynamicType: '', rateType: 'Fixed' });
+                                            setCustomRateDraft({ name: '', description: '', rate: '', unit: '', planType: 'fixed', tariffUid: '', dynamicType: '', rateType: 'Fixed', applyDiscount: false });
                                             setIsCustomModalOpen(true);
                                         }}
                                         className="flex items-center gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20 h-[38px]"
@@ -1071,6 +1081,7 @@ export const AddPlanPage: React.FC = () => {
                                                     <th className="px-3 py-2 font-medium">{showInclusivePrice ? 'Excl. Rate' : 'Rate'}</th>
                                                     {showInclusivePrice && <th className="px-3 py-2 font-medium">Incl. Rate</th>}
                                                     <th className="px-3 py-2 font-medium">Unit</th>
+                                                    <th className="px-3 py-2 font-medium w-[90px] text-center">Discount</th>
                                                     <th className="px-3 py-2 font-medium w-10"></th>
                                                 </tr>
                                             </thead>
@@ -1167,6 +1178,20 @@ export const AddPlanPage: React.FC = () => {
                                                                 </span>
                                                             </td>
                                                         )}
+                                                        <td className="px-3 py-1.5 align-middle text-center">
+                                                            {comp.rateType !== 'None' && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleComponentChange(index, 'applyDiscount', !comp.applyDiscount)}
+                                                                    className={`group relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 ${comp.applyDiscount ? 'bg-green-500' : 'bg-neutral-300 dark:bg-neutral-600'}`}
+                                                                    title={comp.applyDiscount ? 'Discount will be applied' : 'Discount will NOT be applied'}
+                                                                >
+                                                                    <span
+                                                                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out ${comp.applyDiscount ? 'translate-x-[18px]' : 'translate-x-[3px]'}`}
+                                                                    />
+                                                                </button>
+                                                            )}
+                                                        </td>
                                                         <td className="px-3 py-1.5 align-middle text-right">
                                                             <div className="flex items-center justify-end gap-1">
                                                                 <button
@@ -1181,7 +1206,8 @@ export const AddPlanPage: React.FC = () => {
                                                                             planType: comp.planType || 'fixed',
                                                                             tariffUid: comp.tariffUid || '',
                                                                             dynamicType: comp.dynamicType || '',
-                                                                            rateType: comp.rateType || 'Fixed'
+                                                                            rateType: comp.rateType || 'Fixed',
+                                                                            applyDiscount: comp.applyDiscount || false
                                                                         });
                                                                         setIsCustomModalOpen(true);
                                                                     }}
@@ -1216,6 +1242,7 @@ export const AddPlanPage: React.FC = () => {
                                                         <th className="px-3 py-2 font-medium">{showInclusivePrice ? 'Excl. Rate' : 'Rate'}</th>
                                                         {showInclusivePrice && <th className="px-3 py-2 font-medium">Incl. Rate</th>}
                                                         <th className="px-3 py-2 font-medium">Unit</th>
+                                                        <th className="px-3 py-2 font-medium w-[90px] text-center">Discount</th>
                                                         <th className="px-3 py-2 font-medium w-10"></th>
                                                     </tr>
                                                 </thead>
@@ -1304,6 +1331,20 @@ export const AddPlanPage: React.FC = () => {
                                                                     </span>
                                                                 </td>
                                                             )}
+                                                            <td className="px-3 py-1.5 align-middle text-center">
+                                                                {comp.rateType !== 'None' && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleComponentChange(index, 'applyDiscount', !comp.applyDiscount)}
+                                                                        className={`group relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 ${comp.applyDiscount ? 'bg-green-500' : 'bg-neutral-300 dark:bg-neutral-600'}`}
+                                                                        title={comp.applyDiscount ? 'Discount will be applied' : 'Discount will NOT be applied'}
+                                                                    >
+                                                                        <span
+                                                                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out ${comp.applyDiscount ? 'translate-x-[18px]' : 'translate-x-[3px]'}`}
+                                                                        />
+                                                                    </button>
+                                                                )}
+                                                            </td>
                                                             <td className="px-3 py-1.5 align-middle text-right">
                                                                 <div className="flex items-center justify-end gap-1">
                                                                     <button
@@ -1318,7 +1359,8 @@ export const AddPlanPage: React.FC = () => {
                                                                                 planType: comp.planType || 'fixed',
                                                                                 tariffUid: comp.tariffUid || '',
                                                                                 dynamicType: comp.dynamicType || '',
-                                                                                rateType: comp.rateType || 'Fixed'
+                                                                                rateType: comp.rateType || 'Fixed',
+                                                                                applyDiscount: comp.applyDiscount || false
                                                                             });
                                                                             setIsCustomModalOpen(true);
                                                                         }}

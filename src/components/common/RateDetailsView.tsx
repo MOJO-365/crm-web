@@ -24,9 +24,10 @@ export interface RateDetailsViewProps {
     planRatesJson?: string | null;
     isDnspBased?: boolean;
     selectedDnsp?: string | number;
+    showDiscountIndicator?: boolean;
 }
 
-export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan, className, planRatesJson, isDnspBased, selectedDnsp }: RateDetailsViewProps) => {
+export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, isVppPlan, className, planRatesJson, isDnspBased, selectedDnsp, showDiscountIndicator = false }: RateDetailsViewProps) => {
     const { data: columnMetadataData } = useQuery(GET_COLUMN_METADATA, { fetchPolicy: 'cache-first' });
 
     const dynamicRateInfoMap = React.useMemo(() => {
@@ -243,13 +244,22 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                     {rates.map((dRate: any, id: number) => {
                         const unitName = dRate.unitId ? units[dRate.unitId] : '';
                         const val = parseFloat(String(dRate.value || '0'));
+                        const price = dRate.applyDiscount ? calculateDiscountedRate(val, discount) : val;
                         return (
                             <div key={id} className={cn(
                                 colorClass === 'indigo' ? "bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800" : "bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800",
                                 "rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm"
                             )}>
                                 <div className={cn(colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400", "font-bold text-sm")}>
-                                    ${val.toFixed(4)}{unitName ? `/${unitName}` : ''}
+                                    <div className="flex flex-col items-center">
+                                        <span>${price.toFixed(4)}{unitName ? `/${unitName}` : ''}</span>
+                                        {showDiscountIndicator && dRate.applyDiscount && discount > 0 && (
+                                            <div className="flex items-center justify-center gap-1.5 leading-none mt-0.5">
+                                                <span className="text-[10px] font-medium line-through opacity-40">${val.toFixed(4)}</span>
+                                                <span className={cn("px-1 py-0.5 text-[8px] font-black text-white rounded uppercase tracking-tighter", colorClass === 'indigo' ? "bg-indigo-500" : "bg-teal-500")}>-{discount}%</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 {renderLabelWithTooltip(dRate.name, dRate.description, colorClass === 'indigo' ? "text-indigo-600 dark:text-indigo-400" : "text-teal-600 dark:text-teal-400")}
                             </div>
@@ -276,7 +286,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                             .map((rate, idx) => {
                                 const isAnytime = rate.type === 'anytime';
                                 const numericValue = parseFloat(String(rate.value || 0));
-                                const shouldApplyDiscount = rate.type === 'dynamic' ? !!(rate as any).applyDiscount : true;
+                                const shouldApplyDiscount = !!(rate as any).applyDiscount;
                                 const price = shouldApplyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
                                 const unit = resolveUnit(rate, rate.type, 'kWh');
                                 return (
@@ -287,7 +297,17 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                         <div className={cn(
                                             "font-bold text-sm",
                                             isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"
-                                        )}>${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
+                                        )}>
+                                            <div className="flex flex-col items-center">
+                                                <span>${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</span>
+                                                {showDiscountIndicator && shouldApplyDiscount && discount > 0 && (
+                                                    <div className="flex items-center justify-center gap-1.5 leading-none mt-0.5">
+                                                        <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
+                                                        <span className={cn("px-1 py-0.5 text-[8px] font-black text-white rounded uppercase tracking-tighter", isAnytime ? "bg-orange-500" : "bg-blue-500")}>-{discount}%</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                         {renderLabelWithTooltip(rate.label, rate.description, isAnytime ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400")}
                                     </div>
                                 );
@@ -311,7 +331,17 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                     const price = r.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
                                     return (
                                         <div key={id} className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                            <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
+                                            <div className="text-purple-600 dark:text-purple-400 font-bold text-sm">
+                                                <div className="flex flex-col items-center">
+                                                    <span>${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</span>
+                                                    {showDiscountIndicator && r.applyDiscount && discount > 0 && (
+                                                        <div className="flex items-center justify-center gap-1.5 leading-none mt-0.5">
+                                                            <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
+                                                            <span className="px-1 py-0.5 text-[8px] font-black bg-purple-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                             {renderLabelWithTooltip(r.label, r.description, "text-purple-600 dark:text-purple-400")}
                                         </div>
                                     );
@@ -333,7 +363,17 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                     const price = d.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
                                     return (
                                         <div key={id} className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
+                                            <div className="text-rose-600 dark:text-rose-400 font-bold text-sm">
+                                                <div className="flex flex-col items-center">
+                                                    <span>${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</span>
+                                                    {showDiscountIndicator && d.applyDiscount && discount > 0 && (
+                                                        <div className="flex items-center justify-center gap-1.5 leading-none mt-0.5">
+                                                            <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
+                                                            <span className="px-1 py-0.5 text-[8px] font-black bg-rose-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                             {renderLabelWithTooltip(d.label, d.description, "text-rose-600 dark:text-rose-400")}
                                         </div>
                                     );
@@ -347,9 +387,6 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                 <div className="flex items-center gap-2 text-amber-500 dark:text-amber-400 mb-2">
                                     <ActivityIcon size={14} />
                                     <span className="text-xs font-bold uppercase tracking-wide">VPP Orchestration Charges</span>
-                                    {discount > 0 && vppChargesItems.some(r => r.applyDiscount) && (
-                                        <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-500 text-white rounded-md uppercase tracking-tighter">Discount Applied</span>
-                                    )}
                                 </div>
                                 {vppChargesItems.map((r: any, id: number) => {
                                     const unit = resolveUnit(r, 'vppOrcharge', 'day');
@@ -360,7 +397,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                             <div className="text-amber-600 dark:text-amber-400 font-bold text-sm">
                                                 <div className="flex flex-col items-center">
                                                     <span>${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</span>
-                                                    {r.applyDiscount && discount > 0 && (
+                                                    {showDiscountIndicator && r.applyDiscount && discount > 0 && (
                                                         <div className="flex items-center gap-1.5 leading-none mt-0.5">
                                                             <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
                                                             <span className="px-1 py-0.5 text-[8px] font-black bg-amber-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
@@ -392,7 +429,17 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                 const price = rate.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
                                 return (
                                     <div key={idx} className="bg-teal-100 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                        <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</div>
+                                        <div className="text-teal-800 dark:text-teal-300 font-bold text-sm">
+                                            <div className="flex flex-col items-center">
+                                                <span>${price.toFixed(4)}{unit.startsWith('/') ? unit : `/${unit}`}</span>
+                                                {showDiscountIndicator && rate.applyDiscount && discount > 0 && (
+                                                    <div className="flex items-center justify-center gap-1.5 leading-none mt-0.5">
+                                                        <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
+                                                        <span className="px-1 py-0.5 text-[8px] font-black bg-teal-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                         {renderLabelWithTooltip(rate.label, rate.description, "text-teal-800 dark:text-teal-300")}
                                     </div>
                                 );
@@ -415,7 +462,17 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                             const unitStr = resolveUnit(rate, rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', isUsage ? 'kWh' : 'day');
                             return (
                                 <div key={idx} className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm">
-                                    <div className="text-green-600 dark:text-green-400 font-bold text-sm">${price.toFixed(4)}{unitStr.startsWith('/') ? unitStr : `/${unitStr}`}</div>
+                                    <div className="text-green-600 dark:text-green-400 font-bold text-sm">
+                                        <div className="flex flex-col items-center">
+                                            <span>${price.toFixed(4)}{unitStr.startsWith('/') ? unitStr : `/${unitStr}`}</span>
+                                            {showDiscountIndicator && shouldApplyDiscount && discount > 0 && (
+                                                <div className="flex items-center justify-center gap-1.5 leading-none mt-0.5">
+                                                    <span className="text-[10px] font-medium line-through opacity-40">${numericValue.toFixed(4)}</span>
+                                                    <span className="px-1 py-0.5 text-[8px] font-black bg-green-500 text-white rounded uppercase tracking-tighter">-{discount}%</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                     {renderLabelWithTooltip(rate.label, rate.description, "text-green-600 dark:text-green-400")}
                                 </div>
                             );

@@ -7,7 +7,7 @@ import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, RefreshCwIcon, CreditCardIcon
 } from '@/components/icons';
-import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES, GET_USERS, GET_LEAD_SOURCES } from '@/graphql';
+import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES, GET_USERS, GET_LEAD_SOURCES, GET_WEB_API_CREDENTIALS } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -83,6 +83,8 @@ interface Customer {
     pdrsEmailSent?: number;
     pdrsEmailSentAt?: string;
     portalName?: string;
+    hasAcpDetails?: boolean;
+    isPartner?: number;
     source?: string;
     referralName?: string;
 }
@@ -142,6 +144,7 @@ const INITIAL_FILTERS: SearchFilters = {
 };
 
 export function CustomersPage() {
+    const { data: webApiCredsData } = useQuery(GET_WEB_API_CREDENTIALS);
     const navigate = useNavigate();
     const location = useLocation();
     const canView = useAuthStore((state) => state.canViewMenu('customers'));
@@ -203,6 +206,7 @@ export function CustomersPage() {
     const riskStatuses = rsData?.riskStatuses || [];
 
     const { data: sourcesData } = useQuery(GET_LEAD_SOURCES);
+    const { data: credentialsData } = useQuery(GET_WEB_API_CREDENTIALS);
 
     const { data: userData } = useQuery(GET_USERS, {
         variables: { limit: 1000, status: 'ACTIVE', onlyVisibleRoles: true },
@@ -221,12 +225,27 @@ export function CustomersPage() {
             { value: 'PEERLESSGROUP', label: 'Peer Less Group' },
             { value: 'BESS2', label: 'BESS2' }
         ];
+
+        const credentialOptions = (credentialsData?.webApiCredentials || [])
+            .filter((c: any) => c.isPDRS && c.portalName && c.portalName.trim() !== '')
+            .map((c: any) => ({
+                value: c.portalName,
+                label: c.name
+            }));
+
         const leadOptions = (sourcesData?.leadSources || []).map((s: any) => ({
             value: s.name,
             label: s.name
         }));
-        return [...baseOptions, ...leadOptions];
-    }, [sourcesData]);
+
+        // Combine and filter out duplicates based on value
+        const allOptions = [...baseOptions, ...credentialOptions, ...leadOptions];
+        const uniqueOptions = allOptions.filter((option, index, self) =>
+            index === self.findIndex((t) => t.value === option.value)
+        );
+
+        return uniqueOptions;
+    }, [sourcesData, credentialsData]);
 
     // Debounce search and reset pagination
     useEffect(() => {
@@ -773,8 +792,23 @@ export function CustomersPage() {
             width: 'w-[200px] min-w-[150px]',
             render: (row) => {
                 let displayPortal = '';
+                
                 if (row.portalName) {
                     displayPortal = String(row.portalName);
+                    
+                    if (webApiCredsData?.webApiCredentials) {
+                        const matchedCred = webApiCredsData.webApiCredentials.find((c: any) => c.portalName === displayPortal && c.isPDRS);
+                        if (matchedCred) {
+                            displayPortal = matchedCred.name;
+                        }
+                    }
+                }
+
+                if (row.isPartner) {
+                    // Keep the matched client name or raw portalName
+                } else if (row.hasAcpDetails) {
+                    displayPortal = 'BESS2';
+                } else if (displayPortal) {
                     if (displayPortal.toUpperCase() === 'PEERLESSGROUP') {
                         displayPortal = 'PeerLessGroup';
                     } else if (displayPortal.toUpperCase().includes('GEE')) {
@@ -783,7 +817,7 @@ export function CustomersPage() {
                 }
 
                 if (displayPortal) {
-                    if (displayPortal === 'PeerLessGroup' && row.referenceId) {
+                    if (row.referenceId) {
                         return (
                             <Tooltip content={`Ref ID: ${row.referenceId}`} position="top">
                                 <span className="text-foreground text-xs font-medium cursor-help border-b border-dashed border-muted-foreground hover:text-primary transition-colors">

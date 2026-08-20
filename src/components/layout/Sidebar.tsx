@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAccessibleMenus, useUser } from '@/stores/useAuthStore';
-import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon, ListIcon, ActivityIcon, UploadIcon, PlugIcon, TagIcon } from '@/components/icons';
+import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon, ListIcon, ActivityIcon, UploadIcon, PlugIcon, TagIcon, KeyIcon } from '@/components/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 // Dashboard icon component (locally defined in Header originally)
@@ -59,7 +59,8 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     utilmate_tracker: ZapIcon,
     maintenance_tracker: ListIcon,
     insights: ActivityIcon,
-    app_versions: TagIcon
+    app_versions: TagIcon,
+    api_credentials: KeyIcon
 };
 
 // Path mapping
@@ -92,7 +93,8 @@ const pathMap: Record<string, string> = {
     utilmate_tracker: '/push-to-utilmate',
     maintenance_tracker: '/maintenance-tracker',
     insights: '/insights',
-    app_versions: '/app-versions'
+    app_versions: '/app-versions',
+    api_credentials: '/api-credentials'
     // user_management and email have no path, they are groupers
 };
 
