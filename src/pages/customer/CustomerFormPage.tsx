@@ -28,7 +28,8 @@ import {
     SEND_PDRS_CONSENT_EMAIL,
     GET_ACTIVE_PLANS,
     GET_BATTERY_MAKES,
-    GET_BATTERY_MODELS
+    GET_BATTERY_MODELS,
+    GET_WEB_API_CREDENTIALS
 } from '@/graphql';
 import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
 import { getData } from 'country-list';
@@ -657,14 +658,29 @@ export const CustomerFormPage = () => {
     const [markEnrollmentProcessed] = useMutation(MARK_WEB_ENROLLMENT_PROCESSED);
     const [sendPdrsConsentEmail] = useMutation(SEND_PDRS_CONSENT_EMAIL);
 
+    const { data: webApiCredsData } = useQuery(GET_WEB_API_CREDENTIALS, {
+        fetchPolicy: 'network-only'
+    });
+
     const isPdrs = useMemo(() => {
+        let currentPortal = '';
         if (isEditMode) {
-            const portal = customerData?.customer?.portalName?.toUpperCase();
-            return portal === 'PEERLESSGROUP' || portal === 'PDRS';
+            currentPortal = customerData?.customer?.portalName || '';
+        } else {
+            currentPortal = prefillData?.portalname || prefillData?.portalName || '';
         }
-        const prefillPortal = (prefillData?.portalname || prefillData?.portalName || '')?.toUpperCase();
-        return prefillPortal === 'PEERLESSGROUP' || prefillPortal === 'PDRS';
-    }, [prefillData, customerData, isEditMode]);
+
+        if (webApiCredsData?.webApiCredentials && currentPortal) {
+            const matchedCred = webApiCredsData.webApiCredentials.find((c: any) => c.portalName === currentPortal);
+            if (matchedCred && matchedCred.isActive && matchedCred.isPDRS) {
+                return true;
+            }
+        }
+        
+        // Fallback for older hardcoded values just in case
+        const upperPortal = currentPortal.toUpperCase();
+        return upperPortal === 'PEERLESSGROUP' || upperPortal === 'PDRS';
+    }, [prefillData, customerData, isEditMode, webApiCredsData]);
 
     const requiresNominationForm = useMemo(() => {
         if (!activePlansData?.activePlans || !formData.planUid) return false;

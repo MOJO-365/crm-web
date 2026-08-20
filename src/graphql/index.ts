@@ -68,3 +68,7 @@ export * from './mutations/leads';
 
 // App Versions
 export * from './queries/appVersions';
+
+// Web API Credentials
+export * from './queries/webApiCredentials';
+export * from './mutations/webApiCredentials';

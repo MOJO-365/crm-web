@@ -293,6 +293,7 @@ interface CustomerDetails {
     documents?: DocumentItem[];
     // Add missing fields for createCustomer input logic
     offerVersion?: number;
+    ratesHistory?: any[];
 }
 
 interface EmailLog {
@@ -1254,6 +1255,7 @@ const InlineMaintenanceNotes = ({
 
     // Detail Section State
     const [selectedDetailSection, setSelectedDetailSection] = useState<'general' | 'rates' | 'vpp_certificate' | 'tracking' | 'debit' | 'notes' | 'documents' | 'electricity_bills' | 'email_logs' | 'activity_log' | 'maintenance'>(initialSection);
+    const [viewRatesMode, setViewRatesMode] = useState<'current' | 'history'>('current');
 
     // Email Logs Refresh State
     const [emailLogsKey, setEmailLogsKey] = useState(0);
@@ -3088,85 +3090,81 @@ const InlineMaintenanceNotes = ({
                                                     let parsedTimeline: Record<string, any> = {};
                                                     if (selectedCustomerDetails.statusTimeline) {
                                                         try {
-                                                            parsedTimeline = typeof selectedCustomerDetails.statusTimeline === 'string' 
-                                                                ? JSON.parse(selectedCustomerDetails.statusTimeline) 
+                                                            parsedTimeline = typeof selectedCustomerDetails.statusTimeline === 'string'
+                                                                ? JSON.parse(selectedCustomerDetails.statusTimeline)
                                                                 : selectedCustomerDetails.statusTimeline;
                                                         } catch (e) {
                                                             console.error(e);
                                                         }
                                                     }
-                                                    
+
                                                     if (Object.keys(parsedTimeline).length === 0) {
                                                         // Fallback to just showing the current status and creation date
                                                         parsedTimeline = {
                                                             [String(selectedCustomerDetails.status)]: selectedCustomerDetails.createdAt
                                                         };
                                                     }
-                                                    
+
                                                     return (
                                                         <>
                                                             <Tooltip
-                                                            position="bottom"
-                                                            content={
-                                                                <div className="p-2 min-w-[220px]">
-                                                                    <div className="text-xs font-semibold mb-2.5 border-b border-border/50 pb-1.5 text-foreground">Status History</div>
-                                                                    <div className="space-y-2">
-                                                                        {Object.entries(parsedTimeline)
-                                                                            .sort(([, dateA], [, dateB]) => new Date(dateB as string).getTime() - new Date(dateA as string).getTime())
-                                                                            .map(([statusId, date]) => {
-                                                                                const d = typeof date === 'string' && /^\d+$/.test(date) ? new Date(Number(date)) : new Date(date as string);
-                                                                                // Getting label directly if possible, or fallback to statusId
-                                                                                const label = CUSTOMER_STATUS_MAP[Number(statusId)]?.label || statusId;
-                                                                                
-                                                                                // Standard dynamic colors for the badge based on status
-                                                                                const statusNum = Number(statusId);
-                                                                                let bg = 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400';
-                                                                                if (statusNum === 0) bg = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
-                                                                                else if (statusNum === 1) bg = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-                                                                                else if (statusNum === 2) bg = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400';
-                                                                                else if (statusNum === 3) bg = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
-                                                                                else if (statusNum === 6) bg = 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400';
-                                                                                else if (statusNum === 9) bg = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-                                                                                
-                                                                                return (
-                                                                                    <div key={statusId} className="flex items-center justify-between gap-4 text-xs">
-                                                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${bg}`}>{label}</span>
-                                                                                        <span className="text-muted-foreground font-mono text-[10px]">
-                                                                                            {d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                );
-                                                                            })}
+                                                                position="bottom"
+                                                                content={
+                                                                    <div className="p-2 min-w-[220px]">
+                                                                        <div className="text-xs font-semibold mb-2.5 border-b border-border/50 pb-1.5 text-foreground">Status History</div>
+                                                                        <div className="space-y-2">
+                                                                            {Object.entries(parsedTimeline)
+                                                                                .sort(([, dateA], [, dateB]) => new Date(dateB as string).getTime() - new Date(dateA as string).getTime())
+                                                                                .map(([statusId, date]) => {
+                                                                                    const d = typeof date === 'string' && /^\d+$/.test(date) ? new Date(Number(date)) : new Date(date as string);
+                                                                                    // Getting label directly if possible, or fallback to statusId
+                                                                                    const label = CUSTOMER_STATUS_MAP[Number(statusId)]?.label || statusId;
+
+                                                                                    // Standard dynamic colors for the badge based on status
+                                                                                    const statusNum = Number(statusId);
+                                                                                    let bg = 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400';
+                                                                                    if (statusNum === 0) bg = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+                                                                                    else if (statusNum === 1) bg = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+                                                                                    else if (statusNum === 2) bg = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400';
+                                                                                    else if (statusNum === 3) bg = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+                                                                                    else if (statusNum === 6) bg = 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400';
+                                                                                    else if (statusNum === 9) bg = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+
+                                                                                    return (
+                                                                                        <div key={statusId} className="flex items-center justify-between gap-4 text-xs">
+                                                                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${bg}`}>{label}</span>
+                                                                                            <span className="text-muted-foreground font-mono text-[10px]">
+                                                                                                {d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            }
-                                                        >
-                                                            <div className="p-1 rounded-full hover:bg-muted dark:hover:bg-muted/50 cursor-help transition-colors text-muted-foreground flex items-center justify-center">
-                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                                </svg>
-                                                            </div>
-                                                        </Tooltip>
-                                                        <StatusField
-                                                            value={selectedCustomerDetails.status}
-                                                            type="customer_status"
-                                                            mode="badge"
-                                                            onChange={async (newStatus: any) => {
-                                                                try {
-                                                                    await updateCustomer({
-                                                                        variables: {
-                                                                            uid: selectedCustomerDetails.uid,
-                                                                            input: { status: Number(newStatus) }
-                                                                        }
-                                                                    });
-                                                                    toast.success('Status updated');
-                                                                    setSelectedCustomerDetails({ ...selectedCustomerDetails, status: Number(newStatus) });
-                                                                } catch (error) {
-                                                                    toast.error('Failed to update status');
                                                                 }
-                                                            }}
-                                                        />
-                                                    </>
+                                                            >
+
+                                                                <StatusField
+                                                                    value={selectedCustomerDetails.status}
+                                                                    type="customer_status"
+                                                                    mode="badge"
+                                                                    onChange={async (newStatus: any) => {
+                                                                        try {
+                                                                            await updateCustomer({
+                                                                                variables: {
+                                                                                    uid: selectedCustomerDetails.uid,
+                                                                                    input: { status: Number(newStatus) }
+                                                                                }
+                                                                            });
+                                                                            toast.success('Status updated');
+                                                                            setSelectedCustomerDetails({ ...selectedCustomerDetails, status: Number(newStatus) });
+                                                                        } catch (error) {
+                                                                            toast.error('Failed to update status');
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </Tooltip>
+                                                        </>
                                                     );
                                                 })()}
                                             </div>
@@ -4088,7 +4086,7 @@ const InlineMaintenanceNotes = ({
 
                             {selectedDetailSection === 'rates' && selectedCustomerDetails.ratePlan && (
                                 <div className="space-y-6 animate-in fade-in duration-300">
-                                    <div className="flex items-center justify-between border-b border-border pb-4">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-border pb-4 gap-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-xl bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center text-yellow-600 dark:text-yellow-400">
                                                 <ZapIcon size={20} />
@@ -4119,39 +4117,171 @@ const InlineMaintenanceNotes = ({
                                         </div>
                                     </div>
 
-                                    {ratesSnapshotLoading ? (
-                                        <div className="flex items-center justify-center py-12">
-                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                                            <span className="ml-3 text-sm text-muted-foreground">Loading versioned rates...</span>
-                                        </div>
-                                    ) : (() => {
-                                        // Use snapshot offers (from customer's assigned rate version) if available,
-                                        // otherwise fall back to live ratePlan offers
-                                        const offersToShow = snapshotRatePlan?.offers?.length
-                                            ? snapshotRatePlan.offers
-                                            : selectedCustomerDetails.ratePlan.offers;
-                                        const isVppPlan = snapshotRatePlan ? snapshotRatePlan.vpp === 1 : selectedCustomerDetails.ratePlan?.vpp === 1;
-                                        return offersToShow && offersToShow.length > 0 ? (
-                                            <div className="space-y-6">
-                                                {offersToShow.map((offer: any, idx: number) => (
-                                                    <RateDetailsView
-                                                        key={offer.uid || idx}
-                                                        offer={offer}
-                                                        discount={selectedCustomerDetails.discount ?? selectedCustomerDetails.plan?.discount ?? 0}
-                                                        hasSolar={selectedCustomerDetails.solarDetails?.hassolar === 1}
-                                                        vpp={selectedCustomerDetails.vppDetails?.vpp === 1}
-                                                        units={unitMap}
-                                                        isVppPlan={isVppPlan}
-                                                        planRatesJson={selectedCustomerDetails.plan?.ratesJson}
-                                                        isDnspBased={selectedCustomerDetails.plan?.isDnspBased}
-                                                        selectedDnsp={snapshotRatePlan ? snapshotRatePlan.dnsp : selectedCustomerDetails.ratePlan?.dnsp}
+                                    {/* Premium Toggle Switch */}
+                                    {(() => {
+                                        const rawHistory = selectedCustomerDetails.ratesHistory;
+                                        const parsedHistoryArray: any[] = (typeof rawHistory === 'string' ? JSON.parse(rawHistory) : rawHistory) || [];
+                                        
+                                        if (parsedHistoryArray.length === 0) return null;
+                                        
+                                        return (
+                                            <div className="flex justify-end mt-2 mb-4 w-full">
+                                                <div className="relative inline-flex items-center p-1 bg-muted/50 dark:bg-muted/20 backdrop-blur-sm rounded-full border border-border shadow-inner">
+                                                    {/* Sliding background */}
+                                                    <div 
+                                                        className={cn(
+                                                            "absolute top-1 bottom-1 left-1 w-[calc(50%-0.25rem)] bg-background rounded-full shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] border border-border/40",
+                                                            viewRatesMode === 'history' ? "translate-x-full" : "translate-x-0"
+                                                        )}
                                                     />
-                                                ))}
+                                                    
+                                                    <button
+                                                        onClick={() => setViewRatesMode('current')}
+                                                        className={cn(
+                                                            "relative z-10 flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-semibold transition-colors duration-300 rounded-full min-w-[110px]",
+                                                            viewRatesMode === 'current' 
+                                                                ? "text-primary drop-shadow-sm" 
+                                                                : "text-muted-foreground hover:text-foreground"
+                                                        )}
+                                                    >
+                                                        <ZapIcon size={14} className={cn(viewRatesMode === 'current' && "text-yellow-500 fill-yellow-500/20")} />
+                                                        Current Rate
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setViewRatesMode('history')}
+                                                        className={cn(
+                                                            "relative z-10 flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-semibold transition-colors duration-300 rounded-full min-w-[110px]",
+                                                            viewRatesMode === 'history' 
+                                                                ? "text-primary drop-shadow-sm" 
+                                                                : "text-muted-foreground hover:text-foreground"
+                                                        )}
+                                                    >
+                                                        <CalendarIcon size={14} />
+                                                        History
+                                                    </button>
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <p className="text-center text-muted-foreground py-8">No rate offers available.</p>
                                         );
                                     })()}
+                                    {viewRatesMode === 'current' ? (
+                                        ratesSnapshotLoading ? (
+                                            <div className="flex items-center justify-center py-12">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                                                <span className="ml-3 text-sm text-muted-foreground">Loading versioned rates...</span>
+                                            </div>
+                                        ) : (() => {
+                                            // Use snapshot offers (from customer's assigned rate version) if available,
+                                            // otherwise fall back to live ratePlan offers
+                                            const offersToShow = snapshotRatePlan?.offers?.length
+                                                ? snapshotRatePlan.offers
+                                                : selectedCustomerDetails.ratePlan.offers;
+                                            const isVppPlan = snapshotRatePlan ? snapshotRatePlan.vpp === 1 : selectedCustomerDetails.ratePlan?.vpp === 1;
+                                            return offersToShow && offersToShow.length > 0 ? (
+                                                <div className="space-y-6">
+                                                    {offersToShow.map((offer: any, idx: number) => (
+                                                        <RateDetailsView
+                                                            key={offer.uid || idx}
+                                                            offer={offer}
+                                                            discount={selectedCustomerDetails.discount ?? selectedCustomerDetails.plan?.discount ?? 0}
+                                                            hasSolar={selectedCustomerDetails.solarDetails?.hassolar === 1}
+                                                            vpp={selectedCustomerDetails.vppDetails?.vpp === 1}
+                                                            units={unitMap}
+                                                            isVppPlan={isVppPlan}
+                                                            planRatesJson={selectedCustomerDetails.plan?.ratesJson}
+                                                            isDnspBased={selectedCustomerDetails.plan?.isDnspBased}
+                                                            selectedDnsp={snapshotRatePlan ? snapshotRatePlan.dnsp : selectedCustomerDetails.ratePlan?.dnsp}
+                                                            showDiscountIndicator={true}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-center text-muted-foreground py-8">No rate offers available.</p>
+                                            );
+                                        })()
+                                    ) : (
+                                        <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                                            {(() => {
+                                                const rawHistory = selectedCustomerDetails.ratesHistory;
+                                                const historyArray = (typeof rawHistory === 'string' ? JSON.parse(rawHistory) : rawHistory) || [];
+                                                const reversedHistory = [...historyArray].reverse();
+                                                
+                                                if (reversedHistory.length === 0) {
+                                                    return (
+                                                        <p className="text-center text-muted-foreground py-8">
+                                                            No history available.
+                                                        </p>
+                                                    );
+                                                }
+                                                
+                                                return reversedHistory.map((historyEntry: any, index: number) => {
+                                                    const histOffer = historyEntry.rateSnapshot;
+                                                    const histPlanSnap = historyEntry.planSnapshot;
+                                                    
+                                                    // Start date is current entry's assignedAt
+                                                    const startDateStr = new Date(historyEntry.assignedAt).toLocaleDateString(undefined, {
+                                                        year: 'numeric', month: 'short', day: 'numeric',
+                                                        hour: '2-digit', minute: '2-digit'
+                                                    });
+                                                    
+                                                    // End date is the next chronological entry's assignedAt (which is index - 1 in the reversed array)
+                                                    const nextEntry = index > 0 ? reversedHistory[index - 1] : null;
+                                                    const endDateStr = nextEntry 
+                                                        ? new Date(nextEntry.assignedAt).toLocaleDateString(undefined, {
+                                                            year: 'numeric', month: 'short', day: 'numeric',
+                                                            hour: '2-digit', minute: '2-digit'
+                                                        }) 
+                                                        : 'Present';
+
+                                                    if (!histOffer) return null;
+
+                                                    const histDiscount = histPlanSnap?.discount ?? 0;
+                                                    const offers = histOffer.offers || [];
+                                                    
+                                                    return (
+                                                        <div key={index} className="relative pl-6 border-l-2 border-primary/20 pb-4 last:pb-0">
+                                                            <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-background border-2 border-primary"></div>
+                                                            <div className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                                                                <div>
+                                                                    <span className="text-sm font-semibold text-foreground">Duration: {startDateStr} - {endDateStr}</span>
+                                                                    {histOffer.version && (
+                                                                        <span className="ml-2 px-2 py-0.5 text-xs bg-muted rounded-full">Tariff Ver: {histOffer.version}</span>
+                                                                    )}
+                                                                </div>
+                                                                {Number(histDiscount) > 0 && (
+                                                                    <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 rounded-lg shadow-sm">
+                                                                        {histDiscount}% Total Applied Discount
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        <div className="opacity-90 grayscale-[0.2]">
+                                                            {offers.length > 0 ? (
+                                                                <div className="space-y-6">
+                                                                    {offers.map((offerItem: any, idx: number) => (
+                                                                        <RateDetailsView
+                                                                            key={offerItem.uid || idx}
+                                                                            offer={offerItem}
+                                                                            discount={histDiscount}
+                                                                            hasSolar={selectedCustomerDetails.solarDetails?.hassolar === 1}
+                                                                            vpp={selectedCustomerDetails.vppDetails?.vpp === 1}
+                                                                            units={unitMap}
+                                                                            isVppPlan={histOffer.vpp === 1}
+                                                                            planRatesJson={histPlanSnap?.ratesJson}
+                                                                            isDnspBased={selectedCustomerDetails.plan?.isDnspBased}
+                                                                            selectedDnsp={histOffer.dnsp}
+                                                                            showDiscountIndicator={true}
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-sm text-muted-foreground py-4">No offers available in this snapshot.</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
