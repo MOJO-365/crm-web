@@ -127,6 +127,7 @@ export const apolloClient = new ApolloClient({
             User: { keyFields: ['uid'] },
             RatePlan: { keyFields: ['uid'] },
             RateOffer: { keyFields: ['uid'] },
+            Plan: { keyFields: ['uid'] },
         },
     }),
     defaultOptions: {
