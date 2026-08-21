@@ -335,7 +335,12 @@ export const AddPlanPage: React.FC = () => {
 
                 existingRates.forEach(rateComp => {
                     const compDnsp = rateComp.dnsp || 'default';
-                    const existingIndex = baseComponents.findIndex(c => c.name.toUpperCase() === rateComp.name.toUpperCase() && c.dnsp === compDnsp);
+                    const existingIndex = baseComponents.findIndex(c => 
+                        c.name.toUpperCase() === rateComp.name.toUpperCase() && 
+                        c.dnsp === compDnsp &&
+                        !!c.isDynamic === !!rateComp.isDynamic &&
+                        !!c.isCustom === !!rateComp.isCustom
+                    );
                     const defaultRateType = (rateComp.rate || rateComp.unit) ? 'Fixed' : 'According to Tariff';
                     const rateType = rateComp.rateType || defaultRateType;
 
@@ -415,7 +420,7 @@ export const AddPlanPage: React.FC = () => {
 
             if (dynamicNames.size > 0) {
                 setFormData(prev => {
-                    const existingNames = new Set(prev.components.map(c => c.name.toUpperCase()));
+                    const existingNames = new Set(prev.components.filter(c => c.isDynamic).map(c => c.name.toUpperCase()));
                     const newComps = [...prev.components];
                     let changed = false;
 
@@ -520,7 +525,7 @@ export const AddPlanPage: React.FC = () => {
             if (comp.rateType === 'None' || !comp.rateType) return;
 
             // Remove UI-specific and legacy fields so they don't pollute the JSON
-            const { planType, tariffUid, isCustom, isDynamic, ...cleanComp } = comp;
+            const { planType, tariffUid, ...cleanComp } = comp;
             if (!formData.isDnspBased) {
                 delete cleanComp.dnsp;
             }

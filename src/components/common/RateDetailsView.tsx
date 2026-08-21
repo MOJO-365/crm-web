@@ -86,6 +86,8 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
             return items.filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
         }
 
+        const processedLabels = new Set<string>();
+
         const processed = items.map(item => {
             if (item.type !== 'dynamic') {
                 const originalValue = parseFloat(String(item.value || 0)) || 0;
@@ -94,25 +96,33 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                 }
             }
 
-            const matchingPlanRate = planRates.find((pr) => pr.name.toUpperCase() === item.label.toUpperCase());
+            const matchingPlanRate = planRates.find((pr) => {
+                if (pr.name.toUpperCase() !== item.label.toUpperCase()) return false;
+                if (item.type === 'dynamic') return true;
+                return !pr.isDynamic && !pr.isCustom;
+            });
             if (!matchingPlanRate) return null;
 
             if (matchingPlanRate.rateType === 'Fixed') {
+                processedLabels.add(item.label.toUpperCase());
                 return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description, applyDiscount: matchingPlanRate.applyDiscount };
             }
             if (matchingPlanRate.rateType === 'According to Tariff') {
+                processedLabels.add(item.label.toUpperCase());
                 return { ...item, description: matchingPlanRate.info || matchingPlanRate.description || item.description, applyDiscount: matchingPlanRate.applyDiscount };
             }
             return null;
         }).filter(Boolean) as any[];
 
-        const tariffLabels = items.map(i => i.label.replace(/\s+/g, '').toUpperCase());
         const fixedAdditions = planRates.filter(pr => {
             const prDynType = String(pr.dynamicType || '').toLowerCase().replace(/\s+/g, '_');
             const targetType = String(type || '').toLowerCase().replace(/\s+/g, '_');
-            return (prDynType === targetType || (!prDynType && targetType === 'energy_rates')) && 
-                   pr.rateType === 'Fixed' && 
-                   !tariffLabels.includes(pr.name.replace(/\s+/g, '').toUpperCase());
+            const matchesType = (prDynType === targetType || (!prDynType && targetType === 'energy_rates'));
+            
+            return matchesType && 
+                   pr.rateType !== 'None' && 
+                   (pr.isDynamic || pr.isCustom) &&
+                   !processedLabels.has(pr.name.toUpperCase());
         });
         
         fixedAdditions.forEach(fa => {
