@@ -119,9 +119,12 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
             const targetType = String(type || '').toLowerCase().replace(/\s+/g, '_');
             const matchesType = (prDynType === targetType || (!prDynType && targetType === 'energy_rates'));
             
+            const isStandardLabel = ['SUPPLY CHARGE', 'ANYTIME', 'PEAK', 'SHOULDER', 'OFF-PEAK', 'CL1 SUPPLY', 'CL1 USAGE', 'CL2 SUPPLY', 'CL2 USAGE', 'DEMAND', 'DEMAND(OP)', 'DEMAND(P)', 'DEMAND(S)'].includes(pr.name.toUpperCase());
+            const isCustom = pr.isDynamic || pr.isCustom || !isStandardLabel;
+
             return matchesType && 
                    pr.rateType !== 'None' && 
-                   (pr.isDynamic || pr.isCustom) &&
+                   isCustom &&
                    !processedLabels.has(pr.name.toUpperCase());
         });
         
