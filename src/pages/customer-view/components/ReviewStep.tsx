@@ -94,15 +94,18 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
 
     const processItems = React.useCallback((items: any[], type: string) => {
         if (!planRates || planRates.length === 0) {
-            return items.filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
+            return items.filter(rate => {
+                if (rate.value === undefined || rate.value === null || String(rate.value).trim() === '') return false;
+                if (Number(rate.value) === 0) return false;
+                return true;
+            });
         }
 
         const processedLabels = new Set<string>();
 
         const processed = items.map(item => {
             if (item.type !== 'dynamic') {
-                const originalValue = parseFloat(String(item.value || 0)) || 0;
-                if (originalValue === 0) {
+                if (item.value === undefined || item.value === null || String(item.value).trim() === '') {
                     return null;
                 }
             }
@@ -116,7 +119,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
 
             if (matchingPlanRate.rateType === 'Fixed') {
                 processedLabels.add(item.label.replace(/\s+/g, '').toUpperCase());
-                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info, applyDiscount: matchingPlanRate.applyDiscount };
+                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info, applyDiscount: matchingPlanRate.applyDiscount, isExplicitZero: matchingPlanRate.rate === 0 || matchingPlanRate.rate === '0' };
             }
             if (matchingPlanRate.rateType === 'According to Tariff') {
                 processedLabels.add(item.label.replace(/\s+/g, '').toUpperCase());
@@ -147,11 +150,18 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
                 type: 'dynamic',
                 unitId: fa.unit,
                 applyDiscount: fa.applyDiscount !== false,
-                description: fa.info || fa.description
+                description: fa.info || fa.description,
+                isExplicitZero: fa.rate === 0 || fa.rate === '0'
             });
         });
 
-        return processed.filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
+        return processed.filter(rate => {
+            if (rate.value === undefined || rate.value === null || String(rate.value).trim() === '') return false;
+            if (Number(rate.value) === 0 && !rate.isExplicitZero) {
+                return false;
+            }
+            return true;
+        });
     }, [planRates]);
 
     const formatUnit = (key: string, fallback: string) => {
