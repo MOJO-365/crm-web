@@ -31,7 +31,7 @@ import {
     GET_BATTERY_MODELS,
     GET_WEB_API_CREDENTIALS
 } from '@/graphql';
-import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS } from '@/lib/constants';
+import { DNSP_MAP, SALE_TYPE_OPTIONS, BILLING_PREF_OPTIONS, ID_TYPE_OPTIONS, STATE_OPTIONS, TITLE_OPTIONS, RATE_TYPE_MAP } from '@/lib/constants';
 import { getData } from 'country-list';
 import { secondaryApiAxios, apiAxios } from '@/lib/apollo';
 import { formatDateTime, formatSydneyTime } from '@/lib/date';
@@ -55,7 +55,8 @@ import {
     AlertCircleIcon,
     FileTextIcon,
     PlugIcon,
-    GiftIcon
+    GiftIcon,
+    InfoIcon
 } from '@/components/icons';
 import { sendVerification, checkVerification, normalisePhone, denormalisePhone } from '@/lib/twilio';
 
@@ -472,9 +473,12 @@ export const CustomerFormPage = () => {
         if (!activePlansData?.activePlans) return [];
         return activePlansData.activePlans
             .filter((plan: any) => {
-                // Always keep the currently selected plan in the options
+                // Always keep the currently selected plan in the options if it matches the property type
                 if (formData.planUid && plan.uid === formData.planUid) {
-                    return true;
+                    const matchesProperty = plan.propertyType === undefined || plan.propertyType === null || plan.propertyType === formData.propertyType;
+                    if (matchesProperty) {
+                        return true;
+                    }
                 }
                 // Match state if a state is selected
                 if (formData.state) {
@@ -780,16 +784,31 @@ export const CustomerFormPage = () => {
             .filter(rp => {
                 const stateMatch = rp.state?.toLowerCase() === formData.state?.toLowerCase();
                 const activeMatch = !rp.isDeleted && rp.isActive !== false;
-                // Temporarily disabled VPP filtering as requested by user
-                // const vppMatch = formData.vpp ? rp.vpp === 1 : rp.vpp !== 1;
-                return stateMatch && activeMatch; // && vppMatch;
+                
+                // Match property type:
+                // rate_plans.type (DB): 0 = Business, 1 = Residential, 2 = Large Business
+                // customer propertyType: 0 = Residential, 1 = Commercial, 2 = Large Business
+                let propertyTypeMatch = false;
+                const rpType = parseInt(String(rp.type));
+                if (formData.propertyType === 0) {
+                    // Residential customer → show Residential tariffs (rp.type = 1)
+                    propertyTypeMatch = rpType === 1;
+                } else if (formData.propertyType === 1) {
+                    // Commercial customer → show Business tariffs (rp.type = 0)
+                    propertyTypeMatch = rpType === 0;
+                } else if (formData.propertyType === 2) {
+                    // Large Business customer → show Large Business (rp.type = 2) or Business (rp.type = 0) tariffs
+                    propertyTypeMatch = rpType === 2 || rpType === 0;
+                }
+
+                return stateMatch && activeMatch && propertyTypeMatch;
             })
             .map(rp => ({
                 value: rp.uid, // Use UID as unique value to avoid selection ambiguity in the UI
                 label: `${rp.codes} - ${rp.tariff} (${rp.state})`,
                 codeString: rp.codes, // Preserve code string for matching logic
             }));
-    }, [ratePlans, formData.state, formData.vpp]);
+    }, [ratePlans, formData.state, formData.propertyType]);
 
     const countryOptions = useMemo(() => {
         return getData().map((country) => ({
@@ -1258,6 +1277,8 @@ export const CustomerFormPage = () => {
                     updateField('propertyType', 0);
                 } else if (customerType === 'BUSINESS' || customerType === 'COMMERCIAL') {
                     updateField('propertyType', 1);
+                } else if (customerType === 'LARGE BUSINESS' || customerType === 'LARGE_BUSINESS') {
+                    updateField('propertyType', 2);
                 }
 
                 // ✅ Auto-prefill address
@@ -1387,6 +1408,8 @@ export const CustomerFormPage = () => {
                 updateField('propertyType', 0);
             } else if (item.customerType === 'BUSINESS' || item.customerType === 'COMMERCIAL') {
                 updateField('propertyType', 1);
+            } else if (item.customerType === 'LARGE BUSINESS' || item.customerType === 'LARGE_BUSINESS') {
+                updateField('propertyType', 2);
             }
 
             const address = item?.address;
@@ -1675,6 +1698,18 @@ export const CustomerFormPage = () => {
         }
     };
 
+    // Reset selected plan if property type changes and the plan no longer matches
+    useEffect(() => {
+        if (formData.planUid && activePlansData?.activePlans) {
+            const currentPlan = activePlansData.activePlans.find((p: any) => p.uid === formData.planUid);
+            if (currentPlan) {
+                if (currentPlan.propertyType !== undefined && currentPlan.propertyType !== null && currentPlan.propertyType !== formData.propertyType) {
+                    updateField('planUid', '');
+                }
+            }
+        }
+    }, [formData.propertyType, activePlansData]);
+
     // Validation
     const step0Valid = useMemo(() => {
         const required = !!(
@@ -1687,7 +1722,7 @@ export const CustomerFormPage = () => {
             !duplicateErrors.address &&
             !duplicateErrors.nmi
         );
-        if (formData.propertyType === 1) {
+        if (formData.propertyType === 1 || formData.propertyType === 2) {
             return required && !!(formData.businessName?.trim() && formData.abn?.trim());
         }
         return required;
@@ -2476,7 +2511,7 @@ export const CustomerFormPage = () => {
 
                                             <Field label="Property Type">
                                                 <div className="flex gap-2">
-                                                    {(['residential', 'commercial'] as const).map((type, idx) => (
+                                                    {(['residential', 'commercial', 'large business'] as const).map((type, idx) => (
                                                         <Button
                                                             key={type}
                                                             type="button"
@@ -2491,7 +2526,7 @@ export const CustomerFormPage = () => {
                                             </Field>
                                         </div>
 
-                                        {formData.propertyType === 1 && (
+                                        {(formData.propertyType === 1 || formData.propertyType === 2) && (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-muted/50 rounded-xl border border-dashed border-border">
                                                 <div className="col-span-1 md:col-span-2 flex flex-col gap-3">
                                                     <div className="flex items-center gap-2">
@@ -2968,6 +3003,13 @@ export const CustomerFormPage = () => {
                                             )}
                                         </h2>
                                         <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Role limited</span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 p-3 text-xs bg-muted/65 border border-border text-muted-foreground rounded-lg">
+                                        <InfoIcon size={14} className="text-primary shrink-0" />
+                                        <span>
+                                            The displayed rates and plans are filtered based on the selected property type (<strong>{RATE_TYPE_MAP[formData.propertyType] || 'Residential'}</strong>).
+                                        </span>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
@@ -3618,8 +3660,8 @@ export const CustomerFormPage = () => {
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Email:</span> <span className="font-medium">{formData.email}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">Mobile:</span> <span className="font-medium">{formData.phone} {phoneVerified && '✓'}</span></p>
                                                     <p className="flex justify-between"><span className="text-muted-foreground">DOB:</span> <span className="font-medium">{formatDate(formData.dob, { includeTime: false }) || '—'}</span></p>
-                                                    <p className="flex justify-between"><span className="text-muted-foreground">Type:</span> <span className="capitalize font-medium">{formData.propertyType === 1 ? 'Commercial' : 'Residential'}</span></p>
-                                                    {formData.propertyType === 1 && (
+                                                    <p className="flex justify-between"><span className="text-muted-foreground">Type:</span> <span className="capitalize font-medium">{formData.propertyType === 1 ? 'Commercial' : formData.propertyType === 2 ? 'Large Business' : 'Residential'}</span></p>
+                                                    {(formData.propertyType === 1 || formData.propertyType === 2) && (
                                                         <>
                                                             {formData.legalName && (
                                                                 <p className="flex justify-between"><span className="text-muted-foreground">Legal Name:</span> <span className="font-medium">{formData.legalName}</span></p>
@@ -4056,6 +4098,8 @@ export const CustomerFormPage = () => {
                                                                 updateField('propertyType', 0);
                                                             } else if (item.customerType === 'BUSINESS' || item.customerType === 'COMMERCIAL') {
                                                                 updateField('propertyType', 1);
+                                                            } else if (item.customerType === 'LARGE BUSINESS' || item.customerType === 'LARGE_BUSINESS') {
+                                                                updateField('propertyType', 2);
                                                             }
 
                                                             const addr = item.address;
@@ -4426,7 +4470,7 @@ export const CustomerFormPage = () => {
                             <div className="grid grid-cols-1 gap-y-0.5">
                                 <SummaryItem icon={PhoneIcon} label="Mobile" value={formData.phone} />
                                 <SummaryItem icon={MapPinIcon} label="Address" value={`${formData.unitNumber ? `${formData.unitNumber}/` : ''}${formData.streetNumber || ''} ${formData.streetName || ''} ${formData.streetType || ''}${formData.suburb ? `, ${formData.suburb}` : ''} ${formData.state || ''} ${formData.postcode || ''}`} />
-                                <SummaryItem icon={UserIcon} label="Customer type" value={formData.propertyType === 1 ? 'Commercial' : 'Residential'} />
+                                <SummaryItem icon={UserIcon} label="Customer type" value={formData.propertyType === 1 ? 'Commercial' : formData.propertyType === 2 ? 'Large Business' : 'Residential'} />
                                 <SummaryItem icon={ZapIcon} label="Solar" value={formData.hasSolar ? 'Yes' : 'No'} />
                                 <SummaryItem icon={HashIcon} label="NMI" value={formData.nmi} />
                                 <SummaryItem icon={LockIcon} label="Tariff" value={formData.tariffCode} />
