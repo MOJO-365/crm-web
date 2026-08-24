@@ -252,7 +252,7 @@ export function ProjectDetailsCard({ customer }: ProjectDetailsCardProps) {
                             <div className="flex flex-col gap-1">
                                 <span className="text-[11px] font-medium text-gray-500 dark:text-neutral-400">Property Type</span>
                                 <span className="text-sm font-semibold text-gray-900 dark:text-neutral-100">
-                                    {customer.propertyType === 1 ? 'Commercial' : customer.propertyType === 0 ? 'Residential' : '—'}
+                                    {customer.propertyType === 1 ? 'Commercial' : customer.propertyType === 2 ? 'Large Business' : customer.propertyType === 0 ? 'Residential' : '—'}
                                 </span>
                             </div>
                             <div className="flex flex-col gap-1">

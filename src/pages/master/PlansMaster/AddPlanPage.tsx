@@ -397,7 +397,8 @@ export const AddPlanPage: React.FC = () => {
         tariffUid: '',
         dynamicType: '',
         rateType: 'Fixed',
-        applyDiscount: false
+        applyDiscount: false,
+        saveAsZero: false
     });
 
     React.useEffect(() => {
@@ -533,8 +534,8 @@ export const AddPlanPage: React.FC = () => {
             cleanComp.applyDiscount = comp.applyDiscount !== false;
 
             if (cleanComp.rateType === 'Fixed') {
-                const hasRate = cleanComp.rate && String(cleanComp.rate).trim() !== '' && Number(cleanComp.rate) !== 0;
-                if (hasRate && (!cleanComp.unit || cleanComp.unit.trim() === '')) {
+                const hasRate = (cleanComp.rate !== undefined && cleanComp.rate !== null && String(cleanComp.rate).trim() !== '') || cleanComp.rate === 0 || cleanComp.rate === '0';
+                if (hasRate && (!cleanComp.unit || cleanComp.unit.trim() === '') && cleanComp.rate !== 0 && cleanComp.rate !== '0') {
                     newErrors[`comp-${index}-unit`] = `Unit is required for ${cleanComp.name}`;
                     hasComponentError = true;
                 }
@@ -671,7 +672,8 @@ export const AddPlanPage: React.FC = () => {
                                         }}
                                         options={[
                                             { label: 'Residential', value: '0' },
-                                            { label: 'Commercial', value: '1' }
+                                            { label: 'Commercial', value: '1' },
+                                            { label: 'Large Business', value: '2' }
                                         ]}
                                         className="w-full h-[38px]"
                                     />
@@ -1062,7 +1064,7 @@ export const AddPlanPage: React.FC = () => {
                                         size="sm"
                                         onClick={() => {
                                             setEditingCustomRateIndex(null);
-                                            setCustomRateDraft({ name: '', description: '', rate: '', unit: '', planType: 'fixed', tariffUid: '', dynamicType: '', rateType: 'Fixed', applyDiscount: false });
+                                            setCustomRateDraft({ name: '', description: '', rate: '', unit: '', planType: 'fixed', tariffUid: '', dynamicType: '', rateType: 'Fixed', applyDiscount: false, saveAsZero: false });
                                             setIsCustomModalOpen(true);
                                         }}
                                         className="flex items-center gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20 h-[38px]"
@@ -1212,7 +1214,8 @@ export const AddPlanPage: React.FC = () => {
                                                                             tariffUid: comp.tariffUid || '',
                                                                             dynamicType: comp.dynamicType || '',
                                                                             rateType: comp.rateType || 'Fixed',
-                                                                            applyDiscount: comp.applyDiscount || false
+                                                                            applyDiscount: comp.applyDiscount || false,
+                                                                            saveAsZero: comp.rate === 0 || comp.rate === '0'
                                                                         });
                                                                         setIsCustomModalOpen(true);
                                                                     }}
@@ -1365,7 +1368,8 @@ export const AddPlanPage: React.FC = () => {
                                                                                 tariffUid: comp.tariffUid || '',
                                                                                 dynamicType: comp.dynamicType || '',
                                                                                 rateType: comp.rateType || 'Fixed',
-                                                                                applyDiscount: comp.applyDiscount || false
+                                                                                applyDiscount: comp.applyDiscount || false,
+                                                                                saveAsZero: comp.rate === 0 || comp.rate === '0'
                                                                             });
                                                                             setIsCustomModalOpen(true);
                                                                         }}
@@ -1483,6 +1487,33 @@ export const AddPlanPage: React.FC = () => {
                         </div>
                     )}
 
+                    <div className="flex gap-6 pt-2">
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setCustomRateDraft({ ...customRateDraft, applyDiscount: !customRateDraft.applyDiscount })}
+                                className={`group relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 ${customRateDraft.applyDiscount ? 'bg-green-500' : 'bg-neutral-300 dark:bg-neutral-600'}`}
+                            >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out ${customRateDraft.applyDiscount ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+                            </button>
+                            <label className="text-sm font-medium cursor-pointer" onClick={() => setCustomRateDraft({ ...customRateDraft, applyDiscount: !customRateDraft.applyDiscount })}>
+                                Apply Discount
+                            </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setCustomRateDraft({ ...customRateDraft, saveAsZero: !customRateDraft.saveAsZero, ...( !customRateDraft.saveAsZero ? { rate: '0' } : {} ) })}
+                                className={`group relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 ${customRateDraft.saveAsZero ? 'bg-green-500' : 'bg-neutral-300 dark:bg-neutral-600'}`}
+                            >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out ${customRateDraft.saveAsZero ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+                            </button>
+                            <label className="text-sm font-medium cursor-pointer" onClick={() => setCustomRateDraft({ ...customRateDraft, saveAsZero: !customRateDraft.saveAsZero, ...( !customRateDraft.saveAsZero ? { rate: '0' } : {} ) })}>
+                                Save as 0 Value
+                            </label>
+                        </div>
+                    </div>
+
                     <div className="flex justify-end gap-3 pt-4 mt-4">
                         <Button type="button" variant="outline" onClick={() => setIsCustomModalOpen(false)}>
                             Cancel
@@ -1494,25 +1525,32 @@ export const AddPlanPage: React.FC = () => {
 
                                 if (!customRateDraft.name) return toast.error('Rate Name is required');
                                 if (!isStatic) {
-                                    if (!customRateDraft.rate) return toast.error('Rate is required');
-                                    if (!customRateDraft.unit) return toast.error('Unit is required');
+                                    if (!customRateDraft.saveAsZero && !customRateDraft.rate) return toast.error('Rate is required');
+                                    if (!customRateDraft.saveAsZero && !customRateDraft.unit) return toast.error('Unit is required');
                                 }
+
+                                const rateToSave = customRateDraft.saveAsZero ? '0' : customRateDraft.rate;
+                                const unitToSave = customRateDraft.saveAsZero && !customRateDraft.unit ? 'None' : customRateDraft.unit;
+                                
+                                // Clean up the state before saving so we don't save extra properties we don't need
+                                const finalDraft = { ...customRateDraft, rate: rateToSave, unit: unitToSave };
+                                delete (finalDraft as any).saveAsZero;
 
                                 if (editingCustomRateIndex !== null) {
                                     setFormData(prev => {
                                         const newComps = [...prev.components];
                                         newComps[editingCustomRateIndex] = {
                                             ...newComps[editingCustomRateIndex],
-                                            ...customRateDraft
+                                            ...finalDraft
                                         };
                                         return { ...prev, components: newComps };
                                     });
                                 } else {
                                     setFormData(prev => {
                                         const newComps = [...prev.components];
-                                        newComps.push({ ...customRateDraft, isDynamic: true, isCustom: true, dnsp: 'default' });
+                                        newComps.push({ ...finalDraft, isDynamic: true, isCustom: true, dnsp: 'default' });
                                         DNSP_OPTIONS.forEach(dnsp => {
-                                            newComps.push({ ...customRateDraft, isDynamic: true, isCustom: true, dnsp: dnsp.value });
+                                            newComps.push({ ...finalDraft, isDynamic: true, isCustom: true, dnsp: dnsp.value });
                                         });
                                         return { ...prev, components: newComps };
                                     });

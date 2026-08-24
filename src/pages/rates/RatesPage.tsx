@@ -1328,6 +1328,7 @@ export function RatesPage() {
                             const typeLabel = String(row['Type']).trim().toLowerCase();
                             if (typeLabel === 'residential') importedPlan.type = '0';
                             else if (typeLabel === 'business' || typeLabel === 'commercial') importedPlan.type = '1';
+                            else if (typeLabel === 'large business' || typeLabel === 'large_business') importedPlan.type = '2';
                         }
 
                         if (row['VPP']) {
@@ -1418,7 +1419,12 @@ export function RatesPage() {
                             planId: '',
                             dnsp: DNSP_OPTIONS.find(opt => opt.label.toLowerCase() === String(row['DNSP'] || '').trim().toLowerCase())?.value || '0',
                             state: String(row['State'] || 'NSW').trim(),
-                            type: String(row['Type'] || '').trim().toLowerCase() === 'residential' ? '0' : '1',
+                            type: (() => {
+                                const t = String(row['Type'] || '').trim().toLowerCase();
+                                if (t === 'residential') return '0';
+                                if (t === 'large business' || t === 'large_business') return '2';
+                                return '1';
+                            })(),
                             vpp: String(row['VPP'] || '').trim().toLowerCase() === 'yes' ? 1 : 0,
                             discountApplies: String(row['Discount Applies'] || '').trim().toLowerCase() === 'yes',
                             discountPercentage: parseFloat(String(row['Discount %'] || '0')) || 0,
@@ -2476,6 +2482,16 @@ export function RatesPage() {
                                 >
                                     Residential
                                 </button>
+                                <button
+                                    type="button"
+                                    className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${formData.type === 2
+                                        ? 'bg-primary text-white border-primary'
+                                        : 'bg-background text-foreground border-input hover:bg-accent hover:text-accent-foreground'
+                                        }`}
+                                    onClick={() => setFormData(prev => ({ ...prev, type: 2 }))}
+                                >
+                                    Large Business
+                                </button>
                             </div>
                         </div>
                         <div className="space-y-2">
@@ -3214,6 +3230,16 @@ export function RatesPage() {
                                         onClick={() => setFormData(prev => ({ ...prev, type: 1 }))}
                                     >
                                         Residential
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${formData.type === 2
+                                            ? 'bg-primary text-white border-primary'
+                                            : 'bg-background text-foreground border-input hover:bg-accent hover:text-accent-foreground'
+                                            }`}
+                                        onClick={() => setFormData(prev => ({ ...prev, type: 2 }))}
+                                    >
+                                        Large Business
                                     </button>
                                 </div>
                             </div>

@@ -3884,7 +3884,7 @@ const InlineMaintenanceNotes = ({
                                         <div className="space-y-1">
                                             <label className="text-xs text-muted-foreground uppercase font-semibold">Property Type</label>
                                             <p className="font-medium">
-                                                {selectedCustomerDetails.propertyType === 1 ? 'Commercial' : 'Residential'}
+                                                {selectedCustomerDetails.propertyType === 1 ? 'Commercial' : selectedCustomerDetails.propertyType === 2 ? 'Large Business' : 'Residential'}
                                             </p>
                                         </div>
                                         <div className="space-y-1">
@@ -4121,26 +4121,26 @@ const InlineMaintenanceNotes = ({
                                     {(() => {
                                         const rawHistory = selectedCustomerDetails.ratesHistory;
                                         const parsedHistoryArray: any[] = (typeof rawHistory === 'string' ? JSON.parse(rawHistory) : rawHistory) || [];
-                                        
+
                                         if (parsedHistoryArray.length === 0) return null;
-                                        
+
                                         return (
                                             <div className="flex justify-end mt-2 mb-4 w-full">
                                                 <div className="relative inline-flex items-center p-1 bg-muted/50 dark:bg-muted/20 backdrop-blur-sm rounded-full border border-border shadow-inner">
                                                     {/* Sliding background */}
-                                                    <div 
+                                                    <div
                                                         className={cn(
                                                             "absolute top-1 bottom-1 left-1 w-[calc(50%-0.25rem)] bg-background rounded-full shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] border border-border/40",
                                                             viewRatesMode === 'history' ? "translate-x-full" : "translate-x-0"
                                                         )}
                                                     />
-                                                    
+
                                                     <button
                                                         onClick={() => setViewRatesMode('current')}
                                                         className={cn(
                                                             "relative z-10 flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-semibold transition-colors duration-300 rounded-full min-w-[110px]",
-                                                            viewRatesMode === 'current' 
-                                                                ? "text-primary drop-shadow-sm" 
+                                                            viewRatesMode === 'current'
+                                                                ? "text-primary drop-shadow-sm"
                                                                 : "text-muted-foreground hover:text-foreground"
                                                         )}
                                                     >
@@ -4151,8 +4151,8 @@ const InlineMaintenanceNotes = ({
                                                         onClick={() => setViewRatesMode('history')}
                                                         className={cn(
                                                             "relative z-10 flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-semibold transition-colors duration-300 rounded-full min-w-[110px]",
-                                                            viewRatesMode === 'history' 
-                                                                ? "text-primary drop-shadow-sm" 
+                                                            viewRatesMode === 'history'
+                                                                ? "text-primary drop-shadow-sm"
                                                                 : "text-muted-foreground hover:text-foreground"
                                                         )}
                                                     >
@@ -4204,7 +4204,7 @@ const InlineMaintenanceNotes = ({
                                                 const rawHistory = selectedCustomerDetails.ratesHistory;
                                                 const historyArray = (typeof rawHistory === 'string' ? JSON.parse(rawHistory) : rawHistory) || [];
                                                 const reversedHistory = [...historyArray].reverse();
-                                                
+
                                                 if (reversedHistory.length === 0) {
                                                     return (
                                                         <p className="text-center text-muted-foreground py-8">
@@ -4212,31 +4212,31 @@ const InlineMaintenanceNotes = ({
                                                         </p>
                                                     );
                                                 }
-                                                
+
                                                 return reversedHistory.map((historyEntry: any, index: number) => {
                                                     const histOffer = historyEntry.rateSnapshot;
                                                     const histPlanSnap = historyEntry.planSnapshot;
-                                                    
+
                                                     // Start date is current entry's assignedAt
                                                     const startDateStr = new Date(historyEntry.assignedAt).toLocaleDateString(undefined, {
                                                         year: 'numeric', month: 'short', day: 'numeric',
                                                         hour: '2-digit', minute: '2-digit'
                                                     });
-                                                    
+
                                                     // End date is the next chronological entry's assignedAt (which is index - 1 in the reversed array)
                                                     const nextEntry = index > 0 ? reversedHistory[index - 1] : null;
-                                                    const endDateStr = nextEntry 
+                                                    const endDateStr = nextEntry
                                                         ? new Date(nextEntry.assignedAt).toLocaleDateString(undefined, {
                                                             year: 'numeric', month: 'short', day: 'numeric',
                                                             hour: '2-digit', minute: '2-digit'
-                                                        }) 
+                                                        })
                                                         : 'Present';
 
                                                     if (!histOffer) return null;
 
                                                     const histDiscount = histPlanSnap?.discount ?? 0;
                                                     const offers = histOffer.offers || [];
-                                                    
+
                                                     return (
                                                         <div key={index} className="relative pl-6 border-l-2 border-primary/20 pb-4 last:pb-0">
                                                             <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-background border-2 border-primary"></div>
@@ -4253,33 +4253,33 @@ const InlineMaintenanceNotes = ({
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                        <div className="opacity-90 grayscale-[0.2]">
-                                                            {offers.length > 0 ? (
-                                                                <div className="space-y-6">
-                                                                    {offers.map((offerItem: any, idx: number) => (
-                                                                        <RateDetailsView
-                                                                            key={offerItem.uid || idx}
-                                                                            offer={offerItem}
-                                                                            discount={histDiscount}
-                                                                            hasSolar={selectedCustomerDetails.solarDetails?.hassolar === 1}
-                                                                            vpp={selectedCustomerDetails.vppDetails?.vpp === 1}
-                                                                            units={unitMap}
-                                                                            isVppPlan={histOffer.vpp === 1}
-                                                                            planRatesJson={histPlanSnap?.ratesJson}
-                                                                            isDnspBased={selectedCustomerDetails.plan?.isDnspBased}
-                                                                            selectedDnsp={histOffer.dnsp}
-                                                                            showDiscountIndicator={true}
-                                                                        />
-                                                                    ))}
-                                                                </div>
-                                                            ) : (
-                                                                <p className="text-sm text-muted-foreground py-4">No offers available in this snapshot.</p>
-                                                            )}
+                                                            <div className="opacity-90 grayscale-[0.2]">
+                                                                {offers.length > 0 ? (
+                                                                    <div className="space-y-6">
+                                                                        {offers.map((offerItem: any, idx: number) => (
+                                                                            <RateDetailsView
+                                                                                key={offerItem.uid || idx}
+                                                                                offer={offerItem}
+                                                                                discount={histDiscount}
+                                                                                hasSolar={selectedCustomerDetails.solarDetails?.hassolar === 1}
+                                                                                vpp={selectedCustomerDetails.vppDetails?.vpp === 1}
+                                                                                units={unitMap}
+                                                                                isVppPlan={histOffer.vpp === 1}
+                                                                                planRatesJson={histPlanSnap?.ratesJson}
+                                                                                isDnspBased={selectedCustomerDetails.plan?.isDnspBased}
+                                                                                selectedDnsp={histOffer.dnsp}
+                                                                                showDiscountIndicator={true}
+                                                                            />
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="text-sm text-muted-foreground py-4">No offers available in this snapshot.</p>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                );
-                                            });
-                                        })()}
+                                                    );
+                                                });
+                                            })()}
                                         </div>
                                     )}
                                 </div>

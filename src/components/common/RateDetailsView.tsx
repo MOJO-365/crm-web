@@ -83,15 +83,14 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
 
     const processItems = (items: any[], type: string) => {
         if (!planRates || planRates.length === 0) {
-            return items.filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
+            return items.filter(rate => rate.value !== undefined && rate.value !== null && String(rate.value).trim() !== '');
         }
 
         const processedLabels = new Set<string>();
 
         const processed = items.map(item => {
             if (item.type !== 'dynamic') {
-                const originalValue = parseFloat(String(item.value || 0)) || 0;
-                if (originalValue === 0) {
+                if (item.value === undefined || item.value === null || String(item.value).trim() === '') {
                     return null;
                 }
             }
@@ -140,7 +139,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
             });
         });
 
-        return processed.filter(rate => (parseFloat(String(rate.value || 0)) ?? 0) > 0);
+        return processed.filter(rate => rate.value !== undefined && rate.value !== null && String(rate.value).trim() !== '');
     };
     const parsedDynamicRates = typeof offer.dynamicRates === 'string'
         ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()

@@ -153,11 +153,13 @@ export const MSAT_CONNECTED_OPTIONS = [
 export const RATE_TYPE_MAP: Record<string, string> = {
     '0': 'Residential',
     '1': 'Business',
+    '2': 'Large Business',
 };
 
 export const RATE_TYPE_OPTIONS = [
     { value: '1', label: 'Commercial' },
     { value: '0', label: 'Residential' },
+    { value: '2', label: 'Large Business' },
 ];
 
 // Australian States

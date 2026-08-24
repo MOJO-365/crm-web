@@ -875,7 +875,7 @@ export const OfferAccessPage = () => {
                                 <div className="text-sm font-medium text-gray-900 dark:text-white">{RATE_TYPE_MAP[customerData.propertyType] || 'Residential'}</div>
                             </div>
                             {
-                                customerData.propertyType === 1 && (
+                                (customerData.propertyType === 1 || customerData.propertyType === 2) && (
                                     <>
                                         <div>
                                             <div className="text-xs text-muted-foreground mb-1">Business Name</div>

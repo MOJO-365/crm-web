@@ -179,7 +179,7 @@ export const PlansMasterPage: React.FC = () => {
             key: 'propertyType',
             render: (item) => (
                 <span className="capitalize font-medium">
-                    {item.propertyType === 1 ? 'Commercial' : 'Residential'}
+                    {item.propertyType === 1 ? 'Commercial' : item.propertyType === 2 ? 'Large Business' : 'Residential'}
                 </span>
             )
         },
