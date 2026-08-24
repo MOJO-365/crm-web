@@ -83,7 +83,11 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
 
     const processItems = (items: any[], type: string) => {
         if (!planRates || planRates.length === 0) {
-            return items.filter(rate => rate.value !== undefined && rate.value !== null && String(rate.value).trim() !== '');
+            return items.filter(rate => {
+                if (rate.value === undefined || rate.value === null || String(rate.value).trim() === '') return false;
+                if (Number(rate.value) === 0) return false;
+                return true;
+            });
         }
 
         const processedLabels = new Set<string>();
@@ -104,7 +108,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
 
             if (matchingPlanRate.rateType === 'Fixed') {
                 processedLabels.add(item.label.toUpperCase());
-                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description, applyDiscount: matchingPlanRate.applyDiscount };
+                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description, applyDiscount: matchingPlanRate.applyDiscount, isExplicitZero: matchingPlanRate.rate === 0 || matchingPlanRate.rate === '0' };
             }
             if (matchingPlanRate.rateType === 'According to Tariff') {
                 processedLabels.add(item.label.toUpperCase());
@@ -135,11 +139,18 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                 type: 'dynamic',
                 unitId: fa.unit,
                 applyDiscount: fa.applyDiscount !== false,
-                description: fa.info || fa.description
+                description: fa.info || fa.description,
+                isExplicitZero: fa.rate === 0 || fa.rate === '0'
             });
         });
 
-        return processed.filter(rate => rate.value !== undefined && rate.value !== null && String(rate.value).trim() !== '');
+        return processed.filter(rate => {
+            if (rate.value === undefined || rate.value === null || String(rate.value).trim() === '') return false;
+            if (Number(rate.value) === 0 && !rate.isExplicitZero) {
+                return false;
+            }
+            return true;
+        });
     };
     const parsedDynamicRates = typeof offer.dynamicRates === 'string'
         ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
@@ -201,7 +212,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                        (offer.fitCritical || 0) > 0 || 
                        (offer.fitVpp || 0) > 0 || 
                        parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit') ||
-                       planRates.some((pr: any) => ['FEED-IN', 'PREMIUM FIT', 'CRITICAL EVENT FIT', 'BASE FIT'].includes(pr.name.toUpperCase()) && parseFloat(String(pr.rate || 0)) > 0);
+                       planRates.some((pr: any) => ['FEED-IN', 'PREMIUM FIT', 'CRITICAL EVENT FIT', 'BASE FIT'].includes(pr.name.toUpperCase()) && (parseFloat(String(pr.rate || 0)) > 0 || pr.rate === 0 || pr.rate === '0'));
     const rawSolarFitItems = !hasFiTFlag || !hasSolar ? [] : [
         { label: 'Feed-in', value: offer.fit, type: 'fit' },
         { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
@@ -221,7 +232,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                       (offer.cl1Supply || 0) > 0 || 
                       (offer.cl2Supply || 0) > 0 || 
                       parsedDynamicRates.some((r: any) => r.type === 'controlled_load') ||
-                      planRates.some((pr: any) => ['CL1 SUPPLY', 'CL2 SUPPLY', 'CL1 USAGE', 'CL2 USAGE'].includes(pr.name.toUpperCase()) && parseFloat(String(pr.rate || 0)) > 0);
+                      planRates.some((pr: any) => ['CL1 SUPPLY', 'CL2 SUPPLY', 'CL1 USAGE', 'CL2 USAGE'].includes(pr.name.toUpperCase()) && (parseFloat(String(pr.rate || 0)) > 0 || pr.rate === 0 || pr.rate === '0'));
     const controlledLoadItems = processItems(!hasCLFlag ? [] : [
         { label: 'CL1 Usage', value: offer.cl1Usage, type: 'cl1_usage', applyDiscount: true },
         { label: 'CL2 Usage', value: offer.cl2Usage, type: 'cl2_usage', applyDiscount: true },
