@@ -103,9 +103,9 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
 
         const processedLabels = new Set<string>();
 
-        const processed = items.map(item => {
+        const processed = items.map((item: any) => {
             if (item.type !== 'dynamic') {
-                if (item.value === undefined || item.value === null || String(item.value).trim() === '') {
+                if (item.value === undefined || item.value === null || String(item.value).trim() === '' || Number(item.value) === 0) {
                     return null;
                 }
             }
@@ -119,7 +119,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
 
             if (matchingPlanRate.rateType === 'Fixed') {
                 processedLabels.add(item.label.replace(/\s+/g, '').toUpperCase());
-                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info, applyDiscount: matchingPlanRate.applyDiscount, isExplicitZero: matchingPlanRate.rate === 0 || matchingPlanRate.rate === '0' };
+                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info, applyDiscount: matchingPlanRate.applyDiscount, isExplicitZero: matchingPlanRate.saveAsZero === true && (matchingPlanRate.rate === 0 || matchingPlanRate.rate === '0') };
             }
             if (matchingPlanRate.rateType === 'According to Tariff') {
                 processedLabels.add(item.label.replace(/\s+/g, '').toUpperCase());
@@ -151,7 +151,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
                 unitId: fa.unit,
                 applyDiscount: fa.applyDiscount !== false,
                 description: fa.info || fa.description,
-                isExplicitZero: fa.rate === 0 || fa.rate === '0'
+                isExplicitZero: fa.saveAsZero === true && (fa.rate === 0 || fa.rate === '0')
             });
         });
 
