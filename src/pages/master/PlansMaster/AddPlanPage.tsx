@@ -349,6 +349,7 @@ export const AddPlanPage: React.FC = () => {
                             ...baseComponents[existingIndex],
                             ...rateComp,
                             rateType,
+                            saveAsZero: rateComp.saveAsZero ?? (rateComp.rate === 0 || rateComp.rate === '0'),
                             dynamicType: rateComp.dynamicType || baseComponents[existingIndex].dynamicType || COMPONENT_DYNAMIC_TYPE_MAP[rateComp.name.toUpperCase()] || ''
                         };
                     } else {
@@ -357,6 +358,7 @@ export const AddPlanPage: React.FC = () => {
                             ...rateComp,
                             isCustom: !rateComp.isDynamic,
                             rateType,
+                            saveAsZero: rateComp.saveAsZero ?? (rateComp.rate === 0 || rateComp.rate === '0'),
                             dynamicType: rateComp.dynamicType || COMPONENT_DYNAMIC_TYPE_MAP[rateComp.name.toUpperCase()] || '',
                             dnsp: compDnsp
                         });
@@ -1534,7 +1536,6 @@ export const AddPlanPage: React.FC = () => {
                                 
                                 // Clean up the state before saving so we don't save extra properties we don't need
                                 const finalDraft = { ...customRateDraft, rate: rateToSave, unit: unitToSave };
-                                delete (finalDraft as any).saveAsZero;
 
                                 if (editingCustomRateIndex !== null) {
                                     setFormData(prev => {
