@@ -786,19 +786,19 @@ export const CustomerFormPage = () => {
                 const activeMatch = !rp.isDeleted && rp.isActive !== false;
                 
                 // Match property type:
-                // rate_plans.type (DB): 0 = Business, 1 = Residential, 2 = Large Business
+                // rate_plans.type (DB): 0 = Residential, 1 = Commercial, 2 = Large Business
                 // customer propertyType: 0 = Residential, 1 = Commercial, 2 = Large Business
                 let propertyTypeMatch = false;
                 const rpType = parseInt(String(rp.type));
                 if (formData.propertyType === 0) {
-                    // Residential customer → show Residential tariffs (rp.type = 1)
-                    propertyTypeMatch = rpType === 1;
-                } else if (formData.propertyType === 1) {
-                    // Commercial customer → show Business tariffs (rp.type = 0)
+                    // Residential customer → show Residential tariffs (rp.type = 0)
                     propertyTypeMatch = rpType === 0;
+                } else if (formData.propertyType === 1) {
+                    // Commercial customer → show Commercial tariffs (rp.type = 1)
+                    propertyTypeMatch = rpType === 1;
                 } else if (formData.propertyType === 2) {
-                    // Large Business customer → show Large Business (rp.type = 2) or Business (rp.type = 0) tariffs
-                    propertyTypeMatch = rpType === 2 || rpType === 0;
+                    // Large Business customer → show Large Business (rp.type = 2) or Commercial (rp.type = 1) tariffs
+                    propertyTypeMatch = rpType === 2 || rpType === 1;
                 }
 
                 return stateMatch && activeMatch && propertyTypeMatch;
@@ -1116,11 +1116,20 @@ export const CustomerFormPage = () => {
             let matchedRatePlan = null;
             const currentState = (formData.state || nmiItem?.address?.state || '').toLowerCase();
 
+            const isMatchingPropertyType = (rp: any) => {
+                const rpType = parseInt(String(rp.type));
+                if (formData.propertyType === 0) return rpType === 0;
+                if (formData.propertyType === 1) return rpType === 1;
+                if (formData.propertyType === 2) return rpType === 2 || rpType === 1;
+                return true;
+            };
+
             if (targetTariffName) {
                 matchedRatePlan = ratePlans.find(rp =>
                     rp.tariff === targetTariffName &&
                     rp.state?.toLowerCase() === currentState &&
-                    (formData.vpp ? rp.vpp === 1 : rp.vpp !== 1)
+                    (formData.vpp ? rp.vpp === 1 : rp.vpp !== 1) &&
+                    isMatchingPropertyType(rp)
                 );
             }
 
@@ -1131,6 +1140,7 @@ export const CustomerFormPage = () => {
                     matchedRatePlan = ratePlans.find(rp => {
                         if (rp.state?.toLowerCase() !== currentState) return false;
                         if (formData.vpp ? rp.vpp !== 1 : rp.vpp === 1) return false;
+                        if (!isMatchingPropertyType(rp)) return false;
 
                         const activeOffer = rp.offers?.find((o: any) => !o.isDeleted && o.isActive !== false);
                         if (!activeOffer) return false;
