@@ -3,6 +3,7 @@ import { useQuery } from '@apollo/client';
 import { GET_ALL_BONUSES } from '@/graphql/queries/bonus';
 import { GET_COLUMN_METADATA } from '@/graphql/queries/rates';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
+import { processItems as sharedProcessItems } from '@/lib/rate-processing';
 import { ZapIcon, InfoIcon, PhoneIcon, MailIcon } from '@/components/icons';
 import { CustomerViewLayout } from './CustomerViewLayout';
 import { DNSP_LABELS } from '@/lib/constants';
@@ -85,75 +86,7 @@ export const RatesStep: React.FC<RatesStepProps> = ({
     }, [customer?.plan?.ratesJson, customer?.plan?.isDnspBased, ratePlan?.dnsp]);
 
     const processItems = React.useCallback((items: any[], type: string) => {
-        if (!planRates || planRates.length === 0) {
-            return items.filter(rate => {
-                if (rate.value === undefined || rate.value === null || String(rate.value).trim() === '') return false;
-                if (Number(rate.value) === 0) return false;
-                return true;
-            });
-        }
-
-        const processedLabels = new Set<string>();
-
-        const processed = items.map(item => {
-            if (item.type !== 'dynamic') {
-                if (item.value === undefined || item.value === null || String(item.value).trim() === '' || Number(item.value) === 0) {
-                    return null;
-                }
-            }
-
-            const matchingPlanRate = planRates.find((pr: any) => {
-                if (pr.name.replace(/\s+/g, '').toUpperCase() !== item.label.replace(/\s+/g, '').toUpperCase()) return false;
-                if (item.type === 'dynamic') return true;
-                return !pr.isDynamic && !pr.isCustom;
-            });
-            if (!matchingPlanRate) return null;
-
-            if (matchingPlanRate.rateType === 'Fixed') {
-                processedLabels.add(item.label.replace(/\s+/g, '').toUpperCase());
-                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info, applyDiscount: matchingPlanRate.applyDiscount, isExplicitZero: matchingPlanRate.saveAsZero === true && (matchingPlanRate.rate === 0 || matchingPlanRate.rate === '0') };
-            }
-            if (matchingPlanRate.rateType === 'According to Tariff') {
-                processedLabels.add(item.label.replace(/\s+/g, '').toUpperCase());
-                return { ...item, description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info, applyDiscount: matchingPlanRate.applyDiscount };
-            }
-            return null;
-        }).filter(Boolean) as any[];
-
-        const fixedAdditions = planRates.filter((pr: any) => {
-            const prDynType = String(pr.dynamicType || '').toLowerCase().replace(/\s+/g, '_');
-            const targetType = String(type || '').toLowerCase().replace(/\s+/g, '_');
-            const matchesType = (prDynType === targetType || (!prDynType && targetType === 'energy_rates'));
-            
-            const isStandardLabel = ['SUPPLY CHARGE', 'ANYTIME', 'PEAK', 'SHOULDER', 'OFF-PEAK', 'CL1 SUPPLY', 'CL1 USAGE', 'CL2 SUPPLY', 'CL2 USAGE', 'DEMAND', 'DEMAND(OP)', 'DEMAND(P)', 'DEMAND(S)'].includes(pr.name.toUpperCase());
-            const isCustom = pr.isDynamic || pr.isCustom || !isStandardLabel;
-
-            return matchesType && 
-                   pr.rateType !== 'None' && 
-                   isCustom &&
-                   !processedLabels.has(pr.name.replace(/\s+/g, '').toUpperCase());
-        });
-
-        fixedAdditions.forEach((fa: any) => {
-            processed.push({
-                label: fa.name,
-                name: fa.name,
-                value: fa.rate,
-                type: 'dynamic',
-                unitId: fa.unit,
-                applyDiscount: fa.applyDiscount !== false,
-                description: fa.info || fa.description,
-                isExplicitZero: fa.saveAsZero === true && (fa.rate === 0 || fa.rate === '0')
-            });
-        });
-
-        return processed.filter(rate => {
-            if (rate.value === undefined || rate.value === null || String(rate.value).trim() === '') return false;
-            if (Number(rate.value) === 0 && !rate.isExplicitZero) {
-                return false;
-            }
-            return true;
-        });
+        return sharedProcessItems(items, type, planRates);
     }, [planRates]);
 
     const formatUnit = (key: string, fallback: string) => {
@@ -167,58 +100,69 @@ export const RatesStep: React.FC<RatesStepProps> = ({
         (mainOffer?.cl1Supply || 0) > 0 ||
         (mainOffer?.cl2Supply || 0) > 0 ||
         parsedDynamicRates.some((r: any) => r.type === 'controlled_load') ||
-        planRates.some((pr: any) => ['CL1 SUPPLY', 'CL2 SUPPLY', 'CL1 USAGE', 'CL2 USAGE'].includes(pr.name.toUpperCase()) && parseFloat(String(pr.rate || 0)) > 0);
+        planRates.some((pr: any) => ['CL1 SUPPLY', 'CL2 SUPPLY', 'CL1 USAGE', 'CL2 USAGE'].includes(pr.name.toUpperCase()) && (parseFloat(String(pr.rate || 0)) > 0 || pr.rate === 0 || pr.rate === '0'));
+
     const hasFiTRates = (mainOffer?.fit || 0) > 0 ||
         (mainOffer?.fitPeak || 0) > 0 ||
         (mainOffer?.fitCritical || 0) > 0 ||
         (mainOffer?.fitVpp || 0) > 0 ||
-        parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit') ||
-        planRates.some((pr: any) => ['FEED-IN', 'PREMIUM FIT', 'CRITICAL EVENT FIT', 'BASE FIT'].includes(pr.name.toUpperCase()) && parseFloat(String(pr.rate || 0)) > 0);
-    const hasSolar = customer?.solarDetails?.hassolar === 1;
-    const hasFiT = hasFiTRates && hasSolar; const energyRatesItems = React.useMemo(() => {
+        parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit' || r.name?.toUpperCase().includes('FIT') || r.name?.toUpperCase().includes('FEED-IN')) ||
+        planRates.some((pr: any) => ['FEED-IN', 'FEED-IN TARIFF', 'PREMIUM FIT', 'CRITICAL EVENT FIT', 'BASE FIT', 'SOLAR FIT'].includes(pr.name.toUpperCase()) || pr.name.toUpperCase().includes('FIT') || pr.name.toUpperCase().includes('FEED-IN'));
+
+    const hasSolar = Boolean(customer?.solarDetails?.hassolar === 1 || customer?.solarDetails?.hassolar === true || payload?.hasSolar === true || payload?.solarDetails?.hassolar === 1 || (mainOffer?.fit && mainOffer.fit > 0) || planRates.some((pr: any) => pr.name.toUpperCase().includes('FIT') || pr.name.toUpperCase().includes('FEED-IN')));
+    const hasFiT = hasFiTRates && hasSolar;
+
+    const energyRatesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
-            { label: 'Anytime', value: mainOffer.anytime, type: 'anytime' },
-            { label: 'Peak', value: mainOffer.peak, type: 'peak' },
-            { label: 'Shoulder', value: mainOffer.shoulder, type: 'shoulder' },
-            { label: 'Off-Peak', value: mainOffer.offPeak, type: 'offPeak' },
+            { label: 'Peak', value: mainOffer.peak, type: 'peak', applyDiscount: true },
+            { label: 'Off-Peak', value: mainOffer.offPeak, type: 'offPeak', applyDiscount: true },
+            { label: 'Shoulder', value: mainOffer.shoulder, type: 'shoulder', applyDiscount: true },
+            { label: 'Anytime', value: mainOffer.anytime, type: 'anytime', applyDiscount: true },
             ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false, description: r.description || r.info }))
         ], 'energy_rates');
-    }, [mainOffer, parsedDynamicRates, processItems]); const supplyChargesItems = React.useMemo(() => {
+    }, [mainOffer, parsedDynamicRates, processItems]);
+
+    const supplyChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
             { label: 'Supply Charge', value: mainOffer.supplyCharge, type: 'supplyCharge' },
             ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
         ], 'supply_charges');
-    }, [mainOffer, parsedDynamicRates, processItems]); const demandChargesItems = React.useMemo(() => {
+    }, [mainOffer, parsedDynamicRates, processItems]);
+
+    const demandChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
-            { label: 'Demand', value: mainOffer.demand, type: 'demand' },
-            { label: 'Demand(Op)', value: mainOffer.demandOp, type: 'demandOp' },
-            { label: 'Demand(P)', value: mainOffer.demandP, type: 'demandP' },
-            { label: 'Demand(S)', value: mainOffer.demandS, type: 'demandS' },
+            { label: 'Demand', value: mainOffer.demand, type: 'demand', applyDiscount: true },
+            { label: 'Demand(Op)', value: mainOffer.demandOp, type: 'demandOp', applyDiscount: true },
+            { label: 'Demand(P)', value: mainOffer.demandP, type: 'demandP', applyDiscount: true },
+            { label: 'Demand(S)', value: mainOffer.demandS, type: 'demandS', applyDiscount: true },
             ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
         ], 'demand_charges');
-    }, [mainOffer, parsedDynamicRates, processItems]); const vppChargesItems = React.useMemo(() => {
+    }, [mainOffer, parsedDynamicRates, processItems]);
+
+    const vppChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
-            { label: 'VPP Orchestration', value: mainOffer.vppOrcharge, type: 'vppOrcharge', applyDiscount: true },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
+            { label: 'VPP Orchestration', value: mainOffer.vppOrcharge, type: 'vppOrcharge', applyDiscount: false },
+            ...parsedDynamicRates.filter((r: any) => r.type === 'vpp_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: false, description: r.description || r.info }))
         ], 'vpp_charges');
-    }, [mainOffer, parsedDynamicRates, processItems]); const solarFitItems = React.useMemo(() => {
+    }, [mainOffer, parsedDynamicRates, processItems]);
+
+    const solarFitItems = React.useMemo(() => {
         if (!mainOffer || !hasFiT) return [];
         return processItems([
             { label: 'Feed-in', value: mainOffer.fit, type: 'fit' },
+            { label: 'Feed-in Tariff', value: mainOffer.fit, type: 'fit' },
             { label: 'PREMIUM FIT', value: mainOffer.fitPeak, type: 'fitPeak' },
             { label: 'CRITICAL EVENT FIT', value: mainOffer.fitCritical, type: 'fitCritical' },
             { label: 'BASE FIT', value: mainOffer.fitVpp, type: 'fitVpp' },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
+            ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit' || r.type === 'fit' || r.type === 'extra_fit' || r.name?.toUpperCase().includes('FIT') || r.name?.toUpperCase().includes('FEED-IN')).map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
         ], 'solar_fit').filter(rate => {
             const numericValue = parseFloat(String(rate.value || 0));
-            if (numericValue <= 0) return false;
-            const isVppActive = customer?.vppDetails?.vpp === 1 || ratePlan?.vpp === 1;
-            if (rate.type === 'fit') return !isVppActive;
-            return isVppActive;
+            if (numericValue <= 0 && !rate.isExplicitZero) return false;
+            return true;
         });
     }, [mainOffer, parsedDynamicRates, hasFiT, customer, ratePlan, processItems]);
 
@@ -233,11 +177,11 @@ export const RatesStep: React.FC<RatesStepProps> = ({
     }, [mainOffer, parsedDynamicRates, handledTypes, processItems]); const controlledLoadItems = React.useMemo(() => {
         if (!mainOffer || !hasCL) return [];
         return processItems([
-            { label: 'CL1 Usage', value: mainOffer.cl1Usage, type: 'cl1_usage' },
-            { label: 'CL2 Usage', value: mainOffer.cl2Usage, type: 'cl2_usage' },
-            { label: 'CL1 Supply', value: mainOffer.cl1Supply, type: 'cl1_supply' },
-            { label: 'CL2 Supply', value: mainOffer.cl2Supply, type: 'cl2_supply' },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false && r.name.toLowerCase().includes('usage'), description: r.description || r.info }))
+            { label: 'CL1 Usage', value: mainOffer.cl1Usage, type: 'cl1_usage', applyDiscount: true },
+            { label: 'CL2 Usage', value: mainOffer.cl2Usage, type: 'cl2_usage', applyDiscount: true },
+            { label: 'CL1 Supply', value: mainOffer.cl1Supply, type: 'cl1_supply', applyDiscount: true },
+            { label: 'CL2 Supply', value: mainOffer.cl2Supply, type: 'cl2_supply', applyDiscount: true },
+            ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false, description: r.description || r.info }))
         ], 'controlled_load');
     }, [mainOffer, parsedDynamicRates, hasCL, processItems]);
 

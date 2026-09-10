@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { useQuery } from '@apollo/client';
 import { GET_COLUMN_METADATA } from '@/graphql';
 import { calculateDiscountedRate } from '@/lib/rate-utils';
+import { processItems as sharedProcessItems } from '@/lib/rate-processing';
 import {
     ZapIcon,
     PlugIcon,
@@ -82,75 +83,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
     }, [planRatesJson, isDnspBased, selectedDnsp]);
 
     const processItems = (items: any[], type: string) => {
-        if (!planRates || planRates.length === 0) {
-            return items.filter(rate => {
-                if (rate.value === undefined || rate.value === null || String(rate.value).trim() === '') return false;
-                if (Number(rate.value) === 0) return false;
-                return true;
-            });
-        }
-
-        const processedLabels = new Set<string>();
-
-        const processed = items.map(item => {
-            if (item.type !== 'dynamic') {
-                if (item.value === undefined || item.value === null || String(item.value).trim() === '' || Number(item.value) === 0) {
-                    return null;
-                }
-            }
-
-            const matchingPlanRate = planRates.find((pr) => {
-                if (pr.name.toUpperCase() !== item.label.toUpperCase()) return false;
-                if (item.type === 'dynamic') return true;
-                return !pr.isDynamic && !pr.isCustom;
-            });
-            if (!matchingPlanRate) return null;
-
-            if (matchingPlanRate.rateType === 'Fixed') {
-                processedLabels.add(item.label.toUpperCase());
-                return { ...item, value: matchingPlanRate.rate, unitId: matchingPlanRate.unit, description: matchingPlanRate.info || matchingPlanRate.description || item.description, applyDiscount: matchingPlanRate.applyDiscount, isExplicitZero: matchingPlanRate.saveAsZero === true && (matchingPlanRate.rate === 0 || matchingPlanRate.rate === '0') };
-            }
-            if (matchingPlanRate.rateType === 'According to Tariff') {
-                processedLabels.add(item.label.toUpperCase());
-                return { ...item, description: matchingPlanRate.info || matchingPlanRate.description || item.description, applyDiscount: matchingPlanRate.applyDiscount };
-            }
-            return null;
-        }).filter(Boolean) as any[];
-
-        const fixedAdditions = planRates.filter(pr => {
-            const prDynType = String(pr.dynamicType || '').toLowerCase().replace(/\s+/g, '_');
-            const targetType = String(type || '').toLowerCase().replace(/\s+/g, '_');
-            const matchesType = (prDynType === targetType || (!prDynType && targetType === 'energy_rates'));
-            
-            const isStandardLabel = ['SUPPLY CHARGE', 'ANYTIME', 'PEAK', 'SHOULDER', 'OFF-PEAK', 'CL1 SUPPLY', 'CL1 USAGE', 'CL2 SUPPLY', 'CL2 USAGE', 'DEMAND', 'DEMAND(OP)', 'DEMAND(P)', 'DEMAND(S)'].includes(pr.name.toUpperCase());
-            const isCustom = pr.isDynamic || pr.isCustom || !isStandardLabel;
-
-            return matchesType && 
-                   pr.rateType !== 'None' && 
-                   isCustom &&
-                   !processedLabels.has(pr.name.toUpperCase());
-        });
-        
-        fixedAdditions.forEach(fa => {
-            processed.push({
-                label: fa.name,
-                name: fa.name,
-                value: fa.rate,
-                type: 'dynamic',
-                unitId: fa.unit,
-                applyDiscount: fa.applyDiscount !== false,
-                description: fa.info || fa.description,
-                isExplicitZero: fa.saveAsZero === true && (fa.rate === 0 || fa.rate === '0')
-            });
-        });
-
-        return processed.filter(rate => {
-            if (rate.value === undefined || rate.value === null || String(rate.value).trim() === '') return false;
-            if (Number(rate.value) === 0 && !rate.isExplicitZero) {
-                return false;
-            }
-            return true;
-        });
+        return sharedProcessItems(items, type, planRates);
     };
     const parsedDynamicRates = typeof offer.dynamicRates === 'string'
         ? (() => { try { return JSON.parse(offer.dynamicRates); } catch { return []; } })()
@@ -211,19 +144,20 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                        (offer.fitPeak || 0) > 0 || 
                        (offer.fitCritical || 0) > 0 || 
                        (offer.fitVpp || 0) > 0 || 
-                       parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit') ||
-                       planRates.some((pr: any) => ['FEED-IN', 'PREMIUM FIT', 'CRITICAL EVENT FIT', 'BASE FIT'].includes(pr.name.toUpperCase()) && (parseFloat(String(pr.rate || 0)) > 0 || pr.rate === 0 || pr.rate === '0'));
+                       parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit' || r.name?.toUpperCase().includes('FIT') || r.name?.toUpperCase().includes('FEED-IN')) ||
+                       planRates.some((pr: any) => ['FEED-IN', 'FEED-IN TARIFF', 'PREMIUM FIT', 'CRITICAL EVENT FIT', 'BASE FIT', 'SOLAR FIT'].includes(pr.name.toUpperCase()) || pr.name.toUpperCase().includes('FIT') || pr.name.toUpperCase().includes('FEED-IN'));
     const rawSolarFitItems = !hasFiTFlag || !hasSolar ? [] : [
         { label: 'Feed-in', value: offer.fit, type: 'fit' },
+        { label: 'Feed-in Tariff', value: offer.fit, type: 'fit' },
         { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
         { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
         { label: 'BASE FIT', value: offer.fitVpp, type: 'fitVpp' },
-        ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount, description: r.description || r.info }))
+        ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit' || r.type === 'fit' || r.type === 'extra_fit' || r.name?.toUpperCase().includes('FIT') || r.name?.toUpperCase().includes('FEED-IN')).map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount, description: r.description || r.info }))
     ];
     const solarFitItems = processItems(rawSolarFitItems, 'solar_fit').filter(rate => {
-        if (rate.type === 'fit') return !vpp;
-        if (rate.type === 'dynamic') return true;
-        return vpp;
+        const numericValue = parseFloat(String(rate.value || 0));
+        if (numericValue <= 0 && !rate.isExplicitZero) return false;
+        return true;
     });
 
     // Controlled Load Items
@@ -311,7 +245,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                                 const numericValue = parseFloat(String(rate.value || 0));
                                 const shouldApplyDiscount = !!(rate as any).applyDiscount;
                                 const price = shouldApplyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
-                                const unit = resolveUnit(rate, rate.type, 'kWh');
+                                const unit = resolveUnit(rate, rate.type ?? '', 'kWh');
                                 return (
                                     <div key={idx} className={cn(
                                         "border rounded-lg p-3 text-center transition-all duration-200 hover:shadow-sm",
@@ -447,7 +381,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                         {[...solarFitItems]
                             .sort((a, b) => (parseFloat(String(a.value || 0)) ?? 0) - (parseFloat(String(b.value || 0)) ?? 0))
                             .map((rate, idx) => {
-                                const unit = resolveUnit(rate, rate.type, 'kWh');
+                                const unit = resolveUnit(rate, rate.type ?? '', 'kWh');
                                 const numericValue = parseFloat(String(rate.value || '0'));
                                 const price = rate.applyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
                                 return (
@@ -479,7 +413,7 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                         </div>
                         {controlledLoadItems.map((rate, idx) => {
                             const numericValue = parseFloat(String(rate.value || 0));
-                            const isUsage = rate.type.endsWith('_usage') || (rate.type === 'dynamic' && !rate.label.toLowerCase().includes('supply'));
+                            const isUsage = (rate.type?.endsWith('_usage') ?? false) || (rate.type === 'dynamic' && !rate.label.toLowerCase().includes('supply'));
                             const shouldApplyDiscount = !!(rate as any).applyDiscount;
                             const price = shouldApplyDiscount ? calculateDiscountedRate(numericValue, discount) : numericValue;
                             const unitStr = resolveUnit(rate, rate.type === 'cl1_usage' ? 'cl1Usage' : rate.type === 'cl2_usage' ? 'cl2Usage' : rate.type === 'cl1_supply' ? 'cl1Supply' : 'cl2Supply', isUsage ? 'kWh' : 'day');
