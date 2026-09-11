@@ -147,7 +147,6 @@ export const RateDetailsView = ({ offer, discount, hasSolar, vpp, units = {}, is
                        parsedDynamicRates.some((r: any) => r.type === 'fit' || r.type === 'extra_fit' || r.type === 'solar_fit' || r.name?.toUpperCase().includes('FIT') || r.name?.toUpperCase().includes('FEED-IN')) ||
                        planRates.some((pr: any) => ['FEED-IN', 'FEED-IN TARIFF', 'PREMIUM FIT', 'CRITICAL EVENT FIT', 'BASE FIT', 'SOLAR FIT'].includes(pr.name.toUpperCase()) || pr.name.toUpperCase().includes('FIT') || pr.name.toUpperCase().includes('FEED-IN'));
     const rawSolarFitItems = !hasFiTFlag || !hasSolar ? [] : [
-        { label: 'Feed-in', value: offer.fit, type: 'fit' },
         { label: 'Feed-in Tariff', value: offer.fit, type: 'fit' },
         { label: 'PREMIUM FIT', value: offer.fitPeak, type: 'fitPeak' },
         { label: 'CRITICAL EVENT FIT', value: offer.fitCritical, type: 'fitCritical' },
