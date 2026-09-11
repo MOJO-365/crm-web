@@ -23,7 +23,6 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { RatesHistoryModal } from './components/RatesHistoryModal';
 import { ColumnMetadataModal } from './components/ColumnMetadataModal';
 import { GstManagementModal } from './components/GstManagementModal';
-import { isGSTAppliedForColumn } from '@/lib/gst-config';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';

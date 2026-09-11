@@ -16,7 +16,6 @@ import { STATE_OPTIONS, DNSP_OPTIONS } from '@/lib/constants';
 import { apiAxios, BASE_API_URL } from '@/lib/apollo';
 import { GstManagementModal } from '@/pages/rates/components/GstManagementModal';
 import { isGSTAppliedForType } from '@/lib/gst-config';
-import { cn } from '@/lib/utils';
 
 const TARIFF_COMPONENTS = [
     'SUPPLY CHARGE', 'ANYTIME', 'PEAK', 'SHOULDER', 'OFF-PEAK',
@@ -241,7 +240,7 @@ export const AddPlanPage: React.FC = () => {
     const [isCustomDiscountMode, setIsCustomDiscountMode] = useState(false);
     const [editingCustomRateIndex, setEditingCustomRateIndex] = useState<number | null>(null);
     const [gstModalOpen, setGstModalOpen] = useState(false);
-    const [gstConfigVersion, setGstConfigVersion] = useState(0);
+    const [, setGstConfigVersion] = useState(0);
 
     React.useEffect(() => {
         const handleGstUpdate = () => setGstConfigVersion(v => v + 1);
