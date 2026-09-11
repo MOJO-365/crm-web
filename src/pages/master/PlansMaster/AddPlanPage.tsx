@@ -14,6 +14,9 @@ import { ChevronRightIcon, CheckIcon, SpinnerIcon, PencilIcon, UploadIcon } from
 import Modal from '@/components/common/Modal';
 import { STATE_OPTIONS, DNSP_OPTIONS } from '@/lib/constants';
 import { apiAxios, BASE_API_URL } from '@/lib/apollo';
+import { GstManagementModal } from '@/pages/rates/components/GstManagementModal';
+import { isGSTAppliedForType } from '@/lib/gst-config';
+import { cn } from '@/lib/utils';
 
 const TARIFF_COMPONENTS = [
     'SUPPLY CHARGE', 'ANYTIME', 'PEAK', 'SHOULDER', 'OFF-PEAK',
@@ -237,6 +240,14 @@ export const AddPlanPage: React.FC = () => {
     const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
     const [isCustomDiscountMode, setIsCustomDiscountMode] = useState(false);
     const [editingCustomRateIndex, setEditingCustomRateIndex] = useState<number | null>(null);
+    const [gstModalOpen, setGstModalOpen] = useState(false);
+    const [gstConfigVersion, setGstConfigVersion] = useState(0);
+
+    React.useEffect(() => {
+        const handleGstUpdate = () => setGstConfigVersion(v => v + 1);
+        window.addEventListener('gst_config_updated', handleGstUpdate);
+        return () => window.removeEventListener('gst_config_updated', handleGstUpdate);
+    }, []);
     const [tcFile, setTcFile] = useState<File | null>(null);
     const [tcUploading, setTcUploading] = useState(false);
     const [tcUploadedPath, setTcUploadedPath] = useState<string>('');
@@ -1106,17 +1117,35 @@ export const AddPlanPage: React.FC = () => {
                                                                 {comp.description && (
                                                                     <span className="text-[10px] text-muted-foreground leading-tight my-0.5">{comp.description}</span>
                                                                 )}
-                                                                <span className="text-[9px] uppercase font-bold text-muted-foreground/70 tracking-wider">
+                                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                                    <span className="text-[9px] uppercase font-bold text-muted-foreground/70 tracking-wider">
+                                                                        {(() => {
+                                                                            const name = comp.name.toUpperCase();
+                                                                            if (name.includes('CL1') || name.includes('CL2')) return 'CONTROLLED LOAD';
+                                                                            if (name.includes('DEMAND')) return 'DEMAND CHARGES';
+                                                                            if (name.includes('SUPPLY')) return 'SUPPLY CHARGES';
+                                                                            if (name.includes('VPP')) return 'VPP CHARGES';
+                                                                            if (name.includes('FIT')) return 'SOLAR FIT';
+                                                                            return 'ENERGY RATES';
+                                                                        })()}
+                                                                    </span>
                                                                     {(() => {
                                                                         const name = comp.name.toUpperCase();
-                                                                        if (name.includes('CL1') || name.includes('CL2')) return 'CONTROLLED LOAD';
-                                                                        if (name.includes('DEMAND')) return 'DEMAND CHARGES';
-                                                                        if (name.includes('SUPPLY')) return 'SUPPLY CHARGES';
-                                                                        if (name.includes('VPP')) return 'VPP CHARGES';
-                                                                        if (name.includes('FIT')) return 'SOLAR FIT';
-                                                                        return 'ENERGY RATES';
+                                                                        let cat = 'energy_rates';
+                                                                        if (name.includes('CL1') || name.includes('CL2')) cat = 'controlled_load';
+                                                                        else if (name.includes('DEMAND')) cat = 'demand_charges';
+                                                                        else if (name.includes('SUPPLY')) cat = 'supply_charges';
+                                                                        else if (name.includes('VPP')) cat = 'vpp_charges';
+                                                                        else if (name.includes('FIT')) cat = 'solar_fit';
+                                                                        const applies = isGSTAppliedForType(cat);
+                                                                        if (!applies) return null;
+                                                                        return (
+                                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 tracking-wider uppercase leading-none">
+                                                                                +GST
+                                                                            </span>
+                                                                        );
                                                                     })()}
-                                                                </span>
+                                                                </div>
                                                             </div>
                                                         </td>
                                                         <td className="px-3 py-1.5 align-middle">
@@ -1268,9 +1297,21 @@ export const AddPlanPage: React.FC = () => {
                                                                     {comp.description && (
                                                                         <span className="text-[10px] text-muted-foreground leading-tight my-0.5">{comp.description}</span>
                                                                     )}
-                                                                    <span className="text-[9px] uppercase font-bold text-blue-600/80 tracking-wider">
-                                                                        {comp.dynamicType ? String(comp.dynamicType).replace(/_/g, ' ') : 'DYNAMIC RATE'}
-                                                                    </span>
+                                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                                        <span className="text-[9px] uppercase font-bold text-blue-600/80 tracking-wider">
+                                                                            {comp.dynamicType ? String(comp.dynamicType).replace(/_/g, ' ') : 'DYNAMIC RATE'}
+                                                                        </span>
+                                                                        {(() => {
+                                                                            const typeStr = comp.dynamicType || (comp.name.toUpperCase().includes('FIT') ? 'solar_fit' : 'extra_charges');
+                                                                            const applies = isGSTAppliedForType(typeStr);
+                                                                            if (!applies) return null;
+                                                                            return (
+                                                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 tracking-wider uppercase leading-none">
+                                                                                    +GST
+                                                                                </span>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
                                                                 </div>
                                                             </td>
                                                             <td className="px-3 py-1.5 align-middle">
@@ -1466,6 +1507,12 @@ export const AddPlanPage: React.FC = () => {
                             placeholder="Select type"
                             disabled={editingCustomRateIndex !== null && !formData.components[editingCustomRateIndex]?.isCustom && !formData.components[editingCustomRateIndex]?.isDynamic}
                         />
+                        {customRateDraft.dynamicType && isGSTAppliedForType(customRateDraft.dynamicType) && (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-medium mt-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                <span>GST Applicable</span>
+                            </div>
+                        )}
                     </div>
                     {!(editingCustomRateIndex !== null && !formData.components[editingCustomRateIndex]?.isCustom && !formData.components[editingCustomRateIndex]?.isDynamic) && (
                         <div className="grid grid-cols-2 gap-3">
@@ -1564,6 +1611,11 @@ export const AddPlanPage: React.FC = () => {
                     </div>
                 </div>
             </Modal>
+
+            <GstManagementModal
+                isOpen={gstModalOpen}
+                onClose={() => setGstModalOpen(false)}
+            />
         </div>
     );
 };

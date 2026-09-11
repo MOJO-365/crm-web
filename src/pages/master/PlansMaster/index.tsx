@@ -18,6 +18,7 @@ import { formatSydneyTime } from '@/lib/date';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { ColumnMetadataModal } from '@/pages/rates/components/ColumnMetadataModal';
+import { GstManagementModal } from '@/pages/rates/components/GstManagementModal';
 interface Plan {
     uid: string;
     title: string;
@@ -53,6 +54,7 @@ export const PlansMasterPage: React.FC = () => {
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [planToDelete, setPlanToDelete] = useState<Plan | null>(null);
     const [columnModalOpen, setColumnModalOpen] = useState(false);
+    const [gstModalOpen, setGstModalOpen] = useState(false);
 
     const dynamicFieldNames = useMemo(() => {
         const names = new Set<string>();
@@ -316,6 +318,9 @@ export const PlansMasterPage: React.FC = () => {
                             <Button variant="outline" onClick={() => setColumnModalOpen(true)}>
                                 Column Definitions
                             </Button>
+                            <Button variant="outline" onClick={() => setGstModalOpen(true)}>
+                                Manage GST
+                            </Button>
                             <Button onClick={() => navigate('/plans-master/new')}>
                                 <PlusIcon className="w-4 h-4 mr-2" />
                                 Add New Plan
@@ -389,6 +394,11 @@ export const PlansMasterPage: React.FC = () => {
                     'anytime', 'cl1Supply', 'cl1Usage', 'cl2Supply', 'cl2Usage', 'demand', 'demandOp', 'demandP', 'demandS', 'fit', 'fitPeak', 'fitCritical', 'fitVpp', 'offPeak', 'peak', 'shoulder', 'supplyCharge', 'vppOrcharge',
                     ...dynamicFieldNames
                 ]}
+            />
+
+            <GstManagementModal
+                isOpen={gstModalOpen}
+                onClose={() => setGstModalOpen(false)}
             />
         </div>
     );
