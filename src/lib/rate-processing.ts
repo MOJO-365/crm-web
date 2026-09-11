@@ -232,10 +232,16 @@ export function processItems(
         });
     }
 
-    // ── Phase 3: Final filter – drop zero-value rates ──
+    // ── Phase 3: Final deduplication and zero-value filter ──
+    const finalSeen = new Set<string>();
     return processed.filter(rate => {
         if (rate.value === undefined || rate.value === null || String(rate.value).trim() === '') return false;
         if (Number(rate.value) === 0 && !rate.isExplicitZero) return false;
+
+        const key = norm(rate.label || rate.name || '');
+        const aliases = getAliases(key);
+        if (aliases.some(a => finalSeen.has(a))) return false;
+        aliases.forEach(a => finalSeen.add(a));
         return true;
     });
 }
