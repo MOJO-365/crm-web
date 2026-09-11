@@ -201,3 +201,17 @@ export const GET_COLUMN_METADATA = gql`
         }
     }
 `;
+
+export const GET_GST_RULES = gql`
+    query GetGstRules {
+        getGstRules {
+            id
+            key
+            label
+            description
+            appliesGst
+            category
+        }
+    }
+`;
+

@@ -131,3 +131,30 @@ export const SAVE_COLUMN_METADATA = gql`
         }
     }
 `;
+
+export const SAVE_GST_RULE = gql`
+    mutation SaveGstRule($key: String!, $appliesGst: Boolean!) {
+        saveGstRule(key: $key, appliesGst: $appliesGst) {
+            id
+            key
+            label
+            description
+            appliesGst
+            category
+        }
+    }
+`;
+
+export const RESET_GST_RULES = gql`
+    mutation ResetGstRules {
+        resetGstRules {
+            id
+            key
+            label
+            description
+            appliesGst
+            category
+        }
+    }
+`;
+

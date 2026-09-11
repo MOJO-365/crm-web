@@ -22,6 +22,8 @@ import { STATE_OPTIONS, DNSP_OPTIONS, DNSP_MAP, RATE_TYPE_MAP } from '@/lib/cons
 import { Tooltip } from '@/components/ui/Tooltip';
 import { RatesHistoryModal } from './components/RatesHistoryModal';
 import { ColumnMetadataModal } from './components/ColumnMetadataModal';
+import { GstManagementModal } from './components/GstManagementModal';
+import { isGSTAppliedForColumn } from '@/lib/gst-config';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -171,6 +173,7 @@ export function RatesPage() {
     // Manage Units state
     const [unitsModalOpen, setUnitsModalOpen] = useState(false);
     const [columnModalOpen, setColumnModalOpen] = useState(false);
+    const [gstModalOpen, setGstModalOpen] = useState(false);
     const [newUnitName, setNewUnitName] = useState('');
     const [isCreatingUnit, setIsCreatingUnit] = useState(false);
     const [deletingUnitUid, setDeletingUnitUid] = useState<string | null>(null);
@@ -2111,6 +2114,12 @@ export function RatesPage() {
                             >
                                 Column Definitions
                             </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => setGstModalOpen(true)}
+                            >
+                                Manage GST
+                            </Button>
                         </>
                     )}
                     {canCreate && (
@@ -3952,6 +3961,11 @@ export function RatesPage() {
                     'anytime', 'cl1Supply', 'cl1Usage', 'cl2Supply', 'cl2Usage', 'demand', 'demandOp', 'demandP', 'demandS', 'fit', 'fitPeak', 'fitCritical', 'fitVpp', 'offPeak', 'peak', 'shoulder', 'supplyCharge', 'vppOrcharge',
                     ...dynamicFieldNames
                 ]}
+            />
+
+            <GstManagementModal
+                isOpen={gstModalOpen}
+                onClose={() => setGstModalOpen(false)}
             />
 
             {/* Manage Units Modal */}
