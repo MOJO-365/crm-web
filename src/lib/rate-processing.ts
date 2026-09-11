@@ -126,11 +126,15 @@ export function processItems(
     type: string,
     planRates: any[]
 ): RateItem[] {
-    // ── No plan attached → just filter out zero/empty values ──
+    // ── No plan attached → filter out zero/empty values and duplicate aliases ──
     if (!planRates || planRates.length === 0) {
+        const seenNorms = new Set<string>();
         return items.filter(rate => {
             if (rate.value === undefined || rate.value === null || String(rate.value).trim() === '') return false;
             if (Number(rate.value) === 0) return false;
+            const aliases = getAliases(rate.label);
+            if (aliases.some(a => seenNorms.has(a))) return false;
+            aliases.forEach(a => seenNorms.add(a));
             return true;
         });
     }
@@ -151,6 +155,9 @@ export function processItems(
     const processed: RateItem[] = [];
 
     for (const item of items) {
+        // Skip if this label (or its alias) has already been processed
+        if (processedNorms.has(norm(item.label))) continue;
+
         // Skip items with no value (unless dynamic)
         if (item.type !== 'dynamic') {
             if (item.value === undefined || item.value === null ||
@@ -159,9 +166,9 @@ export function processItems(
             }
         }
 
-        // Find matching plan-rate by alias comparison
+        // Find matching plan-rate by alias comparison (skip already processed plan rates)
         const matchingPlanRate = planRates.find((pr: any) =>
-            isAlias(item.label, pr.name)
+            !processedNorms.has(norm(pr.name)) && isAlias(item.label, pr.name)
         );
 
         if (!matchingPlanRate) continue;

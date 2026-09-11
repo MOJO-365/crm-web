@@ -21,7 +21,7 @@ export function GstManagementModal({ isOpen, onClose }: Props) {
         setConfig(getGSTConfig());
     };
 
-    const { data: dbData, loading: isLoading, refetch } = useQuery(GET_GST_RULES, {
+    const { data: dbData, loading: isLoading } = useQuery(GET_GST_RULES, {
         fetchPolicy: 'network-only',
         skip: !isOpen,
         onCompleted: (data) => {
@@ -36,7 +36,7 @@ export function GstManagementModal({ isOpen, onClose }: Props) {
         }
     });
 
-    const [saveGstRuleMutation, { loading: isSaving }] = useMutation(SAVE_GST_RULE, {
+    const [saveGstRuleMutation] = useMutation(SAVE_GST_RULE, {
         onError: (err) => {
             toast.error(err.message || 'Failed to save GST rule');
             loadConfig();

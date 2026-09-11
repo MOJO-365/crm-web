@@ -161,7 +161,6 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
     const solarFitItems = React.useMemo(() => {
         if (!mainOffer || !hasFiT) return [];
         return processItems([
-            { label: 'Feed-in', value: mainOffer.fit, type: 'fit' },
             { label: 'Feed-in Tariff', value: mainOffer.fit, type: 'fit' },
             { label: 'PREMIUM FIT', value: mainOffer.fitPeak, type: 'fitPeak' },
             { label: 'CRITICAL EVENT FIT', value: mainOffer.fitCritical, type: 'fitCritical' },
