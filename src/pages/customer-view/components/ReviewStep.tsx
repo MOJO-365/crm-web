@@ -74,7 +74,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
         : (mainOffer?.dynamicRates || []);
 
     const planRates = React.useMemo(() => {
-        const planRatesJson = customer?.plan?.ratesJson;
+        const planRatesJson = customer?.plan?.ratesJson || ratePlan?.ratesJson || payload?.plan?.ratesJson || payload?.ratesJson;
         if (!planRatesJson) return [];
         let parsed = [];
         if (typeof planRatesJson === 'object') {
@@ -87,11 +87,13 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
             }
         }
         
-        if (customer?.plan?.isDnspBased && ratePlan?.dnsp !== undefined && ratePlan?.dnsp !== null) {
-            return parsed.filter((r: any) => String(r.dnsp) === String(ratePlan.dnsp));
+        const isDnsp = customer?.plan?.isDnspBased || ratePlan?.isDnspBased || payload?.plan?.isDnspBased;
+        const dnspVal = ratePlan?.dnsp ?? customer?.plan?.dnsp;
+        if (isDnsp && dnspVal !== undefined && dnspVal !== null) {
+            return parsed.filter((r: any) => String(r.dnsp) === String(dnspVal));
         }
         return parsed;
-    }, [customer?.plan?.ratesJson, customer?.plan?.isDnspBased, ratePlan?.dnsp]);
+    }, [customer?.plan?.ratesJson, customer?.plan?.isDnspBased, customer?.plan?.dnsp, ratePlan?.ratesJson, ratePlan?.isDnspBased, ratePlan?.dnsp, payload?.plan, payload?.ratesJson]);
 
     const processItems = React.useCallback((items: any[], type: string) => {
         return sharedProcessItems(items, type, planRates);
@@ -123,30 +125,30 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
     const energyRatesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
-            { label: 'Peak', value: mainOffer.peak, type: 'peak', applyDiscount: true },
-            { label: 'Off-Peak', value: mainOffer.offPeak, type: 'offPeak', applyDiscount: true },
-            { label: 'Shoulder', value: mainOffer.shoulder, type: 'shoulder', applyDiscount: true },
-            { label: 'Anytime', value: mainOffer.anytime, type: 'anytime', applyDiscount: true },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false, description: r.description || r.info }))
+            { label: 'Peak', value: mainOffer.peak, type: 'peak', applyDiscount: false },
+            { label: 'Off-Peak', value: mainOffer.offPeak, type: 'offPeak', applyDiscount: false },
+            { label: 'Shoulder', value: mainOffer.shoulder, type: 'shoulder', applyDiscount: false },
+            { label: 'Anytime', value: mainOffer.anytime, type: 'anytime', applyDiscount: false },
+            ...parsedDynamicRates.filter((r: any) => r.type === 'energy_rates').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: false, description: r.description || r.info }))
         ], 'energy_rates');
     }, [mainOffer, parsedDynamicRates, processItems]);
 
     const supplyChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
-            { label: 'Supply Charge', value: mainOffer.supplyCharge, type: 'supplyCharge' },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
+            { label: 'Supply Charge', value: mainOffer.supplyCharge, type: 'supplyCharge', applyDiscount: false },
+            ...parsedDynamicRates.filter((r: any) => r.type === 'supply_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: false, description: r.description || r.info }))
         ], 'supply_charges');
     }, [mainOffer, parsedDynamicRates, processItems]);
 
     const demandChargesItems = React.useMemo(() => {
         if (!mainOffer) return [];
         return processItems([
-            { label: 'Demand', value: mainOffer.demand, type: 'demand', applyDiscount: true },
-            { label: 'Demand(Op)', value: mainOffer.demandOp, type: 'demandOp', applyDiscount: true },
-            { label: 'Demand(P)', value: mainOffer.demandP, type: 'demandP', applyDiscount: true },
-            { label: 'Demand(S)', value: mainOffer.demandS, type: 'demandS', applyDiscount: true },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
+            { label: 'Demand', value: mainOffer.demand, type: 'demand', applyDiscount: false },
+            { label: 'Demand(Op)', value: mainOffer.demandOp, type: 'demandOp', applyDiscount: false },
+            { label: 'Demand(P)', value: mainOffer.demandP, type: 'demandP', applyDiscount: false },
+            { label: 'Demand(S)', value: mainOffer.demandS, type: 'demandS', applyDiscount: false },
+            ...parsedDynamicRates.filter((r: any) => r.type === 'demand_charges').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: false, description: r.description || r.info }))
         ], 'demand_charges');
     }, [mainOffer, parsedDynamicRates, processItems]);
 
@@ -161,11 +163,11 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
     const solarFitItems = React.useMemo(() => {
         if (!mainOffer || !hasFiT) return [];
         return processItems([
-            { label: 'Feed-in Tariff', value: mainOffer.fit, type: 'fit' },
-            { label: 'PREMIUM FIT', value: mainOffer.fitPeak, type: 'fitPeak' },
-            { label: 'CRITICAL EVENT FIT', value: mainOffer.fitCritical, type: 'fitCritical' },
-            { label: 'BASE FIT', value: mainOffer.fitVpp, type: 'fitVpp' },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit' || r.type === 'fit' || r.type === 'extra_fit' || r.name?.toUpperCase().includes('FIT') || r.name?.toUpperCase().includes('FEED-IN')).map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }))
+            { label: 'Feed-in Tariff', value: mainOffer.fit, type: 'fit', applyDiscount: false },
+            { label: 'PREMIUM FIT', value: mainOffer.fitPeak, type: 'fitPeak', applyDiscount: false },
+            { label: 'CRITICAL EVENT FIT', value: mainOffer.fitCritical, type: 'fitCritical', applyDiscount: false },
+            { label: 'BASE FIT', value: mainOffer.fitVpp, type: 'fitVpp', applyDiscount: false },
+            ...parsedDynamicRates.filter((r: any) => r.type === 'solar_fit' || r.type === 'fit' || r.type === 'extra_fit' || r.name?.toUpperCase().includes('FIT') || r.name?.toUpperCase().includes('FEED-IN')).map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: false, description: r.description || r.info }))
         ], 'solar_fit').filter(rate => {
             const numericValue = parseFloat(String(rate.value || 0));
             if (numericValue <= 0 && !rate.isExplicitZero) return false;
@@ -179,18 +181,18 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
         if (!mainOffer) return [];
         const items = parsedDynamicRates
             .filter((r: any) => (r.type === 'fit' || r.type === 'extra_fit') && !handledTypes.includes(r.type))
-            .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }));
+            .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: false, description: r.description || r.info }));
         return processItems(items, 'extra_fit');
     }, [mainOffer, parsedDynamicRates, handledTypes, processItems]);
 
     const controlledLoadItems = React.useMemo(() => {
         if (!mainOffer || !hasCL) return [];
         return processItems([
-            { label: 'CL1 Usage', value: mainOffer.cl1Usage, type: 'cl1_usage', applyDiscount: true },
-            { label: 'CL2 Usage', value: mainOffer.cl2Usage, type: 'cl2_usage', applyDiscount: true },
-            { label: 'CL1 Supply', value: mainOffer.cl1Supply, type: 'cl1_supply', applyDiscount: true },
-            { label: 'CL2 Supply', value: mainOffer.cl2Supply, type: 'cl2_supply', applyDiscount: true },
-            ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: r.applyDiscount !== false, description: r.description || r.info }))
+            { label: 'CL1 Usage', value: mainOffer.cl1Usage, type: 'cl1_usage', applyDiscount: false },
+            { label: 'CL2 Usage', value: mainOffer.cl2Usage, type: 'cl2_usage', applyDiscount: false },
+            { label: 'CL1 Supply', value: mainOffer.cl1Supply, type: 'cl1_supply', applyDiscount: false },
+            { label: 'CL2 Supply', value: mainOffer.cl2Supply, type: 'cl2_supply', applyDiscount: false },
+            ...parsedDynamicRates.filter((r: any) => r.type === 'controlled_load').map((r: any) => ({ label: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: false, description: r.description || r.info }))
         ], 'controlled_load');
     }, [mainOffer, parsedDynamicRates, hasCL, processItems]);
 
@@ -199,7 +201,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
         const handledAll = [...handledTypes, 'fit', 'extra_fit'];
         const items = parsedDynamicRates
             .filter((r: any) => !handledAll.includes(r.type) && (!r.type || r.type === 'charges' || r.type === 'extra_charges'))
-            .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: !!r.applyDiscount, description: r.description || r.info }));
+            .map((r: any) => ({ label: r.name, name: r.name, value: r.value, type: 'dynamic', unitId: r.unitId, applyDiscount: false, description: r.description || r.info }));
         return processItems(items, 'extra_charges');
     }, [mainOffer, parsedDynamicRates, handledTypes, processItems]);
 
@@ -217,13 +219,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
         return items.map(({ category, item, fallbackUnit }) => {
             const numericValue = parseFloat(String(item.value || '0'));
 
-            let applyDiscount = false;
-            if (item.applyDiscount !== undefined) {
-                applyDiscount = !!item.applyDiscount;
-            } else if (category === 'Energy Rates' || category === 'Demand Charges' || category === 'Controlled Load') {
-                applyDiscount = true;
-            }
-
+            const applyDiscount = item.applyDiscount === true;
             const isDiscounted = applyDiscount && discount > 0;
             const price = isDiscounted ? calculateDiscountedRate(numericValue, discount) : numericValue;
 

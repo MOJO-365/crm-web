@@ -353,13 +353,14 @@ const applyPlanOverridesToOffer = (offer: any, planRatesJson: any, isDnspBased?:
                         existingDyn.value = numericRate;
                         if (pr.unit) existingDyn.unitId = pr.unit;
                         if (pr.dynamicType) existingDyn.type = String(pr.dynamicType).toLowerCase().replace(/\s+/g, '_');
+                        if (pr.applyDiscount !== undefined) existingDyn.applyDiscount = pr.applyDiscount === true;
                     } else {
                         dynamicRates.push({
                             name: pr.name,
                             value: numericRate,
                             unitId: pr.unit,
                             type: pr.dynamicType ? String(pr.dynamicType).toLowerCase().replace(/\s+/g, '_') : 'extra_charges',
-                            applyDiscount: false
+                            applyDiscount: pr.applyDiscount === true
                         });
                     }
                 }
