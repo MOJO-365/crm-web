@@ -543,7 +543,7 @@ export const AddPlanPage: React.FC = () => {
                 delete cleanComp.dnsp;
             }
             // Always include applyDiscount in saved data
-            cleanComp.applyDiscount = comp.applyDiscount !== false;
+            cleanComp.applyDiscount = comp.applyDiscount === true;
 
             if (cleanComp.rateType === 'Fixed') {
                 const hasRate = (cleanComp.rate !== undefined && cleanComp.rate !== null && String(cleanComp.rate).trim() !== '') || cleanComp.rate === 0 || cleanComp.rate === '0';

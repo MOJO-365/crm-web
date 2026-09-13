@@ -136,7 +136,7 @@ export function processItems(
             if (aliases.some(a => seenNorms.has(a))) return false;
             aliases.forEach(a => seenNorms.add(a));
             return true;
-        });
+        }).map(rate => ({ ...rate, applyDiscount: false }));
     }
 
     // ── Track which plan-rate names we've already consumed ──
@@ -175,13 +175,15 @@ export function processItems(
 
         markProcessed(item.label, matchingPlanRate.name);
 
+        const applyDiscount = matchingPlanRate.applyDiscount === true;
+
         if (matchingPlanRate.rateType === 'Fixed') {
             processed.push({
                 ...item,
                 label: matchingPlanRate.name || item.label,
                 value: matchingPlanRate.rate,
                 unitId: matchingPlanRate.unit || item.unitId,
-                applyDiscount: matchingPlanRate.applyDiscount,
+                applyDiscount: applyDiscount,
                 description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info,
                 isExplicitZero: matchingPlanRate.saveAsZero === true &&
                     (matchingPlanRate.rate === 0 || matchingPlanRate.rate === '0'),
@@ -190,7 +192,7 @@ export function processItems(
             processed.push({
                 ...item,
                 label: matchingPlanRate.name || item.label,
-                applyDiscount: matchingPlanRate.applyDiscount,
+                applyDiscount: applyDiscount,
                 description: matchingPlanRate.info || matchingPlanRate.description || item.description || item.info,
             });
         }
@@ -220,13 +222,15 @@ export function processItems(
 
         markProcessed(pr.name);
 
+        const applyDiscount = pr.applyDiscount === true;
+
         processed.push({
             label: pr.name,
             name: pr.name,
             value: pr.rate,
             type: 'dynamic',
             unitId: pr.unit,
-            applyDiscount: pr.applyDiscount !== false,
+            applyDiscount: applyDiscount,
             description: pr.info || pr.description,
             isExplicitZero: pr.saveAsZero === true && (pr.rate === 0 || pr.rate === '0'),
         });
