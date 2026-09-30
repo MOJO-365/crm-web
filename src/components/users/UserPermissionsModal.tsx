@@ -436,7 +436,31 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
                 }
             }
 
-            return { ...prev, [menuUid]: updated };
+            const newMap = { ...prev, [menuUid]: updated };
+
+            // If any sub menu is selected (value === true), auto select Module Access Control (parent canView) if not selected
+            const menu = menus.find((m: Menu) => m.uid === menuUid);
+            const parentUid = menu?.parentUid || (selectedMenuUid && currentChildMenus.some((c: Menu) => c.uid === menuUid) ? selectedMenuUid : null);
+
+            if (parentUid && value === true) {
+                const parentExisting = newMap[parentUid] || {
+                    userUid: user.uid,
+                    menuUid: parentUid,
+                    canView: null,
+                    canCreate: null,
+                    canEdit: null,
+                    canDelete: null,
+                };
+
+                if (parentExisting.canView !== true) {
+                    newMap[parentUid] = {
+                        ...parentExisting,
+                        canView: true,
+                    };
+                }
+            }
+
+            return newMap;
         });
     };
 
@@ -458,6 +482,74 @@ export const UserPermissionsModal: React.FC<UserPermissionsModalProps> = ({ isOp
                 isEnabled: value
             }
         }));
+
+        if (value === true) {
+            // Find which menu this feature belongs to
+            let featureMenuUid: string | undefined;
+            for (const menuUid of Object.keys(featuresMap)) {
+                const found = featuresMap[menuUid]?.find(f => f.uid === featureUid);
+                if (found) {
+                    featureMenuUid = found.menuUid || menuUid;
+                    break;
+                }
+            }
+
+            if (featureMenuUid) {
+                const menu = menus.find((m: Menu) => m.uid === featureMenuUid);
+                const parentUid = menu?.parentUid || (selectedMenuUid && currentChildMenus.some((c: Menu) => c.uid === featureMenuUid) ? selectedMenuUid : null);
+
+                setUserPermissionsMap(prev => {
+                    const newMap = { ...prev };
+                    if (parentUid) {
+                        const existingChild = newMap[featureMenuUid!] || {
+                            userUid: user.uid,
+                            menuUid: featureMenuUid!,
+                            canView: null,
+                            canCreate: null,
+                            canEdit: null,
+                            canDelete: null,
+                        };
+                        if (existingChild.canView !== true) {
+                            newMap[featureMenuUid!] = {
+                                ...existingChild,
+                                canView: true,
+                            };
+                        }
+
+                        const existingParent = newMap[parentUid] || {
+                            userUid: user.uid,
+                            menuUid: parentUid,
+                            canView: null,
+                            canCreate: null,
+                            canEdit: null,
+                            canDelete: null,
+                        };
+                        if (existingParent.canView !== true) {
+                            newMap[parentUid] = {
+                                ...existingParent,
+                                canView: true,
+                            };
+                        }
+                    } else if (featureMenuUid) {
+                        const existing = newMap[featureMenuUid] || {
+                            userUid: user.uid,
+                            menuUid: featureMenuUid,
+                            canView: null,
+                            canCreate: null,
+                            canEdit: null,
+                            canDelete: null,
+                        };
+                        if (existing.canView !== true) {
+                            newMap[featureMenuUid] = {
+                                ...existing,
+                                canView: true,
+                            };
+                        }
+                    }
+                    return newMap;
+                });
+            }
+        }
     };
 
 
