@@ -8,6 +8,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { Select } from '@/components/ui/Select';
 import { XIcon, EyeIcon, CheckIcon, AlertCircleIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
+import { formatDate, formatTime, formatDateTime } from '@/lib/date';
 import { toast } from 'react-toastify';
 import React from 'react';
 
@@ -608,6 +609,32 @@ export function CustomerApprovalsPage() {
             }
         }] : []),
         {
+            key: 'createdAt',
+            header: (
+                <div className="flex flex-col gap-1">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            Date
+                        </span>
+                    </div>
+                    <div className="h-7" />
+                </div>
+            ),
+            render: (row) => {
+                if (!row.createdAt) return <span className="text-muted-foreground text-xs">-</span>;
+                return (
+                    <div className="flex flex-col whitespace-nowrap" title={formatDateTime(row.createdAt)}>
+                        <span className="font-medium text-foreground text-xs">
+                            {formatDate(row.createdAt)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                            {formatTime(row.createdAt)}
+                        </span>
+                    </div>
+                );
+            }
+        },
+        {
             key: 'status',
             header: (
                 <div className="flex flex-col gap-1">
@@ -793,6 +820,8 @@ export function CustomerApprovalsPage() {
                                     <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.lastname)}</span>
                                     <span className="text-muted-foreground">DOB</span>
                                     <span className="font-medium">{renderPayloadField(selectedEnrollment.payload.dob)}</span>
+                                    <span className="text-muted-foreground">Submission Date</span>
+                                    <span className="font-medium">{selectedEnrollment.createdAt ? formatDateTime(selectedEnrollment.createdAt) : '-'}</span>
                                 </div>
                             </div>
 

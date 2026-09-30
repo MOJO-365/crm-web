@@ -29,7 +29,7 @@ import {
 import { cn } from '@/lib/utils';
 
 // Types
-import type { Menu, RolePermission, RolePermissionsModalProps } from '@/types';
+import type { Menu, RolePermission, RolePermissionsModalProps, Feature } from '@/types';
 
 // Simple Boolean Toggle Component for Role Permissions
 const PermissionToggle = ({
@@ -74,6 +74,7 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
     const [permissionsMap, setPermissionsMap] = useState<Record<string, RolePermission>>({});
     const [featurePermissionsMap, setFeaturePermissionsMap] = useState<Record<string, boolean>>({});
     const [initialFeaturePermissionsMap, setInitialFeaturePermissionsMap] = useState<Record<string, boolean>>({});
+    const [featuresMap, setFeaturesMap] = useState<Record<string, Feature[]>>({});
     const [searchQuery, setSearchQuery] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
@@ -143,6 +144,16 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
             setInitialFeaturePermissionsMap(map);
         }
     }, [roleFeatureData, isOpen]);
+
+    // Cache features per menu
+    useEffect(() => {
+        if (selectedMenuUid && featureData?.features) {
+            setFeaturesMap(prev => ({
+                ...prev,
+                [selectedMenuUid]: featureData.features
+            }));
+        }
+    }, [featureData, selectedMenuUid]);
 
     // Reset state when modal closes
     useEffect(() => {
@@ -222,7 +233,10 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
         menus.filter((m: Menu) => m.parentUid === parentUid),
         [menus]);
 
-    const currentFeatures = useMemo(() => featureData?.features || [], [featureData]);
+    const currentFeatures = useMemo(() => {
+        if (!selectedMenuUid) return [];
+        return featuresMap[selectedMenuUid] || featureData?.features || [];
+    }, [selectedMenuUid, featuresMap, featureData]);
     
     // Icon mapping for modules
     const iconMap: Record<string, any> = {
@@ -302,6 +316,16 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
                 });
             }
 
+            // If any sub menu is selected (enabled), auto select Module Access Control (parent canView) if not selected
+            const menu = menus.find((m: Menu) => m.uid === menuUid);
+            const parentUid = menu?.parentUid || (selectedMenuUid && currentChildMenus.some((c: Menu) => c.uid === menuUid) ? selectedMenuUid : null);
+            if (parentUid && value === true) {
+                const parentPerm = newMap[parentUid];
+                if (!parentPerm?.canView) {
+                    updateSingle(parentUid, 'canView', true);
+                }
+            }
+
             return newMap;
         });
     };
@@ -311,6 +335,65 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
             ...prev,
             [featureUid]: value
         }));
+
+        if (value === true) {
+            let featureMenuUid: string | undefined;
+            for (const menuUid of Object.keys(featuresMap)) {
+                const found = featuresMap[menuUid]?.find((f: Feature) => f.uid === featureUid);
+                if (found) {
+                    featureMenuUid = found.menuUid || menuUid;
+                    break;
+                }
+            }
+
+            if (featureMenuUid) {
+                const menu = menus.find((m: Menu) => m.uid === featureMenuUid);
+                const parentUid = menu?.parentUid || (selectedMenuUid && currentChildMenus.some((c: Menu) => c.uid === featureMenuUid) ? selectedMenuUid : null);
+
+                setPermissionsMap(prev => {
+                    const newMap = { ...prev };
+                    if (parentUid) {
+                        const existingChild = newMap[featureMenuUid!] || {
+                            roleUid: role.uid,
+                            menuUid: featureMenuUid!,
+                            canView: false,
+                            canCreate: false,
+                            canEdit: false,
+                            canDelete: false,
+                        };
+                        if (!existingChild.canView) {
+                            newMap[featureMenuUid!] = { ...existingChild, canView: true };
+                        }
+
+                        const existingParent = newMap[parentUid] || {
+                            roleUid: role.uid,
+                            menuUid: parentUid,
+                            canView: false,
+                            canCreate: false,
+                            canEdit: false,
+                            canDelete: false,
+                        };
+                        if (!existingParent.canView) {
+                            newMap[parentUid] = { ...existingParent, canView: true };
+                        }
+                    } else if (featureMenuUid) {
+                        const existing = newMap[featureMenuUid] || {
+                            roleUid: role.uid,
+                            menuUid: featureMenuUid,
+                            canView: false,
+                            canCreate: false,
+                            canEdit: false,
+                            canDelete: false,
+                        };
+                        if (!existing.canView) {
+                            newMap[featureMenuUid] = { ...existing, canView: true };
+                        }
+                    }
+
+                    return newMap;
+                });
+            }
+        }
     };
 
     // Select All permissions for current module and its sub-menus

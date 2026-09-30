@@ -14,6 +14,14 @@ export interface RolePermission {
     canDelete: boolean;
 }
 
+export interface Feature {
+    uid: string;
+    name: string;
+    code: string;
+    description?: string;
+    menuUid: string;
+}
+
 export interface RolePermissionsModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -23,3 +31,4 @@ export interface RolePermissionsModalProps {
         isIndependentUi?: boolean;
     };
 }
+
