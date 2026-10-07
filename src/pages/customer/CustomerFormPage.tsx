@@ -374,7 +374,11 @@ const applyPlanOverridesToOffer = (offer: any, planRatesJson: any, isDnspBased?:
             }
         });
 
-        dynamicRates = dynamicRates.filter((dr: any) => planRateNames.includes(dr.name.toUpperCase()));
+        dynamicRates = dynamicRates.filter((dr: any) => {
+            const upper = (dr.name || '').toUpperCase();
+            if (labelToKeyMap[upper]) return false;
+            return planRateNames.includes(upper);
+        });
 
         newOffer.dynamicRates = dynamicRates;
         newOffer.priceUnits = priceUnits;
@@ -2086,7 +2090,7 @@ export const CustomerFormPage = () => {
             // Send in background without awaiting so UI does not get stuck
             if (isEditMode && !isUpdateOnly && isPdrs && savedCustomer?.uid && finalStatus === 7) {
                 sendPdrsConsentEmail({ variables: { customerUid: savedCustomer.uid } })
-                    .catch((emailErr) => {
+                    .catch((emailErr: any) => {
                         console.error('[PDRS] Failed to send consent email in background:', emailErr);
                         toast.error('PDRS consent email failed to send');
                     });
