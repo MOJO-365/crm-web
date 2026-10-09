@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
-import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, SEND_OFFER_EMAIL, SEND_PDRS_CONSENT_EMAIL, GET_PEERLESS_COMPANY_NAMES, GET_WEB_API_CREDENTIALS } from '@/graphql';
+import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, DELETE_WEB_ENROLLMENT, SEND_OFFER_EMAIL, SEND_PDRS_CONSENT_EMAIL, GET_PEERLESS_COMPANY_NAMES, GET_WEB_API_CREDENTIALS } from '@/graphql';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Select } from '@/components/ui/Select';
-import { XIcon, EyeIcon, CheckIcon, AlertCircleIcon } from '@/components/icons';
+import { XIcon, EyeIcon, CheckIcon, AlertCircleIcon, TrashIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTime, formatDateTime } from '@/lib/date';
 import { toast } from 'react-toastify';
+import { useAuthStore } from '@/stores/useAuthStore';
 import React from 'react';
 
 interface WebEnrollment {
@@ -59,6 +60,8 @@ const INITIAL_FILTERS: SearchFilters = {
 };
 
 export function CustomerApprovalsPage() {
+    const canDeleteApproval = useAuthStore((state) => state.hasFeatureAccess('feature_delete_customer_approvals'));
+
     const [filters, setFilters] = useState<SearchFilters>(INITIAL_FILTERS);
     const [debouncedFilters, setDebouncedFilters] = useState<SearchFilters>(INITIAL_FILTERS);
     const [page, setPage] = useState(1);
@@ -66,6 +69,10 @@ export function CustomerApprovalsPage() {
     const [selectedEnrollment, setSelectedEnrollment] = useState<WebEnrollment | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [enrollmentToDelete, setEnrollmentToDelete] = useState<WebEnrollment | null>(null);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [deletingUid, setDeletingUid] = useState<string | null>(null);
     const [approvingUid, setApprovingUid] = useState<string | null>(null);
     const [rejectingUid, setRejectingUid] = useState<string | null>(null);
     const [enrollmentToReject, setEnrollmentToReject] = useState<WebEnrollment | null>(null);
@@ -207,20 +214,36 @@ export function CustomerApprovalsPage() {
         }
     });
 
+    const [deleteMutation, { loading: deleting }] = useMutation(DELETE_WEB_ENROLLMENT, {
+        onCompleted: () => {
+            toast.success('Customer approval deleted successfully');
+            refetch();
+            setIsModalOpen(false);
+            setIsDeleteDialogOpen(false);
+            setEnrollmentToDelete(null);
+            setDeleteConfirmText('');
+            setDeletingUid(null);
+        },
+        onError: (error) => {
+            toast.error(`Delete failed: ${error.message}`);
+            setDeletingUid(null);
+        }
+    });
+
     const handleView = (enrollment: WebEnrollment) => {
         setSelectedEnrollment(enrollment);
         setIsModalOpen(true);
     };
 
     const handleApprove = (enrollment: WebEnrollment, sendEmail: boolean = false) => {
-        if (approving || rejecting) return;
+        if (approving || rejecting || deleting) return;
         setApprovingUid(enrollment.uid);
         setIsSendingEmail(sendEmail);
         approveMutation({ variables: { uid: enrollment.uid } });
     };
 
     const handleReject = (enrollment: WebEnrollment) => {
-        if (approving || rejecting) return;
+        if (approving || rejecting || deleting) return;
         setEnrollmentToReject(enrollment);
         setIsRejectDialogOpen(true);
     };
@@ -230,6 +253,38 @@ export function CustomerApprovalsPage() {
         setRejectingUid(enrollmentToReject.uid);
         rejectMutation({ variables: { uid: enrollmentToReject.uid } });
     };
+
+    const handleDeleteClick = (enrollment: WebEnrollment) => {
+        if (approving || rejecting || deleting) return;
+        setEnrollmentToDelete(enrollment);
+        setDeleteConfirmText('');
+        setIsDeleteDialogOpen(true);
+    };
+
+    const handleConfirmDelete = () => {
+        if (!enrollmentToDelete) return;
+        setDeletingUid(enrollmentToDelete.uid);
+        deleteMutation({ variables: { uid: enrollmentToDelete.uid } });
+    };
+
+    const getCustomerDisplayName = (enrollment: WebEnrollment | null) => {
+        if (!enrollment?.payload) return 'this customer';
+        const { title, firstname, lastname, first_name, last_name, email } = enrollment.payload;
+        const fName = firstname || first_name;
+        const lName = lastname || last_name;
+        const fullName = [title, fName, lName].filter(v => v && typeof v !== 'object').join(' ');
+        return fullName.trim() || email || 'this customer';
+    };
+
+    const targetNmi = enrollmentToDelete?.payload?.nmi ? String(enrollmentToDelete.payload.nmi).trim() : '';
+    const targetCustomerName = enrollmentToDelete ? getCustomerDisplayName(enrollmentToDelete) : '';
+    const targetConfirmValue = targetNmi || (targetCustomerName !== 'this customer' ? targetCustomerName : 'DELETE');
+
+    const isDeleteConfirmValid = !!enrollmentToDelete && (
+        (targetNmi && deleteConfirmText.trim().toLowerCase() === targetNmi.toLowerCase()) ||
+        (targetCustomerName && targetCustomerName !== 'this customer' && deleteConfirmText.trim().toLowerCase() === targetCustomerName.toLowerCase()) ||
+        deleteConfirmText.trim().toUpperCase() === 'DELETE'
+    );
 
     const handleFilterChange = (key: keyof SearchFilters, value: string) => {
         setFilters(prev => {
@@ -700,6 +755,20 @@ export function CustomerApprovalsPage() {
                             <EyeIcon size={16} />
                         </Button>
                     </Tooltip>
+                    {canDeleteApproval && (
+                        <Tooltip content="Delete Permanently">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                onClick={() => handleDeleteClick(row)}
+                                isLoading={deletingUid === row.uid}
+                                disabled={(approving || rejecting || deleting) && deletingUid !== row.uid}
+                            >
+                                {deletingUid !== row.uid && <TrashIcon size={16} />}
+                            </Button>
+                        </Tooltip>
+                    )}
                     {row.processed === 0 && (
                         <>
                             <Tooltip content="Approve & Integrate">
@@ -996,8 +1065,20 @@ export function CustomerApprovalsPage() {
                                 >
                                     Reject
                                 </Button>
-
                             </div>
+                        )}
+                        {canDeleteApproval && selectedEnrollment && (
+                            <Button
+                                variant="destructive"
+                                onClick={() => {
+                                    const toDelete = selectedEnrollment;
+                                    setIsModalOpen(false);
+                                    handleDeleteClick(toDelete);
+                                }}
+                                disabled={approving || rejecting || deleting}
+                            >
+                                Delete
+                            </Button>
                         )}
                     </div>
                 </div>
@@ -1043,6 +1124,64 @@ export function CustomerApprovalsPage() {
                         >
                             Cancel
                         </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={isDeleteDialogOpen}
+                onClose={() => !deleting && setIsDeleteDialogOpen(false)}
+                title="Delete Customer Approval Permanently"
+                size="sm"
+                footer={
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsDeleteDialogOpen(false)}
+                            disabled={deleting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="text-white bg-red-600 hover:bg-red-700 shadow-sm"
+                            onClick={handleConfirmDelete}
+                            isLoading={deleting || deletingUid === enrollmentToDelete?.uid}
+                            disabled={!isDeleteConfirmValid || deleting}
+                            loadingText="Deleting..."
+                        >
+                            Delete
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                        <p className="mb-3">
+                            Are you sure you want to completely delete customer approval for{' '}
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                                {getCustomerDisplayName(enrollmentToDelete)}
+                            </span>?
+                        </p>
+                        <div className="border p-3 rounded-lg flex items-start gap-3 mb-4 bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-900/50">
+                            <AlertCircleIcon size={18} className="text-red-500 shrink-0 mt-0.5" />
+                            <p className="text-xs text-red-900 dark:text-red-300 font-medium">
+                                CRITICAL: This will permanently remove this customer approval record from the database. This action CANNOT be undone.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase text-muted-foreground">
+                                To confirm, type <span className="text-foreground tracking-wider select-all font-bold">{targetConfirmValue}</span> below:
+                            </label>
+                            <Input
+                                placeholder={`Type ${targetNmi ? 'NMI' : 'Customer Name'} here...`}
+                                value={deleteConfirmText}
+                                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                className="border-red-200 focus:border-red-500 focus:ring-red-500/20"
+                                autoFocus
+                            />
+                        </div>
                     </div>
                 </div>
             </Modal>

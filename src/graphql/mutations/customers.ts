@@ -355,6 +355,12 @@ export const REJECT_WEB_ENROLLMENT = gql`
     }
 `;
 
+export const DELETE_WEB_ENROLLMENT = gql`
+    mutation DeleteWebEnrollment($uid: String!) {
+        deleteWebEnrollment(uid: $uid)
+    }
+`;
+
 export const ASSIGN_CUSTOMER = gql`
     mutation AssignCustomer($uid: String!, $userUid: String!) {
         assignCustomer(uid: $uid, userUid: $userUid) {
