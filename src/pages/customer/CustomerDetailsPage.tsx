@@ -2519,7 +2519,8 @@ const InlineMaintenanceNotes = ({
         const previousValue = selectedCustomerDetails.msatDetails?.msatConnected;
         const now = new Date().toISOString();
 
-        const vppOn = selectedCustomerDetails.vppDetails?.vppConnected === 1;
+        const isVppApplicable = selectedCustomerDetails.vppDetails?.vpp === 1;
+        const vppOn = !isVppApplicable || selectedCustomerDetails.vppDetails?.vppConnected === 1;
         const utilmateOn = selectedCustomerDetails.utilmateDetails?.utilmateConnected === 1;
         const isSigned = (!!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2) || selectedCustomerDetails.isWithoutSignature === 1;
         const newStatus = (newValue && vppOn && utilmateOn && isSigned) ? 9 : undefined;
@@ -2660,7 +2661,8 @@ const InlineMaintenanceNotes = ({
             }
 
             const now = new Date().toISOString();
-            const vppOn = selectedCustomerDetails.vppDetails?.vppConnected === 1;
+            const isVppApplicable = selectedCustomerDetails.vppDetails?.vpp === 1;
+            const vppOn = !isVppApplicable || selectedCustomerDetails.vppDetails?.vppConnected === 1;
             const msatOn = selectedCustomerDetails.msatDetails?.msatConnected === 1;
             const isSigned = (!!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2) || selectedCustomerDetails.isWithoutSignature === 1;
             const newStatus = (vppOn && msatOn && isSigned) ? 9 : undefined;
@@ -2708,7 +2710,8 @@ const InlineMaintenanceNotes = ({
         setIsSkippingUtilmate(true);
         try {
             const now = new Date().toISOString();
-            const vppOn = selectedCustomerDetails.vppDetails?.vppConnected === 1;
+            const isVppApplicable = selectedCustomerDetails.vppDetails?.vpp === 1;
+            const vppOn = !isVppApplicable || selectedCustomerDetails.vppDetails?.vppConnected === 1;
             const msatOn = selectedCustomerDetails.msatDetails?.msatConnected === 1;
             const isSigned = (!!selectedCustomerDetails.signDate && selectedCustomerDetails.status > 2) || selectedCustomerDetails.isWithoutSignature === 1;
             const newStatus = (vppOn && msatOn && isSigned) ? 9 : undefined;
