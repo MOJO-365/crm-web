@@ -520,6 +520,11 @@ export const GET_CUSTOMERS_CURSOR = gql`
                     name
                 }
                 referenceId
+                createdAt
+                leadCreatedAt
+                portalCreatedAt
+                originType
+                firstAddedAt
             }
             pageInfo {
                 hasNextPage

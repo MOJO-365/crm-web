@@ -19,6 +19,7 @@ import BulkEmailModal from './BulkEmailModal';
 import { DNSP_OPTIONS, DISCOUNT_OPTIONS, CUSTOMER_STATUS_OPTIONS, VPP_OPTIONS, VPP_CONNECTED_OPTIONS, ULTIMATE_STATUS_OPTIONS, MSAT_CONNECTED_OPTIONS } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { formatDateTime } from '@/lib/date';
 
 interface CustomerAddress {
     id: string;
@@ -87,6 +88,10 @@ interface Customer {
     isPartner?: number;
     source?: string;
     referralName?: string;
+    leadCreatedAt?: string;
+    portalCreatedAt?: string;
+    originType?: string;
+    firstAddedAt?: string;
 }
 
 interface PageInfo {
@@ -816,44 +821,97 @@ export function CustomersPage() {
                     }
                 }
 
-                if (displayPortal) {
-                    if (row.referenceId) {
-                        return (
-                            <Tooltip content={`Ref ID: ${row.referenceId}`} position="top">
-                                <span className="text-foreground text-xs font-medium cursor-help border-b border-dashed border-muted-foreground hover:text-primary transition-colors">
-                                    {displayPortal}
-                                </span>
-                            </Tooltip>
-                        );
-                    }
+                const displayText = displayPortal || row.source || '-';
+                if (displayText === '-') {
                     return (
                         <span className="text-foreground text-xs font-medium">
-                            {displayPortal}
+                            -
                         </span>
                     );
                 }
 
-                if (row.source) {
-                    if (row.source === 'Referral' && row.referralName) {
-                        return (
-                            <Tooltip content={`Referred by: ${row.referralName}`} position="top">
-                                <span className="text-foreground text-xs font-medium cursor-help border-b border-dashed border-muted-foreground hover:text-primary transition-colors">
-                                    Referral
-                                </span>
-                            </Tooltip>
-                        );
-                    }
-                    return (
-                        <span className="text-foreground text-xs font-medium">
-                            {row.source}
-                        </span>
-                    );
-                }
+                // Determine origin: 'Customer Portals', 'Leads', or 'Direct'
+                const origin = row.originType || (row.leadCreatedAt || row.leadUid ? 'Leads' : (row.portalCreatedAt || displayPortal || row.portalName ? 'Customer Portals' : 'Direct'));
+                const isLeads = origin === 'Leads';
+                const isCustomerPortals = origin === 'Customer Portals';
+
+                // Determine earliest insertion date across all sources
+                const leadDate = row.leadCreatedAt ? new Date(row.leadCreatedAt) : null;
+                const portalDate = row.portalCreatedAt ? new Date(row.portalCreatedAt) : null;
+                const createdDate = row.createdAt ? new Date(row.createdAt) : null;
+
+                // Candidate dates
+                const allDates = [leadDate, portalDate, createdDate].filter((d): d is Date => d !== null);
+                const earliestDate = allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : createdDate;
+
+                // Check whether portal/lead was the original entry or if customer was created in CRM first
+                const portalCameFirst = portalDate && createdDate && portalDate.getTime() < createdDate.getTime();
+                const leadCameFirst = leadDate && createdDate && leadDate.getTime() < createdDate.getTime();
+                const crmCameFirst = createdDate && (
+                    (portalDate && createdDate.getTime() < portalDate.getTime()) ||
+                    (leadDate && createdDate.getTime() < leadDate.getTime())
+                );
+
+                const tooltipContent = (
+                    <div className="flex flex-col gap-1.5 text-left text-xs min-w-[210px] text-slate-100">
+                        {row.referralName && (
+                            <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-700/60">
+                                <span className="text-slate-400 font-medium text-[11px]">Referred by:</span>
+                                <span className="text-amber-400 font-bold text-xs">{row.referralName}</span>
+                            </div>
+                        )}
+                        {row.referenceId && (
+                            <div className="flex items-center justify-between gap-2 text-[11px]">
+                                <span className="text-slate-400">Ref ID:</span>
+                                <span className="text-slate-200 font-mono font-medium">{row.referenceId}</span>
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between gap-2 pt-0.5">
+                            <span className="text-slate-400 text-[11px]">Origin:</span>
+                            <span className={cn(
+                                "text-[11px] font-bold px-2 py-0.5 rounded-full border shadow-sm",
+                                isLeads ? "bg-blue-950/80 text-blue-300 border-blue-500/50" :
+                                isCustomerPortals ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/50" :
+                                "bg-purple-950/80 text-purple-300 border-purple-500/50"
+                            )}>
+                                {origin}
+                            </span>
+                        </div>
+                        {/* Primary Date: When the entry was first inserted/added */}
+                        <div className="flex flex-col gap-0.5 pt-1 border-t border-slate-700/60">
+                            <span className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider">
+                                {portalCameFirst ? 'Added in Customer Portals' :
+                                 leadCameFirst ? 'Added in Leads' :
+                                 crmCameFirst ? 'First Added (CRM)' :
+                                 (isLeads ? 'Added in Leads' : isCustomerPortals ? 'Added in Customer Portals' : 'First Added')}
+                            </span>
+                            <span className="font-semibold text-slate-100 text-xs">
+                                {formatDateTime(earliestDate || row.createdAt)}
+                            </span>
+                        </div>
+                        {/* Secondary Event: Customer Approved / Created in CRM (if portal/lead came first) */}
+                        {(portalCameFirst || leadCameFirst) && row.createdAt && (
+                            <div className="flex items-center justify-between gap-2 text-[10px] text-slate-400 pt-1 border-t border-slate-700/60">
+                                <span>Customer Approved:</span>
+                                <span className="text-slate-300 font-medium">{formatDateTime(row.createdAt)}</span>
+                            </div>
+                        )}
+                        {/* Secondary Event: Portal submission received later (if CRM was created first) */}
+                        {crmCameFirst && portalDate && (
+                            <div className="flex items-center justify-between gap-2 text-[10px] text-slate-400 pt-1 border-t border-slate-700/60">
+                                <span>Portal Form Received:</span>
+                                <span className="text-slate-300 font-medium">{formatDateTime(portalDate)}</span>
+                            </div>
+                        )}
+                    </div>
+                );
 
                 return (
-                    <span className="text-foreground text-xs font-medium">
-                        -
-                    </span>
+                    <Tooltip content={tooltipContent} position="top" className="!bg-slate-900 !text-slate-100 !border-slate-700/80 !shadow-2xl !p-3 !rounded-lg">
+                        <span className="text-foreground text-xs font-medium cursor-help border-b border-dashed border-muted-foreground hover:text-primary transition-colors">
+                            {displayText}
+                        </span>
+                    </Tooltip>
                 );
             },
         },
