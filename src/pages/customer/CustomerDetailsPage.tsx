@@ -1769,12 +1769,14 @@ const InlineMaintenanceNotes = ({
         const baseUrl = apiAxios.defaults.baseURL || '';
 
         let apiPath = '';
-        let fileName = 'Offer_Preview.html';
+        const customerName = selectedCustomerDetails ? (`${selectedCustomerDetails.firstName || ''} ${selectedCustomerDetails.lastName || ''}`.trim() || selectedCustomerDetails.businessName || selectedCustomerDetails.customerId || 'Customer') : 'Customer';
+        const safeCustomerName = customerName.replace(/[^\w\s-]/g, '').trim() || 'Customer';
+        let fileName = `GEE Power & Gas Agreement - ${safeCustomerName}.html`;
 
         if (selectedCustomerDetails && selectedCustomerDetails.status > 2 && selectedCustomerDetails.signedPdfPath) {
             const path = selectedCustomerDetails.signedPdfPath;
             apiPath = `/documents/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
-            fileName = path.split('/').pop() || 'document.pdf';
+            fileName = `GEE Power & Gas Agreement - ${safeCustomerName}.pdf`;
         } else {
             apiPath = `/agreement/preview/${uid}?format=html`;
         }
@@ -1880,7 +1882,14 @@ const InlineMaintenanceNotes = ({
             formData.append('name', docName);
             if (startDate) formData.append('startDate', startDate);
             if (endDate) formData.append('endDate', endDate);
-            formData.append('file', file);
+
+            let uploadFileObj = file;
+            const customerNameForFile = (`${selectedCustomerDetails.firstName || ''} ${selectedCustomerDetails.lastName || ''}`.trim() || selectedCustomerDetails.businessName || 'Customer');
+            if (/jaimin\s*patel/i.test(file.name)) {
+                const cleanedName = file.name.replace(/jaimin\s*patel/gi, customerNameForFile);
+                uploadFileObj = new File([file], cleanedName, { type: file.type });
+            }
+            formData.append('file', uploadFileObj);
 
             await apiAxios.post('/documents/upload', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
