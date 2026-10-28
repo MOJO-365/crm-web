@@ -785,8 +785,21 @@ export const CustomerFormPage = () => {
 
     const tariffOptions = useMemo(() => {
         if (!formData.state) return [];
-        return ratePlans
+
+        const currentTargetUid = selectedRatePlan?.uid || customerData?.customer?.ratePlanUid || customerData?.customer?.ratePlan?.uid;
+        const currentTargetCode = formData.tariffCode || customerData?.customer?.tariffCode;
+
+        const options = ratePlans
             .filter(rp => {
+                // ALWAYS include the customer's currently assigned or selected rate plan regardless of filters
+                const isCurrentAssignedPlan = Boolean(
+                    (currentTargetUid && rp.uid === currentTargetUid) ||
+                    (currentTargetCode && (rp.codes === currentTargetCode || rp.tariff === currentTargetCode))
+                );
+                if (isCurrentAssignedPlan) {
+                    return true;
+                }
+
                 const stateMatch = rp.state?.toLowerCase() === formData.state?.toLowerCase();
                 const activeMatch = !rp.isDeleted && rp.isActive !== false;
                 
@@ -808,12 +821,30 @@ export const CustomerFormPage = () => {
 
                 return stateMatch && activeMatch && propertyTypeMatch;
             })
-            .map(rp => ({
-                value: rp.uid, // Use UID as unique value to avoid selection ambiguity in the UI
-                label: `${rp.codes} - ${rp.tariff} (${rp.state})`,
-                codeString: rp.codes, // Preserve code string for matching logic
-            }));
-    }, [ratePlans, formData.state, formData.propertyType]);
+            .map(rp => {
+                const isTypeMismatch = rp.type !== undefined && rp.type !== null && parseInt(String(rp.type)) !== formData.propertyType;
+                const typeLabel = isTypeMismatch ? ` [${RATE_TYPE_MAP[rp.type] || 'Other'}]` : '';
+                const legacyLabel = (rp.isDeleted || rp.isActive === false) ? ' [Legacy]' : '';
+                return {
+                    value: rp.uid, // Use UID as unique value to avoid selection ambiguity in the UI
+                    label: `${rp.codes} - ${rp.tariff} (${rp.state})${typeLabel}${legacyLabel}`,
+                    codeString: rp.codes, // Preserve code string for matching logic
+                };
+            });
+
+        // Ensure selectedRatePlan is always selectable in the dropdown even if not in ratePlans array
+        if (selectedRatePlan && !options.some(opt => opt.value === selectedRatePlan.uid)) {
+            const isTypeMismatch = selectedRatePlan.type !== undefined && selectedRatePlan.type !== null && parseInt(String(selectedRatePlan.type)) !== formData.propertyType;
+            const typeLabel = isTypeMismatch ? ` [${RATE_TYPE_MAP[selectedRatePlan.type] || 'Other'}]` : '';
+            options.unshift({
+                value: selectedRatePlan.uid,
+                label: `${selectedRatePlan.codes || selectedRatePlan.tariff} - ${selectedRatePlan.tariff || ''} (${selectedRatePlan.state || formData.state || ''})${typeLabel}`,
+                codeString: selectedRatePlan.codes || selectedRatePlan.tariff,
+            });
+        }
+
+        return options;
+    }, [ratePlans, formData.state, formData.propertyType, selectedRatePlan, customerData?.customer, formData.tariffCode]);
 
     const countryOptions = useMemo(() => {
         return getData().map((country) => ({
@@ -961,11 +992,51 @@ export const CustomerFormPage = () => {
     useEffect(() => {
         if (customerData?.customer && ratePlans.length > 0 && initializedRatePlanForUid.current !== uid) {
             const c = customerData.customer;
-            if (c.tariffCode) {
-                const rp = (c.ratePlan?.uid)
-                    ? ratePlans.find((r: any) => r.uid === c.ratePlan?.uid)
-                    : ratePlans.find((r: any) => r.codes === c.tariffCode);
-                if (rp) setSelectedRatePlan(rp);
+            console.log('[TARIFF DEBUG] === Initial Rate Plan Selection ===');
+            console.log('[TARIFF DEBUG] Customer tariffCode:', c.tariffCode);
+            console.log('[TARIFF DEBUG] Customer ratePlanUid:', c.ratePlanUid);
+            console.log('[TARIFF DEBUG] Customer ratePlan?.uid:', c.ratePlan?.uid);
+            console.log('[TARIFF DEBUG] Customer rateVersion:', c.rateVersion);
+            console.log('[TARIFF DEBUG] Customer state:', c.address?.state);
+            console.log('[TARIFF DEBUG] Customer propertyType:', c.propertyType);
+            console.log('[TARIFF DEBUG] formData.state:', formData.state);
+            console.log('[TARIFF DEBUG] formData.propertyType:', formData.propertyType);
+            console.log('[TARIFF DEBUG] Total ratePlans loaded:', ratePlans.length);
+            console.log('[TARIFF DEBUG] Total tariffOptions available:', tariffOptions.length);
+            console.log('[TARIFF DEBUG] tariffOptions:', JSON.stringify(tariffOptions.map(o => ({ value: o.value, label: o.label, codeString: o.codeString })).slice(0, 10)));
+            console.log('[TARIFF DEBUG] First 5 ratePlans codes:', ratePlans.slice(0, 5).map((r: any) => ({ uid: r.uid, codes: r.codes, state: r.state, type: r.type, isDeleted: r.isDeleted, isActive: r.isActive })));
+            
+            const targetUid = c.ratePlanUid || c.ratePlan?.uid;
+            const targetCode = c.tariffCode;
+
+            if (targetUid || targetCode) {
+                let rp = targetUid ? ratePlans.find((r: any) => r.uid === targetUid) : null;
+                if (!rp && targetCode) {
+                    rp = ratePlans.find((r: any) => r.codes === targetCode || r.tariff === targetCode);
+                }
+                if (!rp && targetCode) {
+                    rp = ratePlans.find((r: any) => r.codes?.includes(targetCode) || targetCode?.includes(r.codes));
+                }
+                if (!rp && c.ratePlan) {
+                    rp = c.ratePlan;
+                }
+                if (!rp && (c as any).ratesHistory?.[0]?.rateSnapshot) {
+                    rp = (c as any).ratesHistory[0].rateSnapshot;
+                }
+
+                if (rp) {
+                    console.log('[TARIFF DEBUG] ✅ Setting selectedRatePlan:', rp.uid, rp.codes);
+                    setSelectedRatePlan(rp);
+                    setFormData(prev => ({
+                        ...prev,
+                        tariffCode: rp.codes || rp.tariff || prev.tariffCode,
+                        ratePlanUid: rp.uid || prev.ratePlanUid
+                    }));
+                } else {
+                    console.log('[TARIFF DEBUG] ❌ No matching rate plan found for:', { targetUid, targetCode });
+                }
+            } else {
+                console.log('[TARIFF DEBUG] ⚠️ Customer has no tariffCode or ratePlanUid set');
             }
             initializedRatePlanForUid.current = uid || null;
         }
@@ -1553,6 +1624,20 @@ export const CustomerFormPage = () => {
 
     // Clear tariff code if it doesn't match available options for current state/vpp
     useEffect(() => {
+        // Skip clearing during initial load in edit mode — let the rate plan init effect run first
+        // This prevents a race condition where historic rates are still loading and tariffOptions is empty/stale
+        if (isEditMode && initializedRatePlanForUid.current !== uid) return;
+
+        // In edit mode, do NOT clear the customer's original saved rate plan
+        if (isEditMode && customerData?.customer) {
+            const initialPlanUid = customerData.customer.ratePlanUid || customerData.customer.ratePlan?.uid;
+            const initialTariffCode = customerData.customer.tariffCode;
+            if ((initialPlanUid && selectedRatePlan?.uid === initialPlanUid) ||
+                (initialTariffCode && formData.tariffCode === initialTariffCode)) {
+                return;
+            }
+        }
+
         // Only run if we have rate plans loaded (to avoid clearing on initial mount while loading)
         // AND we have a state selected (since tariffOptions depends on state)
         if (ratePlans.length > 0 && formData.state && formData.tariffCode) {
@@ -1565,7 +1650,7 @@ export const CustomerFormPage = () => {
                 setSelectedRatePlan(null);
             }
         }
-    }, [tariffOptions, ratePlans.length, formData.state, formData.vpp, formData.tariffCode, selectedRatePlan]);
+    }, [tariffOptions, ratePlans.length, formData.state, formData.vpp, formData.tariffCode, selectedRatePlan, isEditMode, customerData?.customer, uid]);
 
     const [touched, setTouched] = useState<Record<string, boolean>>({});
 
