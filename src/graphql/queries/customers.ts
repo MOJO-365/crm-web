@@ -1100,6 +1100,7 @@ export const GET_CUSTOMER_VPP_CERTIFICATE_DETAILS = gql`
                 id
                 certificateNo
                 issueDate
+                solarCapacity
                 batteryManufacturer
                 batteryModel
                 batterySerialNumber
@@ -1133,6 +1134,10 @@ export const GET_CUSTOMER_VPP_CERTIFICATE_DETAILS = gql`
                 isAllRequiredFilled
                 isVppCertificateEmailSent
                 isVppCertificateEmailSentAt
+            }
+            solarDetails {
+                solarcapacity
+                invertercapacity
             }
             batteryDetails {
                 batterybrand

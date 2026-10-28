@@ -52,6 +52,7 @@ export function VppCertificateTab({
 
     const [formState, setFormState] = useState({
         issueDate: '',
+        solarCapacity: '',
         batteryManufacturer: '',
         batteryModel: '-',
         batterySerialNumber: '',
@@ -207,6 +208,7 @@ export function VppCertificateTab({
         if (data?.customer) {
             const v = data.customer.vppCertificateDetails;
             const b = data.customer.batteryDetails;
+            const s = data.customer.solarDetails;
 
             const batteryMake = resolveBatteryMakeName(v?.batteryManufacturer || b?.batterybrand || '');
             const inverterMake = resolveInverterMakeName(v?.inverterManufacturer || '');
@@ -215,6 +217,7 @@ export function VppCertificateTab({
                 setFormState(prev => ({
                     ...prev,
                     issueDate: v?.issueDate ? formatIssueDateStr(v.issueDate) : (prev.issueDate || new Date().toISOString().split('T')[0]),
+                    solarCapacity: v?.solarCapacity?.toString() || s?.solarcapacity?.toString() || solarDetails?.solarcapacity?.toString() || prev.solarCapacity || '',
                     batteryManufacturer: batteryMake || prev.batteryManufacturer,
                     batteryModel: (v?.batteryModel && v.batteryModel.trim() !== '') ? v.batteryModel : (b?.batterymodel && b.batterymodel.trim() !== '' ? b.batterymodel : (prev.batteryModel || '-')),
                     batterySerialNumber: v?.batterySerialNumber || b?.snnumber || prev.batterySerialNumber || '',
@@ -224,7 +227,7 @@ export function VppCertificateTab({
                     inverterManufacturer: inverterMake || prev.inverterManufacturer,
                     inverterModel: (v?.inverterModel && v.inverterModel.trim() !== '') ? v.inverterModel : (prev.inverterModel || '-'),
                     inverterSnNumbers: v?.inverterSnNumbers || prev.inverterSnNumbers || '',
-                    inverterCapacity: v?.inverterCapacity?.toString() || b?.inverterCapacity?.toString() || solarDetails?.invertercapacity?.toString() || prev.inverterCapacity || '',
+                    inverterCapacity: v?.inverterCapacity?.toString() || b?.inverterCapacity?.toString() || s?.invertercapacity?.toString() || solarDetails?.invertercapacity?.toString() || prev.inverterCapacity || '',
                     isLifeSupportEquipment: v?.isLifeSupportEquipment ?? prev.isLifeSupportEquipment ?? 0,
                     ifYesDetails: v?.ifYesDetails || prev.ifYesDetails || '',
                     internetConnectionType: v?.internetConnectionType ?? prev.internetConnectionType ?? 0,
@@ -401,6 +404,7 @@ export function VppCertificateTab({
             batteryModel: (formState.batteryModel && formState.batteryModel.trim() !== '') ? formState.batteryModel : '-',
             inverterModel: (formState.inverterModel && formState.inverterModel.trim() !== '') ? formState.inverterModel : '-',
             testResult: effectiveTestResult,
+            solarCapacity: formState.solarCapacity ? parseFloat(formState.solarCapacity) : null,
             batteryUsableCapacity: formState.batteryUsableCapacity ? parseFloat(formState.batteryUsableCapacity) : null,
             inverterCapacity: formState.inverterCapacity ? parseFloat(formState.inverterCapacity) : null,
             batteryInstalledDate: formState.batteryInstalledDate ? new Date(formState.batteryInstalledDate).toISOString() : null,
@@ -639,11 +643,25 @@ export function VppCertificateTab({
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-foreground">Solar Capacity (kW)</label>
-                                        <Input value={solarDetails?.solarcapacity ? `${solarDetails.solarcapacity} kW` : '-'} disabled={true} />
+                                        <Input
+                                            type="number"
+                                            step="any"
+                                            placeholder="e.g. 6.6"
+                                            name="solarCapacity"
+                                            value={formState.solarCapacity}
+                                            onChange={handleChange}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-foreground">Inverter Capacity (kW)</label>
-                                        <Input value={solarDetails?.invertercapacity ? `${solarDetails.invertercapacity} kW` : '-'} disabled={true} />
+                                        <Input
+                                            type="number"
+                                            step="any"
+                                            placeholder="e.g. 5.0"
+                                            name="inverterCapacity"
+                                            value={formState.inverterCapacity}
+                                            onChange={handleChange}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-foreground">Issue Date</label>

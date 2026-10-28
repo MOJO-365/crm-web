@@ -302,6 +302,7 @@ export const GENERATE_VPP_CERTIFICATE = gql`
         id
         certificateNo
         issueDate
+        solarCapacity
         batteryManufacturer
         batteryModel
         batterySerialNumber
