@@ -25,6 +25,20 @@ interface VppCertificateTabProps {
     handleSaveVppDetails?: () => void;
 }
 
+const formatIssueDateStr = (val?: any): string => {
+    if (!val) return '';
+    if (typeof val === 'string') {
+        const match = val.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (match) return match[1];
+    }
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+};
+
 export function VppCertificateTab({
     customerUid,
     onUpdate,
@@ -37,14 +51,15 @@ export function VppCertificateTab({
     });
 
     const [formState, setFormState] = useState({
+        issueDate: '',
         batteryManufacturer: '',
-        batteryModel: '',
+        batteryModel: '-',
         batterySerialNumber: '',
         batteryInstalledDate: '',
         batteryUsableCapacity: '',
         batteryPortConnected: 0,
         inverterManufacturer: '',
-        inverterModel: '',
+        inverterModel: '-',
         inverterSnNumbers: '',
         inverterCapacity: '',
         isLifeSupportEquipment: 0,
@@ -76,7 +91,7 @@ export function VppCertificateTab({
         let capacityUpdate = {};
 
         if (field === 'batteryManufacturer') {
-            const makeObj = makesData?.batteryMakes?.find((m: any) => m.make === value);
+            const makeObj = makesData?.batteryMakes?.find((m: any) => m.make === value || m.uid === value);
             if (makeObj?.batteryUsableCapacity) {
                 capacityUpdate = { batteryUsableCapacity: makeObj.batteryUsableCapacity.toString() };
             }
@@ -85,7 +100,7 @@ export function VppCertificateTab({
         setFormState(prev => ({
             ...prev,
             [field]: value,
-            [field === 'batteryManufacturer' ? 'batteryModel' : 'inverterModel']: '',
+            [field === 'batteryManufacturer' ? 'batteryModel' : 'inverterModel']: '-',
             ...capacityUpdate
         }));
     };
@@ -100,8 +115,12 @@ export function VppCertificateTab({
         label: m.make
     })) || [];
 
-    const selectedBatteryMake = makesData?.batteryMakes?.find((m: any) => m.make?.toLowerCase() === formState.batteryManufacturer?.toLowerCase());
-    const selectedInverterMake = inverterMakesData?.inverterMakes?.find((m: any) => m.make?.toLowerCase() === formState.inverterManufacturer?.toLowerCase());
+    const selectedBatteryMake = makesData?.batteryMakes?.find((m: any) =>
+        m.uid === formState.batteryManufacturer || m.make?.toLowerCase() === formState.batteryManufacturer?.toLowerCase()
+    );
+    const selectedInverterMake = inverterMakesData?.inverterMakes?.find((m: any) =>
+        m.uid === formState.inverterManufacturer || m.make?.toLowerCase() === formState.inverterManufacturer?.toLowerCase()
+    );
 
     const { data: batteryModelsData, loading: loadingBatteryModels } = useQuery(GET_BATTERY_MODELS, {
         variables: { makeUid: selectedBatteryMake?.uid },
@@ -115,26 +134,40 @@ export function VppCertificateTab({
         fetchPolicy: 'cache-first'
     });
 
-    const batteryModelOptions = batteryModelsData?.batteryModels?.filter((m: any) => m.isActive).map((m: any) => ({
-        value: m.uid,
-        label: m.model
-    })) || [];
+    const batteryModelOptions = [
+        { value: '-', label: '-' },
+        ...(batteryModelsData?.batteryModels?.filter((m: any) => m.isActive && m.model !== '-').map((m: any) => ({
+            value: m.model,
+            label: m.model
+        })) || [])
+    ];
 
-    const inverterModelOptions = inverterModelsData?.inverterModels?.filter((m: any) => m.isActive).map((m: any) => ({
-        value: m.model,
-        label: m.model
-    })) || [];
+    const inverterModelOptions = [
+        { value: '-', label: '-' },
+        ...(inverterModelsData?.inverterModels?.filter((m: any) => m.isActive && m.model !== '-').map((m: any) => ({
+            value: m.model,
+            label: m.model
+        })) || [])
+    ];
 
     const handleBatteryModelChange = (value: string) => {
-        const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.uid === value);
+        if (!value || value === '-') {
+            setFormState(prev => ({ ...prev, batteryModel: '-' }));
+            return;
+        }
+        const modelObj = batteryModelsData?.batteryModels?.find((m: any) => m.model === value || m.uid === value);
         setFormState(prev => ({
             ...prev,
-            batteryModel: value,
+            batteryModel: modelObj ? modelObj.model : value,
             ...(modelObj?.capacity ? { batteryUsableCapacity: modelObj.capacity.toString() } : {})
         }));
     };
 
     const handleInverterModelChange = (value: string) => {
+        if (!value || value === '-') {
+            setFormState(prev => ({ ...prev, inverterModel: '-' }));
+            return;
+        }
         const modelObj = inverterModelsData?.inverterModels?.find((m: any) => m.model === value);
         setFormState(prev => ({
             ...prev,
@@ -158,46 +191,112 @@ export function VppCertificateTab({
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
+    const resolveBatteryMakeName = (val?: string) => {
+        if (!val) return '';
+        const match = makesData?.batteryMakes?.find((m: any) => m.uid === val || m.make?.toLowerCase() === val.toLowerCase());
+        return match ? match.make : val;
+    };
+
+    const resolveInverterMakeName = (val?: string) => {
+        if (!val) return '';
+        const match = inverterMakesData?.inverterMakes?.find((m: any) => m.uid === val || m.make?.toLowerCase() === val.toLowerCase());
+        return match ? match.make : val;
+    };
+
     useEffect(() => {
         if (data?.customer) {
             const v = data.customer.vppCertificateDetails;
             const b = data.customer.batteryDetails;
+
+            const batteryMake = resolveBatteryMakeName(v?.batteryManufacturer || b?.batterybrand || '');
+            const inverterMake = resolveInverterMakeName(v?.inverterManufacturer || '');
+
             setTimeout(() => {
-                setFormState({
-                    batteryManufacturer: v?.batteryManufacturer || b?.batterybrand || '',
-                    batteryModel: v?.batteryModel || b?.batterymodel || '',
-                    batterySerialNumber: v?.batterySerialNumber || b?.snnumber || '',
-                    batteryInstalledDate: v?.batteryInstalledDate ? new Date(v.batteryInstalledDate).toISOString().split('T')[0] : '',
-                    batteryUsableCapacity: v?.batteryUsableCapacity?.toString() || b?.batterycapacity?.toString() || '',
-                    batteryPortConnected: v?.batteryPortConnected ?? 0,
-                    inverterManufacturer: v?.inverterManufacturer || '',
-                    inverterModel: v?.inverterModel || '',
-                    inverterSnNumbers: v?.inverterSnNumbers || '',
-                    inverterCapacity: v?.inverterCapacity?.toString() || b?.inverterCapacity?.toString() || '',
-                    isLifeSupportEquipment: v?.isLifeSupportEquipment ?? 0,
-                    ifYesDetails: v?.ifYesDetails || '',
-                    internetConnectionType: v?.internetConnectionType ?? 0,
-                    internetOtherText: v?.internetOtherText || '',
-                    modemRouterLocation: v?.modemRouterLocation || '',
-                    apiIntegration: v?.apiIntegration ?? 0,
-                    remoteChargesCommandTest: v?.remoteChargesCommandTest ?? 0,
-                    remoteChargesCommandTestAt: v?.remoteChargesCommandTestAt ? new Date(v.remoteChargesCommandTestAt).toISOString().slice(0, 16) : '',
-                    remoteDischargesCommandTest: v?.remoteDischargesCommandTest ?? 0,
-                    remoteDischargesCommandTestAt: v?.remoteDischargesCommandTestAt ? new Date(v.remoteDischargesCommandTestAt).toISOString().slice(0, 16) : '',
-                    stateOfChangeMonitoring: v?.stateOfChangeMonitoring ?? 0,
-                    stateOfChangeMonitoringAt: v?.stateOfChangeMonitoringAt ? new Date(v.stateOfChangeMonitoringAt).toISOString().slice(0, 16) : '',
-                    gridExportVerification: v?.gridExportVerification ?? 0,
-                    gridExportVerificationAt: v?.gridExportVerificationAt ? new Date(v.gridExportVerificationAt).toISOString().slice(0, 16) : '',
-                    gridImportVerification: v?.gridImportVerification ?? 0,
-                    gridImportVerificationAt: v?.gridImportVerificationAt ? new Date(v.gridImportVerificationAt).toISOString().slice(0, 16) : '',
-                    communicationFailSafeTest: v?.communicationFailSafeTest ?? 0,
-                    communicationFailSafeTestAt: v?.communicationFailSafeTestAt ? new Date(v.communicationFailSafeTestAt).toISOString().slice(0, 16) : '',
-                    testResult: v?.testResult || '',
-                    additionalNotes: v?.additionalNotes || ''
-                });
+                setFormState(prev => ({
+                    ...prev,
+                    issueDate: v?.issueDate ? formatIssueDateStr(v.issueDate) : (prev.issueDate || new Date().toISOString().split('T')[0]),
+                    batteryManufacturer: batteryMake || prev.batteryManufacturer,
+                    batteryModel: (v?.batteryModel && v.batteryModel.trim() !== '') ? v.batteryModel : (b?.batterymodel && b.batterymodel.trim() !== '' ? b.batterymodel : (prev.batteryModel || '-')),
+                    batterySerialNumber: v?.batterySerialNumber || b?.snnumber || prev.batterySerialNumber || '',
+                    batteryInstalledDate: v?.batteryInstalledDate ? new Date(v.batteryInstalledDate).toISOString().split('T')[0] : (prev.batteryInstalledDate || ''),
+                    batteryUsableCapacity: v?.batteryUsableCapacity?.toString() || b?.batterycapacity?.toString() || prev.batteryUsableCapacity || '',
+                    batteryPortConnected: v?.batteryPortConnected ?? prev.batteryPortConnected ?? 0,
+                    inverterManufacturer: inverterMake || prev.inverterManufacturer,
+                    inverterModel: (v?.inverterModel && v.inverterModel.trim() !== '') ? v.inverterModel : (prev.inverterModel || '-'),
+                    inverterSnNumbers: v?.inverterSnNumbers || prev.inverterSnNumbers || '',
+                    inverterCapacity: v?.inverterCapacity?.toString() || b?.inverterCapacity?.toString() || solarDetails?.invertercapacity?.toString() || prev.inverterCapacity || '',
+                    isLifeSupportEquipment: v?.isLifeSupportEquipment ?? prev.isLifeSupportEquipment ?? 0,
+                    ifYesDetails: v?.ifYesDetails || prev.ifYesDetails || '',
+                    internetConnectionType: v?.internetConnectionType ?? prev.internetConnectionType ?? 0,
+                    internetOtherText: v?.internetOtherText || prev.internetOtherText || '',
+                    modemRouterLocation: v?.modemRouterLocation || prev.modemRouterLocation || '',
+                    apiIntegration: v?.apiIntegration ?? prev.apiIntegration ?? 0,
+                    remoteChargesCommandTest: v?.remoteChargesCommandTest ?? prev.remoteChargesCommandTest ?? 0,
+                    remoteChargesCommandTestAt: v?.remoteChargesCommandTestAt ? new Date(v.remoteChargesCommandTestAt).toISOString().slice(0, 16) : (prev.remoteChargesCommandTestAt || ''),
+                    remoteDischargesCommandTest: v?.remoteDischargesCommandTest ?? prev.remoteDischargesCommandTest ?? 0,
+                    remoteDischargesCommandTestAt: v?.remoteDischargesCommandTestAt ? new Date(v.remoteDischargesCommandTestAt).toISOString().slice(0, 16) : (prev.remoteDischargesCommandTestAt || ''),
+                    stateOfChangeMonitoring: v?.stateOfChangeMonitoring ?? prev.stateOfChangeMonitoring ?? 0,
+                    stateOfChangeMonitoringAt: v?.stateOfChangeMonitoringAt ? new Date(v.stateOfChangeMonitoringAt).toISOString().slice(0, 16) : (prev.stateOfChangeMonitoringAt || ''),
+                    gridExportVerification: v?.gridExportVerification ?? prev.gridExportVerification ?? 0,
+                    gridExportVerificationAt: v?.gridExportVerificationAt ? new Date(v.gridExportVerificationAt).toISOString().slice(0, 16) : (prev.gridExportVerificationAt || ''),
+                    gridImportVerification: v?.gridImportVerification ?? prev.gridImportVerification ?? 0,
+                    gridImportVerificationAt: v?.gridImportVerificationAt ? new Date(v.gridImportVerificationAt).toISOString().slice(0, 16) : (prev.gridImportVerificationAt || ''),
+                    communicationFailSafeTest: v?.communicationFailSafeTest ?? prev.communicationFailSafeTest ?? 0,
+                    communicationFailSafeTestAt: v?.communicationFailSafeTestAt ? new Date(v.communicationFailSafeTestAt).toISOString().slice(0, 16) : (prev.communicationFailSafeTestAt || ''),
+                    testResult: v?.testResult || prev.testResult || (
+                        ((v?.remoteChargesCommandTest ?? prev.remoteChargesCommandTest) === 1
+                            && (v?.remoteDischargesCommandTest ?? prev.remoteDischargesCommandTest) === 1
+                            && (v?.stateOfChangeMonitoring ?? prev.stateOfChangeMonitoring) === 1
+                            && (v?.gridExportVerification ?? prev.gridExportVerification) === 1
+                            && (v?.gridImportVerification ?? prev.gridImportVerification) === 1
+                            && (v?.communicationFailSafeTest ?? prev.communicationFailSafeTest) === 1)
+                            ? 'All Test passed successfully' : ''
+                    ),
+                    additionalNotes: v?.additionalNotes || prev.additionalNotes || ''
+                }));
             }, 0);
         }
-    }, [data]);
+    }, [data, makesData, inverterMakesData]);
+
+    // Re-resolve battery manufacturer name if makesData finishes loading afterwards
+    useEffect(() => {
+        if (formState.batteryManufacturer && makesData?.batteryMakes?.length) {
+            const match = makesData.batteryMakes.find((m: any) => m.uid === formState.batteryManufacturer);
+            if (match) {
+                setFormState(prev => ({ ...prev, batteryManufacturer: match.make }));
+            }
+        }
+    }, [makesData, formState.batteryManufacturer]);
+
+    // Re-resolve inverter manufacturer name if inverterMakesData finishes loading afterwards
+    useEffect(() => {
+        if (formState.inverterManufacturer && inverterMakesData?.inverterMakes?.length) {
+            const match = inverterMakesData.inverterMakes.find((m: any) => m.uid === formState.inverterManufacturer);
+            if (match) {
+                setFormState(prev => ({ ...prev, inverterManufacturer: match.make }));
+            }
+        }
+    }, [inverterMakesData, formState.inverterManufacturer]);
+
+    // Re-resolve battery model name if batteryModelsData finishes loading
+    useEffect(() => {
+        if (formState.batteryModel && formState.batteryModel !== '-' && batteryModelsData?.batteryModels?.length) {
+            const match = batteryModelsData.batteryModels.find((m: any) => m.uid === formState.batteryModel);
+            if (match) {
+                setFormState(prev => ({ ...prev, batteryModel: match.model }));
+            }
+        }
+    }, [batteryModelsData, formState.batteryModel]);
+
+    // Re-resolve inverter model name if inverterModelsData finishes loading
+    useEffect(() => {
+        if (formState.inverterModel && formState.inverterModel !== '-' && inverterModelsData?.inverterModels?.length) {
+            const match = inverterModelsData.inverterModels.find((m: any) => m.uid === formState.inverterModel);
+            if (match) {
+                setFormState(prev => ({ ...prev, inverterModel: match.model }));
+            }
+        }
+    }, [inverterModelsData, formState.inverterModel]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
@@ -218,24 +317,47 @@ export function VppCertificateTab({
         setFormState(prev => {
             const currentVal = (prev as Record<string, unknown>)[testField] as number;
             const newVal = currentVal === 1 ? 0 : 1;
-            return {
+            const updated = {
                 ...prev,
                 [testField]: newVal,
                 [timestampField]: newVal === 1 ? new Date().toISOString().slice(0, 16) : ''
             };
+            const allPassed = updated.remoteChargesCommandTest === 1
+                && updated.remoteDischargesCommandTest === 1
+                && updated.stateOfChangeMonitoring === 1
+                && updated.gridExportVerification === 1
+                && updated.gridImportVerification === 1
+                && updated.communicationFailSafeTest === 1;
+
+            if (!prev.testResult || prev.testResult === 'All Test passed successfully' || prev.testResult === 'Failed') {
+                updated.testResult = allPassed ? 'All Test passed successfully' : 'Failed';
+            }
+            return updated;
         });
     };
 
-    const handlePreview = () => {
+    const handlePreview = async () => {
+        setPreviewUrl(null);
         setIsLoadingPreview(true);
-        const baseUrl = apiAxios.defaults.baseURL || '';
-        setPreviewUrl(`${baseUrl}/vpp-certificate/preview/${customerUid}`);
         setPreviewModalOpen(true);
+        const baseUrl = apiAxios.defaults.baseURL || '';
+
+        // Auto-save latest form state so the preview API reads the up-to-date test results
+        try {
+            await generateVppCertificate({
+                variables: { customerUid, input: buildInputFormat() }
+            });
+            refetch();
+        } catch (e) {
+            console.error('Error syncing before preview:', e);
+        }
+
+        setPreviewUrl(`${baseUrl}/vpp-certificate/preview/${customerUid}?t=${Date.now()}`);
     };
 
     const handleDownload = () => {
         const baseUrl = apiAxios.defaults.baseURL || '';
-        const downloadUrl = `${baseUrl}/vpp-certificate/preview/${customerUid}?format=pdf`;
+        const downloadUrl = `${baseUrl}/vpp-certificate/preview/${customerUid}?format=pdf&t=${Date.now()}`;
         window.open(downloadUrl, '_blank');
     };
 
@@ -243,12 +365,10 @@ export function VppCertificateTab({
     // Required fields for full certificate generation (excludes if_yes_details, internet_other_text, all test fields + timestamps)
     const REQUIRED_FIELDS: { key: string; label: string }[] = [
         { key: 'batteryManufacturer', label: 'Battery Manufacturer' },
-        { key: 'batteryModel', label: 'Battery Model' },
         { key: 'batterySerialNumber', label: 'Battery Serial Number' },
         { key: 'batteryInstalledDate', label: 'Battery Installed Date' },
         { key: 'batteryUsableCapacity', label: 'Battery Usable Capacity' },
         { key: 'inverterManufacturer', label: 'Inverter Manufacturer' },
-        { key: 'inverterModel', label: 'Inverter Model' },
         { key: 'inverterSnNumbers', label: 'Inverter Serial Number' },
         { key: 'inverterCapacity', label: 'Inverter Capacity' },
         { key: 'modemRouterLocation', label: 'Modem Router Location' },
@@ -265,19 +385,34 @@ export function VppCertificateTab({
         return missing;
     };
 
-    const buildInputFormat = () => ({
-        ...formState,
-        batteryUsableCapacity: formState.batteryUsableCapacity ? parseFloat(formState.batteryUsableCapacity) : null,
-        inverterCapacity: formState.inverterCapacity ? parseFloat(formState.inverterCapacity) : null,
-        batteryInstalledDate: formState.batteryInstalledDate ? new Date(formState.batteryInstalledDate).toISOString() : null,
-        remoteChargesCommandTestAt: formState.remoteChargesCommandTestAt ? new Date(formState.remoteChargesCommandTestAt).toISOString() : null,
-        remoteDischargesCommandTestAt: formState.remoteDischargesCommandTestAt ? new Date(formState.remoteDischargesCommandTestAt).toISOString() : null,
-        stateOfChangeMonitoringAt: formState.stateOfChangeMonitoringAt ? new Date(formState.stateOfChangeMonitoringAt).toISOString() : null,
-        gridExportVerificationAt: formState.gridExportVerificationAt ? new Date(formState.gridExportVerificationAt).toISOString() : null,
-        gridImportVerificationAt: formState.gridImportVerificationAt ? new Date(formState.gridImportVerificationAt).toISOString() : null,
-        communicationFailSafeTestAt: formState.communicationFailSafeTestAt ? new Date(formState.communicationFailSafeTestAt).toISOString() : null,
-        isAllRequiredFilled: validateRequiredFields().length === 0 ? 1 : 0,
-    });
+    const buildInputFormat = () => {
+        const allPassed = formState.remoteChargesCommandTest === 1
+            && formState.remoteDischargesCommandTest === 1
+            && formState.stateOfChangeMonitoring === 1
+            && formState.gridExportVerification === 1
+            && formState.gridImportVerification === 1
+            && formState.communicationFailSafeTest === 1;
+
+        const effectiveTestResult = formState.testResult || (allPassed ? 'All Test passed successfully' : 'Failed');
+
+        return {
+            ...formState,
+            issueDate: formState.issueDate ? formState.issueDate : new Date().toISOString().split('T')[0],
+            batteryModel: (formState.batteryModel && formState.batteryModel.trim() !== '') ? formState.batteryModel : '-',
+            inverterModel: (formState.inverterModel && formState.inverterModel.trim() !== '') ? formState.inverterModel : '-',
+            testResult: effectiveTestResult,
+            batteryUsableCapacity: formState.batteryUsableCapacity ? parseFloat(formState.batteryUsableCapacity) : null,
+            inverterCapacity: formState.inverterCapacity ? parseFloat(formState.inverterCapacity) : null,
+            batteryInstalledDate: formState.batteryInstalledDate ? new Date(formState.batteryInstalledDate).toISOString() : null,
+            remoteChargesCommandTestAt: formState.remoteChargesCommandTestAt ? new Date(formState.remoteChargesCommandTestAt).toISOString() : null,
+            remoteDischargesCommandTestAt: formState.remoteDischargesCommandTestAt ? new Date(formState.remoteDischargesCommandTestAt).toISOString() : null,
+            stateOfChangeMonitoringAt: formState.stateOfChangeMonitoringAt ? new Date(formState.stateOfChangeMonitoringAt).toISOString() : null,
+            gridExportVerificationAt: formState.gridExportVerificationAt ? new Date(formState.gridExportVerificationAt).toISOString() : null,
+            gridImportVerificationAt: formState.gridImportVerificationAt ? new Date(formState.gridImportVerificationAt).toISOString() : null,
+            communicationFailSafeTestAt: formState.communicationFailSafeTestAt ? new Date(formState.communicationFailSafeTestAt).toISOString() : null,
+            isAllRequiredFilled: validateRequiredFields().length === 0 ? 1 : 0,
+        };
+    };
 
 
     const handleSaveDraft = async () => {
@@ -339,7 +474,7 @@ export function VppCertificateTab({
     const isFormComplete = missingFields.length === 0;
 
     return (
-        <div className="flex flex-col h-[500px] animate-in fade-in duration-300">
+        <div className="space-y-6 animate-in fade-in duration-300">
 
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-4">
@@ -368,6 +503,17 @@ export function VppCertificateTab({
                     >
                         <Settings2Icon size={16} className={loading ? 'animate-spin' : ''} />
                     </Button>
+                    {formState.issueDate && (
+                        <div className="text-right border-r border-border pr-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Issue Date</p>
+                            <p className="text-sm font-bold text-foreground">
+                                {(() => {
+                                    const parts = formState.issueDate.split('-');
+                                    return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : formState.issueDate;
+                                })()}
+                            </p>
+                        </div>
+                    )}
                     {vppCertificateDetails?.certificateNo && (
                         <div className="text-right">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Certificate No</p>
@@ -378,7 +524,7 @@ export function VppCertificateTab({
             </div>
 
             {/* Progress Stepper */}
-            <div className="relative mt-6 mb-6">
+            <div className="relative py-2">
                 <div className="flex items-center justify-between">
                     {STEPS.map((step, index) => {
                         const StepIcon = step.icon;
@@ -428,9 +574,63 @@ export function VppCertificateTab({
                 </div>
             </div>
 
+            {/* Navigation & Action Controls Above Form Layout */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCurrentStep(prev => prev - 1)}
+                    disabled={isFirstStep}
+                    className={isFirstStep ? 'invisible pointer-events-none' : ''}
+                >
+                    ← Previous
+                </Button>
+
+                <div className="flex flex-wrap items-center gap-3">
+                    {isLastStep && !isFormComplete && (
+                        <div
+                            className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3 py-1.5 rounded-lg cursor-help"
+                            title={`Missing required fields: ${missingFields.join(', ')}`}
+                        >
+                            <span className="font-semibold shrink-0">⚠️ Missing required:</span>
+                            <span className="max-w-[280px] truncate font-medium">{missingFields.join(', ')}</span>
+                        </div>
+                    )}
+
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSaveDraft}
+                        isLoading={isSavingDraft}
+                        disabled={isSavingDraft || isSaving}
+                    >
+                        Save Draft
+                    </Button>
+
+                    {isLastStep ? (
+                        <Button
+                            type="button"
+                            onClick={handleGenerateCertificate}
+                            isLoading={isSaving}
+                            disabled={isSaving || isSavingDraft}
+                            className={!isFormComplete ? "opacity-90 ring-1 ring-amber-400/50" : ""}
+                            title={!isFormComplete ? `Click to see missing fields: ${missingFields.join(', ')}` : ""}
+                        >
+                            {vppCertificateDetails?.id ? 'Update' : 'Generate'}
+                        </Button>
+                    ) : (
+                        <Button
+                            type="button"
+                            onClick={() => setCurrentStep(prev => prev + 1)}
+                        >
+                            Next →
+                        </Button>
+                    )}
+                </div>
+            </div>
+
             {/* Step Content */}
-            <div className="flex-1 overflow-y-auto pr-2 pb-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-                <div className="bg-card border border-border rounded-xl p-6 animate-in fade-in slide-in-from-right-2 duration-300" key={currentStep}>
+            <div className="bg-card border border-border rounded-xl p-6 animate-in fade-in slide-in-from-right-2 duration-300" key={currentStep}>
                     {/* Step 1 — Solar and Inverter Details */}
                     {STEPS[currentStep].id === 1 && (
                         <div className="space-y-6">
@@ -445,13 +645,30 @@ export function VppCertificateTab({
                                         <label className="text-sm font-medium text-foreground">Inverter Capacity (kW)</label>
                                         <Input value={solarDetails?.invertercapacity ? `${solarDetails.invertercapacity} kW` : '-'} disabled={true} />
                                     </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-foreground">Issue Date</label>
+                                        <DatePicker
+                                            value={formState.issueDate || null}
+                                            onChange={(date) => {
+                                                if (!date) {
+                                                    setFormState(prev => ({ ...prev, issueDate: '' }));
+                                                    return;
+                                                }
+                                                const y = date.getFullYear();
+                                                const m = String(date.getMonth() + 1).padStart(2, '0');
+                                                const d = String(date.getDate()).padStart(2, '0');
+                                                setFormState(prev => ({ ...prev, issueDate: `${y}-${m}-${d}` }));
+                                            }}
+                                            placeholder="Select issue date"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Inverter Details</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Manufacturer</label>
+                                    <label className="text-sm font-medium text-foreground">Manufacturer <span className="text-red-500">*</span></label>
                                     <Select
                                         value={formState.inverterManufacturer}
                                         onChange={(v: any) => handleManufacturerChange('inverterManufacturer', v as string)}
@@ -464,20 +681,20 @@ export function VppCertificateTab({
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Model</label>
                                     <Select
-                                        value={formState.inverterModel}
+                                        value={formState.inverterModel || '-'}
                                         onChange={(v) => handleInverterModelChange(v as string)}
                                         options={inverterModelOptions}
-                                        placeholder="Select model"
+                                        placeholder="-"
                                         creatable={true}
                                         isLoading={loadingInverterModels}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
+                                    <label className="text-sm font-medium text-foreground">Serial Number(SN numbers) <span className="text-red-500">*</span></label>
                                     <Input name="inverterSnNumbers" value={formState.inverterSnNumbers} onChange={handleChange} />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Capacity (kW)</label>
+                                    <label className="text-sm font-medium text-foreground">Capacity (kW) <span className="text-red-500">*</span></label>
                                     <Input type="number" step="0.1" name="inverterCapacity" value={formState.inverterCapacity} onChange={handleChange} />
                                 </div>
                                 <div className="space-y-2">
@@ -505,7 +722,7 @@ export function VppCertificateTab({
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Battery Details</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Manufacturer</label>
+                                    <label className="text-sm font-medium text-foreground">Manufacturer <span className="text-red-500">*</span></label>
                                     <Select
                                         value={formState.batteryManufacturer}
                                         onChange={(v: any) => handleManufacturerChange('batteryManufacturer', v as string)}
@@ -519,21 +736,21 @@ export function VppCertificateTab({
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Model</label>
                                     <Select
-                                        value={formState.batteryModel}
+                                        value={formState.batteryModel || '-'}
                                         onChange={(v) => handleBatteryModelChange(v as string)}
                                         options={batteryModelOptions}
-                                        placeholder="Select model"
-                                        disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryModel}
+                                        placeholder="-"
+                                        disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryModel && vppCertificateDetails.batteryModel !== '-'}
                                         creatable={true}
                                         isLoading={loadingBatteryModels}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Serial Number(SN numbers)</label>
+                                    <label className="text-sm font-medium text-foreground">Serial Number(SN numbers) <span className="text-red-500">*</span></label>
                                     <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batterySerialNumber} />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Installed Date</label>
+                                    <label className="text-sm font-medium text-foreground">Installed Date <span className="text-red-500">*</span></label>
                                     <DatePicker
                                         value={formState.batteryInstalledDate || null}
                                         onChange={(date) => setFormState(prev => ({ ...prev, batteryInstalledDate: date ? date.toISOString().split('T')[0] : '' }))}
@@ -541,7 +758,7 @@ export function VppCertificateTab({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Usable Capacity (kWh)</label>
+                                    <label className="text-sm font-medium text-foreground">Usable Capacity (kWh) <span className="text-red-500">*</span></label>
                                     <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryUsableCapacity} />
                                 </div>
                                 <div className="space-y-2">
@@ -585,7 +802,7 @@ export function VppCertificateTab({
                                     </div>
                                 )}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Modem Router Location</label>
+                                    <label className="text-sm font-medium text-foreground">Modem Router Location <span className="text-red-500">*</span></label>
                                     <Input name="modemRouterLocation" value={formState.modemRouterLocation} onChange={handleChange} />
                                 </div>
                                 <div className="space-y-2">
@@ -621,16 +838,26 @@ export function VppCertificateTab({
                                     return (
                                         <div
                                             key={test.field}
-                                            className="flex items-center justify-between p-4 rounded-xl border-2 border-border bg-card"
+                                            onClick={() => handleToggleTest(test.field, test.tsField)}
+                                            className={`
+                                                flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 select-none
+                                                ${isPassed
+                                                    ? 'border-green-500/50 bg-green-50/20 dark:bg-green-950/20 hover:border-green-500 shadow-xs'
+                                                    : 'border-border bg-card hover:border-muted-foreground/40 hover:bg-muted/20'
+                                                }
+                                            `}
                                         >
                                             <p className="text-sm font-medium text-foreground">{test.label}</p>
                                             <button
                                                 type="button"
-                                                onClick={() => handleToggleTest(test.field, test.tsField)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleToggleTest(test.field, test.tsField);
+                                                }}
                                                 className={`
-                                                    px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200
+                                                    px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer
                                                     ${isPassed
-                                                        ? 'bg-green-500 text-white hover:bg-green-600'
+                                                        ? 'bg-green-500 text-white hover:bg-green-600 shadow-sm'
                                                         : 'bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20'
                                                     }
                                                 `}
@@ -665,9 +892,9 @@ export function VppCertificateTab({
                                             <label className="text-sm font-medium text-foreground">Test Result / Notes</label>
                                             <Input
                                                 name="testResult"
-                                                value={formState.testResult || (allPassed ? 'All Test passed successfully' : 'Failed')}
+                                                value={formState.testResult}
                                                 onChange={handleChange}
-                                                placeholder="Any specific notes or observations..."
+                                                placeholder={allPassed ? 'All Test passed successfully' : 'Failed'}
                                             />
                                         </div>
                                     </>
@@ -687,49 +914,11 @@ export function VppCertificateTab({
                         </div>
                     )}
                 </div>
-            </div>
 
-            {/* Navigation Buttons */}
-            <div className="flex-none pt-4 mt-auto border-t border-border bg-background z-10 flex items-center justify-between">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setCurrentStep(prev => prev - 1)}
-                    disabled={isFirstStep}
-                    className={isFirstStep ? 'opacity-0 pointer-events-none' : ''}
-                >
-                    ← Previous
-                </Button>
-
-                <div className="flex items-center gap-3">
-                    <Button type="button" variant="outline" onClick={handleSaveDraft} isLoading={isSavingDraft} disabled={isSavingDraft || isSaving}>
-                        Save Draft
-                    </Button>
-
-                    {isLastStep ? (
-                        <Button
-                            type="button"
-                            onClick={handleGenerateCertificate}
-                            isLoading={isSaving}
-                            disabled={isSaving || isSavingDraft || !isFormComplete}
-                            title={!isFormComplete ? `Missing: ${missingFields.join(', ')}` : ""}
-                        >
-                            {vppCertificateDetails?.id ? 'Update' : 'Generate'}
-                        </Button>
-                    ) : (
-                        <Button
-                            type="button"
-                            onClick={() => setCurrentStep(prev => prev + 1)}
-                        >
-                            Next →
-                        </Button>
-                    )}
-                </div>
-            </div>
             {/* Preview Modal */}
             <Modal
                 isOpen={previewModalOpen}
-                onClose={() => { setPreviewModalOpen(false); setIsLoadingPreview(false); }}
+                onClose={() => { setPreviewModalOpen(false); setPreviewUrl(null); setIsLoadingPreview(false); }}
                 title="VPP Certificate Preview"
                 size="full"
             >
@@ -762,7 +951,7 @@ export function VppCertificateTab({
                     <Button variant="outline" onClick={handleDownload} className="text-blue-600 border-blue-200 hover:bg-blue-50">
                         <DownloadIcon size={16} className="mr-2" /> Download PDF
                     </Button>
-                    <Button variant="outline" onClick={() => { setPreviewModalOpen(false); setIsLoadingPreview(false); }}>
+                    <Button variant="outline" onClick={() => { setPreviewModalOpen(false); setPreviewUrl(null); setIsLoadingPreview(false); }}>
                         Close
                     </Button>
                 </div>
