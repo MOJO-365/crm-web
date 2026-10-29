@@ -650,6 +650,7 @@ export function VppCertificateTab({
                                             name="solarCapacity"
                                             value={formState.solarCapacity}
                                             onChange={handleChange}
+                                            disabled={true}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -661,6 +662,7 @@ export function VppCertificateTab({
                                             name="inverterCapacity"
                                             value={formState.inverterCapacity}
                                             onChange={handleChange}
+                                            disabled={true}
                                         />
                                     </div>
                                     <div className="space-y-2">
