@@ -5,7 +5,7 @@ import { useQuery, useLazyQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
 import {
     PlusIcon, PencilIcon,
-    CheckIcon, XIcon, MailIcon, RefreshCwIcon, CreditCardIcon
+    CheckIcon, XIcon, MailIcon, RefreshCwIcon, CreditCardIcon, UsersIcon
 } from '@/components/icons';
 import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES, GET_USERS, GET_LEAD_SOURCES, GET_WEB_API_CREDENTIALS } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -15,6 +15,7 @@ import { Select } from '@/components/ui/Select';
 // import { Switch } from '@/components/ui/Switch';
 import { StatusField } from '@/components/common';
 import BulkEmailModal from './BulkEmailModal';
+import BulkAssignSalesRepModal from './BulkAssignSalesRepModal';
 
 import { DNSP_OPTIONS, DISCOUNT_OPTIONS, CUSTOMER_STATUS_OPTIONS, VPP_OPTIONS, VPP_CONNECTED_OPTIONS, ULTIMATE_STATUS_OPTIONS, MSAT_CONNECTED_OPTIONS } from '@/lib/constants';
 import { toast } from 'react-toastify';
@@ -157,6 +158,7 @@ export function CustomersPage() {
     const canEdit = useAuthStore((state) => state.canEditInMenu('customers'));
     const canDelete = useAuthStore((state) => state.canDeleteInMenu('customers'));
     const canViewAllCustomers = useAuthStore((state) => state.hasFeatureAccess('feature_view_all_customers'));
+    const canAssignUser = useAuthStore((state) => state.hasFeatureAccess('feature_assign_sales_rep'));
     const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => {
         const saved = sessionStorage.getItem(CUSTOMERS_FILTER_KEY);
         try {
@@ -202,6 +204,7 @@ export function CustomersPage() {
     // State for selection
     const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
     const [bulkEmailModalOpen, setBulkEmailModalOpen] = useState(false);
+    const [bulkAssignModalOpen, setBulkAssignModalOpen] = useState(false);
     const [isSelectingAll, setIsSelectingAll] = useState(false);
     const [totalFilteredCount, setTotalFilteredCount] = useState<number | undefined>(undefined);
 
@@ -268,7 +271,7 @@ export function CustomersPage() {
         return () => clearTimeout(timer);
     }, [searchFilters, debouncedFilters]);
 
-    const { data, loading, error } = useQuery<CustomersCursorResponse>(GET_CUSTOMERS_CURSOR, {
+    const { data, loading, error, refetch } = useQuery<CustomersCursorResponse>(GET_CUSTOMERS_CURSOR, {
         variables: {
             first: limit,
             after: pageCursors[currentPage - 1] || null,
@@ -1294,6 +1297,17 @@ export function CustomersPage() {
                                 <MailIcon size={16} />
                                 Send Email
                             </Button>
+                            {canAssignUser && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setBulkAssignModalOpen(true)}
+                                    className="flex items-center gap-2"
+                                >
+                                    <UsersIcon size={16} />
+                                    Assign User
+                                </Button>
+                            )}
                         </div>
                     )}
                     {canCreate && (
@@ -1365,6 +1379,17 @@ export function CustomersPage() {
                     setSelectedCustomerIds([]);
                     // Optional: refresh list if needed, but not strictly required for email sending
                     toast.success("Bulk email process completed");
+                }}
+            />
+
+            <BulkAssignSalesRepModal
+                isOpen={bulkAssignModalOpen}
+                onClose={() => setBulkAssignModalOpen(false)}
+                selectedCustomerIds={selectedCustomerIds}
+                userOptions={userOptions}
+                onSuccess={() => {
+                    setSelectedCustomerIds([]);
+                    refetch();
                 }}
             />
 

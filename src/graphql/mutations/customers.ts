@@ -417,3 +417,10 @@ export const SEND_VPP_PUSH_TO_GSYNC_EMAIL = gql`
         }
     }
 `;
+
+export const BULK_ASSIGN_CUSTOMERS = gql`
+    mutation BulkAssignCustomers($uids: [String!]!, $userUid: String) {
+        bulkAssignCustomers(uids: $uids, userUid: $userUid)
+    }
+`;
+
