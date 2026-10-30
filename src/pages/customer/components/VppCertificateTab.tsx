@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Modal } from '@/components/common';
+import { Popover } from '@/components/ui/Popover';
 import { apiAxios } from '@/lib/apollo';
 import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES, GET_INVERTER_MAKES, GET_BATTERY_MODELS, GET_INVERTER_MODELS } from '@/graphql';
 import { FileTextIcon, ZapIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon, DownloadIcon, AlertCircleIcon } from '@/components/icons';
@@ -194,6 +195,25 @@ export function VppCertificateTab({
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const errorBoxRef = useRef<HTMLDivElement>(null);
+    const [isMissingHovered, setIsMissingHovered] = useState(false);
+    const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const handleMissingMouseEnter = () => {
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        setIsMissingHovered(true);
+    };
+
+    const handleMissingMouseLeave = () => {
+        hoverTimeoutRef.current = setTimeout(() => {
+            setIsMissingHovered(false);
+        }, 200);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        };
+    }, []);
 
     const resolveBatteryMakeName = (val?: string) => {
         if (!val) return '';
@@ -384,7 +404,6 @@ export function VppCertificateTab({
         { key: 'batterySerialNumber', label: 'Battery Serial Number', stepIndex: 1, stepName: 'Battery Details' },
         { key: 'batteryInstalledDate', label: 'Battery Installed Date', stepIndex: 1, stepName: 'Battery Details' },
         { key: 'batteryUsableCapacity', label: 'Battery Usable Capacity', stepIndex: 1, stepName: 'Battery Details' },
-        { key: 'modemRouterLocation', label: 'Modem Router Location', stepIndex: 2, stepName: 'Network & API' },
     ];
 
     const getMissingFields = () => {
@@ -450,14 +469,12 @@ export function VppCertificateTab({
 
         const missing = getMissingFields();
         if (missing.length > 0) {
+            setIsMissingHovered(true);
             const count = missing.length;
             toast.error(
-                `Cannot ${vppCertificateDetails?.id ? 'update' : 'generate'} certificate: ${count} required ${count === 1 ? 'field is' : 'fields are'} missing. Please review the details below.`,
+                `Cannot ${vppCertificateDetails?.id ? 'update' : 'generate'} certificate: ${count} required ${count === 1 ? 'field is' : 'fields are'} missing. Hover over 'Missing' above to review.`,
                 { autoClose: 6000 }
             );
-            setTimeout(() => {
-                errorBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
             return;
         }
 
@@ -630,17 +647,104 @@ export function VppCertificateTab({
 
                 <div className="flex flex-wrap items-center gap-3">
                     {isLastStep && !isFormComplete && (
-                        <div
-                            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border ${
-                                hasAttemptedSubmit
-                                    ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-800/60 font-semibold'
-                                    : 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60'
-                            }`}
-                            title={`Missing required fields: ${missingFields.join(', ')}`}
-                        >
-                            <span className="font-semibold shrink-0">⚠️ {hasAttemptedSubmit ? 'Incomplete:' : 'Missing:'}</span>
-                            <span className="font-medium">{missingFieldItems.length} required {missingFieldItems.length === 1 ? 'field' : 'fields'} missing</span>
-                        </div>
+                        <Popover
+                            isOpen={isMissingHovered}
+                            onOpenChange={setIsMissingHovered}
+                            placement="bottom-end"
+                            trigger={
+                                <div
+                                    onMouseEnter={handleMissingMouseEnter}
+                                    onMouseLeave={handleMissingMouseLeave}
+                                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border cursor-pointer select-none transition-all ${
+                                        hasAttemptedSubmit
+                                            ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-800/60 font-semibold shadow-xs'
+                                            : 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60 shadow-xs'
+                                    }`}
+                                >
+                                    <span className="font-semibold shrink-0">⚠️ Missing:</span>
+                                    <span className="font-medium">{missingFieldItems.length} required {missingFieldItems.length === 1 ? 'field' : 'fields'} missing</span>
+                                </div>
+                            }
+                            content={
+                                <div
+                                    onMouseEnter={handleMissingMouseEnter}
+                                    onMouseLeave={handleMissingMouseLeave}
+                                    className="w-[600px] max-w-[92vw] rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/95 dark:bg-neutral-900 p-4 shadow-xl backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200"
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+                                            !
+                                        </div>
+                                        <div className="flex-1 space-y-2.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                                                        Incomplete Form — {missingFieldItems.length} Required {missingFieldItems.length === 1 ? 'Field' : 'Fields'} Remaining
+                                                    </h4>
+                                                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800 dark:bg-amber-900/80 dark:text-amber-200">
+                                                        Action Required
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                                                Please complete all required fields across the steps below before clicking <span className="font-semibold">{vppCertificateDetails?.id ? 'Update' : 'Generate'}</span>. Click any step to jump directly to it:
+                                            </p>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                                                {Object.entries(
+                                                    missingFieldItems.reduce<Record<number, typeof missingFieldItems>>((acc, item) => {
+                                                        (acc[item.stepIndex] = acc[item.stepIndex] || []).push(item);
+                                                        return acc;
+                                                    }, {})
+                                                ).map(([stepIdxStr, items]) => {
+                                                    const stepIdx = Number(stepIdxStr);
+                                                    const stepInfo = STEPS[stepIdx];
+                                                    return (
+                                                        <div
+                                                            key={stepIdx}
+                                                            className="bg-white dark:bg-neutral-950 rounded-lg p-3 border border-border shadow-xs flex flex-col justify-between gap-2"
+                                                        >
+                                                            <div>
+                                                                <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-border/50">
+                                                                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                                                        <span className="w-4 h-4 rounded-full bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-300 text-[10px] flex items-center justify-center font-bold">
+                                                                            {stepIdx + 1}
+                                                                        </span>
+                                                                        {stepInfo.label}
+                                                                    </span>
+                                                                    <span className="text-[10px] font-semibold text-red-500 bg-red-50 dark:bg-red-950/60 px-1.5 py-0.5 rounded">
+                                                                        {items.length} missing
+                                                                    </span>
+                                                                </div>
+                                                                <ul className="space-y-1 pl-4 list-disc text-[11px] text-muted-foreground">
+                                                                    {items.map(field => (
+                                                                        <li key={field.key} className="text-red-600 dark:text-red-400 font-medium">
+                                                                            {field.label}
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setIsMissingHovered(false);
+                                                                    setCurrentStep(stepIdx);
+                                                                }}
+                                                                className="w-full text-xs font-semibold h-7 hover:bg-primary hover:text-primary-foreground transition-colors"
+                                                            >
+                                                                Go to Step {stepIdx + 1} →
+                                                            </Button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        />
                     )}
 
                     <Button
@@ -866,8 +970,8 @@ export function VppCertificateTab({
                                     </div>
                                 )}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Modem Router Location <span className="text-red-500">*</span></label>
-                                    <Input name="modemRouterLocation" value={formState.modemRouterLocation} onChange={handleChange} error={hasAttemptedSubmit && isFieldEmpty(formState.modemRouterLocation) ? 'Modem Router Location is required' : undefined} />
+                                    <label className="text-sm font-medium text-foreground">Modem Router Location</label>
+                                    <Input name="modemRouterLocation" value={formState.modemRouterLocation} onChange={handleChange} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">API Integration Completed</label>
@@ -904,97 +1008,7 @@ export function VppCertificateTab({
                                 </div>
                             )}
 
-                            {/* Missing Required Fields Alert Box */}
-                            {missingFieldItems.length > 0 && (
-                                <div
-                                    ref={errorBoxRef}
-                                    className={`rounded-xl border p-5 transition-all duration-300 animate-in fade-in ${
-                                        hasAttemptedSubmit
-                                            ? 'border-red-300 dark:border-red-900/70 bg-red-50/90 dark:bg-red-950/40 ring-2 ring-red-400/30 shadow-md'
-                                            : 'border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30'
-                                    }`}
-                                >
-                                    <div className="flex items-start gap-3.5">
-                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                                            hasAttemptedSubmit
-                                                ? 'bg-red-500 text-white shadow-md shadow-red-500/25'
-                                                : 'bg-amber-500 text-white shadow-md shadow-amber-500/25'
-                                        }`}>
-                                            <AlertCircleIcon size={20} />
-                                        </div>
-                                        <div className="flex-1 space-y-3">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <h4 className={`text-sm font-bold ${hasAttemptedSubmit ? 'text-red-900 dark:text-red-200' : 'text-amber-900 dark:text-amber-200'}`}>
-                                                        {hasAttemptedSubmit
-                                                            ? `Cannot ${vppCertificateDetails?.id ? 'Update' : 'Generate'} Certificate — ${missingFieldItems.length} Required ${missingFieldItems.length === 1 ? 'Field' : 'Fields'} Missing`
-                                                            : `Incomplete Form — ${missingFieldItems.length} Required ${missingFieldItems.length === 1 ? 'Field' : 'Fields'} Remaining`
-                                                        }
-                                                    </h4>
-                                                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                                                        hasAttemptedSubmit
-                                                            ? 'bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                                            : 'bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
-                                                    }`}>
-                                                        Action Required
-                                                    </span>
-                                                </div>
-                                                <p className={`text-xs mt-1 ${hasAttemptedSubmit ? 'text-red-700 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'}`}>
-                                                    Please complete all required fields across the steps below before clicking <span className="font-semibold">{vppCertificateDetails?.id ? 'Update' : 'Generate'}</span>. Click any step to jump directly to it:
-                                                </p>
-                                            </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-                                                {Object.entries(
-                                                    missingFieldItems.reduce<Record<number, typeof missingFieldItems>>((acc, item) => {
-                                                        (acc[item.stepIndex] = acc[item.stepIndex] || []).push(item);
-                                                        return acc;
-                                                    }, {})
-                                                ).map(([stepIdxStr, items]) => {
-                                                    const stepIdx = Number(stepIdxStr);
-                                                    const stepInfo = STEPS[stepIdx];
-                                                    return (
-                                                        <div
-                                                            key={stepIdx}
-                                                            className="bg-background dark:bg-neutral-900 rounded-lg p-3.5 border border-border shadow-xs flex flex-col justify-between gap-3 hover:border-primary/50 transition-colors"
-                                                        >
-                                                            <div>
-                                                                <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/50">
-                                                                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                                                                        <span className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-300 text-[10px] flex items-center justify-center font-bold">
-                                                                            {stepIdx + 1}
-                                                                        </span>
-                                                                        {stepInfo.label}
-                                                                    </span>
-                                                                    <span className="text-[10px] font-semibold text-red-500 bg-red-50 dark:bg-red-950 px-1.5 py-0.5 rounded">
-                                                                        {items.length} missing
-                                                                    </span>
-                                                                </div>
-                                                                <ul className="space-y-1.5 pl-4 list-disc text-xs text-muted-foreground">
-                                                                    {items.map(field => (
-                                                                        <li key={field.key} className="text-red-600 dark:text-red-400 font-medium">
-                                                                            {field.label}
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                            <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() => setCurrentStep(stepIdx)}
-                                                                className="w-full text-xs font-semibold h-8 hover:bg-primary hover:text-primary-foreground transition-colors"
-                                                            >
-                                                                Go to Step {stepIdx + 1} →
-                                                            </Button>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Testing & Verification</h4>
 
