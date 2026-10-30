@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
@@ -8,7 +8,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { Modal } from '@/components/common';
 import { apiAxios } from '@/lib/apollo';
 import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES, GET_INVERTER_MAKES, GET_BATTERY_MODELS, GET_INVERTER_MODELS } from '@/graphql';
-import { FileTextIcon, ZapIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon, DownloadIcon } from '@/components/icons';
+import { FileTextIcon, ZapIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon, DownloadIcon, AlertCircleIcon } from '@/components/icons';
 
 interface VppCertificateTabProps {
     customerUid: string;
@@ -191,6 +191,9 @@ export function VppCertificateTab({
     const [previewModalOpen, setPreviewModalOpen] = useState(false);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+    const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const errorBoxRef = useRef<HTMLDivElement>(null);
 
     const resolveBatteryMakeName = (val?: string) => {
         if (!val) return '';
@@ -365,27 +368,31 @@ export function VppCertificateTab({
     };
 
 
+    const isFieldEmpty = (val: any): boolean => {
+        if (val === '' || val === null || val === undefined) return true;
+        if (typeof val === 'string' && val.trim() === '') return true;
+        if (typeof val === 'number' && isNaN(val)) return true;
+        return false;
+    };
+
     // Required fields for full certificate generation (excludes if_yes_details, internet_other_text, all test fields + timestamps)
-    const REQUIRED_FIELDS: { key: string; label: string }[] = [
-        { key: 'batteryManufacturer', label: 'Battery Manufacturer' },
-        { key: 'batterySerialNumber', label: 'Battery Serial Number' },
-        { key: 'batteryInstalledDate', label: 'Battery Installed Date' },
-        { key: 'batteryUsableCapacity', label: 'Battery Usable Capacity' },
-        { key: 'inverterManufacturer', label: 'Inverter Manufacturer' },
-        { key: 'inverterSnNumbers', label: 'Inverter Serial Number' },
-        { key: 'inverterCapacity', label: 'Inverter Capacity' },
-        { key: 'modemRouterLocation', label: 'Modem Router Location' },
+    const REQUIRED_FIELDS = [
+        { key: 'inverterManufacturer', label: 'Inverter Manufacturer', stepIndex: 0, stepName: 'Solar and Inverter Details' },
+        { key: 'inverterSnNumbers', label: 'Inverter Serial Number', stepIndex: 0, stepName: 'Solar and Inverter Details' },
+        { key: 'inverterCapacity', label: 'Inverter Capacity', stepIndex: 0, stepName: 'Solar and Inverter Details' },
+        { key: 'batteryManufacturer', label: 'Battery Manufacturer', stepIndex: 1, stepName: 'Battery Details' },
+        { key: 'batterySerialNumber', label: 'Battery Serial Number', stepIndex: 1, stepName: 'Battery Details' },
+        { key: 'batteryInstalledDate', label: 'Battery Installed Date', stepIndex: 1, stepName: 'Battery Details' },
+        { key: 'batteryUsableCapacity', label: 'Battery Usable Capacity', stepIndex: 1, stepName: 'Battery Details' },
+        { key: 'modemRouterLocation', label: 'Modem Router Location', stepIndex: 2, stepName: 'Network & API' },
     ];
 
+    const getMissingFields = () => {
+        return REQUIRED_FIELDS.filter(f => isFieldEmpty((formState as Record<string, unknown>)[f.key]));
+    };
+
     const validateRequiredFields = (): string[] => {
-        const missing: string[] = [];
-        for (const f of REQUIRED_FIELDS) {
-            const val = (formState as Record<string, unknown>)[f.key];
-            if (val === '' || val === null || val === undefined) {
-                missing.push(f.label);
-            }
-        }
-        return missing;
+        return getMissingFields().map(f => f.label);
     };
 
     const buildInputFormat = () => {
@@ -438,9 +445,19 @@ export function VppCertificateTab({
     };
 
     const handleGenerateCertificate = async () => {
-        const missing = validateRequiredFields();
+        setHasAttemptedSubmit(true);
+        setSubmitError(null);
+
+        const missing = getMissingFields();
         if (missing.length > 0) {
-            toast.error(`Please fill all required fields: ${missing.join(', ')}`);
+            const count = missing.length;
+            toast.error(
+                `Cannot ${vppCertificateDetails?.id ? 'update' : 'generate'} certificate: ${count} required ${count === 1 ? 'field is' : 'fields are'} missing. Please review the details below.`,
+                { autoClose: 6000 }
+            );
+            setTimeout(() => {
+                errorBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
             return;
         }
 
@@ -449,13 +466,18 @@ export function VppCertificateTab({
             await generateVppCertificate({
                 variables: { customerUid, input: buildInputFormat() }
             });
-            toast.success('VPP Certificate generated successfully!');
+            toast.success(`VPP Certificate ${vppCertificateDetails?.id ? 'updated' : 'generated'} successfully!`);
+            setHasAttemptedSubmit(false);
             refetch();
             await onUpdate?.();
         } catch (error) {
             console.error('Error generating VPP Certificate:', error);
             const msg = error instanceof Error ? error.message : 'Failed to generate VPP Certificate.';
+            setSubmitError(msg);
             toast.error(msg);
+            setTimeout(() => {
+                errorBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
         } finally {
             setIsSaving(false);
         }
@@ -474,8 +496,9 @@ export function VppCertificateTab({
     const isLastStep = currentStep === STEPS.length - 1;
     const isFirstStep = currentStep === 0;
 
-    const missingFields = validateRequiredFields();
-    const isFormComplete = missingFields.length === 0;
+    const missingFieldItems = getMissingFields();
+    const missingFields = missingFieldItems.map(f => f.label);
+    const isFormComplete = missingFieldItems.length === 0;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
@@ -532,7 +555,9 @@ export function VppCertificateTab({
                 <div className="flex items-center justify-between">
                     {STEPS.map((step, index) => {
                         const StepIcon = step.icon;
-                        const isCompleted = index < currentStep;
+                        const stepMissing = missingFieldItems.filter(f => f.stepIndex === index);
+                        const hasStepErrors = hasAttemptedSubmit && stepMissing.length > 0;
+                        const isCompleted = index < currentStep && stepMissing.length === 0;
                         const isActive = index === currentStep;
                         return (
                             <React.Fragment key={step.id}>
@@ -543,21 +568,34 @@ export function VppCertificateTab({
                                 >
                                     <div
                                         className={`
-                                            w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 border-2
-                                            ${isCompleted
-                                                ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                                                : isActive
-                                                    ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/25'
-                                                    : 'bg-muted/50 border-border text-muted-foreground group-hover:border-muted-foreground/50'
+                                            w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 border-2 relative
+                                            ${hasStepErrors
+                                                ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/25 ring-2 ring-red-400/30'
+                                                : isCompleted
+                                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                                                    : isActive
+                                                        ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/25'
+                                                        : 'bg-muted/50 border-border text-muted-foreground group-hover:border-muted-foreground/50'
                                             }
                                         `}
                                     >
-                                        {isCompleted ? <CheckIcon size={16} /> : <StepIcon size={16} />}
+                                        {hasStepErrors ? (
+                                            <AlertCircleIcon size={18} />
+                                        ) : isCompleted ? (
+                                            <CheckIcon size={16} />
+                                        ) : (
+                                            <StepIcon size={16} />
+                                        )}
+                                        {hasStepErrors && (
+                                            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-extrabold flex items-center justify-center border border-white dark:border-neutral-900">
+                                                {stepMissing.length}
+                                            </span>
+                                        )}
                                     </div>
                                     <span
                                         className={`
                                             text-[10px] font-bold uppercase tracking-wider text-center max-w-[80px] leading-tight transition-colors
-                                            ${isActive ? 'text-primary' : isCompleted ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}
+                                            ${hasStepErrors ? 'text-red-600 dark:text-red-400 font-bold' : isActive ? 'text-primary' : isCompleted ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}
                                         `}
                                     >
                                         {step.label}
@@ -593,11 +631,15 @@ export function VppCertificateTab({
                 <div className="flex flex-wrap items-center gap-3">
                     {isLastStep && !isFormComplete && (
                         <div
-                            className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3 py-1.5 rounded-lg cursor-help"
+                            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border ${
+                                hasAttemptedSubmit
+                                    ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-800/60 font-semibold'
+                                    : 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60'
+                            }`}
                             title={`Missing required fields: ${missingFields.join(', ')}`}
                         >
-                            <span className="font-semibold shrink-0">⚠️ Missing required:</span>
-                            <span className="max-w-[280px] truncate font-medium">{missingFields.join(', ')}</span>
+                            <span className="font-semibold shrink-0">⚠️ {hasAttemptedSubmit ? 'Incomplete:' : 'Missing:'}</span>
+                            <span className="font-medium">{missingFieldItems.length} required {missingFieldItems.length === 1 ? 'field' : 'fields'} missing</span>
                         </div>
                     )}
 
@@ -696,6 +738,7 @@ export function VppCertificateTab({
                                         placeholder="Select brand"
                                         creatable
                                         isLoading={loadingInverterMakes}
+                                        error={hasAttemptedSubmit && isFieldEmpty(formState.inverterManufacturer) ? 'Inverter Manufacturer is required' : undefined}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -711,11 +754,11 @@ export function VppCertificateTab({
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Serial Number(SN numbers) <span className="text-red-500">*</span></label>
-                                    <Input name="inverterSnNumbers" value={formState.inverterSnNumbers} onChange={handleChange} />
+                                    <Input name="inverterSnNumbers" value={formState.inverterSnNumbers} onChange={handleChange} error={hasAttemptedSubmit && isFieldEmpty(formState.inverterSnNumbers) ? 'Inverter Serial Number is required' : undefined} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Capacity (kW) <span className="text-red-500">*</span></label>
-                                    <Input type="number" step="0.1" name="inverterCapacity" value={formState.inverterCapacity} onChange={handleChange} />
+                                    <Input type="number" step="0.1" name="inverterCapacity" value={formState.inverterCapacity} onChange={handleChange} error={hasAttemptedSubmit && isFieldEmpty(formState.inverterCapacity) ? 'Inverter Capacity is required' : undefined} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Life Support Equipment</label>
@@ -748,9 +791,9 @@ export function VppCertificateTab({
                                         onChange={(v: any) => handleManufacturerChange('batteryManufacturer', v as string)}
                                         options={batteryMakeOptions}
                                         placeholder="Select brand"
-
                                         creatable
                                         isLoading={loadingBatteryMakes}
+                                        error={hasAttemptedSubmit && isFieldEmpty(formState.batteryManufacturer) ? 'Battery Manufacturer is required' : undefined}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -767,7 +810,7 @@ export function VppCertificateTab({
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Serial Number(SN numbers) <span className="text-red-500">*</span></label>
-                                    <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" />
+                                    <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" error={hasAttemptedSubmit && isFieldEmpty(formState.batterySerialNumber) ? 'Battery Serial Number is required' : undefined} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Installed Date <span className="text-red-500">*</span></label>
@@ -775,11 +818,12 @@ export function VppCertificateTab({
                                         value={formState.batteryInstalledDate || null}
                                         onChange={(date) => setFormState(prev => ({ ...prev, batteryInstalledDate: date ? date.toISOString().split('T')[0] : '' }))}
                                         placeholder="Select date"
+                                        error={hasAttemptedSubmit && isFieldEmpty(formState.batteryInstalledDate) ? 'Battery Installed Date is required' : undefined}
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Usable Capacity (kWh) <span className="text-red-500">*</span></label>
-                                    <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} />
+                                    <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} error={hasAttemptedSubmit && isFieldEmpty(formState.batteryUsableCapacity) ? 'Battery Usable Capacity is required' : undefined} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Backup Port Connected</label>
@@ -823,7 +867,7 @@ export function VppCertificateTab({
                                 )}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Modem Router Location <span className="text-red-500">*</span></label>
-                                    <Input name="modemRouterLocation" value={formState.modemRouterLocation} onChange={handleChange} />
+                                    <Input name="modemRouterLocation" value={formState.modemRouterLocation} onChange={handleChange} error={hasAttemptedSubmit && isFieldEmpty(formState.modemRouterLocation) ? 'Modem Router Location is required' : undefined} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">API Integration Completed</label>
@@ -843,6 +887,115 @@ export function VppCertificateTab({
                     {/* Step 4 — Testing & Verification */}
                     {STEPS[currentStep].id === 4 && (
                         <div className="space-y-6">
+                            {/* Submission Error Banner */}
+                            {submitError && (
+                                <div className="p-4 rounded-xl border border-red-300 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 flex items-start justify-between gap-3 animate-in fade-in">
+                                    <div className="flex items-center gap-2">
+                                        <AlertCircleIcon size={18} className="text-red-600 dark:text-red-400 shrink-0" />
+                                        <span className="text-sm font-semibold">{submitError}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSubmitError(null)}
+                                        className="text-xs text-red-700 dark:text-red-400 hover:underline font-bold"
+                                    >
+                                        Dismiss
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Missing Required Fields Alert Box */}
+                            {missingFieldItems.length > 0 && (
+                                <div
+                                    ref={errorBoxRef}
+                                    className={`rounded-xl border p-5 transition-all duration-300 animate-in fade-in ${
+                                        hasAttemptedSubmit
+                                            ? 'border-red-300 dark:border-red-900/70 bg-red-50/90 dark:bg-red-950/40 ring-2 ring-red-400/30 shadow-md'
+                                            : 'border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30'
+                                    }`}
+                                >
+                                    <div className="flex items-start gap-3.5">
+                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                            hasAttemptedSubmit
+                                                ? 'bg-red-500 text-white shadow-md shadow-red-500/25'
+                                                : 'bg-amber-500 text-white shadow-md shadow-amber-500/25'
+                                        }`}>
+                                            <AlertCircleIcon size={20} />
+                                        </div>
+                                        <div className="flex-1 space-y-3">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className={`text-sm font-bold ${hasAttemptedSubmit ? 'text-red-900 dark:text-red-200' : 'text-amber-900 dark:text-amber-200'}`}>
+                                                        {hasAttemptedSubmit
+                                                            ? `Cannot ${vppCertificateDetails?.id ? 'Update' : 'Generate'} Certificate — ${missingFieldItems.length} Required ${missingFieldItems.length === 1 ? 'Field' : 'Fields'} Missing`
+                                                            : `Incomplete Form — ${missingFieldItems.length} Required ${missingFieldItems.length === 1 ? 'Field' : 'Fields'} Remaining`
+                                                        }
+                                                    </h4>
+                                                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                                                        hasAttemptedSubmit
+                                                            ? 'bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                                            : 'bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+                                                    }`}>
+                                                        Action Required
+                                                    </span>
+                                                </div>
+                                                <p className={`text-xs mt-1 ${hasAttemptedSubmit ? 'text-red-700 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'}`}>
+                                                    Please complete all required fields across the steps below before clicking <span className="font-semibold">{vppCertificateDetails?.id ? 'Update' : 'Generate'}</span>. Click any step to jump directly to it:
+                                                </p>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                                                {Object.entries(
+                                                    missingFieldItems.reduce<Record<number, typeof missingFieldItems>>((acc, item) => {
+                                                        (acc[item.stepIndex] = acc[item.stepIndex] || []).push(item);
+                                                        return acc;
+                                                    }, {})
+                                                ).map(([stepIdxStr, items]) => {
+                                                    const stepIdx = Number(stepIdxStr);
+                                                    const stepInfo = STEPS[stepIdx];
+                                                    return (
+                                                        <div
+                                                            key={stepIdx}
+                                                            className="bg-background dark:bg-neutral-900 rounded-lg p-3.5 border border-border shadow-xs flex flex-col justify-between gap-3 hover:border-primary/50 transition-colors"
+                                                        >
+                                                            <div>
+                                                                <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/50">
+                                                                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                                                        <span className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-300 text-[10px] flex items-center justify-center font-bold">
+                                                                            {stepIdx + 1}
+                                                                        </span>
+                                                                        {stepInfo.label}
+                                                                    </span>
+                                                                    <span className="text-[10px] font-semibold text-red-500 bg-red-50 dark:bg-red-950 px-1.5 py-0.5 rounded">
+                                                                        {items.length} missing
+                                                                    </span>
+                                                                </div>
+                                                                <ul className="space-y-1.5 pl-4 list-disc text-xs text-muted-foreground">
+                                                                    {items.map(field => (
+                                                                        <li key={field.key} className="text-red-600 dark:text-red-400 font-medium">
+                                                                            {field.label}
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => setCurrentStep(stepIdx)}
+                                                                className="w-full text-xs font-semibold h-8 hover:bg-primary hover:text-primary-foreground transition-colors"
+                                                            >
+                                                                Go to Step {stepIdx + 1} →
+                                                            </Button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Testing & Verification</h4>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
