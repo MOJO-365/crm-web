@@ -42,7 +42,7 @@ const formatIssueDateStr = (val?: any): string => {
 export function VppCertificateTab({
     customerUid,
     onUpdate,
-    vppDetails,
+
     solarDetails
 }: VppCertificateTabProps) {
     const { data, loading, refetch } = useQuery(GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, {
@@ -748,7 +748,7 @@ export function VppCertificateTab({
                                         onChange={(v: any) => handleManufacturerChange('batteryManufacturer', v as string)}
                                         options={batteryMakeOptions}
                                         placeholder="Select brand"
-                                        disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryManufacturer}
+
                                         creatable
                                         isLoading={loadingBatteryMakes}
                                     />
@@ -760,14 +760,14 @@ export function VppCertificateTab({
                                         onChange={(v) => handleBatteryModelChange(v as string)}
                                         options={batteryModelOptions}
                                         placeholder="-"
-                                        disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryModel && vppCertificateDetails.batteryModel !== '-'}
+
                                         creatable={true}
                                         isLoading={loadingBatteryModels}
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Serial Number(SN numbers) <span className="text-red-500">*</span></label>
-                                    <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batterySerialNumber} />
+                                    <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Installed Date <span className="text-red-500">*</span></label>
@@ -779,7 +779,7 @@ export function VppCertificateTab({
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Usable Capacity (kWh) <span className="text-red-500">*</span></label>
-                                    <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} disabled={vppDetails?.vppConnected === 1 && !!vppCertificateDetails?.batteryUsableCapacity} />
+                                    <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Backup Port Connected</label>
