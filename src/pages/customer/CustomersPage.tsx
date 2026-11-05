@@ -271,6 +271,14 @@ export function CustomersPage() {
         return () => clearTimeout(timer);
     }, [searchFilters, debouncedFilters]);
 
+    const hasSearch = !!(
+        debouncedFilters.id?.trim() ||
+        debouncedFilters.name?.trim() ||
+        debouncedFilters.mobile?.trim() ||
+        debouncedFilters.address?.trim() ||
+        debouncedFilters.tariff?.trim()
+    );
+
     const { data, loading, error, refetch } = useQuery<CustomersCursorResponse>(GET_CUSTOMERS_CURSOR, {
         variables: {
             first: limit,
@@ -291,7 +299,7 @@ export function CustomersPage() {
             searchAssignedTo: debouncedFilters.assignedTo || undefined,
             searchCreatedBy: debouncedFilters.createdBy || undefined,
             searchPortal: debouncedFilters.portal || undefined,
-            includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : 'false',
+            includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : ((debouncedFilters.status === '' && hasSearch) ? 'true' : 'false'),
         },
         fetchPolicy: 'network-only',
         notifyOnNetworkStatusChange: true,
@@ -427,7 +435,7 @@ export function CustomersPage() {
                     searchRiskStatus: debouncedFilters.riskStatus || undefined,
                     searchAssignedTo: debouncedFilters.assignedTo || undefined,
                     searchPortal: debouncedFilters.portal || undefined,
-                    includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : 'false',
+                    includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : ((debouncedFilters.status === '' && hasSearch) ? 'true' : 'false'),
                 },
             });
 
