@@ -72,3 +72,7 @@ export * from './queries/appVersions';
 // Web API Credentials
 export * from './queries/webApiCredentials';
 export * from './mutations/webApiCredentials';
+
+// Company References
+export * from './queries/companyRef';
+export * from './mutations/companyRef';

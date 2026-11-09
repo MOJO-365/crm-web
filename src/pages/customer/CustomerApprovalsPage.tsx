@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { DataTable, type Column, Modal } from '@/components/common';
-import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, DELETE_WEB_ENROLLMENT, SEND_OFFER_EMAIL, SEND_PDRS_CONSENT_EMAIL, GET_PEERLESS_COMPANY_NAMES, GET_WEB_API_CREDENTIALS } from '@/graphql';
+import { GET_WEB_ENROLLMENTS, APPROVE_WEB_ENROLLMENT, REJECT_WEB_ENROLLMENT, DELETE_WEB_ENROLLMENT, SEND_OFFER_EMAIL, SEND_PDRS_CONSENT_EMAIL, GET_PEERLESS_COMPANY_NAMES, GET_WEB_API_CREDENTIALS, GET_COMPANY_REFS } from '@/graphql';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -122,36 +122,82 @@ export function CustomerApprovalsPage() {
         fetchPolicy: 'network-only'
     });
 
+    const { data: companyRefsData } = useQuery(GET_COMPANY_REFS, {
+        fetchPolicy: 'network-only'
+    });
+
+    const enrollments = data?.webEnrollments?.data || [];
+    const meta = data?.webEnrollments?.meta;
+
     const portalOptions = React.useMemo(() => {
-        const defaultOptions = [
+        const defaultOptions: { value: string; label: string }[] = [
             { value: '', label: 'All Portals' },
             { value: 'Gee Energy', label: 'Gee Energy' },
             { value: 'PEERLESSGROUP', label: 'Peer Less Group' },
             { value: 'BESS2', label: 'BESS2' }
         ];
 
+        const existingValues = new Set(defaultOptions.map(o => o.value.toLowerCase()));
+
+        // 1. Add from Company References
+        if (companyRefsData?.companyRefs) {
+            for (const comp of companyRefsData.companyRefs) {
+                const val = comp.portalName || comp.name;
+                if (val && !existingValues.has(val.toLowerCase())) {
+                    defaultOptions.push({
+                        value: val,
+                        label: comp.name
+                    });
+                    existingValues.add(val.toLowerCase());
+                }
+                if (comp.name && !existingValues.has(comp.name.toLowerCase())) {
+                    defaultOptions.push({
+                        value: comp.name,
+                        label: comp.name
+                    });
+                    existingValues.add(comp.name.toLowerCase());
+                }
+            }
+        }
+
+        // 2. Add from Web API Credentials
         if (webApiCredsData?.webApiCredentials) {
-            const dynamicOptions = webApiCredsData.webApiCredentials
-                .filter((cred: any) => cred.isActive && cred.isPDRS && cred.portalName)
-                .map((cred: any) => ({
-                    value: cred.portalName,
-                    label: cred.name
-                }));
-            
-            const existingValues = new Set(defaultOptions.map(o => o.value));
-            for (const option of dynamicOptions) {
-                if (!existingValues.has(option.value)) {
-                    defaultOptions.push(option);
-                    existingValues.add(option.value);
+            for (const cred of webApiCredsData.webApiCredentials) {
+                const val = cred.portalName || cred.name;
+                if (val && !existingValues.has(val.toLowerCase())) {
+                    defaultOptions.push({
+                        value: val,
+                        label: cred.name
+                    });
+                    existingValues.add(val.toLowerCase());
+                }
+            }
+        }
+
+        // 3. Add any dynamic portals discovered in current enrollments
+        if (enrollments && enrollments.length > 0) {
+            for (const row of enrollments) {
+                const rawPortal = row.payload?.portalname || row.payload?.portalName || row.payload?.companyName || row.payload?.company_name || row.payload?.createdBy?.company_name;
+                if (rawPortal && typeof rawPortal === 'string' && rawPortal.trim()) {
+                    const trimmed = rawPortal.trim();
+                    if (!existingValues.has(trimmed.toLowerCase())) {
+                        const matchedComp = companyRefsData?.companyRefs?.find((c: any) =>
+                            (c.portalName && c.portalName.toLowerCase() === trimmed.toLowerCase()) ||
+                            (c.code && c.code.toLowerCase() === trimmed.toLowerCase()) ||
+                            (c.name && c.name.toLowerCase() === trimmed.toLowerCase())
+                        );
+                        defaultOptions.push({
+                            value: trimmed,
+                            label: matchedComp?.name || trimmed
+                        });
+                        existingValues.add(trimmed.toLowerCase());
+                    }
                 }
             }
         }
 
         return defaultOptions;
-    }, [webApiCredsData]);
-
-    const enrollments = data?.webEnrollments?.data || [];
-    const meta = data?.webEnrollments?.meta;
+    }, [webApiCredsData, companyRefsData, enrollments]);
 
     const [sendOfferEmail] = useMutation(SEND_OFFER_EMAIL, {
         onCompleted: () => {
@@ -581,13 +627,27 @@ export function CustomerApprovalsPage() {
                 </div>
             ),
             render: (row) => {
-                const rawPortal = row.payload?.portalname || row.payload?.portalName;
+                const rawPortal = row.payload?.portalname || row.payload?.portalName || row.payload?.companyName || row.payload?.company_name || row.payload?.createdBy?.company_name;
                 let displayPortal = rawPortal ? String(rawPortal) : '-';
                 
                 if (webApiCredsData?.webApiCredentials && rawPortal) {
-                    const matchedCred = webApiCredsData.webApiCredentials.find((c: any) => c.portalName === rawPortal);
+                    const matchedCred = webApiCredsData.webApiCredentials.find((c: any) => 
+                        (c.portalName && c.portalName.toLowerCase() === String(rawPortal).toLowerCase()) ||
+                        (c.name && c.name.toLowerCase() === String(rawPortal).toLowerCase())
+                    );
                     if (matchedCred && matchedCred.name) {
                         displayPortal = matchedCred.name;
+                    }
+                }
+
+                if (companyRefsData?.companyRefs && rawPortal) {
+                    const matchedComp = companyRefsData.companyRefs.find((c: any) => 
+                        (c.portalName && c.portalName.toLowerCase() === String(rawPortal).toLowerCase()) || 
+                        (c.code && c.code.toLowerCase() === String(rawPortal).toLowerCase()) || 
+                        (c.name && c.name.toLowerCase() === String(rawPortal).toLowerCase())
+                    );
+                    if (matchedComp && matchedComp.name) {
+                        displayPortal = matchedComp.name;
                     }
                 }
 

@@ -3,11 +3,11 @@ import { useQuery, useMutation } from '@apollo/client';
 import { toast } from 'react-toastify';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/ui/Button';
-import { 
-    ChevronRightIcon, 
-    ShieldCheckIcon, 
-    ShieldIcon, 
-    CloseIcon, 
+import {
+    ChevronRightIcon,
+    ShieldCheckIcon,
+    ShieldIcon,
+    CloseIcon,
     ZapIcon,
     UserIcon,
     BatteryIcon,
@@ -16,7 +16,9 @@ import {
     MailIcon,
     FileTextIcon,
     UserSettingIcon,
-    ListIcon
+    ListIcon,
+    SearchIcon,
+    BuildingIcon
 } from '@/components/icons';
 import {
     GET_MENUS,
@@ -112,6 +114,8 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
 
     const [updatePermissions] = useMutation(UPDATE_PERMISSIONS);
     const [upsertRoleFeaturePermission] = useMutation(UPSERT_ROLE_FEATURE_PERMISSION);
+    const rawMenus = useMemo<Menu[]>(() => menuData?.menus?.data || [], [menuData]);
+    const menus: Menu[] = rawMenus;
 
     // Initialize permissions from server
     useEffect(() => {
@@ -127,10 +131,48 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
                     canDelete: p.canDelete,
                 };
             });
+
+            // If company_ref exists in menus, ensure virtual mapping is mirrored
+            const compMenu = menus.find((m: Menu) => m.code === 'company_ref');
+            const isMasterOrAdmin = role.name?.toLowerCase().includes('master') || role.name?.toLowerCase().includes('admin');
+            if (compMenu) {
+                if (map[compMenu.uid]) {
+                    map['company_ref_virtual_uid'] = {
+                        ...map[compMenu.uid],
+                        menuUid: 'company_ref_virtual_uid'
+                    };
+                } else if (isMasterOrAdmin) {
+                    map[compMenu.uid] = {
+                        roleUid: role.uid,
+                        menuUid: compMenu.uid,
+                        canView: true,
+                        canCreate: true,
+                        canEdit: true,
+                        canDelete: true,
+                    };
+                    map['company_ref_virtual_uid'] = {
+                        ...map[compMenu.uid],
+                        menuUid: 'company_ref_virtual_uid'
+                    };
+                }
+            } else if (isMasterOrAdmin) {
+                // Default enabled for master/admin roles
+                if (!map['company_ref_virtual_uid']) {
+                    map['company_ref_virtual_uid'] = {
+                        roleUid: role.uid,
+                        menuUid: 'company_ref_virtual_uid',
+                        canView: true,
+                        canCreate: true,
+                        canEdit: true,
+                        canDelete: true,
+                    };
+                }
+            }
+
             setPermissionsMap(map);
             setInitialPermissionsMap(map);
         }
-    }, [rolePermissionData, isOpen]);
+    }, [rolePermissionData, isOpen, menus, role]);
 
     // Initialize feature permissions from server
     useEffect(() => {
@@ -214,12 +256,10 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
         return changed;
     }, [featurePermissionsMap, initialFeaturePermissionsMap]);
 
-    const rawMenus = useMemo(() => menuData?.menus?.data || [], [menuData]);
-    const menus = rawMenus;
 
     const topLevelMenus = useMemo(() => {
         const topLevel = menus.filter((m: Menu) => !m.parentUid);
-        
+
         if (role.isIndependentUi) {
             // If the role has an independent UI, ONLY show the menu associated with this UI
             return topLevel.filter((m: Menu) => m.name === role.name || m.code === 'branch_portal');
@@ -237,7 +277,7 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
         if (!selectedMenuUid) return [];
         return featuresMap[selectedMenuUid] || featureData?.features || [];
     }, [selectedMenuUid, featuresMap, featureData]);
-    
+
     // Icon mapping for modules
     const iconMap: Record<string, any> = {
         leads: UserIcon,
@@ -251,7 +291,8 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
         plans_master: ListIcon,
         battery_master: BatteryIcon,
         inverter_master: InverterIcon,
-        rates: ZapIcon
+        rates: ZapIcon,
+        company_ref: BuildingIcon
     };
 
     // Default Selection
@@ -487,12 +528,40 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
 
     const currentChildMenus = useMemo(() => {
         if (!selectedMenuUid) return [];
-        let children = getChildMenus(selectedMenuUid);
+        let children = [...getChildMenus(selectedMenuUid)];
+
+        const selectedMenu = menus.find((m: Menu) => m.uid === selectedMenuUid);
+        const isMasterMenu = selectedMenu && (
+            selectedMenu.code === 'master' ||
+            selectedMenu.code === 'master_data' ||
+            selectedMenu.name?.toLowerCase().includes('master')
+        );
+
+        if (isMasterMenu) {
+            const hasCompanyRef = children.some((c: Menu) => c.code === 'company_ref');
+            if (!hasCompanyRef) {
+                const existingCompanyRef = menus.find((m: Menu) => m.code === 'company_ref');
+                if (existingCompanyRef) {
+                    children.push(existingCompanyRef);
+                } else {
+                    children.push({
+                        uid: 'company_ref_virtual_uid',
+                        name: 'Company References',
+                        code: 'company_ref',
+                        parentUid: selectedMenuUid
+                    } as Menu);
+                }
+            }
+        }
+
+        // Sort sub-menus alphabetically by name for clarity
+        children.sort((a: Menu, b: Menu) => a.name.localeCompare(b.name));
+
         if (searchQuery) {
             children = children.filter((m: Menu) => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
         }
         return children;
-    }, [selectedMenuUid, getChildMenus, searchQuery]);
+    }, [selectedMenuUid, getChildMenus, menus, searchQuery]);
 
     const selectedMenuName = menus.find((m: Menu) => m.uid === selectedMenuUid)?.name;
 
@@ -509,9 +578,12 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
             if (changedMenus.size > 0) {
                 const permissionsToUpdate = Array.from(changedMenus).map(menuUid => {
                     const perm = permissionsMap[menuUid];
+                    const realMenuUid = menuUid === 'company_ref_virtual_uid'
+                        ? (menus.find((m: Menu) => m.code === 'company_ref')?.uid || 'company_ref')
+                        : menuUid;
                     return {
                         roleUid: role.uid,
-                        menuUid,
+                        menuUid: realMenuUid,
                         canView: perm?.canView ?? false,
                         canCreate: perm?.canCreate ?? false,
                         canEdit: perm?.canEdit ?? false,
@@ -661,6 +733,16 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({ isOp
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                                     {selectedMenuName}
                                 </h3>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Search sub-menus..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="text-xs px-3 py-1.5 pl-8 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-[#5c8a14] w-52 text-gray-700 dark:text-gray-200 placeholder-gray-400"
+                                    />
+                                    <SearchIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                                </div>
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">

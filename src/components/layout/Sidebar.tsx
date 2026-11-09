@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAccessibleMenus, useUser } from '@/stores/useAuthStore';
-import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon, ListIcon, ActivityIcon, UploadIcon, PlugIcon, TagIcon, KeyIcon } from '@/components/icons';
+import { CustomerIcon, RatesIcon, UserSettingIcon, FileTextIcon, ShieldCheckIcon, ChevronRightIcon, ChevronDownIcon, UserIcon, MailIcon, CopyIcon, SendIcon, DocumentTypeIcon, NoteTypeIcon, NotificationIcon, ShieldIcon, CalendarIcon, ZapIcon, BatteryIcon, InverterIcon, ListIcon, ActivityIcon, UploadIcon, PlugIcon, TagIcon, KeyIcon, BuildingIcon } from '@/components/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 // Dashboard icon component (locally defined in Header originally)
@@ -60,7 +60,8 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     maintenance_tracker: ListIcon,
     insights: ActivityIcon,
     app_versions: TagIcon,
-    api_credentials: KeyIcon
+    api_credentials: KeyIcon,
+    company_ref: BuildingIcon
 };
 
 // Path mapping
@@ -94,7 +95,8 @@ const pathMap: Record<string, string> = {
     maintenance_tracker: '/maintenance-tracker',
     insights: '/insights',
     app_versions: '/app-versions',
-    api_credentials: '/api-credentials'
+    api_credentials: '/api-credentials',
+    company_ref: '/company-ref'
     // user_management and email have no path, they are groupers
 };
 
@@ -166,7 +168,25 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
     const popoverRef = useRef<HTMLDivElement>(null);
 
     // Group menus and sort by sortOrder then name
-    const sortedMenus = [...accessibleMenus].sort((a, b) => {
+    const allMenus = [...accessibleMenus];
+
+    // Ensure Company References is present under Master parent menu if user has Master access
+    const masterParent = allMenus.find(m => (m.menuCode === 'master' || m.menuCode === 'master_data' || m.menuName?.toLowerCase().includes('master')) && !m.parentUid);
+    if (masterParent && !allMenus.some(m => m.menuCode === 'company_ref')) {
+        allMenus.push({
+            menuUid: 'company_ref_sidebar_uid',
+            menuName: 'Company References',
+            menuCode: 'company_ref',
+            parentUid: masterParent.menuUid,
+            sortOrder: 85,
+            canView: true,
+            canCreate: true,
+            canEdit: true,
+            canDelete: true
+        });
+    }
+
+    const sortedMenus = allMenus.sort((a, b) => {
         const sortA = a.sortOrder ?? 999;
         const sortB = b.sortOrder ?? 999;
         if (sortA !== sortB) return sortA - sortB;
@@ -188,7 +208,7 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
 
     // Auto-expand parent if child is active
     useEffect(() => {
-        const activeChild = accessibleMenus.find(m => {
+        const activeChild = sortedMenus.find(m => {
             const path = pathMap[m.menuCode] || `/${m.menuCode}`;
             return location.pathname.startsWith(path) && path !== '/';
         });
@@ -199,7 +219,7 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                 [activeChild.parentUid!]: true
             }));
         }
-    }, [location.pathname, accessibleMenus]);
+    }, [location.pathname, sortedMenus]);
 
     const toggleSubMenu = (uid: string) => {
         if (!isOpen) {

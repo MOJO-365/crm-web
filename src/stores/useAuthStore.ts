@@ -146,12 +146,26 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
             if (data?.me) {
                 const user = data.me as UserInfo;
+                const menus = [...(user.accessibleMenus || [])];
+                const masterParent = menus.find(m => (m.menuCode === 'master' || m.menuCode === 'master_data' || m.menuName?.toLowerCase().includes('master')) && !m.parentUid);
+                if (masterParent && !menus.some(m => m.menuCode === 'company_ref')) {
+                    menus.push({
+                        menuUid: 'company_ref_auto_uid',
+                        menuName: 'Company References',
+                        menuCode: 'company_ref',
+                        parentUid: masterParent.menuUid,
+                        sortOrder: 85,
+                        canView: true,
+                        canCreate: true,
+                        canEdit: true,
+                        canDelete: true,
+                    });
+                }
                 set({
                     user,
-                    accessibleMenus: user.accessibleMenus || [],
+                    accessibleMenus: menus,
                     accessibleFeatures: user.accessibleFeatures || [],
                     hasFetched: true,
-
                     isLoading: false,
                 });
             } else {
@@ -174,21 +188,37 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     // Permission helpers
     canViewMenu: (menuCode: string) => {
+        if (menuCode === 'company_ref') {
+            const hasMaster = get().accessibleMenus.some(m => (m.menuCode === 'master' || m.menuCode === 'master_data') && m.canView);
+            if (hasMaster || get().user?.isMaster) return true;
+        }
         const menu = get().accessibleMenus.find(m => m.menuCode === menuCode);
         return menu?.canView ?? false;
     },
 
     canCreateInMenu: (menuCode: string) => {
+        if (menuCode === 'company_ref') {
+            const hasMaster = get().accessibleMenus.some(m => (m.menuCode === 'master' || m.menuCode === 'master_data') && m.canCreate);
+            if (hasMaster || get().user?.isMaster) return true;
+        }
         const menu = get().accessibleMenus.find(m => m.menuCode === menuCode);
         return menu?.canCreate ?? false;
     },
 
     canEditInMenu: (menuCode: string) => {
+        if (menuCode === 'company_ref') {
+            const hasMaster = get().accessibleMenus.some(m => (m.menuCode === 'master' || m.menuCode === 'master_data') && m.canEdit);
+            if (hasMaster || get().user?.isMaster) return true;
+        }
         const menu = get().accessibleMenus.find(m => m.menuCode === menuCode);
         return menu?.canEdit ?? false;
     },
 
     canDeleteInMenu: (menuCode: string) => {
+        if (menuCode === 'company_ref') {
+            const hasMaster = get().accessibleMenus.some(m => (m.menuCode === 'master' || m.menuCode === 'master_data') && m.canDelete);
+            if (hasMaster || get().user?.isMaster) return true;
+        }
         const menu = get().accessibleMenus.find(m => m.menuCode === menuCode);
         return menu?.canDelete ?? false;
     },

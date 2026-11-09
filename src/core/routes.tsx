@@ -49,6 +49,8 @@ const PushToUtilmatePage = lazyWithRetry(() => import('@/pages/trackers/PushToUt
 const MaintenanceTrackerPage = lazyWithRetry(() => import('@/pages/trackers/MaintenanceTrackerPage').then(m => ({ default: m.MaintenanceTrackerPage })));
 const AppVersionsPage = lazyWithRetry(() => import('@/pages/master/AppVersionsPage').then(m => ({ default: m.AppVersionsPage })));
 const WebApiCredentialsPage = lazyWithRetry(() => import('@/pages/master/WebApiCredentialsPage').then(m => ({ default: m.WebApiCredentialsPage })));
+const CompanyRefPage = lazyWithRetry(() => import('@/pages/master/CompanyRefPage').then(m => ({ default: m.CompanyRefPage })));
+const CompanyEnrollmentPage = lazyWithRetry(() => import('@/pages/enrollment/CompanyEnrollmentPage').then(m => ({ default: m.CompanyEnrollmentPage })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -86,6 +88,8 @@ const router = createBrowserRouter(
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/account-enrollment/:uid" element={<CustomerViewPage />} />
+            <Route path="/enroll/:code" element={<CompanyEnrollmentPage />} />
+            <Route path="/company-enrollment/:code" element={<CompanyEnrollmentPage />} />
 
             {/* Root handler for Offer Page (public) vs Dashboard (protected) */}
             <Route path="/" element={<RootRouteHandler />} />
@@ -138,6 +142,7 @@ const router = createBrowserRouter(
                 <Route path="/master-data" element={<RequirePermission menuCode="document_types"><MasterDataPage /></RequirePermission>} />
                 <Route path="/app-versions" element={<RequirePermission menuCode="app_versions"><AppVersionsPage /></RequirePermission>} />
                 <Route path="/api-credentials" element={<RequirePermission menuCode="api_credentials"><WebApiCredentialsPage /></RequirePermission>} />
+                <Route path="/company-ref" element={<RequirePermission menuCode="company_ref"><CompanyRefPage /></RequirePermission>} />
 
                 {/* General authenticated routes */}
                 <Route path="/change-password" element={<ChangePasswordPage />} />

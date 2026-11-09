@@ -12,10 +12,10 @@ interface RequirePermissionProps {
  * Authentication is assumed to be already handled by parent ProtectedRoute.
  */
 export function RequirePermission({ children, menuCode }: RequirePermissionProps) {
-    const { accessibleMenus } = useAuthStore();
+    const { accessibleMenus, user } = useAuthStore();
 
-    const hasAccess = accessibleMenus.some(
-        menu => menu.menuCode === menuCode && menu.canView
+    const hasAccess = user?.isMaster || accessibleMenus.some(
+        menu => (menu.menuCode === menuCode || (menuCode === 'company_ref' && (menu.menuCode === 'document_types' || menu.menuCode === 'api_credentials'))) && menu.canView
     );
 
     if (!hasAccess) {

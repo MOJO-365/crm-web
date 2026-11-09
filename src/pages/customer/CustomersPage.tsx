@@ -7,7 +7,7 @@ import {
     PlusIcon, PencilIcon,
     CheckIcon, XIcon, MailIcon, RefreshCwIcon, CreditCardIcon, UsersIcon
 } from '@/components/icons';
-import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES, GET_USERS, GET_LEAD_SOURCES, GET_WEB_API_CREDENTIALS } from '@/graphql';
+import { GET_CUSTOMERS_CURSOR, RESTORE_CUSTOMER, GET_ALL_FILTERED_CUSTOMER_IDS, GET_RISK_STATUSES, GET_USERS, GET_LEAD_SOURCES, GET_WEB_API_CREDENTIALS, GET_COMPANY_REFS } from '@/graphql';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -215,6 +215,9 @@ export function CustomersPage() {
 
     const { data: sourcesData } = useQuery(GET_LEAD_SOURCES);
     const { data: credentialsData } = useQuery(GET_WEB_API_CREDENTIALS);
+    const { data: companyRefsData } = useQuery(GET_COMPANY_REFS, {
+        variables: { activeOnly: true }
+    });
 
     const { data: userData } = useQuery(GET_USERS, {
         variables: { limit: 1000, status: 'ACTIVE', onlyVisibleRoles: true },
@@ -241,19 +244,26 @@ export function CustomersPage() {
                 label: c.name
             }));
 
+        const companyOptions = (companyRefsData?.companyRefs || [])
+            .filter((c: any) => c.isActive)
+            .map((c: any) => ({
+                value: c.portalName || c.name,
+                label: c.name
+            }));
+
         const leadOptions = (sourcesData?.leadSources || []).map((s: any) => ({
             value: s.name,
             label: s.name
         }));
 
         // Combine and filter out duplicates based on value
-        const allOptions = [...baseOptions, ...credentialOptions, ...leadOptions];
+        const allOptions = [...baseOptions, ...credentialOptions, ...companyOptions, ...leadOptions];
         const uniqueOptions = allOptions.filter((option, index, self) =>
             index === self.findIndex((t) => t.value === option.value)
         );
 
         return uniqueOptions;
-    }, [sourcesData, credentialsData]);
+    }, [sourcesData, credentialsData, companyRefsData]);
 
     // Debounce search and reset pagination
     useEffect(() => {
