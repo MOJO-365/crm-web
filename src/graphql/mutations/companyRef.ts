@@ -119,3 +119,10 @@ export const TOGGLE_COMPANY_REF_LINK_STATUS = gql`
     }
 `;
 
+export const DELETE_COMPANY_REF_LINK = gql`
+    mutation DeleteCompanyRefLink($uid: String!) {
+        deleteCompanyRefLink(uid: $uid)
+    }
+`;
+
+

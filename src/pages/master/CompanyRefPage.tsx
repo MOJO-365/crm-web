@@ -7,6 +7,7 @@ import {
     DELETE_COMPANY_REF,
     GENERATE_COMPANY_REF_LINK,
     TOGGLE_COMPANY_REF_LINK_STATUS,
+    DELETE_COMPANY_REF_LINK,
     GET_COMPANY_REF_SUBMISSIONS
 } from '@/graphql';
 import { Button } from '@/components/ui/Button';
@@ -78,6 +79,10 @@ export const CompanyRefPage = () => {
     const [newCustomCode, setNewCustomCode] = useState('');
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+    // Delete Link Confirmation Modal State
+    const [deleteLinkModalOpen, setDeleteLinkModalOpen] = useState(false);
+    const [linkToDelete, setLinkToDelete] = useState<CompanyRefLink | null>(null);
+
     // GraphQL Queries & Mutations
     const { data, loading, error, refetch } = useQuery(GET_COMPANY_REFS, {
         fetchPolicy: 'network-only'
@@ -98,6 +103,7 @@ export const CompanyRefPage = () => {
     const [deleteCompany, { loading: deleting }] = useMutation(DELETE_COMPANY_REF);
     const [generateLink, { loading: generatingLink }] = useMutation(GENERATE_COMPANY_REF_LINK);
     const [toggleLinkStatus] = useMutation(TOGGLE_COMPANY_REF_LINK_STATUS);
+    const [deleteLinkMutation, { loading: deletingLink }] = useMutation(DELETE_COMPANY_REF_LINK);
 
     const companies: CompanyRef[] = useMemo(() => {
         return data?.companyRefs || [];
@@ -411,6 +417,34 @@ export const CompanyRefPage = () => {
             refetch();
         } catch (err: any) {
             toast.error(err.message || 'Failed to update link status');
+        }
+    };
+
+    const handleDeleteLinkClick = (link: CompanyRefLink) => {
+        setLinkToDelete(link);
+        setDeleteLinkModalOpen(true);
+    };
+
+    const handleConfirmDeleteLink = async () => {
+        if (!linkToDelete) return;
+        try {
+            await deleteLinkMutation({
+                variables: { uid: linkToDelete.uid }
+            });
+            toast.success('Referral link deleted successfully');
+            setDeleteLinkModalOpen(false);
+
+            if (activeCompanyForLinks) {
+                setActiveCompanyForLinks(prev => prev ? ({
+                    ...prev,
+                    links: (prev.links || []).filter(l => l.uid !== linkToDelete.uid),
+                    linksCount: Math.max(0, (prev.linksCount ?? prev.links?.length ?? 1) - 1)
+                }) : null);
+            }
+            setLinkToDelete(null);
+            await refetch();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to delete referral link');
         }
     };
 
@@ -852,6 +886,39 @@ export const CompanyRefPage = () => {
                 </div>
             </Modal>
 
+            {/* Delete Referral Link Confirmation Modal */}
+            <Modal
+                isOpen={deleteLinkModalOpen}
+                onClose={() => setDeleteLinkModalOpen(false)}
+                title="Delete Referral Link"
+                size="md"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-foreground">
+                        Are you sure you want to delete referral link <span className="font-semibold text-red-500 font-mono">{linkToDelete?.linkCode}</span> ({linkToDelete?.campaignName || 'Referral Link'})?
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        Customers clicking this link in the future will see that the referral link is unavailable.
+                    </p>
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeleteLinkModalOpen(false)}
+                            disabled={deletingLink}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleConfirmDeleteLink}
+                            disabled={deletingLink}
+                        >
+                            {deletingLink ? 'Deleting...' : 'Delete Link'}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
             {/* Links Generation & History Modal */}
             <Modal
                 isOpen={isLinksModalOpen}
@@ -991,7 +1058,7 @@ export const CompanyRefPage = () => {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleCopy(fullUrl, link.uid)}
-                                                                className="p-1.5 border border-border rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                                                                className="p-1.5 border border-border rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                                                 title="Copy link"
                                                             >
                                                                 <CopyIcon size={13} />
@@ -1000,11 +1067,19 @@ export const CompanyRefPage = () => {
                                                                 href={fullUrl}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                className="p-1.5 border border-border rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                                                                className="p-1.5 border border-border rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                                                 title="Open enrollment page in new tab"
                                                             >
                                                                 <ExternalLinkIcon size={13} />
                                                             </a>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteLinkClick(link)}
+                                                                className="p-1.5 border border-red-200 dark:border-red-900 rounded bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/50 transition-colors"
+                                                                title="Delete referral link"
+                                                            >
+                                                                <TrashIcon size={13} />
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </tr>
