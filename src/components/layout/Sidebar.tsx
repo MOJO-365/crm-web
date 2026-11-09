@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -167,43 +167,48 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
     const parentRefs = useRef<Record<string, HTMLButtonElement | null>>({});
     const popoverRef = useRef<HTMLDivElement>(null);
 
-    // Group menus and sort by sortOrder then name
-    const allMenus = [...accessibleMenus];
+    // Group menus and sort by sortOrder then name memoized to prevent infinite re-render loops
+    const sortedMenus = useMemo(() => {
+        const allMenus = [...accessibleMenus];
 
-    // Ensure Company References is present under Master parent menu if user has Master access
-    const masterParent = allMenus.find(m => (m.menuCode === 'master' || m.menuCode === 'master_data' || m.menuName?.toLowerCase().includes('master')) && !m.parentUid);
-    if (masterParent && !allMenus.some(m => m.menuCode === 'company_ref')) {
-        allMenus.push({
-            menuUid: 'company_ref_sidebar_uid',
-            menuName: 'Company References',
-            menuCode: 'company_ref',
-            parentUid: masterParent.menuUid,
-            sortOrder: 85,
-            canView: true,
-            canCreate: true,
-            canEdit: true,
-            canDelete: true
-        });
-    }
-
-    const sortedMenus = allMenus.sort((a, b) => {
-        const sortA = a.sortOrder ?? 999;
-        const sortB = b.sortOrder ?? 999;
-        if (sortA !== sortB) return sortA - sortB;
-        return a.menuName.localeCompare(b.menuName);
-    });
-
-    const rootMenus = sortedMenus.filter(m => {
-        if (m.parentUid || m.menuCode === 'dashboard') return false;
-
-        // Hide User Management for non-masters in independent UI
-        if (user?.isIndependentUi && !user?.isMaster) {
-            if (m.menuCode === 'user_management' || m.menuCode === 'users' || m.menuCode === 'roles') {
-                return false;
-            }
+        // Ensure Company References is present under Master parent menu if user has Master access
+        const masterParent = allMenus.find(m => (m.menuCode === 'master' || m.menuCode === 'master_data' || m.menuName?.toLowerCase().includes('master')) && !m.parentUid);
+        if (masterParent && !allMenus.some(m => m.menuCode === 'company_ref')) {
+            allMenus.push({
+                menuUid: 'company_ref_sidebar_uid',
+                menuName: 'Company References',
+                menuCode: 'company_ref',
+                parentUid: masterParent.menuUid,
+                sortOrder: 85,
+                canView: true,
+                canCreate: true,
+                canEdit: true,
+                canDelete: true
+            });
         }
-        return true;
-    });
+
+        return allMenus.sort((a, b) => {
+            const sortA = a.sortOrder ?? 999;
+            const sortB = b.sortOrder ?? 999;
+            if (sortA !== sortB) return sortA - sortB;
+            return a.menuName.localeCompare(b.menuName);
+        });
+    }, [accessibleMenus]);
+
+    const rootMenus = useMemo(() => {
+        return sortedMenus.filter(m => {
+            if (m.parentUid || m.menuCode === 'dashboard') return false;
+
+            // Hide User Management for non-masters in independent UI
+            if (user?.isIndependentUi && !user?.isMaster) {
+                if (m.menuCode === 'user_management' || m.menuCode === 'users' || m.menuCode === 'roles') {
+                    return false;
+                }
+            }
+            return true;
+        });
+    }, [sortedMenus, user?.isIndependentUi, user?.isMaster]);
+
     const getChildren = (parentUid: string) => sortedMenus.filter(m => m.parentUid === parentUid);
 
     // Auto-expand parent if child is active
@@ -214,10 +219,15 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
         });
 
         if (activeChild && activeChild.parentUid) {
-            setExpandedMenus(prev => ({
-                ...prev,
-                [activeChild.parentUid!]: true
-            }));
+            setExpandedMenus(prev => {
+                if (prev[activeChild.parentUid!]) {
+                    return prev;
+                }
+                return {
+                    ...prev,
+                    [activeChild.parentUid!]: true
+                };
+            });
         }
     }, [location.pathname, sortedMenus]);
 

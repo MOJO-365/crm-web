@@ -18,7 +18,7 @@ export function DynamicLayout({ children }: { children?: React.ReactNode }) {
         
         return (
             <div className="w-full h-screen bg-gray-50 overflow-auto">
-                {children || <Outlet />}
+                {children || <Outlet key={location.pathname} />}
             </div>
         );
     }
@@ -31,7 +31,7 @@ export function DynamicLayout({ children }: { children?: React.ReactNode }) {
 
     return (
         <MainLayout>
-            {children || <Outlet />}
+            {children || <Outlet key={location.pathname} />}
         </MainLayout>
     );
 }
