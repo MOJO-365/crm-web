@@ -444,54 +444,72 @@ export const CompanyEnrollmentPage = () => {
 
     // Step Progress Indicator for Step 1 and Step 2
     const renderStepProgress = () => (
-        <div className="pt-1 pb-2">
-            <div className="flex items-center justify-between gap-2">
-                {/* Step 1 Pill */}
-                <div className={cn(
-                    "flex-1 flex items-center gap-2 p-2.5 rounded-xl border text-xs transition-all",
-                    currentView === 'step1'
-                        ? "bg-primary/10 border-primary/30 text-primary font-semibold"
-                        : "bg-muted/40 border-border text-muted-foreground"
-                )}>
+        <div className="py-1">
+            <div className="flex items-center justify-between gap-3 relative">
+                {/* Step 1 Indicator */}
+                <div
+                    onClick={() => currentView === 'step2' && setCurrentView('step1')}
+                    className={cn(
+                        "flex items-center gap-2.5 min-w-0 transition-all",
+                        currentView === 'step2' ? "cursor-pointer group" : ""
+                    )}
+                >
                     <div className={cn(
-                        "w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold",
+                        "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all shadow-2xs",
                         currentView === 'step2'
-                            ? "bg-primary text-primary-foreground"
+                            ? "bg-primary text-primary-foreground group-hover:scale-105"
                             : currentView === 'step1'
-                            ? "bg-primary text-primary-foreground"
+                            ? "bg-primary text-primary-foreground ring-4 ring-primary/15"
                             : "bg-muted text-muted-foreground"
                     )}>
-                        {currentView === 'step2' ? <CheckIcon size={12} strokeWidth={3} /> : '1'}
+                        {currentView === 'step2' ? <CheckIcon size={13} strokeWidth={3} /> : '1'}
                     </div>
-                    <span className="truncate">1. Customer Information</span>
+                    <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-tight">Step 1</span>
+                        <span className={cn(
+                            "text-xs truncate leading-tight transition-colors",
+                            currentView === 'step1' ? "text-primary font-bold" : currentView === 'step2' ? "text-foreground group-hover:text-primary font-medium" : "text-muted-foreground font-medium"
+                        )}>
+                            Customer Info
+                        </span>
+                    </div>
                 </div>
 
-                <div className="w-4 h-0.5 bg-border shrink-0" />
-
-                {/* Step 2 Pill */}
-                <div className={cn(
-                    "flex-1 flex items-center gap-2 p-2.5 rounded-xl border text-xs transition-all",
-                    currentView === 'step2'
-                        ? "bg-primary/10 border-primary/30 text-primary font-semibold"
-                        : "bg-muted/40 border-border text-muted-foreground"
-                )}>
+                {/* Connecting Progress Track */}
+                <div className="flex-1 mx-2 sm:mx-4 h-1 bg-muted/80 rounded-full overflow-hidden">
                     <div className={cn(
-                        "w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold",
+                        "h-full bg-primary transition-all duration-300 ease-out",
+                        currentView === 'step2' ? "w-full" : "w-0"
+                    )} />
+                </div>
+
+                {/* Step 2 Indicator */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={cn(
+                        "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all shadow-2xs",
                         currentView === 'step2'
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
+                            ? "bg-primary text-primary-foreground ring-4 ring-primary/15"
+                            : "bg-muted/70 text-muted-foreground border border-border/80"
                     )}>
                         2
                     </div>
-                    <span className="truncate">2. Supply Details & Submit</span>
+                    <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-tight">Step 2</span>
+                        <span className={cn(
+                            "text-xs leading-tight truncate transition-colors",
+                            currentView === 'step2' ? "text-primary font-bold" : "text-muted-foreground font-medium"
+                        )}>
+                            Supply Details
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 py-10 px-4 sm:px-6 flex justify-center">
-            <div className="w-full max-w-2xl bg-card border border-border/80 rounded-[28px] p-6 sm:p-9 shadow-sm space-y-6">
+        <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 py-8 px-4 sm:px-6 flex justify-center items-start">
+            <div className="w-full max-w-2xl bg-card border border-border/80 rounded-[24px] p-5 sm:p-7 shadow-sm space-y-5">
 
                 {/* Shared Top Header */}
                 {renderTopHeader()}
@@ -500,7 +518,7 @@ export const CompanyEnrollmentPage = () => {
                 {/* VIEW 0: FIRST SCREEN (As shown in user's reference image)   */}
                 {/* ========================================================== */}
                 {currentView === 'overview' && (
-                    <div className="space-y-6 animate-in fade-in duration-150">
+                    <div className="space-y-5 animate-in fade-in duration-150">
                         {/* Referral Partner Card */}
                         {renderPartnerCard()}
 
@@ -518,7 +536,7 @@ export const CompanyEnrollmentPage = () => {
                         <div className="grid grid-cols-2 gap-3">
                             <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
                                 <span className="text-2xl font-bold text-foreground tracking-tight">$300</span>
-                                <span className="text-[11px] text-muted-foreground mt-0.5">Welcome credit*</span>
+                                <span className="text-[11px] text-muted-foreground mt-0.5">Welcome credit</span>
                             </div>
 
                             <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
@@ -528,12 +546,12 @@ export const CompanyEnrollmentPage = () => {
 
                             <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
                                 <span className="text-2xl font-bold text-foreground tracking-tight">30¢</span>
-                                <span className="text-[11px] text-muted-foreground mt-0.5">Import rate / kWh*</span>
+                                <span className="text-[11px] text-muted-foreground mt-0.5">Import rate / kWh</span>
                             </div>
 
                             <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
                                 <span className="text-2xl font-bold text-foreground tracking-tight">Up to 30¢</span>
-                                <span className="text-[11px] text-muted-foreground mt-0.5">Battery export FiT / kWh*</span>
+                                <span className="text-[11px] text-muted-foreground mt-0.5">Battery export FiT / kWh</span>
                             </div>
                         </div>
 
@@ -554,7 +572,7 @@ export const CompanyEnrollmentPage = () => {
                         </div>
 
                         {/* Divider */}
-                        <div className="border-t border-border/70 pt-2" />
+                        <div className="border-t border-border/70 pt-1" />
 
                         {/* Next Button - Themed */}
                         <div className="space-y-2">
@@ -946,16 +964,6 @@ export const CompanyEnrollmentPage = () => {
                         </div>
                     </form>
                 )}
-
-                {/* 7. Bottom Footnote Disclaimer */}
-                <div className="pt-2 border-t border-border/60 text-center space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium">
-                        Illustrative design only
-                    </p>
-                    <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-lg mx-auto">
-                        *Illustrative plan information. Rates, credits, export conditions and eligibility must be confirmed against the current applicable GEE Energy offer.
-                    </p>
-                </div>
 
             </div>
         </div>

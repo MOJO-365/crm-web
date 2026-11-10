@@ -4,7 +4,7 @@
  */
 
 // Characters allowed in phone number input
-const ALLOWED_PHONE_CHARS = /^[0-9+\s()-]*$/;
+export const ALLOWED_PHONE_CHARS = /^[0-9+\s()-]*$/;
 
 /**
  * Filter raw input to only allow valid phone characters and limit max length.
