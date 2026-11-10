@@ -129,6 +129,14 @@ export function CustomerApprovalsPage() {
     const enrollments = data?.webEnrollments?.data || [];
     const meta = data?.webEnrollments?.meta;
 
+    const isCompanyRefActive = (comp: any): boolean => {
+        return Boolean(comp && (comp.isActive === true || comp.isActive === 1 || comp.isActive === '1' || comp.isActive === 'true'));
+    };
+
+    const isCredActive = (cred: any): boolean => {
+        return Boolean(cred && cred.isActive !== false && cred.isActive !== 0 && cred.isActive !== '0');
+    };
+
     const portalOptions = React.useMemo(() => {
         const defaultOptions: { value: string; label: string }[] = [
             { value: '', label: 'All Portals' },
@@ -138,58 +146,86 @@ export function CustomerApprovalsPage() {
         ];
 
         const existingValues = new Set(defaultOptions.map(o => o.value.toLowerCase()));
+        const existingLabels = new Set(defaultOptions.map(o => o.label.toLowerCase()));
 
-        // 1. Add from Company References
+        // 1. Add ONLY ACTIVE Company References
         if (companyRefsData?.companyRefs) {
             for (const comp of companyRefsData.companyRefs) {
-                const val = comp.portalName || comp.name;
-                if (val && !existingValues.has(val.toLowerCase())) {
+                // Only show active company references
+                if (!isCompanyRefActive(comp)) continue;
+
+                const displayName = (comp.name || comp.portalName || '').trim();
+                const filterVal = comp.portalName || comp.name;
+                if (!displayName) continue;
+
+                if (!existingLabels.has(displayName.toLowerCase())) {
                     defaultOptions.push({
-                        value: val,
-                        label: comp.name
+                        value: filterVal,
+                        label: displayName
                     });
-                    existingValues.add(val.toLowerCase());
-                }
-                if (comp.name && !existingValues.has(comp.name.toLowerCase())) {
-                    defaultOptions.push({
-                        value: comp.name,
-                        label: comp.name
-                    });
-                    existingValues.add(comp.name.toLowerCase());
+                    existingLabels.add(displayName.toLowerCase());
+                    existingValues.add(filterVal.toLowerCase());
+                    existingValues.add(displayName.toLowerCase());
                 }
             }
         }
 
-        // 2. Add from Web API Credentials
+        // 2. Add from Web API Credentials (only active)
         if (webApiCredsData?.webApiCredentials) {
             for (const cred of webApiCredsData.webApiCredentials) {
-                const val = cred.portalName || cred.name;
-                if (val && !existingValues.has(val.toLowerCase())) {
+                if (!isCredActive(cred)) continue;
+
+                const displayName = (cred.name || cred.portalName || '').trim();
+                const filterVal = cred.portalName || cred.name;
+                if (!displayName) continue;
+
+                if (!existingLabels.has(displayName.toLowerCase())) {
                     defaultOptions.push({
-                        value: val,
-                        label: cred.name
+                        value: filterVal,
+                        label: displayName
                     });
-                    existingValues.add(val.toLowerCase());
+                    existingLabels.add(displayName.toLowerCase());
+                    existingValues.add(filterVal.toLowerCase());
+                    existingValues.add(displayName.toLowerCase());
                 }
             }
         }
 
-        // 3. Add any dynamic portals discovered in current enrollments
+        // 3. Add dynamic portals discovered in current enrollments, excluding any inactive company references or inactive credentials
         if (enrollments && enrollments.length > 0) {
             for (const row of enrollments) {
                 const rawPortal = row.payload?.portalname || row.payload?.portalName || row.payload?.companyName || row.payload?.company_name || row.payload?.createdBy?.company_name;
                 if (rawPortal && typeof rawPortal === 'string' && rawPortal.trim()) {
                     const trimmed = rawPortal.trim();
-                    if (!existingValues.has(trimmed.toLowerCase())) {
-                        const matchedComp = companyRefsData?.companyRefs?.find((c: any) =>
-                            (c.portalName && c.portalName.toLowerCase() === trimmed.toLowerCase()) ||
-                            (c.code && c.code.toLowerCase() === trimmed.toLowerCase()) ||
-                            (c.name && c.name.toLowerCase() === trimmed.toLowerCase())
-                        );
+
+                    // Check if this matches a known company reference
+                    const matchedComp = companyRefsData?.companyRefs?.find((c: any) =>
+                        (c.portalName && c.portalName.toLowerCase() === trimmed.toLowerCase()) ||
+                        (c.code && c.code.toLowerCase() === trimmed.toLowerCase()) ||
+                        (c.name && c.name.toLowerCase() === trimmed.toLowerCase())
+                    );
+
+                    // If it belongs to an inactive company reference, DO NOT show it in the portal dropdown!
+                    if (matchedComp && !isCompanyRefActive(matchedComp)) {
+                        continue;
+                    }
+
+                    // Check if this matches a web API credential
+                    const matchedCred = webApiCredsData?.webApiCredentials?.find((c: any) =>
+                        (c.portalName && c.portalName.toLowerCase() === trimmed.toLowerCase()) ||
+                        (c.name && c.name.toLowerCase() === trimmed.toLowerCase())
+                    );
+                    if (matchedCred && !isCredActive(matchedCred)) {
+                        continue;
+                    }
+
+                    const label = (matchedComp?.name || matchedCred?.name || trimmed).trim();
+                    if (!existingLabels.has(label.toLowerCase()) && !existingValues.has(trimmed.toLowerCase())) {
                         defaultOptions.push({
                             value: trimmed,
-                            label: matchedComp?.name || trimmed
+                            label: label
                         });
+                        existingLabels.add(label.toLowerCase());
                         existingValues.add(trimmed.toLowerCase());
                     }
                 }
