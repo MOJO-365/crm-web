@@ -10,11 +10,9 @@ import {
     ZapIcon,
     RefreshCwIcon,
     PhoneIcon,
-    MailIcon,
-    ArrowRightIcon,
-    ArrowLeftIcon
+    MailIcon
 } from '@/components/icons';
-import { STATE_OPTIONS } from '@/lib/constants';
+import { TITLE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { sanitizePhoneInput, formatAustralianPhone, validatePhoneNumber } from '@/lib/phone';
 import { BASE_API_URL } from '@/lib/apollo';
@@ -32,7 +30,7 @@ interface CompanyInfo {
     linkCode?: string;
 }
 
-// Custom Handshake / Referral Partner Icon
+// Handshake icon for referral partner banner
 const HandshakeIcon = ({ size = 22, className }: { size?: number; className?: string }) => (
     <svg
         width={size}
@@ -78,10 +76,7 @@ export const CompanyEnrollmentPage = () => {
     const [company, setCompany] = useState<CompanyInfo | null>(null);
     const [companyError, setCompanyError] = useState<string | null>(null);
 
-    // Multi-step form state (1 = Personal Info, 2 = Supply & Address)
-    const [step, setStep] = useState<1 | 2>(1);
-
-    // Form fields
+    // Form fields - all comprehensive fields preserved
     const [formData, setFormData] = useState({
         title: 'Mr',
         firstname: '',
@@ -145,8 +140,7 @@ export const CompanyEnrollmentPage = () => {
         }
     };
 
-    // Step 1 Validation (Personal details)
-    const validateStep1 = () => {
+    const validate = () => {
         const newErrors: Record<string, string> = {};
 
         if (!formData.firstname.trim()) newErrors.firstname = 'First name is required *';
@@ -163,13 +157,9 @@ export const CompanyEnrollmentPage = () => {
             newErrors.mobile = phoneErr;
         }
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    // Step 2 Validation (Supply & Address details)
-    const validateStep2 = () => {
-        const newErrors: Record<string, string> = {};
+        if (!formData.streetAddress.trim()) newErrors.streetAddress = 'Street address is required *';
+        if (!formData.suburb.trim()) newErrors.suburb = 'Suburb is required *';
+        if (!formData.postcode.trim()) newErrors.postcode = 'Postcode is required *';
 
         const cleanNmi = formData.nmi.replace(/\s+/g, '');
         if (!cleanNmi) {
@@ -177,10 +167,6 @@ export const CompanyEnrollmentPage = () => {
         } else if (cleanNmi.length < 10 || cleanNmi.length > 11) {
             newErrors.nmi = 'NMI must be 10 or 11 digits';
         }
-
-        if (!formData.streetAddress.trim()) newErrors.streetAddress = 'Street address is required *';
-        if (!formData.suburb.trim()) newErrors.suburb = 'Suburb is required *';
-        if (!formData.postcode.trim()) newErrors.postcode = 'Postcode is required *';
 
         if (!formData.agreed) {
             newErrors.agreed = 'You must accept the terms to submit your application';
@@ -190,25 +176,9 @@ export const CompanyEnrollmentPage = () => {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleContinue = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (validateStep1()) {
-            setStep(2);
-            // Smoothly scroll down to the step 2 form section
-            const el = document.getElementById('application-form-section');
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!validateStep1()) {
-            setStep(1);
-            return;
-        }
-        if (!validateStep2() || !company) return;
+        if (!validate() || !company) return;
 
         setSubmitting(true);
         try {
@@ -317,7 +287,7 @@ export const CompanyEnrollmentPage = () => {
                         <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Solar Soak Plan Application</span>
                         <h2 className="text-2xl font-bold text-foreground mt-1">Application Received!</h2>
                         <p className="text-sm text-muted-foreground mt-1">
-                            Thank you, <span className="font-semibold text-foreground">{formData.firstname}</span>. Your electricity switch request via <span className="font-semibold text-foreground">{company.name}</span> has been successfully received.
+                            Thank you, <span className="font-semibold text-foreground">{formData.firstname}</span>. Your electricity application via <span className="font-semibold text-foreground">{company.name}</span> has been successfully submitted.
                         </p>
                     </div>
 
@@ -345,13 +315,12 @@ export const CompanyEnrollmentPage = () => {
                     </div>
 
                     <p className="text-xs text-muted-foreground">
-                        Our energy onboarding team will confirm your supply meter details and send your Solar Soak welcome pack to <span className="font-medium text-foreground">{formData.email}</span>.
+                        Our onboarding team will verify your supply details and send your Solar Soak welcome contract to <span className="font-medium text-foreground">{formData.email}</span>.
                     </p>
 
                     <Button
                         onClick={() => {
                             setSubmittedUid(null);
-                            setStep(1);
                             setFormData({
                                 title: 'Mr',
                                 firstname: '',
@@ -377,18 +346,18 @@ export const CompanyEnrollmentPage = () => {
         );
     }
 
-    // Main Partner Referral Enrollment Screen
+    // Main Partner Referral Enrollment Screen (Comprehensive layout with image references)
     return (
-        <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 py-8 px-4 sm:px-6 flex justify-center">
-            <div className="w-full max-w-[620px] bg-card border border-border/80 rounded-[28px] p-6 sm:p-9 shadow-sm space-y-6">
+        <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 py-10 px-4 sm:px-6 flex justify-center">
+            <div className="w-full max-w-2xl bg-card border border-border/80 rounded-[28px] p-6 sm:p-9 shadow-sm space-y-7">
 
-                {/* 1. Header: Brand + Partner Referral Pill */}
+                {/* 1. Top Header: GEE Energy Brand + Partner Referral Badge */}
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-1.5">
+                        <h2 className="text-xl font-bold tracking-tight text-foreground">
                             GEE Energy
                         </h2>
-                        <p className="text-xs text-muted-foreground font-normal">
+                        <p className="text-xs text-muted-foreground">
                             Smart electricity solutions
                         </p>
                     </div>
@@ -399,16 +368,16 @@ export const CompanyEnrollmentPage = () => {
                 </div>
 
                 {/* 2. Referral Partner Verified Card */}
-                <div className="border border-border/80 rounded-2xl p-4 bg-card/60 flex items-center justify-between gap-3.5 shadow-2xs">
-                    <div className="flex items-center gap-3">
+                <div className="border border-border/80 rounded-2xl p-4 bg-muted/20 flex items-center justify-between gap-3.5 shadow-2xs">
+                    <div className="flex items-center gap-3.5 min-w-0">
                         <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/50 flex items-center justify-center shrink-0">
                             <HandshakeIcon size={22} />
                         </div>
-                        <div className="flex flex-col">
+                        <div className="flex flex-col min-w-0">
                             <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">
                                 YOU HAVE BEEN REFERRED BY
                             </span>
-                            <span className="text-base sm:text-lg font-bold text-foreground leading-tight">
+                            <span className="text-base sm:text-lg font-bold text-foreground leading-tight truncate">
                                 {company.name}
                             </span>
                             <span className="text-[11px] text-muted-foreground mt-0.5">
@@ -417,42 +386,58 @@ export const CompanyEnrollmentPage = () => {
                         </div>
                     </div>
 
-                    <div className="text-emerald-600 dark:text-emerald-400 shrink-0">
-                        <VerifiedCheckIcon size={22} />
+                    <div className="flex items-center gap-3 shrink-0">
+                        {(company.email || company.phone) && (
+                            <div className="hidden sm:flex flex-col text-right text-[11px] text-muted-foreground">
+                                {company.email && (
+                                    <span className="flex items-center justify-end gap-1 truncate">
+                                        <MailIcon size={11} /> {company.email}
+                                    </span>
+                                )}
+                                {company.phone && (
+                                    <span className="flex items-center justify-end gap-1">
+                                        <PhoneIcon size={11} /> {company.phone}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        <div className="text-emerald-600 dark:text-emerald-400 shrink-0">
+                            <VerifiedCheckIcon size={22} />
+                        </div>
                     </div>
                 </div>
 
-                {/* 3. Hero Headline: Move to Solar Soak Plan */}
-                <div className="space-y-2 pt-1">
+                {/* 3. Hero Section: Move to Solar Soak Plan */}
+                <div className="space-y-2">
                     <h1 className="text-2xl sm:text-[28px] font-bold tracking-tight text-foreground leading-tight">
                         Move to Solar Soak Plan
                     </h1>
                     <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                        Discover the GEE Energy Solar Soak Plan and complete your electricity application online.
+                        Discover the GEE Energy Solar Soak Plan and complete your electricity application online. Designed to maximise your solar & battery savings.
                     </p>
                 </div>
 
                 {/* 4. Highlight Stats Cards (2x2 Grid) */}
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                    {/* Card 1: $300 Welcome credit */}
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Card 1 */}
                     <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
                         <span className="text-2xl font-bold text-foreground tracking-tight">$300</span>
                         <span className="text-[11px] text-muted-foreground mt-0.5">Welcome credit*</span>
                     </div>
 
-                    {/* Card 2: $0 Exit fees */}
+                    {/* Card 2 */}
                     <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
                         <span className="text-2xl font-bold text-foreground tracking-tight">$0</span>
                         <span className="text-[11px] text-muted-foreground mt-0.5">Exit fees</span>
                     </div>
 
-                    {/* Card 3: 30¢ Import rate */}
+                    {/* Card 3 */}
                     <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
                         <span className="text-2xl font-bold text-foreground tracking-tight">30¢</span>
                         <span className="text-[11px] text-muted-foreground mt-0.5">Import rate / kWh*</span>
                     </div>
 
-                    {/* Card 4: Up to 30¢ Battery export FiT */}
+                    {/* Card 4 */}
                     <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
                         <span className="text-2xl font-bold text-foreground tracking-tight">Up to 30¢</span>
                         <span className="text-[11px] text-muted-foreground mt-0.5">Battery export FiT / kWh*</span>
@@ -460,36 +445,26 @@ export const CompanyEnrollmentPage = () => {
                 </div>
 
                 {/* 5. Value Proposition Bullets */}
-                <div className="space-y-2.5 pt-1">
+                <div className="space-y-2.5">
                     <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
                         <VerifiedCheckIcon size={17} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Flexible electricity plan</span>
+                        <span>Flexible electricity plan with daytime solar soak hours</span>
                     </div>
                     <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
                         <VerifiedCheckIcon size={17} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Battery-friendly feed-in tariffs</span>
+                        <span>Battery-friendly feed-in tariffs to boost solar export returns</span>
                     </div>
                     <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
                         <VerifiedCheckIcon size={17} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Simple online application</span>
+                        <span>Simple online application with seamless switch & zero power interruption</span>
                     </div>
                 </div>
 
                 {/* Divider Line */}
                 <div className="border-t border-border/70 my-2" />
 
-                {/* 6. Form Section */}
-                <div id="application-form-section" className="space-y-4 pt-1">
-                    {/* Form Section Header with Step Indicator */}
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-base sm:text-lg font-bold text-foreground">
-                            Your electricity application
-                        </h3>
-                        <span className="text-xs font-semibold text-muted-foreground font-mono">
-                            Step {step} of 2
-                        </span>
-                    </div>
-
+                {/* 6. Comprehensive Electricity Application Form */}
+                <form onSubmit={handleSubmit} className="space-y-6">
                     {errors.submit && (
                         <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
                             <AlertCircleIcon size={16} className="shrink-0" />
@@ -497,52 +472,89 @@ export const CompanyEnrollmentPage = () => {
                         </div>
                     )}
 
-                    {/* Step 1: Personal Contact Information */}
-                    {step === 1 && (
-                        <form onSubmit={handleContinue} className="space-y-4 animate-in fade-in duration-150">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-foreground">
-                                        First name *
-                                    </label>
-                                    <Input
-                                        placeholder="John"
-                                        value={formData.firstname}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, firstname: e.target.value });
-                                            if (errors.firstname) setErrors(prev => ({ ...prev, firstname: '' }));
-                                        }}
-                                        className={cn(
-                                            "h-11 rounded-xl bg-background border-border/90 text-sm",
-                                            errors.firstname && "border-red-500 ring-1 ring-red-500"
-                                        )}
-                                    />
-                                    {errors.firstname && <p className="text-[11px] text-red-500">{errors.firstname}</p>}
-                                </div>
+                    {/* Section 1: Customer Information */}
+                    <div className="space-y-4">
+                        <div className="border-b border-border/70 pb-2">
+                            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                                1. Customer Information
+                            </h3>
+                            <p className="text-xs text-muted-foreground">Enter primary account holder details.</p>
+                        </div>
 
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-foreground">
-                                        Last name *
-                                    </label>
-                                    <Input
-                                        placeholder="Doe"
-                                        value={formData.lastname}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, lastname: e.target.value });
-                                            if (errors.lastname) setErrors(prev => ({ ...prev, lastname: '' }));
-                                        }}
-                                        className={cn(
-                                            "h-11 rounded-xl bg-background border-border/90 text-sm",
-                                            errors.lastname && "border-red-500 ring-1 ring-red-500"
-                                        )}
-                                    />
-                                    {errors.lastname && <p className="text-[11px] text-red-500">{errors.lastname}</p>}
-                                </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+                            <div className="sm:col-span-3 space-y-1">
+                                <label className="text-xs font-semibold text-foreground">Title</label>
+                                <Select
+                                    options={TITLE_OPTIONS}
+                                    value={formData.title}
+                                    onChange={(val) => setFormData({ ...formData, title: val as string })}
+                                    className="h-11 rounded-xl bg-background border-border/90 text-sm"
+                                />
+                            </div>
+
+                            <div className="sm:col-span-4 space-y-1">
+                                <label className="text-xs font-semibold text-foreground">
+                                    First Name <span className="text-red-500">*</span>
+                                </label>
+                                <Input
+                                    placeholder="John"
+                                    value={formData.firstname}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, firstname: e.target.value });
+                                        if (errors.firstname) setErrors(prev => ({ ...prev, firstname: '' }));
+                                    }}
+                                    className={cn(
+                                        "h-11 rounded-xl bg-background border-border/90 text-sm",
+                                        errors.firstname && "border-red-500 ring-1 ring-red-500"
+                                    )}
+                                />
+                                {errors.firstname && <p className="text-[11px] text-red-500">{errors.firstname}</p>}
+                            </div>
+
+                            <div className="sm:col-span-5 space-y-1">
+                                <label className="text-xs font-semibold text-foreground">
+                                    Last Name <span className="text-red-500">*</span>
+                                </label>
+                                <Input
+                                    placeholder="Doe"
+                                    value={formData.lastname}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, lastname: e.target.value });
+                                        if (errors.lastname) setErrors(prev => ({ ...prev, lastname: '' }));
+                                    }}
+                                    className={cn(
+                                        "h-11 rounded-xl bg-background border-border/90 text-sm",
+                                        errors.lastname && "border-red-500 ring-1 ring-red-500"
+                                    )}
+                                />
+                                {errors.lastname && <p className="text-[11px] text-red-500">{errors.lastname}</p>}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-foreground">
+                                    Email Address <span className="text-red-500">*</span>
+                                </label>
+                                <Input
+                                    type="email"
+                                    placeholder="john.doe@example.com"
+                                    value={formData.email}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, email: e.target.value });
+                                        if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
+                                    }}
+                                    className={cn(
+                                        "h-11 rounded-xl bg-background border-border/90 text-sm",
+                                        errors.email && "border-red-500 ring-1 ring-red-500"
+                                    )}
+                                />
+                                {errors.email && <p className="text-[11px] text-red-500">{errors.email}</p>}
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-xs font-medium text-foreground">
-                                    Mobile number *
+                                <label className="text-xs font-semibold text-foreground">
+                                    Mobile Number <span className="text-red-500 font-bold">*</span>
                                 </label>
                                 <Input
                                     placeholder="0412 345 678"
@@ -557,251 +569,201 @@ export const CompanyEnrollmentPage = () => {
                                         errors.mobile && "border-red-500 ring-1 ring-red-500"
                                     )}
                                 />
-                                {errors.mobile && <p className="text-[11px] text-red-500">{errors.mobile}</p>}
+                                {errors.mobile && <p className="text-[11px] text-red-500 font-medium">{errors.mobile}</p>}
+                                <p className="text-[10px] text-muted-foreground">Australian mobile (04xx xxx xxx)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Electricity Supply Details */}
+                    <div className="space-y-4 pt-2">
+                        <div className="border-b border-border/70 pb-2">
+                            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                                2. Electricity Supply Details
+                            </h3>
+                            <p className="text-xs text-muted-foreground">National Meter Identifier (NMI) and service address.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                                    <ZapIcon size={14} className="text-amber-500" />
+                                    <span>NMI (10 or 11 digits) <span className="text-red-500">*</span></span>
+                                </label>
+                                <Input
+                                    placeholder="e.g. 4102000000"
+                                    value={formData.nmi}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, nmi: e.target.value.toUpperCase() });
+                                        if (errors.nmi) setErrors(prev => ({ ...prev, nmi: '' }));
+                                    }}
+                                    className={cn(
+                                        "h-11 font-mono rounded-xl bg-background border-border/90 text-sm",
+                                        errors.nmi && "border-red-500 ring-1 ring-red-500"
+                                    )}
+                                    maxLength={11}
+                                />
+                                {errors.nmi ? (
+                                    <p className="text-[11px] text-red-500">{errors.nmi}</p>
+                                ) : (
+                                    <p className="text-[10px] text-muted-foreground">Located on the first or second page of your power bill.</p>
+                                )}
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-xs font-medium text-foreground">
-                                    Email address *
+                                <label className="text-xs font-semibold text-foreground">Property Type</label>
+                                <Select
+                                    options={[
+                                        { value: '0', label: 'Residential' },
+                                        { value: '1', label: 'Commercial / Business' }
+                                    ]}
+                                    value={formData.propertyType}
+                                    onChange={(val) => setFormData({ ...formData, propertyType: val as string })}
+                                    className="h-11 rounded-xl bg-background border-border/90 text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Street Address with Google Places Autocomplete */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold text-foreground">
+                                Street Address <span className="text-red-500">*</span>
+                            </label>
+                            <LocationAutocomplete
+                                placeholder="Start typing address (e.g. 123 Example Street)..."
+                                value={formData.streetAddress}
+                                onChange={(val) => {
+                                    setFormData(prev => ({ ...prev, streetAddress: val }));
+                                    if (errors.streetAddress) {
+                                        setErrors(prev => ({ ...prev, streetAddress: '' }));
+                                    }
+                                }}
+                                onSelect={(place) => {
+                                    const unitNumber = place.unitNumber || '';
+                                    let streetNumber = place.streetNumber || place.houseNumber || '';
+                                    let houseNumberSuffix = '';
+
+                                    const suffixMatch = streetNumber.match(/^(\d+)\s*([a-zA-Z])$/);
+                                    if (suffixMatch) {
+                                        streetNumber = suffixMatch[1];
+                                        houseNumberSuffix = suffixMatch[2].toUpperCase();
+                                    }
+
+                                    const streetCombined = [streetNumber + houseNumberSuffix, place.streetName, place.streetType].filter(Boolean).join(' ');
+                                    const fullStreet = unitNumber ? `${unitNumber}/${streetCombined}` : (streetCombined || place.address);
+
+                                    const validStates = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'ACT', 'NT'];
+                                    const normState = (place.state || '').toUpperCase();
+                                    const matchedState = validStates.find(s => s === normState);
+
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        streetAddress: fullStreet || place.address,
+                                        suburb: place.suburb || prev.suburb,
+                                        state: matchedState || prev.state,
+                                        postcode: place.postcode || prev.postcode
+                                    }));
+
+                                    setErrors(prev => {
+                                        const updated = { ...prev };
+                                        delete updated.streetAddress;
+                                        if (place.suburb) delete updated.suburb;
+                                        if (place.postcode) delete updated.postcode;
+                                        return updated;
+                                    });
+                                }}
+                                error={errors.streetAddress}
+                                zIndexClass="z-[9999]"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+                            <div className="sm:col-span-6 space-y-1">
+                                <label className="text-xs font-semibold text-foreground">
+                                    Suburb <span className="text-red-500">*</span>
                                 </label>
                                 <Input
-                                    type="email"
-                                    placeholder="john@example.com"
-                                    value={formData.email}
+                                    placeholder="Sydney"
+                                    value={formData.suburb}
                                     onChange={(e) => {
-                                        setFormData({ ...formData, email: e.target.value });
-                                        if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
+                                        setFormData({ ...formData, suburb: e.target.value });
+                                        if (errors.suburb) setErrors(prev => ({ ...prev, suburb: '' }));
                                     }}
                                     className={cn(
                                         "h-11 rounded-xl bg-background border-border/90 text-sm",
-                                        errors.email && "border-red-500 ring-1 ring-red-500"
+                                        errors.suburb && "border-red-500 ring-1 ring-red-500"
                                     )}
                                 />
-                                {errors.email && <p className="text-[11px] text-red-500">{errors.email}</p>}
+                                {errors.suburb && <p className="text-[11px] text-red-500">{errors.suburb}</p>}
                             </div>
 
-                            <Button
-                                type="submit"
-                                className="w-full h-11 text-sm font-semibold rounded-xl mt-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white transition-all shadow-xs flex items-center justify-center gap-1.5"
-                            >
-                                <span>Continue</span>
-                                <ArrowRightIcon size={16} />
-                            </Button>
-                        </form>
-                    )}
-
-                    {/* Step 2: Supply Details, Address & Consent */}
-                    {step === 2 && (
-                        <form onSubmit={handleSubmit} className="space-y-4 animate-in fade-in duration-150">
-                            <div className="flex items-center justify-between pb-1">
-                                <button
-                                    type="button"
-                                    onClick={() => setStep(1)}
-                                    className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
-                                >
-                                    <ArrowLeftIcon size={14} />
-                                    <span>Back to personal details</span>
-                                </button>
-                                <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">
-                                    {formData.firstname} {formData.lastname} ({formData.mobile})
-                                </span>
+                            <div className="sm:col-span-3 space-y-1">
+                                <label className="text-xs font-semibold text-foreground">State</label>
+                                <Select
+                                    options={STATE_OPTIONS}
+                                    value={formData.state}
+                                    onChange={(val) => setFormData({ ...formData, state: val as string })}
+                                    className="h-11 rounded-xl bg-background border-border/90 text-sm"
+                                />
                             </div>
 
-                            {/* NMI and Property Type */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-foreground flex items-center gap-1">
-                                        <ZapIcon size={13} className="text-amber-500" />
-                                        <span>NMI (10 or 11 digits) *</span>
-                                    </label>
-                                    <Input
-                                        placeholder="e.g. 4102000000"
-                                        value={formData.nmi}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, nmi: e.target.value.toUpperCase() });
-                                            if (errors.nmi) setErrors(prev => ({ ...prev, nmi: '' }));
-                                        }}
-                                        className={cn(
-                                            "h-11 font-mono rounded-xl bg-background border-border/90 text-sm",
-                                            errors.nmi && "border-red-500 ring-1 ring-red-500"
-                                        )}
-                                        maxLength={11}
-                                    />
-                                    {errors.nmi ? (
-                                        <p className="text-[11px] text-red-500">{errors.nmi}</p>
-                                    ) : (
-                                        <p className="text-[10px] text-muted-foreground">Found on your current electricity bill</p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-foreground">Property type</label>
-                                    <Select
-                                        options={[
-                                            { value: '0', label: 'Residential' },
-                                            { value: '1', label: 'Commercial' }
-                                        ]}
-                                        value={formData.propertyType}
-                                        onChange={(val) => setFormData({ ...formData, propertyType: val as string })}
-                                        className="h-11 rounded-xl bg-background border-border/90 text-sm"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Street Address with Google Autocomplete */}
-                            <div className="space-y-1">
-                                <label className="text-xs font-medium text-foreground">
-                                    Supply address *
+                            <div className="sm:col-span-3 space-y-1">
+                                <label className="text-xs font-semibold text-foreground">
+                                    Postcode <span className="text-red-500">*</span>
                                 </label>
-                                <LocationAutocomplete
-                                    placeholder="Start typing your street address..."
-                                    value={formData.streetAddress}
-                                    onChange={(val) => {
-                                        setFormData(prev => ({ ...prev, streetAddress: val }));
-                                        if (errors.streetAddress) {
-                                            setErrors(prev => ({ ...prev, streetAddress: '' }));
-                                        }
+                                <Input
+                                    placeholder="2000"
+                                    value={formData.postcode}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, postcode: e.target.value });
+                                        if (errors.postcode) setErrors(prev => ({ ...prev, postcode: '' }));
                                     }}
-                                    onSelect={(place) => {
-                                        const unitNumber = place.unitNumber || '';
-                                        let streetNumber = place.streetNumber || place.houseNumber || '';
-                                        let houseNumberSuffix = '';
-
-                                        const suffixMatch = streetNumber.match(/^(\d+)\s*([a-zA-Z])$/);
-                                        if (suffixMatch) {
-                                            streetNumber = suffixMatch[1];
-                                            houseNumberSuffix = suffixMatch[2].toUpperCase();
-                                        }
-
-                                        const streetCombined = [streetNumber + houseNumberSuffix, place.streetName, place.streetType].filter(Boolean).join(' ');
-                                        const fullStreet = unitNumber ? `${unitNumber}/${streetCombined}` : (streetCombined || place.address);
-
-                                        const validStates = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'ACT', 'NT'];
-                                        const normState = (place.state || '').toUpperCase();
-                                        const matchedState = validStates.find(s => s === normState);
-
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            streetAddress: fullStreet || place.address,
-                                            suburb: place.suburb || prev.suburb,
-                                            state: matchedState || prev.state,
-                                            postcode: place.postcode || prev.postcode
-                                        }));
-
-                                        setErrors(prev => {
-                                            const updated = { ...prev };
-                                            delete updated.streetAddress;
-                                            if (place.suburb) delete updated.suburb;
-                                            if (place.postcode) delete updated.postcode;
-                                            return updated;
-                                        });
-                                    }}
-                                    error={errors.streetAddress}
-                                    zIndexClass="z-[9999]"
-                                />
-                            </div>
-
-                            {/* Suburb, State, Postcode */}
-                            <div className="grid grid-cols-12 gap-3">
-                                <div className="col-span-6 space-y-1">
-                                    <label className="text-xs font-medium text-foreground">
-                                        Suburb *
-                                    </label>
-                                    <Input
-                                        placeholder="Sydney"
-                                        value={formData.suburb}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, suburb: e.target.value });
-                                            if (errors.suburb) setErrors(prev => ({ ...prev, suburb: '' }));
-                                        }}
-                                        className={cn(
-                                            "h-11 rounded-xl bg-background border-border/90 text-sm",
-                                            errors.suburb && "border-red-500 ring-1 ring-red-500"
-                                        )}
-                                    />
-                                    {errors.suburb && <p className="text-[11px] text-red-500">{errors.suburb}</p>}
-                                </div>
-
-                                <div className="col-span-3 space-y-1">
-                                    <label className="text-xs font-medium text-foreground">State</label>
-                                    <Select
-                                        options={STATE_OPTIONS}
-                                        value={formData.state}
-                                        onChange={(val) => setFormData({ ...formData, state: val as string })}
-                                        className="h-11 rounded-xl bg-background border-border/90 text-sm"
-                                    />
-                                </div>
-
-                                <div className="col-span-3 space-y-1">
-                                    <label className="text-xs font-medium text-foreground">
-                                        Postcode *
-                                    </label>
-                                    <Input
-                                        placeholder="2000"
-                                        value={formData.postcode}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, postcode: e.target.value });
-                                            if (errors.postcode) setErrors(prev => ({ ...prev, postcode: '' }));
-                                        }}
-                                        className={cn(
-                                            "h-11 rounded-xl bg-background border-border/90 text-sm",
-                                            errors.postcode && "border-red-500 ring-1 ring-red-500"
-                                        )}
-                                        maxLength={4}
-                                    />
-                                    {errors.postcode && <p className="text-[11px] text-red-500">{errors.postcode}</p>}
-                                </div>
-                            </div>
-
-                            {/* Terms & Consent */}
-                            <div className="pt-2 space-y-2 border-t border-border/60">
-                                <div className="flex items-start gap-2.5">
-                                    <input
-                                        type="checkbox"
-                                        id="agreeConsent"
-                                        checked={formData.agreed}
-                                        onChange={(e) => setFormData({ ...formData, agreed: e.target.checked })}
-                                        className="mt-1 rounded border-input text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-                                    />
-                                    <label htmlFor="agreeConsent" className="text-xs text-muted-foreground leading-relaxed cursor-pointer select-none">
-                                        I confirm that I am the account holder or authorized representative for the electricity supply address above. I consent to enrolling into the GEE Energy Solar Soak Plan through referral partner <strong className="text-foreground">{company.name}</strong> and agree to receive electricity supply communications.
-                                    </label>
-                                </div>
-                                {errors.agreed && <p className="text-[11px] text-red-500">{errors.agreed}</p>}
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex items-center gap-3 pt-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setStep(1)}
-                                    className="h-11 rounded-xl px-4 text-xs font-semibold"
-                                    disabled={submitting}
-                                >
-                                    Back
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    className="flex-1 h-11 text-sm font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white transition-all shadow-xs"
-                                    disabled={submitting}
-                                >
-                                    {submitting ? (
-                                        <span className="flex items-center gap-2">
-                                            <RefreshCwIcon size={16} className="animate-spin" />
-                                            Submitting Application...
-                                        </span>
-                                    ) : (
-                                        'Submit Energy Application'
+                                    className={cn(
+                                        "h-11 rounded-xl bg-background border-border/90 text-sm",
+                                        errors.postcode && "border-red-500 ring-1 ring-red-500"
                                     )}
-                                </Button>
+                                    maxLength={4}
+                                />
+                                {errors.postcode && <p className="text-[11px] text-red-500">{errors.postcode}</p>}
                             </div>
-                        </form>
-                    )}
-                </div>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Consent & Confirmation */}
+                    <div className="pt-3 border-t border-border/70 space-y-4">
+                        <div className="flex items-start gap-2.5">
+                            <input
+                                type="checkbox"
+                                id="agreeConsent"
+                                checked={formData.agreed}
+                                onChange={(e) => setFormData({ ...formData, agreed: e.target.checked })}
+                                className="mt-1 rounded border-input text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                            />
+                            <label htmlFor="agreeConsent" className="text-xs text-muted-foreground leading-relaxed cursor-pointer select-none">
+                                I confirm that I am the account holder or authorized representative for the electricity supply address above. I consent to enrolling into the GEE Energy Solar Soak Plan through referral partner <strong className="text-foreground">{company.name}</strong> and agree to receive electricity supply communications.
+                            </label>
+                        </div>
+                        {errors.agreed && <p className="text-[11px] text-red-500">{errors.agreed}</p>}
+
+                        <Button
+                            type="submit"
+                            className="w-full h-11 text-sm font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white transition-all shadow-md"
+                            disabled={submitting}
+                        >
+                            {submitting ? (
+                                <span className="flex items-center gap-2">
+                                    <RefreshCwIcon size={16} className="animate-spin" />
+                                    Submitting Application...
+                                </span>
+                            ) : (
+                                'Submit Energy Application'
+                            )}
+                        </Button>
+                    </div>
+                </form>
 
                 {/* 7. Bottom Footnote Disclaimer */}
-                <div className="pt-4 border-t border-border/60 text-center space-y-1">
+                <div className="pt-3 border-t border-border/60 text-center space-y-1">
                     <p className="text-xs text-muted-foreground font-medium">
                         Illustrative design only
                     </p>
