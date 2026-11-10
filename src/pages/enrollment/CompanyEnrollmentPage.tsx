@@ -10,7 +10,10 @@ import {
     ZapIcon,
     RefreshCwIcon,
     PhoneIcon,
-    MailIcon
+    MailIcon,
+    ArrowRightIcon,
+    ArrowLeftIcon,
+    CheckIcon
 } from '@/components/icons';
 import { TITLE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -30,7 +33,7 @@ interface CompanyInfo {
     linkCode?: string;
 }
 
-// Handshake icon for referral partner banner
+// Custom Handshake / Referral Partner Icon
 const HandshakeIcon = ({ size = 22, className }: { size?: number; className?: string }) => (
     <svg
         width={size}
@@ -76,7 +79,10 @@ export const CompanyEnrollmentPage = () => {
     const [company, setCompany] = useState<CompanyInfo | null>(null);
     const [companyError, setCompanyError] = useState<string | null>(null);
 
-    // Form fields - all comprehensive fields preserved
+    // Multi-stage flow: 'overview' (landing) -> 'step1' (Customer Details) -> 'step2' (Supply & Address)
+    const [currentView, setCurrentView] = useState<'overview' | 'step1' | 'step2'>('overview');
+
+    // Form fields
     const [formData, setFormData] = useState({
         title: 'Mr',
         firstname: '',
@@ -140,7 +146,8 @@ export const CompanyEnrollmentPage = () => {
         }
     };
 
-    const validate = () => {
+    // Step 1 Validation
+    const validateStep1 = () => {
         const newErrors: Record<string, string> = {};
 
         if (!formData.firstname.trim()) newErrors.firstname = 'First name is required *';
@@ -157,9 +164,13 @@ export const CompanyEnrollmentPage = () => {
             newErrors.mobile = phoneErr;
         }
 
-        if (!formData.streetAddress.trim()) newErrors.streetAddress = 'Street address is required *';
-        if (!formData.suburb.trim()) newErrors.suburb = 'Suburb is required *';
-        if (!formData.postcode.trim()) newErrors.postcode = 'Postcode is required *';
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    // Step 2 Validation
+    const validateStep2 = () => {
+        const newErrors: Record<string, string> = {};
 
         const cleanNmi = formData.nmi.replace(/\s+/g, '');
         if (!cleanNmi) {
@@ -167,6 +178,10 @@ export const CompanyEnrollmentPage = () => {
         } else if (cleanNmi.length < 10 || cleanNmi.length > 11) {
             newErrors.nmi = 'NMI must be 10 or 11 digits';
         }
+
+        if (!formData.streetAddress.trim()) newErrors.streetAddress = 'Street address is required *';
+        if (!formData.suburb.trim()) newErrors.suburb = 'Suburb is required *';
+        if (!formData.postcode.trim()) newErrors.postcode = 'Postcode is required *';
 
         if (!formData.agreed) {
             newErrors.agreed = 'You must accept the terms to submit your application';
@@ -176,9 +191,26 @@ export const CompanyEnrollmentPage = () => {
         return Object.keys(newErrors).length === 0;
     };
 
+    const handleStartApplication = () => {
+        setCurrentView('step1');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleStep1Next = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (validateStep1()) {
+            setCurrentView('step2');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!validate() || !company) return;
+        if (!validateStep1()) {
+            setCurrentView('step1');
+            return;
+        }
+        if (!validateStep2() || !company) return;
 
         setSubmitting(true);
         try {
@@ -246,7 +278,7 @@ export const CompanyEnrollmentPage = () => {
         return (
             <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 flex flex-col items-center justify-center p-4">
                 <div className="flex items-center gap-3 text-muted-foreground bg-card p-6 rounded-2xl border border-border shadow-sm">
-                    <RefreshCwIcon size={20} className="animate-spin text-emerald-600" />
+                    <RefreshCwIcon size={20} className="animate-spin text-primary" />
                     <span className="text-sm font-medium">Loading Solar Soak enrollment portal...</span>
                 </div>
             </div>
@@ -266,7 +298,7 @@ export const CompanyEnrollmentPage = () => {
                         {companyError || 'The referral link you entered is invalid or has expired.'}
                     </p>
                     <div className="pt-2">
-                        <Link to="/login" className="inline-block text-xs font-semibold text-emerald-600 hover:underline">
+                        <Link to="/login" className="inline-block text-xs font-semibold text-primary hover:underline">
                             Return to Login
                         </Link>
                     </div>
@@ -280,11 +312,11 @@ export const CompanyEnrollmentPage = () => {
         return (
             <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 flex flex-col items-center justify-center p-4">
                 <div className="max-w-lg w-full bg-card rounded-3xl border border-border p-8 text-center space-y-5 shadow-md animate-in fade-in zoom-in-95 duration-200">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-primary/15 text-primary flex items-center justify-center">
                         <CheckCircleIcon size={36} />
                     </div>
                     <div>
-                        <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Solar Soak Plan Application</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-primary">Solar Soak Plan Application</span>
                         <h2 className="text-2xl font-bold text-foreground mt-1">Application Received!</h2>
                         <p className="text-sm text-muted-foreground mt-1">
                             Thank you, <span className="font-semibold text-foreground">{formData.firstname}</span>. Your electricity application via <span className="font-semibold text-foreground">{company.name}</span> has been successfully submitted.
@@ -298,7 +330,7 @@ export const CompanyEnrollmentPage = () => {
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/50">
                             <span className="text-muted-foreground">Selected Plan:</span>
-                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">GEE Energy Solar Soak Plan</span>
+                            <span className="font-semibold text-primary">GEE Energy Solar Soak Plan</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/50">
                             <span className="text-muted-foreground">Service NMI:</span>
@@ -315,12 +347,13 @@ export const CompanyEnrollmentPage = () => {
                     </div>
 
                     <p className="text-xs text-muted-foreground">
-                        Our onboarding team will verify your supply details and send your Solar Soak welcome contract to <span className="font-medium text-foreground">{formData.email}</span>.
+                        Our onboarding team will verify your supply meter details and send your Solar Soak welcome contract to <span className="font-medium text-foreground">{formData.email}</span>.
                     </p>
 
                     <Button
                         onClick={() => {
                             setSubmittedUid(null);
+                            setCurrentView('overview');
                             setFormData({
                                 title: 'Mr',
                                 firstname: '',
@@ -346,141 +379,222 @@ export const CompanyEnrollmentPage = () => {
         );
     }
 
-    // Main Partner Referral Enrollment Screen (Comprehensive layout with image references)
+    // Shared Header Component for all stages
+    const renderTopHeader = () => (
+        <div className="flex items-center justify-between gap-3">
+            <div>
+                <h2 className="text-xl font-bold tracking-tight text-foreground">
+                    GEE Energy
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                    Smart electricity solutions
+                </p>
+            </div>
+
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+                Partner referral
+            </div>
+        </div>
+    );
+
+    // Shared Referral Partner Card
+    const renderPartnerCard = (compact = false) => (
+        <div className={cn(
+            "border border-border/80 rounded-2xl bg-muted/20 flex items-center justify-between gap-3.5 shadow-2xs",
+            compact ? "p-3 sm:p-3.5" : "p-4"
+        )}>
+            <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
+                    <HandshakeIcon size={22} />
+                </div>
+                <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">
+                        YOU HAVE BEEN REFERRED BY
+                    </span>
+                    <span className="text-base sm:text-lg font-bold text-foreground leading-tight truncate">
+                        {company.name}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground mt-0.5">
+                        Official GEE Energy referral partner
+                    </span>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+                {(company.email || company.phone) && !compact && (
+                    <div className="hidden sm:flex flex-col text-right text-[11px] text-muted-foreground">
+                        {company.email && (
+                            <span className="flex items-center justify-end gap-1 truncate">
+                                <MailIcon size={11} /> {company.email}
+                            </span>
+                        )}
+                        {company.phone && (
+                            <span className="flex items-center justify-end gap-1">
+                                <PhoneIcon size={11} /> {company.phone}
+                            </span>
+                        )}
+                    </div>
+                )}
+                <div className="text-primary shrink-0">
+                    <VerifiedCheckIcon size={22} />
+                </div>
+            </div>
+        </div>
+    );
+
+    // Step Progress Indicator for Step 1 and Step 2
+    const renderStepProgress = () => (
+        <div className="pt-1 pb-2">
+            <div className="flex items-center justify-between gap-2">
+                {/* Step 1 Pill */}
+                <div className={cn(
+                    "flex-1 flex items-center gap-2 p-2.5 rounded-xl border text-xs transition-all",
+                    currentView === 'step1'
+                        ? "bg-primary/10 border-primary/30 text-primary font-semibold"
+                        : "bg-muted/40 border-border text-muted-foreground"
+                )}>
+                    <div className={cn(
+                        "w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold",
+                        currentView === 'step2'
+                            ? "bg-primary text-primary-foreground"
+                            : currentView === 'step1'
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                    )}>
+                        {currentView === 'step2' ? <CheckIcon size={12} strokeWidth={3} /> : '1'}
+                    </div>
+                    <span className="truncate">1. Customer Information</span>
+                </div>
+
+                <div className="w-4 h-0.5 bg-border shrink-0" />
+
+                {/* Step 2 Pill */}
+                <div className={cn(
+                    "flex-1 flex items-center gap-2 p-2.5 rounded-xl border text-xs transition-all",
+                    currentView === 'step2'
+                        ? "bg-primary/10 border-primary/30 text-primary font-semibold"
+                        : "bg-muted/40 border-border text-muted-foreground"
+                )}>
+                    <div className={cn(
+                        "w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold",
+                        currentView === 'step2'
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                    )}>
+                        2
+                    </div>
+                    <span className="truncate">2. Supply Details & Submit</span>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 py-10 px-4 sm:px-6 flex justify-center">
-            <div className="w-full max-w-2xl bg-card border border-border/80 rounded-[28px] p-6 sm:p-9 shadow-sm space-y-7">
+            <div className="w-full max-w-2xl bg-card border border-border/80 rounded-[28px] p-6 sm:p-9 shadow-sm space-y-6">
 
-                {/* 1. Top Header: GEE Energy Brand + Partner Referral Badge */}
-                <div className="flex items-center justify-between gap-3">
-                    <div>
-                        <h2 className="text-xl font-bold tracking-tight text-foreground">
-                            GEE Energy
-                        </h2>
-                        <p className="text-xs text-muted-foreground">
-                            Smart electricity solutions
-                        </p>
-                    </div>
+                {/* Shared Top Header */}
+                {renderTopHeader()}
 
-                    <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs">
-                        Partner referral
-                    </div>
-                </div>
+                {/* ========================================================== */}
+                {/* VIEW 0: FIRST SCREEN (As shown in user's reference image)   */}
+                {/* ========================================================== */}
+                {currentView === 'overview' && (
+                    <div className="space-y-6 animate-in fade-in duration-150">
+                        {/* Referral Partner Card */}
+                        {renderPartnerCard()}
 
-                {/* 2. Referral Partner Verified Card */}
-                <div className="border border-border/80 rounded-2xl p-4 bg-muted/20 flex items-center justify-between gap-3.5 shadow-2xs">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/50 flex items-center justify-center shrink-0">
-                            <HandshakeIcon size={22} />
+                        {/* Move to Solar Soak Plan Heading */}
+                        <div className="space-y-2">
+                            <h1 className="text-2xl sm:text-[28px] font-bold tracking-tight text-foreground leading-tight">
+                                Move to Solar Soak Plan
+                            </h1>
+                            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                                Discover the GEE Energy Solar Soak Plan and complete your electricity application online. Designed to maximise your solar & battery savings.
+                            </p>
                         </div>
-                        <div className="flex flex-col min-w-0">
-                            <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">
-                                YOU HAVE BEEN REFERRED BY
-                            </span>
-                            <span className="text-base sm:text-lg font-bold text-foreground leading-tight truncate">
-                                {company.name}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground mt-0.5">
-                                Official GEE Energy referral partner
-                            </span>
-                        </div>
-                    </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
-                        {(company.email || company.phone) && (
-                            <div className="hidden sm:flex flex-col text-right text-[11px] text-muted-foreground">
-                                {company.email && (
-                                    <span className="flex items-center justify-end gap-1 truncate">
-                                        <MailIcon size={11} /> {company.email}
-                                    </span>
-                                )}
-                                {company.phone && (
-                                    <span className="flex items-center justify-end gap-1">
-                                        <PhoneIcon size={11} /> {company.phone}
-                                    </span>
-                                )}
+                        {/* 4 Highlight Stat Cards (2x2 Grid) */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
+                                <span className="text-2xl font-bold text-foreground tracking-tight">$300</span>
+                                <span className="text-[11px] text-muted-foreground mt-0.5">Welcome credit*</span>
                             </div>
-                        )}
-                        <div className="text-emerald-600 dark:text-emerald-400 shrink-0">
-                            <VerifiedCheckIcon size={22} />
+
+                            <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
+                                <span className="text-2xl font-bold text-foreground tracking-tight">$0</span>
+                                <span className="text-[11px] text-muted-foreground mt-0.5">Exit fees</span>
+                            </div>
+
+                            <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
+                                <span className="text-2xl font-bold text-foreground tracking-tight">30¢</span>
+                                <span className="text-[11px] text-muted-foreground mt-0.5">Import rate / kWh*</span>
+                            </div>
+
+                            <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
+                                <span className="text-2xl font-bold text-foreground tracking-tight">Up to 30¢</span>
+                                <span className="text-[11px] text-muted-foreground mt-0.5">Battery export FiT / kWh*</span>
+                            </div>
+                        </div>
+
+                        {/* 3 Value Proposition Bullets */}
+                        <div className="space-y-2.5">
+                            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
+                                <VerifiedCheckIcon size={17} className="text-primary shrink-0" />
+                                <span>Flexible electricity plan with daytime solar soak hours</span>
+                            </div>
+                            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
+                                <VerifiedCheckIcon size={17} className="text-primary shrink-0" />
+                                <span>Battery-friendly feed-in tariffs to boost solar export returns</span>
+                            </div>
+                            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
+                                <VerifiedCheckIcon size={17} className="text-primary shrink-0" />
+                                <span>Simple online application with seamless switch & zero power interruption</span>
+                            </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="border-t border-border/70 pt-2" />
+
+                        {/* Next Button - Themed */}
+                        <div className="space-y-2">
+                            <Button
+                                type="button"
+                                onClick={handleStartApplication}
+                                className="w-full h-12 text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all shadow-md flex items-center justify-center gap-2"
+                            >
+                                <span>Next</span>
+                                <ArrowRightIcon size={18} />
+                            </Button>
+                            <p className="text-[11px] text-center text-muted-foreground">
+                                Fast 2-step application · Takes less than 2 minutes
+                            </p>
                         </div>
                     </div>
-                </div>
+                )}
 
-                {/* 3. Hero Section: Move to Solar Soak Plan */}
-                <div className="space-y-2">
-                    <h1 className="text-2xl sm:text-[28px] font-bold tracking-tight text-foreground leading-tight">
-                        Move to Solar Soak Plan
-                    </h1>
-                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                        Discover the GEE Energy Solar Soak Plan and complete your electricity application online. Designed to maximise your solar & battery savings.
-                    </p>
-                </div>
+                {/* ========================================================== */}
+                {/* VIEW 1: STEP 1 (Customer Information)                      */}
+                {/* ========================================================== */}
+                {currentView === 'step1' && (
+                    <form onSubmit={handleStep1Next} className="space-y-5 animate-in fade-in duration-150">
+                        {/* Compact Partner Banner */}
+                        {renderPartnerCard(true)}
 
-                {/* 4. Highlight Stats Cards (2x2 Grid) */}
-                <div className="grid grid-cols-2 gap-3">
-                    {/* Card 1 */}
-                    <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
-                        <span className="text-2xl font-bold text-foreground tracking-tight">$300</span>
-                        <span className="text-[11px] text-muted-foreground mt-0.5">Welcome credit*</span>
-                    </div>
+                        {/* Step Progress Tracker */}
+                        {renderStepProgress()}
 
-                    {/* Card 2 */}
-                    <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
-                        <span className="text-2xl font-bold text-foreground tracking-tight">$0</span>
-                        <span className="text-[11px] text-muted-foreground mt-0.5">Exit fees</span>
-                    </div>
-
-                    {/* Card 3 */}
-                    <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
-                        <span className="text-2xl font-bold text-foreground tracking-tight">30¢</span>
-                        <span className="text-[11px] text-muted-foreground mt-0.5">Import rate / kWh*</span>
-                    </div>
-
-                    {/* Card 4 */}
-                    <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
-                        <span className="text-2xl font-bold text-foreground tracking-tight">Up to 30¢</span>
-                        <span className="text-[11px] text-muted-foreground mt-0.5">Battery export FiT / kWh*</span>
-                    </div>
-                </div>
-
-                {/* 5. Value Proposition Bullets */}
-                <div className="space-y-2.5">
-                    <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
-                        <VerifiedCheckIcon size={17} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Flexible electricity plan with daytime solar soak hours</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
-                        <VerifiedCheckIcon size={17} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Battery-friendly feed-in tariffs to boost solar export returns</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
-                        <VerifiedCheckIcon size={17} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Simple online application with seamless switch & zero power interruption</span>
-                    </div>
-                </div>
-
-                {/* Divider Line */}
-                <div className="border-t border-border/70 my-2" />
-
-                {/* 6. Comprehensive Electricity Application Form */}
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    {errors.submit && (
-                        <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
-                            <AlertCircleIcon size={16} className="shrink-0" />
-                            <span>{errors.submit}</span>
-                        </div>
-                    )}
-
-                    {/* Section 1: Customer Information */}
-                    <div className="space-y-4">
+                        {/* Section Title */}
                         <div className="border-b border-border/70 pb-2">
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
-                                1. Customer Information
+                            <h3 className="text-base font-bold text-foreground">
+                                Step 1: Customer Information
                             </h3>
-                            <p className="text-xs text-muted-foreground">Enter primary account holder details.</p>
+                            <p className="text-xs text-muted-foreground">
+                                Please enter your personal and contact details.
+                            </p>
                         </div>
 
+                        {/* Title, First Name, Last Name */}
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
                             <div className="sm:col-span-3 space-y-1">
                                 <label className="text-xs font-semibold text-foreground">Title</label>
@@ -531,6 +645,7 @@ export const CompanyEnrollmentPage = () => {
                             </div>
                         </div>
 
+                        {/* Email and Mobile Number */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                             <div className="space-y-1">
                                 <label className="text-xs font-semibold text-foreground">
@@ -573,17 +688,73 @@ export const CompanyEnrollmentPage = () => {
                                 <p className="text-[10px] text-muted-foreground">Australian mobile (04xx xxx xxx)</p>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Section 2: Electricity Supply Details */}
-                    <div className="space-y-4 pt-2">
-                        <div className="border-b border-border/70 pb-2">
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
-                                2. Electricity Supply Details
-                            </h3>
-                            <p className="text-xs text-muted-foreground">National Meter Identifier (NMI) and service address.</p>
+                        {/* Step 1 Actions */}
+                        <div className="flex items-center gap-3 pt-3 border-t border-border/70">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setCurrentView('overview')}
+                                className="h-11 rounded-xl px-4 text-xs font-semibold"
+                            >
+                                <ArrowLeftIcon size={14} className="mr-1" />
+                                Back to Plan
+                            </Button>
+                            <Button
+                                type="submit"
+                                className="flex-1 h-11 text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all shadow-md flex items-center justify-center gap-1.5"
+                            >
+                                <span>Next: Supply Details</span>
+                                <ArrowRightIcon size={16} />
+                            </Button>
+                        </div>
+                    </form>
+                )}
+
+                {/* ========================================================== */}
+                {/* VIEW 2: STEP 2 (Electricity Supply Details & Consent)      */}
+                {/* ========================================================== */}
+                {currentView === 'step2' && (
+                    <form onSubmit={handleSubmit} className="space-y-5 animate-in fade-in duration-150">
+                        {/* Compact Partner Banner */}
+                        {renderPartnerCard(true)}
+
+                        {/* Step Progress Tracker */}
+                        {renderStepProgress()}
+
+                        {/* Customer Summary Chip */}
+                        <div className="p-3 rounded-xl bg-muted/40 border border-border flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold text-foreground">{formData.firstname} {formData.lastname}</span>
+                                <span className="text-muted-foreground font-mono">({formData.mobile})</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setCurrentView('step1')}
+                                className="text-primary hover:underline text-xs font-semibold"
+                            >
+                                Edit Details
+                            </button>
                         </div>
 
+                        {/* Section Title */}
+                        <div className="border-b border-border/70 pb-2">
+                            <h3 className="text-base font-bold text-foreground">
+                                Step 2: Electricity Supply Details
+                            </h3>
+                            <p className="text-xs text-muted-foreground">
+                                National Meter Identifier (NMI) and service supply address.
+                            </p>
+                        </div>
+
+                        {errors.submit && (
+                            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+                                <AlertCircleIcon size={16} className="shrink-0" />
+                                <span>{errors.submit}</span>
+                            </div>
+                        )}
+
+                        {/* NMI and Property Type */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                             <div className="space-y-1">
                                 <label className="text-xs font-semibold text-foreground flex items-center gap-1">
@@ -606,7 +777,7 @@ export const CompanyEnrollmentPage = () => {
                                 {errors.nmi ? (
                                     <p className="text-[11px] text-red-500">{errors.nmi}</p>
                                 ) : (
-                                    <p className="text-[10px] text-muted-foreground">Located on the first or second page of your power bill.</p>
+                                    <p className="text-[10px] text-muted-foreground">Found on your current electricity bill</p>
                                 )}
                             </div>
 
@@ -627,7 +798,7 @@ export const CompanyEnrollmentPage = () => {
                         {/* Street Address with Google Places Autocomplete */}
                         <div className="space-y-1">
                             <label className="text-xs font-semibold text-foreground">
-                                Street Address <span className="text-red-500">*</span>
+                                Supply Address <span className="text-red-500">*</span>
                             </label>
                             <LocationAutocomplete
                                 placeholder="Start typing address (e.g. 123 Example Street)..."
@@ -677,6 +848,7 @@ export const CompanyEnrollmentPage = () => {
                             />
                         </div>
 
+                        {/* Suburb, State, Postcode */}
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
                             <div className="sm:col-span-6 space-y-1">
                                 <label className="text-xs font-semibold text-foreground">
@@ -727,43 +899,56 @@ export const CompanyEnrollmentPage = () => {
                                 {errors.postcode && <p className="text-[11px] text-red-500">{errors.postcode}</p>}
                             </div>
                         </div>
-                    </div>
 
-                    {/* Section 3: Consent & Confirmation */}
-                    <div className="pt-3 border-t border-border/70 space-y-4">
-                        <div className="flex items-start gap-2.5">
-                            <input
-                                type="checkbox"
-                                id="agreeConsent"
-                                checked={formData.agreed}
-                                onChange={(e) => setFormData({ ...formData, agreed: e.target.checked })}
-                                className="mt-1 rounded border-input text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-                            />
-                            <label htmlFor="agreeConsent" className="text-xs text-muted-foreground leading-relaxed cursor-pointer select-none">
-                                I confirm that I am the account holder or authorized representative for the electricity supply address above. I consent to enrolling into the GEE Energy Solar Soak Plan through referral partner <strong className="text-foreground">{company.name}</strong> and agree to receive electricity supply communications.
-                            </label>
+                        {/* Consent & Confirmation */}
+                        <div className="pt-2 border-t border-border/70 space-y-2">
+                            <div className="flex items-start gap-2.5">
+                                <input
+                                    type="checkbox"
+                                    id="agreeConsent"
+                                    checked={formData.agreed}
+                                    onChange={(e) => setFormData({ ...formData, agreed: e.target.checked })}
+                                    className="mt-1 rounded border-input text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                                />
+                                <label htmlFor="agreeConsent" className="text-xs text-muted-foreground leading-relaxed cursor-pointer select-none">
+                                    I confirm that I am the account holder or authorized representative for the electricity supply address above. I consent to enrolling into the GEE Energy Solar Soak Plan through referral partner <strong className="text-foreground">{company.name}</strong> and agree to receive electricity supply communications.
+                                </label>
+                            </div>
+                            {errors.agreed && <p className="text-[11px] text-red-500">{errors.agreed}</p>}
                         </div>
-                        {errors.agreed && <p className="text-[11px] text-red-500">{errors.agreed}</p>}
 
-                        <Button
-                            type="submit"
-                            className="w-full h-11 text-sm font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white transition-all shadow-md"
-                            disabled={submitting}
-                        >
-                            {submitting ? (
-                                <span className="flex items-center gap-2">
-                                    <RefreshCwIcon size={16} className="animate-spin" />
-                                    Submitting Application...
-                                </span>
-                            ) : (
-                                'Submit Energy Application'
-                            )}
-                        </Button>
-                    </div>
-                </form>
+                        {/* Step 2 Actions */}
+                        <div className="flex items-center gap-3 pt-3 border-t border-border/70">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setCurrentView('step1')}
+                                className="h-11 rounded-xl px-4 text-xs font-semibold"
+                                disabled={submitting}
+                            >
+                                <ArrowLeftIcon size={14} className="mr-1" />
+                                Back to Step 1
+                            </Button>
+                            <Button
+                                type="submit"
+                                className="flex-1 h-11 text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all shadow-md flex items-center justify-center gap-2"
+                                disabled={submitting}
+                            >
+                                {submitting ? (
+                                    <span className="flex items-center gap-2">
+                                        <RefreshCwIcon size={16} className="animate-spin" />
+                                        Submitting Application...
+                                    </span>
+                                ) : (
+                                    'Submit Energy Application'
+                                )}
+                            </Button>
+                        </div>
+                    </form>
+                )}
 
                 {/* 7. Bottom Footnote Disclaimer */}
-                <div className="pt-3 border-t border-border/60 text-center space-y-1">
+                <div className="pt-2 border-t border-border/60 text-center space-y-1">
                     <p className="text-xs text-muted-foreground font-medium">
                         Illustrative design only
                     </p>
