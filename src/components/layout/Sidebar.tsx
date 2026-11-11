@@ -61,7 +61,12 @@ const iconMap: Record<string, React.FC<{ size?: number; className?: string }>> =
     insights: ActivityIcon,
     app_versions: TagIcon,
     api_credentials: KeyIcon,
-    company_ref: BuildingIcon
+    company_ref: BuildingIcon,
+    company_references: BuildingIcon,
+    company_reference: BuildingIcon,
+    'company-ref': BuildingIcon,
+    'company-references': BuildingIcon,
+    companyref: BuildingIcon
 };
 
 // Path mapping
@@ -96,8 +101,37 @@ const pathMap: Record<string, string> = {
     insights: '/insights',
     app_versions: '/app-versions',
     api_credentials: '/api-credentials',
-    company_ref: '/company-ref'
+    company_ref: '/company-ref',
+    company_references: '/company-ref',
+    company_reference: '/company-ref',
+    'company-ref': '/company-ref',
+    'company-references': '/company-ref',
+    companyref: '/company-ref'
     // user_management and email have no path, they are groupers
+};
+
+// Helper to reliably resolve icons even if code casing or naming varies
+const getMenuIcon = (menu?: { menuCode?: string; menuName?: string }) => {
+    if (!menu) return null;
+    const code = (menu.menuCode || '').toLowerCase().trim();
+    const name = (menu.menuName || '').toLowerCase().trim();
+    if (iconMap[code]) return iconMap[code];
+    if (code.includes('company') || name.includes('company reference')) {
+        return BuildingIcon;
+    }
+    return null;
+};
+
+// Helper to reliably resolve paths even if code casing or naming varies
+const getMenuPath = (menu?: { menuCode?: string; menuName?: string }) => {
+    if (!menu) return '/';
+    const code = (menu.menuCode || '').toLowerCase().trim();
+    const name = (menu.menuName || '').toLowerCase().trim();
+    if (pathMap[code]) return pathMap[code];
+    if (code.includes('company') || name.includes('company reference')) {
+        return '/company-ref';
+    }
+    return `/${menu.menuCode}`;
 };
 
 interface SidebarProps {
@@ -214,7 +248,7 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
     // Auto-expand parent if child is active
     useEffect(() => {
         const activeChild = sortedMenus.find(m => {
-            const path = pathMap[m.menuCode] || `/${m.menuCode}`;
+            const path = getMenuPath(m);
             return location.pathname.startsWith(path) && path !== '/';
         });
 
@@ -328,11 +362,11 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                     const hasSubMenus = children.length > 1 || menu.menuCode === 'trackers';
                     
                     // Priority for icon: Child icon > Parent Icon
-                    const IconComponent = iconMap[effectiveMenu.menuCode] || iconMap[menu.menuCode];
+                    const IconComponent = getMenuIcon(effectiveMenu) || getMenuIcon(menu);
 
                     // Simple item (Leaf or simplified group)
                     if (!hasSubMenus) {
-                        let path = pathMap[effectiveMenu.menuCode] || `/${effectiveMenu.menuCode}`;
+                        let path = getMenuPath(effectiveMenu);
                         if (user?.isIndependentUi && effectiveMenu.menuCode === 'users') {
                             path = '/branch-portal/staff';
                         }
@@ -364,7 +398,7 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                     const isExpanded = expandedMenus[menu.menuUid];
                     // Check if any child is active to highlight parent
                     const isChildActive = children.some(child => {
-                        const childPath = pathMap[child.menuCode] || `/${child.menuCode}`;
+                        const childPath = getMenuPath(child);
                         return location.pathname.startsWith(childPath);
                     });
 
@@ -409,11 +443,11 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                                             </div>
                                             <div className="p-1 flex flex-col gap-0.5">
                                                 {children.map(child => {
-                                                    let childPath = pathMap[child.menuCode] || `/${child.menuCode}`;
+                                                    let childPath = getMenuPath(child);
                                                     if (user?.isIndependentUi && child.menuCode === 'users') {
                                                         childPath = '/branch-portal/staff';
                                                     }
-                                                    const ChildIcon = iconMap[child.menuCode];
+                                                    const ChildIcon = getMenuIcon(child);
                                                     return (
                                                         <NavLink
                                                             key={child.menuUid}
@@ -484,11 +518,11 @@ export function Sidebar({ className, isOpen = true }: SidebarProps) {
                             {isExpanded && (
                                 <div className="space-y-1">
                                     {children.map(child => {
-                                        let childPath = pathMap[child.menuCode] || `/${child.menuCode}`;
+                                        let childPath = getMenuPath(child);
                                         if (user?.isIndependentUi && child.menuCode === 'users') {
                                             childPath = '/branch-portal/staff';
                                         }
-                                        const ChildIcon = iconMap[child.menuCode];
+                                        const ChildIcon = getMenuIcon(child);
                                         return (
                                             <NavLink
                                                 key={child.menuUid}

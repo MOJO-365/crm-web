@@ -142,7 +142,11 @@ const router = createBrowserRouter(
                 <Route path="/master-data" element={<RequirePermission menuCode="document_types"><MasterDataPage /></RequirePermission>} />
                 <Route path="/app-versions" element={<RequirePermission menuCode="app_versions"><AppVersionsPage /></RequirePermission>} />
                 <Route path="/api-credentials" element={<RequirePermission menuCode="api_credentials"><WebApiCredentialsPage /></RequirePermission>} />
+                {/* Company References Master */}
                 <Route path="/company-ref" element={<RequirePermission menuCode="company_ref"><CompanyRefPage /></RequirePermission>} />
+                <Route path="/company_ref" element={<RequirePermission menuCode="company_ref"><CompanyRefPage /></RequirePermission>} />
+                <Route path="/company-references" element={<RequirePermission menuCode="company_ref"><CompanyRefPage /></RequirePermission>} />
+                <Route path="/company_references" element={<RequirePermission menuCode="company_ref"><CompanyRefPage /></RequirePermission>} />
 
                 {/* General authenticated routes */}
                 <Route path="/change-password" element={<ChangePasswordPage />} />

@@ -280,7 +280,18 @@ export const CompanyEnrollmentPage = () => {
                 },
                 fullAddress: fullAddress,
                 property_type: parseInt(formData.propertyType, 10),
-                isVpp: 0,
+                isVpp: 1,
+                planName: 'Solar Flow Plan',
+                plan_name: 'Solar Flow Plan',
+                ratePlan: {
+                    name: 'Solar Flow Plan',
+                    title: 'Solar Flow Plan'
+                },
+                planDetails: {
+                    planName: 'Solar Flow Plan',
+                    isSolarRequired: 1,
+                    isBatteryRequired: 1
+                },
                 // Portal Tagging
                 portalname: company.portalName || company.name,
                 portalName: company.portalName || company.name,
@@ -320,10 +331,10 @@ export const CompanyEnrollmentPage = () => {
     // Loading State
     if (loadingCompany) {
         return (
-            <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 flex flex-col items-center justify-center p-4">
-                <div className="flex items-center gap-3 text-muted-foreground bg-card p-6 rounded-2xl border border-border shadow-sm">
-                    <RefreshCwIcon size={20} className="animate-spin text-primary" />
-                    <span className="text-sm font-medium">Loading Solar Soak enrollment portal...</span>
+            <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 flex flex-col items-center justify-center p-3 sm:p-4">
+                <div className="flex items-center gap-3 text-muted-foreground bg-card p-5 sm:p-6 rounded-2xl border border-border shadow-sm max-w-sm w-full justify-center">
+                    <RefreshCwIcon size={20} className="animate-spin text-primary shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium">Loading Solar Flow enrollment portal...</span>
                 </div>
             </div>
         );
@@ -332,20 +343,20 @@ export const CompanyEnrollmentPage = () => {
     // Invalid Link / Error State
     if (companyError || !company) {
         return (
-            <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 flex flex-col items-center justify-center p-4">
-                <div className="max-w-md w-full bg-card rounded-3xl border border-border p-8 text-center space-y-4 shadow-sm">
-                    <div className="w-14 h-14 mx-auto rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 flex items-center justify-center">
-                        <AlertCircleIcon size={30} />
+            <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 flex flex-col items-center justify-center p-3 sm:p-4">
+                <div className="max-w-md w-full bg-card rounded-2xl sm:rounded-3xl border border-border p-6 sm:p-8 text-center space-y-4 shadow-sm">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 mx-auto rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 flex items-center justify-center">
+                        <AlertCircleIcon size={28} />
                     </div>
-                    <h2 className="text-xl font-bold text-foreground">Referral Link Unavailable</h2>
-                    <p className="text-sm text-muted-foreground">
+                    <h2 className="text-lg sm:text-xl font-bold text-foreground">Referral Link Unavailable</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                         {companyError || 'The referral link you entered is invalid or has expired.'}
                     </p>
                     <div className="pt-2">
                         <button
                             type="button"
                             onClick={() => window.location.reload()}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary-hover transition-all shadow-xs cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary-hover transition-all shadow-xs cursor-pointer"
                         >
                             <RefreshCwIcon size={14} />
                             Retry Link
@@ -359,44 +370,45 @@ export const CompanyEnrollmentPage = () => {
     // Success Submission Screen
     if (submittedUid) {
         return (
-            <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 flex flex-col items-center justify-center p-4">
-                <div className="max-w-lg w-full bg-card rounded-3xl border border-border p-8 text-center space-y-5 shadow-md animate-in fade-in zoom-in-95 duration-200">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-primary/15 text-primary flex items-center justify-center">
-                        <CheckCircleIcon size={36} />
+            <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 flex flex-col items-center justify-center p-3 sm:p-4">
+                <div className="max-w-lg w-full bg-card rounded-2xl sm:rounded-3xl border border-border p-5 sm:p-8 text-center space-y-4 sm:space-y-5 shadow-md animate-in fade-in zoom-in-95 duration-200">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full bg-primary/15 text-primary flex items-center justify-center">
+                        <CheckCircleIcon size={32} className="sm:hidden" />
+                        <CheckCircleIcon size={36} className="hidden sm:block" />
                     </div>
                     <div>
-                        <span className="text-xs font-semibold uppercase tracking-wider text-primary">Solar Soak Plan Application</span>
-                        <h2 className="text-2xl font-bold text-foreground mt-1">Application Received!</h2>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-primary">Solar Flow Plan Application</span>
+                        <h2 className="text-xl sm:text-2xl font-bold text-foreground mt-1">Application Received!</h2>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                             Thank you, <span className="font-semibold text-foreground">{formData.firstname}</span>. Your electricity application via <span className="font-semibold text-foreground">{company.name}</span> has been successfully submitted.
                         </p>
                     </div>
 
-                    <div className="bg-muted/40 p-5 rounded-2xl text-left text-xs space-y-2.5 border border-border">
-                        <div className="flex justify-between py-1 border-b border-border/50">
-                            <span className="text-muted-foreground">Reference UID:</span>
-                            <span className="font-mono font-medium text-foreground">{submittedUid}</span>
+                    <div className="bg-muted/40 p-3.5 sm:p-5 rounded-xl sm:rounded-2xl text-left text-xs space-y-2 sm:space-y-2.5 border border-border">
+                        <div className="flex justify-between py-1 border-b border-border/50 gap-2">
+                            <span className="text-muted-foreground shrink-0">Reference UID:</span>
+                            <span className="font-mono font-medium text-foreground truncate">{submittedUid}</span>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-border/50">
-                            <span className="text-muted-foreground">Selected Plan:</span>
-                            <span className="font-semibold text-primary">GEE Energy Solar Soak Plan</span>
+                        <div className="flex justify-between py-1 border-b border-border/50 gap-2">
+                            <span className="text-muted-foreground shrink-0">Selected Plan:</span>
+                            <span className="font-semibold text-primary text-right truncate">GEE Energy Solar Flow Plan</span>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-border/50">
-                            <span className="text-muted-foreground">Service NMI:</span>
+                        <div className="flex justify-between py-1 border-b border-border/50 gap-2">
+                            <span className="text-muted-foreground shrink-0">Service NMI:</span>
                             <span className="font-mono font-medium text-foreground">{formData.nmi}</span>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-border/50">
-                            <span className="text-muted-foreground">Referral Partner:</span>
-                            <span className="font-semibold text-foreground">{company.name}</span>
+                        <div className="flex justify-between py-1 border-b border-border/50 gap-2">
+                            <span className="text-muted-foreground shrink-0">Referral Partner:</span>
+                            <span className="font-semibold text-foreground text-right truncate">{company.name}</span>
                         </div>
-                        <div className="flex justify-between py-1">
-                            <span className="text-muted-foreground">Application Status:</span>
-                            <span className="font-semibold text-amber-600 dark:text-amber-400">Pending Customer Approval</span>
+                        <div className="flex justify-between py-1 gap-2">
+                            <span className="text-muted-foreground shrink-0">Application Status:</span>
+                            <span className="font-semibold text-amber-600 dark:text-amber-400 text-right">Pending Customer Approval</span>
                         </div>
                     </div>
 
                     <p className="text-xs text-muted-foreground">
-                        Our onboarding team will verify your supply meter details and send your Solar Soak welcome contract to <span className="font-medium text-foreground">{formData.email}</span>.
+                        Our onboarding team will verify your supply meter details and send your Solar Flow welcome contract to <span className="font-medium text-foreground break-all">{formData.email}</span>.
                     </p>
 
                     <Button
@@ -419,7 +431,7 @@ export const CompanyEnrollmentPage = () => {
                             });
                         }}
                         variant="outline"
-                        className="w-full rounded-xl"
+                        className="w-full rounded-xl h-11 text-xs font-semibold"
                     >
                         Submit Another Application
                     </Button>
@@ -431,16 +443,20 @@ export const CompanyEnrollmentPage = () => {
     // Shared Header Component for all stages
     const renderTopHeader = () => (
         <div className="flex items-center justify-between gap-3">
-            <div>
-                <h2 className="text-xl font-bold tracking-tight text-foreground">
-                    GEE Energy
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                    Smart electricity solutions
-                </p>
+            <div className="flex items-center gap-2.5">
+                <img
+                    src="/main-logo-dark 6.png"
+                    alt="GEE Energy"
+                    className="h-7 sm:h-8 object-contain block dark:hidden"
+                />
+                <img
+                    src="/main-logo 6.png"
+                    alt="GEE Energy"
+                    className="h-7 sm:h-8 object-contain hidden dark:block"
+                />
             </div>
 
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+            <div className="inline-flex items-center px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-primary/10 text-primary border border-primary/20 shadow-2xs shrink-0">
                 Partner referral
             </div>
         </div>
@@ -449,27 +465,28 @@ export const CompanyEnrollmentPage = () => {
     // Shared Referral Partner Card
     const renderPartnerCard = (compact = false) => (
         <div className={cn(
-            "border border-border/80 rounded-2xl bg-muted/20 flex items-center justify-between gap-3.5 shadow-2xs",
-            compact ? "p-3 sm:p-3.5" : "p-4"
+            "border border-border/80 rounded-xl sm:rounded-2xl bg-muted/20 flex items-center justify-between gap-3 shadow-2xs",
+            compact ? "p-3 sm:p-3.5" : "p-3.5 sm:p-4"
         )}>
-            <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
-                    <HandshakeIcon size={22} />
+            <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
+                    <HandshakeIcon size={20} className="sm:hidden" />
+                    <HandshakeIcon size={22} className="hidden sm:block" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">
+                    <span className="text-[9px] sm:text-[10px] font-bold tracking-wider uppercase text-muted-foreground truncate">
                         YOU HAVE BEEN REFERRED BY
                     </span>
-                    <span className="text-base sm:text-lg font-bold text-foreground leading-tight truncate">
+                    <span className="text-sm sm:text-lg font-bold text-foreground leading-tight truncate">
                         {company.name}
                     </span>
-                    <span className="text-[11px] text-muted-foreground mt-0.5">
+                    <span className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
                         Official GEE Energy referral partner
                     </span>
                 </div>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 {(company.email || company.phone) && !compact && (
                     <div className="hidden sm:flex flex-col text-right text-[11px] text-muted-foreground">
                         {company.email && (
@@ -485,7 +502,8 @@ export const CompanyEnrollmentPage = () => {
                     </div>
                 )}
                 <div className="text-primary shrink-0">
-                    <VerifiedCheckIcon size={22} />
+                    <VerifiedCheckIcon size={20} className="sm:hidden" />
+                    <VerifiedCheckIcon size={22} className="hidden sm:block" />
                 </div>
             </div>
         </div>
@@ -494,29 +512,29 @@ export const CompanyEnrollmentPage = () => {
     // Step Progress Indicator for Step 1 and Step 2
     const renderStepProgress = () => (
         <div className="py-1">
-            <div className="flex items-center justify-between gap-3 relative">
+            <div className="flex items-center justify-between gap-2 sm:gap-3 relative">
                 {/* Step 1 Indicator */}
                 <div
                     onClick={() => currentView === 'step2' && setCurrentView('step1')}
                     className={cn(
-                        "flex items-center gap-2.5 min-w-0 transition-all",
+                        "flex items-center gap-2 sm:gap-2.5 min-w-0 transition-all",
                         currentView === 'step2' ? "cursor-pointer group" : ""
                     )}
                 >
                     <div className={cn(
-                        "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all shadow-2xs",
+                        "w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold shrink-0 transition-all shadow-2xs",
                         currentView === 'step2'
                             ? "bg-primary text-primary-foreground group-hover:scale-105"
                             : currentView === 'step1'
                             ? "bg-primary text-primary-foreground ring-4 ring-primary/15"
                             : "bg-muted text-muted-foreground"
                     )}>
-                        {currentView === 'step2' ? <CheckIcon size={13} strokeWidth={3} /> : '1'}
+                        {currentView === 'step2' ? <CheckIcon size={12} strokeWidth={3} /> : '1'}
                     </div>
                     <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-tight">Step 1</span>
+                        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-tight">Step 1</span>
                         <span className={cn(
-                            "text-xs truncate leading-tight transition-colors",
+                            "text-[11px] sm:text-xs truncate leading-tight transition-colors",
                             currentView === 'step1' ? "text-primary font-bold" : currentView === 'step2' ? "text-foreground group-hover:text-primary font-medium" : "text-muted-foreground font-medium"
                         )}>
                             Customer Info
@@ -533,9 +551,9 @@ export const CompanyEnrollmentPage = () => {
                 </div>
 
                 {/* Step 2 Indicator */}
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                     <div className={cn(
-                        "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all shadow-2xs",
+                        "w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold shrink-0 transition-all shadow-2xs",
                         currentView === 'step2'
                             ? "bg-primary text-primary-foreground ring-4 ring-primary/15"
                             : "bg-muted/70 text-muted-foreground border border-border/80"
@@ -543,9 +561,9 @@ export const CompanyEnrollmentPage = () => {
                         2
                     </div>
                     <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-tight">Step 2</span>
+                        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-tight">Step 2</span>
                         <span className={cn(
-                            "text-xs leading-tight truncate transition-colors",
+                            "text-[11px] sm:text-xs leading-tight truncate transition-colors",
                             currentView === 'step2' ? "text-primary font-bold" : "text-muted-foreground font-medium"
                         )}>
                             Supply Details
@@ -557,8 +575,8 @@ export const CompanyEnrollmentPage = () => {
     );
 
     return (
-        <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 py-8 px-4 sm:px-6 flex justify-center items-start">
-            <div className="w-full max-w-2xl bg-card border border-border/80 rounded-[24px] p-5 sm:p-7 shadow-sm space-y-5">
+        <div className="min-h-screen bg-[#fafbfc] dark:bg-slate-950 py-4 sm:py-8 px-3 sm:px-6 flex justify-center items-start">
+            <div className="w-full max-w-2xl bg-card border border-border/80 rounded-2xl sm:rounded-[24px] p-4 sm:p-7 shadow-sm space-y-4 sm:space-y-5">
 
                 {/* Shared Top Header */}
                 {renderTopHeader()}
@@ -571,52 +589,75 @@ export const CompanyEnrollmentPage = () => {
                         {/* Referral Partner Card */}
                         {renderPartnerCard()}
 
-                        {/* Move to Solar Soak Plan Heading */}
-                        <div className="space-y-2">
-                            <h1 className="text-2xl sm:text-[28px] font-bold tracking-tight text-foreground leading-tight">
-                                Move to Solar Soak Plan
+                        {/* Move to Solar Flow Plan Heading */}
+                        <div className="space-y-1.5 sm:space-y-2">
+                            <h1 className="text-xl sm:text-2xl md:text-[28px] font-bold tracking-tight text-foreground leading-tight">
+                                Move to Solar Flow Plan
                             </h1>
                             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                                Discover the GEE Energy Solar Soak Plan and complete your electricity application online. Designed to maximise your solar & battery savings.
+                                Discover the GEE Energy Solar Flow Plan and complete your electricity application online. Designed to maximise your solar & battery savings.
                             </p>
                         </div>
 
                         {/* 4 Highlight Stat Cards (2x2 Grid) */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
-                                <span className="text-2xl font-bold text-foreground tracking-tight">$300</span>
-                                <span className="text-[11px] text-muted-foreground mt-0.5">Welcome credit</span>
+                        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                            <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
+                                <span className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">$25</span>
+                                <span className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 leading-tight">Monthly VPP credit</span>
                             </div>
 
-                            <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
-                                <span className="text-2xl font-bold text-foreground tracking-tight">$0</span>
-                                <span className="text-[11px] text-muted-foreground mt-0.5">Exit fees</span>
+                            <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
+                                <span className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">10¢</span>
+                                <span className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 leading-tight">Evening feed-in / kWh</span>
                             </div>
 
-                            <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
-                                <span className="text-2xl font-bold text-foreground tracking-tight">30¢</span>
-                                <span className="text-[11px] text-muted-foreground mt-0.5">Import rate / kWh</span>
+                            <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
+                                <span className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">FREE</span>
+                                <span className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 leading-tight">Energy window (11am-2pm)</span>
                             </div>
 
-                            <div className="p-4 rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
-                                <span className="text-2xl font-bold text-foreground tracking-tight">Up to 30¢</span>
-                                <span className="text-[11px] text-muted-foreground mt-0.5">Battery export FiT / kWh</span>
+                            <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-border/80 bg-card flex flex-col justify-center">
+                                <span className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">15% Below</span>
+                                <span className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 leading-tight">Reference price</span>
                             </div>
                         </div>
 
-                        {/* 3 Value Proposition Bullets */}
-                        <div className="space-y-2.5">
-                            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
-                                <VerifiedCheckIcon size={17} className="text-primary shrink-0" />
-                                <span>Flexible electricity plan with daytime solar soak hours</span>
-                            </div>
-                            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
-                                <VerifiedCheckIcon size={17} className="text-primary shrink-0" />
-                                <span>Battery-friendly feed-in tariffs to boost solar export returns</span>
-                            </div>
-                            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-foreground font-medium">
-                                <VerifiedCheckIcon size={17} className="text-primary shrink-0" />
-                                <span>Simple online application with seamless switch & zero power interruption</span>
+                        {/* Key Benefits */}
+                        <div className="space-y-2.5 sm:space-y-3">
+                            <h3 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                Key Benefits
+                            </h3>
+                            <div className="space-y-2 sm:space-y-2.5">
+                                <div className="flex items-start gap-2 sm:gap-2.5 text-xs sm:text-sm text-foreground">
+                                    <VerifiedCheckIcon size={17} className="text-primary shrink-0 mt-0.5" />
+                                    <span className="leading-relaxed">
+                                        <strong className="font-semibold text-foreground">$25/month VPP Credit</strong> – receive a monthly credit for participating in the GEE VPP Plan.
+                                    </span>
+                                </div>
+                                <div className="flex items-start gap-2 sm:gap-2.5 text-xs sm:text-sm text-foreground">
+                                    <VerifiedCheckIcon size={17} className="text-primary shrink-0 mt-0.5" />
+                                    <span className="leading-relaxed">
+                                        <strong className="font-semibold text-foreground">$0.10/kWh Evening Feed-in Rate</strong> – on the first 10 kWh exported between 5pm–9pm.
+                                    </span>
+                                </div>
+                                <div className="flex items-start gap-2 sm:gap-2.5 text-xs sm:text-sm text-foreground">
+                                    <VerifiedCheckIcon size={17} className="text-primary shrink-0 mt-0.5" />
+                                    <span className="leading-relaxed">
+                                        <strong className="font-semibold text-foreground">FREE Energy Window</strong> – enjoy electricity at $0/kWh from 11am–2pm, capped at 24 kWh/day.
+                                    </span>
+                                </div>
+                                <div className="flex items-start gap-2.5 text-xs sm:text-sm text-foreground">
+                                    <VerifiedCheckIcon size={17} className="text-primary shrink-0 mt-0.5" />
+                                    <span className="leading-relaxed">
+                                        <strong className="font-semibold text-foreground">15% Below Reference Price</strong> – your rates sit below the Government Reference Price for your zone.
+                                    </span>
+                                </div>
+                                <div className="flex items-start gap-2.5 text-xs sm:text-sm text-foreground">
+                                    <VerifiedCheckIcon size={17} className="text-primary shrink-0 mt-0.5" />
+                                    <span className="leading-relaxed">
+                                        <strong className="font-semibold text-foreground">No Lock-in or Exit Fees</strong> – flexibility to leave without early exit fees.
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
@@ -628,7 +669,7 @@ export const CompanyEnrollmentPage = () => {
                             <Button
                                 type="button"
                                 onClick={handleStartApplication}
-                                className="w-full h-12 text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all shadow-md flex items-center justify-center gap-2"
+                                className="w-full h-11 sm:h-12 text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
                             >
                                 <span>Next</span>
                                 <ArrowRightIcon size={18} />
@@ -644,7 +685,7 @@ export const CompanyEnrollmentPage = () => {
                 {/* VIEW 1: STEP 1 (Customer Information)                      */}
                 {/* ========================================================== */}
                 {currentView === 'step1' && (
-                    <form onSubmit={handleStep1Next} className="space-y-5 animate-in fade-in duration-150">
+                    <form onSubmit={handleStep1Next} className="space-y-4 sm:space-y-5 animate-in fade-in duration-150">
                         {/* Compact Partner Banner */}
                         {renderPartnerCard(true)}
 
@@ -653,17 +694,17 @@ export const CompanyEnrollmentPage = () => {
 
                         {/* Section Title */}
                         <div className="border-b border-border/70 pb-2">
-                            <h3 className="text-base font-bold text-foreground">
+                            <h3 className="text-sm sm:text-base font-bold text-foreground">
                                 Step 1: Customer Information
                             </h3>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-[11px] sm:text-xs text-muted-foreground">
                                 Please enter your personal and contact details.
                             </p>
                         </div>
 
                         {/* Title, First Name, Last Name */}
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
-                            <div className="sm:col-span-3 space-y-1">
+                        <div className="grid grid-cols-12 gap-3 sm:gap-3.5">
+                            <div className="col-span-4 sm:col-span-3 space-y-1">
                                 <label className="text-xs font-semibold text-foreground">Title</label>
                                 <Select
                                     options={TITLE_OPTIONS}
@@ -673,7 +714,7 @@ export const CompanyEnrollmentPage = () => {
                                 />
                             </div>
 
-                            <div className="sm:col-span-4 space-y-1">
+                            <div className="col-span-8 sm:col-span-4 space-y-1">
                                 <label className="text-xs font-semibold text-foreground">
                                     First Name <span className="text-red-500">*</span>
                                 </label>
@@ -692,7 +733,7 @@ export const CompanyEnrollmentPage = () => {
                                 {errors.firstname && <p className="text-[11px] text-red-500">{errors.firstname}</p>}
                             </div>
 
-                            <div className="sm:col-span-5 space-y-1">
+                            <div className="col-span-12 sm:col-span-5 space-y-1">
                                 <label className="text-xs font-semibold text-foreground">
                                     Last Name <span className="text-red-500">*</span>
                                 </label>
@@ -713,13 +754,16 @@ export const CompanyEnrollmentPage = () => {
                         </div>
 
                         {/* Email and Mobile Number */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                             <div className="space-y-1">
                                 <label className="text-xs font-semibold text-foreground">
                                     Email Address <span className="text-red-500">*</span>
                                 </label>
                                 <Input
                                     type="email"
+                                    inputMode="email"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
                                     placeholder="john.doe@example.com"
                                     value={formData.email}
                                     onChange={(e) => {
@@ -739,10 +783,12 @@ export const CompanyEnrollmentPage = () => {
                                     Mobile Number <span className="text-red-500 font-bold">*</span>
                                 </label>
                                 <div className="flex items-center">
-                                    <div className="flex items-center justify-center h-11 px-3.5 bg-muted/60 border border-r-0 border-border/90 rounded-l-xl text-sm font-semibold text-muted-foreground whitespace-nowrap select-none">
+                                    <div className="flex items-center justify-center h-11 px-3 sm:px-3.5 bg-muted/60 border border-r-0 border-border/90 rounded-l-xl text-xs sm:text-sm font-semibold text-muted-foreground whitespace-nowrap select-none">
                                         +61
                                     </div>
                                     <Input
+                                        type="tel"
+                                        inputMode="numeric"
                                         placeholder="412 345 678"
                                         value={formData.mobile}
                                         onChange={(e) => handleMobileChange(e.target.value)}
@@ -763,19 +809,20 @@ export const CompanyEnrollmentPage = () => {
                         </div>
 
                         {/* Step 1 Actions */}
-                        <div className="flex items-center gap-3 pt-3 border-t border-border/70">
+                        <div className="flex items-center gap-2.5 sm:gap-3 pt-3 border-t border-border/70">
                             <Button
                                 type="button"
                                 variant="outline"
                                 onClick={() => setCurrentView('overview')}
-                                className="h-11 rounded-xl px-4 text-xs font-semibold"
+                                className="h-11 rounded-xl px-3 sm:px-4 text-xs font-semibold shrink-0 cursor-pointer"
                             >
                                 <ArrowLeftIcon size={14} className="mr-1" />
-                                Back to Plan
+                                <span className="hidden sm:inline">Back to Plan</span>
+                                <span className="sm:hidden">Back</span>
                             </Button>
                             <Button
                                 type="submit"
-                                className="flex-1 h-11 text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all shadow-md flex items-center justify-center gap-1.5"
+                                className="flex-1 h-11 text-xs sm:text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                                 <span>Next: Supply Details</span>
                                 <ArrowRightIcon size={16} />
@@ -788,7 +835,7 @@ export const CompanyEnrollmentPage = () => {
                 {/* VIEW 2: STEP 2 (Electricity Supply Details & Consent)      */}
                 {/* ========================================================== */}
                 {currentView === 'step2' && (
-                    <form onSubmit={handleSubmit} className="space-y-5 animate-in fade-in duration-150">
+                    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 animate-in fade-in duration-150">
                         {/* Compact Partner Banner */}
                         {renderPartnerCard(true)}
 
@@ -796,15 +843,15 @@ export const CompanyEnrollmentPage = () => {
                         {renderStepProgress()}
 
                         {/* Customer Summary Chip */}
-                        <div className="p-3 rounded-xl bg-muted/40 border border-border flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
-                                <span className="font-semibold text-foreground">{formData.firstname} {formData.lastname}</span>
-                                <span className="text-muted-foreground font-mono">(0{formData.mobile.replace(/\D/g, '').replace(/^0/, '')})</span>
+                        <div className="p-2.5 sm:p-3 rounded-xl bg-muted/40 border border-border flex items-center justify-between text-xs gap-2">
+                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                <span className="font-semibold text-foreground truncate">{formData.firstname} {formData.lastname}</span>
+                                <span className="text-muted-foreground font-mono text-[11px] sm:text-xs shrink-0">(0{formData.mobile.replace(/\D/g, '').replace(/^0/, '')})</span>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setCurrentView('step1')}
-                                className="text-primary hover:underline text-xs font-semibold"
+                                className="text-primary hover:underline text-xs font-semibold shrink-0 cursor-pointer"
                             >
                                 Edit Details
                             </button>
@@ -812,10 +859,10 @@ export const CompanyEnrollmentPage = () => {
 
                         {/* Section Title */}
                         <div className="border-b border-border/70 pb-2">
-                            <h3 className="text-base font-bold text-foreground">
+                            <h3 className="text-sm sm:text-base font-bold text-foreground">
                                 Step 2: Electricity Supply Details
                             </h3>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-[11px] sm:text-xs text-muted-foreground">
                                 National Meter Identifier (NMI) and service supply address.
                             </p>
                         </div>
@@ -828,7 +875,7 @@ export const CompanyEnrollmentPage = () => {
                         )}
 
                         {/* NMI and Property Type */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                             <div className="space-y-1">
                                 <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                                     <ZapIcon size={14} className="text-amber-500" />
@@ -837,6 +884,7 @@ export const CompanyEnrollmentPage = () => {
                                 <Input
                                     placeholder="e.g. 4102000000"
                                     value={formData.nmi}
+                                    inputMode="numeric"
                                     onChange={(e) => {
                                         setFormData({ ...formData, nmi: e.target.value.toUpperCase() });
                                         if (errors.nmi) setErrors(prev => ({ ...prev, nmi: '' }));
@@ -922,8 +970,8 @@ export const CompanyEnrollmentPage = () => {
                         </div>
 
                         {/* Suburb, State, Postcode */}
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
-                            <div className="sm:col-span-6 space-y-1">
+                        <div className="grid grid-cols-12 gap-3 sm:gap-3.5">
+                            <div className="col-span-12 sm:col-span-6 space-y-1">
                                 <label className="text-xs font-semibold text-foreground">
                                     Suburb <span className="text-red-500">*</span>
                                 </label>
@@ -942,7 +990,7 @@ export const CompanyEnrollmentPage = () => {
                                 {errors.suburb && <p className="text-[11px] text-red-500">{errors.suburb}</p>}
                             </div>
 
-                            <div className="sm:col-span-3 space-y-1">
+                            <div className="col-span-6 sm:col-span-3 space-y-1">
                                 <label className="text-xs font-semibold text-foreground">State</label>
                                 <Select
                                     options={STATE_OPTIONS}
@@ -952,13 +1000,14 @@ export const CompanyEnrollmentPage = () => {
                                 />
                             </div>
 
-                            <div className="sm:col-span-3 space-y-1">
+                            <div className="col-span-6 sm:col-span-3 space-y-1">
                                 <label className="text-xs font-semibold text-foreground">
                                     Postcode <span className="text-red-500">*</span>
                                 </label>
                                 <Input
                                     placeholder="2000"
                                     value={formData.postcode}
+                                    inputMode="numeric"
                                     onChange={(e) => {
                                         setFormData({ ...formData, postcode: e.target.value });
                                         if (errors.postcode) setErrors(prev => ({ ...prev, postcode: '' }));
@@ -981,39 +1030,43 @@ export const CompanyEnrollmentPage = () => {
                                     id="agreeConsent"
                                     checked={formData.agreed}
                                     onChange={(e) => setFormData({ ...formData, agreed: e.target.checked })}
-                                    className="mt-1 rounded border-input text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                                    className="mt-0.5 rounded border-input text-primary focus:ring-primary w-4 h-4 cursor-pointer shrink-0"
                                 />
-                                <label htmlFor="agreeConsent" className="text-xs text-muted-foreground leading-relaxed cursor-pointer select-none">
-                                    I confirm that I am the account holder or authorized representative for the electricity supply address above. I consent to enrolling into the GEE Energy Solar Soak Plan through referral partner <strong className="text-foreground">{company.name}</strong> and agree to receive electricity supply communications.
+                                <label htmlFor="agreeConsent" className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed cursor-pointer select-none">
+                                    I confirm that I am the account holder or authorized representative for the electricity supply address above. I consent to enrolling into the GEE Energy Solar Flow Plan through referral partner <strong className="text-foreground">{company.name}</strong> and agree to receive electricity supply communications.
                                 </label>
                             </div>
                             {errors.agreed && <p className="text-[11px] text-red-500">{errors.agreed}</p>}
                         </div>
 
                         {/* Step 2 Actions */}
-                        <div className="flex items-center gap-3 pt-3 border-t border-border/70">
+                        <div className="flex items-center gap-2.5 sm:gap-3 pt-3 border-t border-border/70">
                             <Button
                                 type="button"
                                 variant="outline"
                                 onClick={() => setCurrentView('step1')}
-                                className="h-11 rounded-xl px-4 text-xs font-semibold"
+                                className="h-11 rounded-xl px-3 sm:px-4 text-xs font-semibold shrink-0 cursor-pointer"
                                 disabled={submitting}
                             >
                                 <ArrowLeftIcon size={14} className="mr-1" />
-                                Back to Step 1
+                                <span className="hidden sm:inline">Back to Step 1</span>
+                                <span className="sm:hidden">Back</span>
                             </Button>
                             <Button
                                 type="submit"
-                                className="flex-1 h-11 text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all shadow-md flex items-center justify-center gap-2"
+                                className="flex-1 h-11 text-xs sm:text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all shadow-md flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer"
                                 disabled={submitting}
                             >
                                 {submitting ? (
                                     <span className="flex items-center gap-2">
                                         <RefreshCwIcon size={16} className="animate-spin" />
-                                        Submitting Application...
+                                        <span className="truncate">Submitting...</span>
                                     </span>
                                 ) : (
-                                    'Submit Energy Application'
+                                    <>
+                                        <span className="hidden sm:inline">Submit Energy Application</span>
+                                        <span className="sm:hidden">Submit Application</span>
+                                    </>
                                 )}
                             </Button>
                         </div>

@@ -15,7 +15,11 @@ export function RequirePermission({ children, menuCode }: RequirePermissionProps
     const { accessibleMenus, user } = useAuthStore();
 
     const hasAccess = user?.isMaster || accessibleMenus.some(
-        menu => (menu.menuCode === menuCode || (menuCode === 'company_ref' && (menu.menuCode === 'document_types' || menu.menuCode === 'api_credentials'))) && menu.canView
+        menu => (
+            menu.menuCode === menuCode ||
+            ((menuCode === 'company_ref' || menuCode === 'company_references') &&
+             (menu.menuCode === 'company_ref' || menu.menuCode === 'company_references' || menu.menuCode === 'company-ref' || menu.menuName?.toLowerCase().includes('company reference') || menu.menuCode === 'document_types' || menu.menuCode === 'api_credentials'))
+        ) && menu.canView
     );
 
     if (!hasAccess) {
