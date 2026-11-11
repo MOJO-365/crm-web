@@ -71,6 +71,14 @@ const VerifiedCheckIcon = ({ size = 22, className }: { size?: number; className?
     </svg>
 );
 
+const getWebRestApiBase = () => {
+    const raw = (BASE_API_URL || '').replace(/\/graphql\/?$/, '').replace(/\/+$/, '');
+    if (!raw) {
+        return '/api';
+    }
+    return raw.endsWith('/api') ? raw : `${raw}/api`;
+};
+
 export const CompanyEnrollmentPage = () => {
     const { code } = useParams<{ code: string }>();
 
@@ -112,20 +120,26 @@ export const CompanyEnrollmentPage = () => {
         const fetchCompany = async () => {
             try {
                 setLoadingCompany(true);
-                const apiBase = (BASE_API_URL || 'http://localhost:4000').replace(/\/graphql\/?$/, '').replace(/\/+$/, '');
+                const apiBase = getWebRestApiBase();
                 const token = import.meta.env.VITE_WEB_TOKEN || 'GSYNC_WEB_v1_0tuu903stcif2kzsx7t8fyy';
                 const res = await axios.get(`${apiBase}/web/company-ref/${encodeURIComponent(code)}`, {
                     headers: {
                         'X-Web-Token': token
                     }
                 });
+
+                // Check for valid JSON response payload
+                if (typeof res.data === 'string' || (res.headers && res.headers['content-type'] && !res.headers['content-type'].includes('application/json'))) {
+                    throw new Error('Received unexpected non-JSON response from server.');
+                }
+
                 if (res.data?.success && res.data?.data) {
                     setCompany(res.data.data);
                 } else {
                     setCompanyError(res.data?.message || 'Referral link is invalid or inactive.');
                 }
             } catch (err: any) {
-                const msg = err.response?.data?.message || 'Referral link is invalid, expired, or deactivated.';
+                const msg = err.response?.data?.message || err.message || 'Referral link is invalid, expired, or deactivated.';
                 setCompanyError(msg);
             } finally {
                 setLoadingCompany(false);
@@ -306,7 +320,7 @@ export const CompanyEnrollmentPage = () => {
                 }
             };
 
-            const apiBase = (BASE_API_URL || 'http://localhost:4000').replace(/\/graphql\/?$/, '').replace(/\/+$/, '');
+            const apiBase = getWebRestApiBase();
             const token = import.meta.env.VITE_WEB_TOKEN || 'GSYNC_WEB_v1_0tuu903stcif2kzsx7t8fyy';
             const response = await axios.post(`${apiBase}/web/create-customer`, payload, {
                 headers: {
