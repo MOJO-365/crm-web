@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -342,9 +342,14 @@ export const CompanyEnrollmentPage = () => {
                         {companyError || 'The referral link you entered is invalid or has expired.'}
                     </p>
                     <div className="pt-2">
-                        <Link to="/login" className="inline-block text-xs font-semibold text-primary hover:underline">
-                            Return to Login
-                        </Link>
+                        <button
+                            type="button"
+                            onClick={() => window.location.reload()}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary-hover transition-all shadow-xs cursor-pointer"
+                        >
+                            <RefreshCwIcon size={14} />
+                            Retry Link
+                        </button>
                     </div>
                 </div>
             </div>

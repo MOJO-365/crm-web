@@ -36,6 +36,16 @@ axiosInstance.interceptors.request.use((config: any) => {
     return config;
 });
 
+export const isPublicRoute = (pathname?: string): boolean => {
+    const path = (pathname || (typeof window !== 'undefined' ? window.location.pathname : '')).toLowerCase();
+    return (
+        path.startsWith('/enroll') ||
+        path.startsWith('/company-enrollment') ||
+        path.startsWith('/account-enrollment') ||
+        path === '/login'
+    );
+};
+
 // Response interceptor for error handling
 axiosInstance.interceptors.response.use(
     (response) => response,
@@ -43,29 +53,38 @@ axiosInstance.interceptors.response.use(
         // Handle 401 - token expired or security restriction
         if (error.response?.status === 401) {
             const errorData: any = error.response?.data;
-            const configData = typeof error.config?.data === 'string' ? JSON.parse(error.config.data) : error.config?.data;
+            let configData: any = null;
+            try {
+                configData = typeof error.config?.data === 'string' ? JSON.parse(error.config.data) : error.config?.data;
+            } catch {
+                configData = null;
+            }
             const operationName = configData?.operationName;
 
-            // Check both standard REST error and GraphQL error formats
-            const isIpRestricted = errorData?.error === 'IP restricted' || 
-                                  errorData?.errors?.[0]?.message === 'IP restricted';
+            // Never show session expired or security alert toasts on public unauthenticated pages
+            if (!isPublicRoute()) {
+                const isIpRestricted = errorData?.error === 'IP restricted' || 
+                                      errorData?.errors?.[0]?.message === 'IP restricted';
 
-            if (isIpRestricted) {
-                toast.error('Security Alert: Access denied from this IP address. Please log in from an authorized location.', {
-                    toastId: 'ip-restricted-error',
-                    autoClose: 10000
-                });
-            } else if (operationName === 'Me') {
-                // Only show session expired for the initial 'Me' query to avoid spamming
-                toast.warn('Session expired. Please log in again.', {
-                    toastId: 'auth-error',
-                });
+                if (isIpRestricted) {
+                    toast.error('Security Alert: Access denied from this IP address. Please log in from an authorized location.', {
+                        toastId: 'ip-restricted-error',
+                        autoClose: 10000
+                    });
+                } else if (operationName === 'Me') {
+                    // Only show session expired for the initial 'Me' query to avoid spamming
+                    toast.warn('Session expired. Please log in again.', {
+                        toastId: 'auth-error',
+                    });
+                }
             }
 
             console.warn(`Authentication error in ${operationName || 'request'} - logging out`);
             
-            // Trigger store logout which clears tokens and redirects
-            useAuthStore.getState().logout();
+            // Only trigger store logout if not on a public unauthenticated page
+            if (!isPublicRoute()) {
+                useAuthStore.getState().logout();
+            }
         }
         return Promise.reject(error);
     }

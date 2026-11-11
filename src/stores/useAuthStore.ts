@@ -119,6 +119,18 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     // Hydrate from localStorage on app startup
     hydrate: async () => {
+        // Do not query authenticated user state if on public unauthenticated enrollment pages
+        if (typeof window !== 'undefined') {
+            const path = window.location.pathname.toLowerCase();
+            if (
+                path.startsWith('/enroll') ||
+                path.startsWith('/company-enrollment') ||
+                path.startsWith('/account-enrollment')
+            ) {
+                return;
+            }
+        }
+
         const accessToken = getAccessToken();
         const refreshToken = getRefreshToken();
 
@@ -131,6 +143,18 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     // Fetch current user data from API (called once)
     fetchUser: async () => {
+        // Do not query authenticated user state if on public unauthenticated enrollment pages
+        if (typeof window !== 'undefined') {
+            const path = window.location.pathname.toLowerCase();
+            if (
+                path.startsWith('/enroll') ||
+                path.startsWith('/company-enrollment') ||
+                path.startsWith('/account-enrollment')
+            ) {
+                return;
+            }
+        }
+
         const { token, hasFetched, isLoading } = get();
 
         // Don't fetch if no token, already fetched, or currently loading
