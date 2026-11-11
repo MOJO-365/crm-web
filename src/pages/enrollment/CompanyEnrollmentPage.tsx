@@ -7,7 +7,6 @@ import { Select } from '@/components/ui/Select';
 import {
     CheckCircleIcon,
     AlertCircleIcon,
-    ZapIcon,
     RefreshCwIcon,
     PhoneIcon,
     MailIcon,
@@ -100,7 +99,6 @@ export const CompanyEnrollmentPage = () => {
         suburb: '',
         state: 'NSW',
         postcode: '',
-        nmi: '',
         propertyType: '0', // 0 = Residential, 1 = Commercial
         agreed: false
     });
@@ -228,13 +226,6 @@ export const CompanyEnrollmentPage = () => {
     const validateStep2 = () => {
         const newErrors: Record<string, string> = {};
 
-        const cleanNmi = formData.nmi.replace(/\s+/g, '');
-        if (!cleanNmi) {
-            newErrors.nmi = 'NMI is required *';
-        } else if (cleanNmi.length < 10 || cleanNmi.length > 11) {
-            newErrors.nmi = 'NMI must be 10 or 11 digits';
-        }
-
         if (!formData.streetAddress.trim()) newErrors.streetAddress = 'Street address is required *';
         if (!formData.suburb.trim()) newErrors.suburb = 'Suburb is required *';
         if (!formData.postcode.trim()) newErrors.postcode = 'Postcode is required *';
@@ -283,7 +274,6 @@ export const CompanyEnrollmentPage = () => {
                 phone: dbMobile,
                 mobile: dbMobile,
                 number: dbMobile,
-                nmi: formData.nmi.trim().toUpperCase(),
                 address: {
                     street: formData.streetAddress.trim(),
                     suburb: formData.suburb.trim(),
@@ -408,8 +398,8 @@ export const CompanyEnrollmentPage = () => {
                             <span className="font-semibold text-primary text-right truncate">GEE Energy Solar Flow Plan</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/50 gap-2">
-                            <span className="text-muted-foreground shrink-0">Service NMI:</span>
-                            <span className="font-mono font-medium text-foreground">{formData.nmi}</span>
+                            <span className="text-muted-foreground shrink-0">Supply Address:</span>
+                            <span className="font-medium text-foreground text-right truncate">{formData.streetAddress}, {formData.suburb}</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/50 gap-2">
                             <span className="text-muted-foreground shrink-0">Referral Partner:</span>
@@ -422,7 +412,7 @@ export const CompanyEnrollmentPage = () => {
                     </div>
 
                     <p className="text-xs text-muted-foreground">
-                        Our onboarding team will verify your supply meter details and send your Solar Flow welcome contract to <span className="font-medium text-foreground break-all">{formData.email}</span>.
+                        Our onboarding team will verify your supply details and send your Solar Flow welcome contract to <span className="font-medium text-foreground break-all">{formData.email}</span>.
                     </p>
 
                     <Button
@@ -439,7 +429,6 @@ export const CompanyEnrollmentPage = () => {
                                 suburb: '',
                                 state: 'NSW',
                                 postcode: '',
-                                nmi: '',
                                 propertyType: '0',
                                 agreed: false
                             });
@@ -877,7 +866,7 @@ export const CompanyEnrollmentPage = () => {
                                 Step 2: Electricity Supply Details
                             </h3>
                             <p className="text-[11px] sm:text-xs text-muted-foreground">
-                                National Meter Identifier (NMI) and service supply address.
+                                Service supply address and property details.
                             </p>
                         </div>
 
@@ -888,46 +877,18 @@ export const CompanyEnrollmentPage = () => {
                             </div>
                         )}
 
-                        {/* NMI and Property Type */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
-                                    <ZapIcon size={14} className="text-amber-500" />
-                                    <span>NMI (10 or 11 digits) <span className="text-red-500">*</span></span>
-                                </label>
-                                <Input
-                                    placeholder="e.g. 4102000000"
-                                    value={formData.nmi}
-                                    inputMode="numeric"
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, nmi: e.target.value.toUpperCase() });
-                                        if (errors.nmi) setErrors(prev => ({ ...prev, nmi: '' }));
-                                    }}
-                                    className={cn(
-                                        "h-11 font-mono rounded-xl bg-background border-border/90 text-sm",
-                                        errors.nmi && "border-red-500 ring-1 ring-red-500"
-                                    )}
-                                    maxLength={11}
-                                />
-                                {errors.nmi ? (
-                                    <p className="text-[11px] text-red-500">{errors.nmi}</p>
-                                ) : (
-                                    <p className="text-[10px] text-muted-foreground">Found on your current electricity bill</p>
-                                )}
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-foreground">Property Type</label>
-                                <Select
-                                    options={[
-                                        { value: '0', label: 'Residential' },
-                                        { value: '1', label: 'Commercial / Business' }
-                                    ]}
-                                    value={formData.propertyType}
-                                    onChange={(val) => setFormData({ ...formData, propertyType: val as string })}
-                                    className="h-11 rounded-xl bg-background border-border/90 text-sm"
-                                />
-                            </div>
+                        {/* Property Type */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold text-foreground">Property Type</label>
+                            <Select
+                                options={[
+                                    { value: '0', label: 'Residential' },
+                                    { value: '1', label: 'Commercial / Business' }
+                                ]}
+                                value={formData.propertyType}
+                                onChange={(val) => setFormData({ ...formData, propertyType: val as string })}
+                                className="h-11 rounded-xl bg-background border-border/90 text-sm"
+                            />
                         </div>
 
                         {/* Street Address with Google Places Autocomplete */}
