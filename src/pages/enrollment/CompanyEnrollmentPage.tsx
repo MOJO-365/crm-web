@@ -17,7 +17,6 @@ import {
 } from '@/components/icons';
 import { TITLE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { sanitizePhoneInput, formatAustralianPhone, validatePhoneNumber } from '@/lib/phone';
 import { BASE_API_URL } from '@/lib/apollo';
 import LocationAutocomplete from '@/pages/LocationAutocomplete';
 
@@ -136,12 +135,55 @@ export const CompanyEnrollmentPage = () => {
         fetchCompany();
     }, [code]);
 
+    const validateMobileInput = (val: string): string | null => {
+        const digits = (val || '').replace(/\D/g, '').replace(/^0/, '');
+        if (!digits) {
+            return 'Mobile number is required *';
+        }
+        if (!digits.startsWith('4')) {
+            return 'Australian mobile must start with 4 (e.g. 412 345 678)';
+        }
+        if (digits.length < 9) {
+            return `Mobile number must be 9 digits (${digits.length}/9 entered)`;
+        }
+        if (digits.length > 9) {
+            return 'Mobile number cannot exceed 9 digits';
+        }
+        if (/^(\d)\1+$/.test(digits)) {
+            return 'Please enter a valid active mobile number';
+        }
+        return null;
+    };
+
     const handleMobileChange = (raw: string) => {
-        const sanitized = sanitizePhoneInput(raw);
-        const formatted = formatAustralianPhone(sanitized);
+        // Strip everything except digits
+        let digits = raw.replace(/\D/g, '');
+
+        // If starts with 61 and length > 9, strip 61
+        if (digits.startsWith('61') && digits.length > 9) {
+            digits = digits.slice(2);
+        }
+
+        // "No need to take 0" -> If user types leading 0, strip it automatically
+        if (digits.startsWith('0')) {
+            digits = digits.slice(1);
+        }
+
+        // Australian mobile without leading 0 is 9 digits (starts with 4)
+        digits = digits.slice(0, 9);
+
+        // Format as 4XX XXX XXX
+        let formatted = digits;
+        if (digits.length > 6) {
+            formatted = `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+        } else if (digits.length > 3) {
+            formatted = `${digits.slice(0, 3)} ${digits.slice(3)}`;
+        }
+
         setFormData(prev => ({ ...prev, mobile: formatted }));
-        if (errors.mobile || sanitized.length >= 8) {
-            const err = validatePhoneNumber(formatted, true);
+
+        if (errors.mobile || digits.length >= 9) {
+            const err = validateMobileInput(formatted);
             setErrors(prev => ({ ...prev, mobile: err || '' }));
         }
     };
@@ -159,7 +201,7 @@ export const CompanyEnrollmentPage = () => {
             newErrors.email = 'Please enter a valid email address';
         }
 
-        const phoneErr = validatePhoneNumber(formData.mobile, true);
+        const phoneErr = validateMobileInput(formData.mobile);
         if (phoneErr) {
             newErrors.mobile = phoneErr;
         }
@@ -215,16 +257,18 @@ export const CompanyEnrollmentPage = () => {
         setSubmitting(true);
         try {
             const fullAddress = `${formData.streetAddress.trim()}, ${formData.suburb.trim()} ${formData.state} ${formData.postcode.trim()}`;
-            const cleanPhone = `+61${formData.mobile.replace(/\D/g, '').replace(/^0/, '')}`;
+            const rawDigits = formData.mobile.replace(/\D/g, '').replace(/^0/, '');
+            // User requirement: "No need to take 0 add by default add while saving in db"
+            const dbMobile = `0${rawDigits}`; // e.g. "0451254154"
 
             const payload = {
                 title: formData.title || 'Mr',
                 firstname: formData.firstname.trim(),
                 lastname: formData.lastname.trim(),
                 email: formData.email.trim().toLowerCase(),
-                phone: cleanPhone,
-                mobile: cleanPhone,
-                number: cleanPhone,
+                phone: dbMobile,
+                mobile: dbMobile,
+                number: dbMobile,
                 nmi: formData.nmi.trim().toUpperCase(),
                 address: {
                     street: formData.streetAddress.trim(),
@@ -689,21 +733,27 @@ export const CompanyEnrollmentPage = () => {
                                 <label className="text-xs font-semibold text-foreground">
                                     Mobile Number <span className="text-red-500 font-bold">*</span>
                                 </label>
-                                <Input
-                                    placeholder="0412 345 678"
-                                    value={formData.mobile}
-                                    onChange={(e) => handleMobileChange(e.target.value)}
-                                    onBlur={() => {
-                                        const err = validatePhoneNumber(formData.mobile, true);
-                                        if (err) setErrors(prev => ({ ...prev, mobile: err }));
-                                    }}
-                                    className={cn(
-                                        "h-11 rounded-xl bg-background border-border/90 text-sm",
-                                        errors.mobile && "border-red-500 ring-1 ring-red-500"
-                                    )}
-                                />
+                                <div className="flex items-center">
+                                    <div className="flex items-center justify-center h-11 px-3.5 bg-muted/60 border border-r-0 border-border/90 rounded-l-xl text-sm font-semibold text-muted-foreground whitespace-nowrap select-none">
+                                        +61
+                                    </div>
+                                    <Input
+                                        placeholder="412 345 678"
+                                        value={formData.mobile}
+                                        onChange={(e) => handleMobileChange(e.target.value)}
+                                        onBlur={() => {
+                                            const err = validateMobileInput(formData.mobile);
+                                            if (err) setErrors(prev => ({ ...prev, mobile: err }));
+                                        }}
+                                        className={cn(
+                                            "h-11 rounded-r-xl rounded-l-none bg-background border-border/90 text-sm",
+                                            errors.mobile && "border-red-500 ring-1 ring-red-500"
+                                        )}
+                                        maxLength={12}
+                                    />
+                                </div>
                                 {errors.mobile && <p className="text-[11px] text-red-500 font-medium">{errors.mobile}</p>}
-                                <p className="text-[10px] text-muted-foreground">Australian mobile (04xx xxx xxx)</p>
+                                <p className="text-[10px] text-muted-foreground">Australian mobile (4xx xxx xxx)</p>
                             </div>
                         </div>
 
@@ -744,7 +794,7 @@ export const CompanyEnrollmentPage = () => {
                         <div className="p-3 rounded-xl bg-muted/40 border border-border flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2">
                                 <span className="font-semibold text-foreground">{formData.firstname} {formData.lastname}</span>
-                                <span className="text-muted-foreground font-mono">({formData.mobile})</span>
+                                <span className="text-muted-foreground font-mono">(0{formData.mobile.replace(/\D/g, '').replace(/^0/, '')})</span>
                             </div>
                             <button
                                 type="button"
