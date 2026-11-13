@@ -1107,6 +1107,11 @@ export const GET_CUSTOMER_VPP_CERTIFICATE_DETAILS = gql`
                 batteryInstalledDate
                 batteryUsableCapacity
                 batteryPortConnected
+                hasSecondBattery
+                battery2Manufacturer
+                battery2Model
+                battery2UsableCapacity
+                totalBatteryUsableCapacity
                 inverterManufacturer
                 inverterModel
                 inverterSnNumbers

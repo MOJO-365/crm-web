@@ -309,6 +309,11 @@ export const GENERATE_VPP_CERTIFICATE = gql`
         batteryInstalledDate
         batteryUsableCapacity
         batteryPortConnected
+        hasSecondBattery
+        battery2Manufacturer
+        battery2Model
+        battery2UsableCapacity
+        totalBatteryUsableCapacity
         inverterManufacturer
         inverterModel
         inverterSnNumbers

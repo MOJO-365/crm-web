@@ -9,7 +9,7 @@ import { Modal } from '@/components/common';
 import { Popover } from '@/components/ui/Popover';
 import { apiAxios } from '@/lib/apollo';
 import { GET_CUSTOMER_VPP_CERTIFICATE_DETAILS, GENERATE_VPP_CERTIFICATE, GET_BATTERY_MAKES, GET_INVERTER_MAKES, GET_BATTERY_MODELS, GET_INVERTER_MODELS } from '@/graphql';
-import { FileTextIcon, ZapIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon, DownloadIcon, AlertCircleIcon } from '@/components/icons';
+import { FileTextIcon, ZapIcon, ShieldCheckIcon, CheckIcon, EyeIcon, Settings2Icon, SunIcon, DownloadIcon, AlertCircleIcon, PlusIcon, TrashIcon } from '@/components/icons';
 
 interface VppCertificateTabProps {
     customerUid: string;
@@ -60,6 +60,11 @@ export function VppCertificateTab({
         batteryInstalledDate: '',
         batteryUsableCapacity: '',
         batteryPortConnected: 0,
+        hasSecondBattery: 0,
+        battery2Manufacturer: '',
+        battery2Model: '-',
+        battery2UsableCapacity: '',
+        totalBatteryUsableCapacity: '',
         inverterManufacturer: '',
         inverterModel: '-',
         inverterSnNumbers: '',
@@ -120,6 +125,9 @@ export function VppCertificateTab({
     const selectedBatteryMake = makesData?.batteryMakes?.find((m: any) =>
         m.uid === formState.batteryManufacturer || m.make?.toLowerCase() === formState.batteryManufacturer?.toLowerCase()
     );
+    const selectedBattery2Make = makesData?.batteryMakes?.find((m: any) =>
+        m.uid === formState.battery2Manufacturer || m.make?.toLowerCase() === formState.battery2Manufacturer?.toLowerCase()
+    );
     const selectedInverterMake = inverterMakesData?.inverterMakes?.find((m: any) =>
         m.uid === formState.inverterManufacturer || m.make?.toLowerCase() === formState.inverterManufacturer?.toLowerCase()
     );
@@ -127,6 +135,12 @@ export function VppCertificateTab({
     const { data: batteryModelsData, loading: loadingBatteryModels } = useQuery(GET_BATTERY_MODELS, {
         variables: { makeUid: selectedBatteryMake?.uid },
         skip: !selectedBatteryMake?.uid,
+        fetchPolicy: 'cache-first'
+    });
+
+    const { data: battery2ModelsData, loading: loadingBattery2Models } = useQuery(GET_BATTERY_MODELS, {
+        variables: { makeUid: selectedBattery2Make?.uid },
+        skip: !selectedBattery2Make?.uid,
         fetchPolicy: 'cache-first'
     });
 
@@ -139,6 +153,14 @@ export function VppCertificateTab({
     const batteryModelOptions = [
         { value: '-', label: '-' },
         ...(batteryModelsData?.batteryModels?.filter((m: any) => m.isActive && m.model !== '-').map((m: any) => ({
+            value: m.model,
+            label: m.model
+        })) || [])
+    ];
+
+    const battery2ModelOptions = [
+        { value: '-', label: '-' },
+        ...(battery2ModelsData?.batteryModels?.filter((m: any) => m.isActive && m.model !== '-').map((m: any) => ({
             value: m.model,
             label: m.model
         })) || [])
@@ -162,6 +184,34 @@ export function VppCertificateTab({
             ...prev,
             batteryModel: modelObj ? modelObj.model : value,
             ...(modelObj?.capacity ? { batteryUsableCapacity: modelObj.capacity.toString() } : {})
+        }));
+    };
+
+    const handleBattery2ManufacturerChange = (value: string) => {
+        let capacityUpdate = {};
+        const makeObj = makesData?.batteryMakes?.find((m: any) => m.make === value || m.uid === value);
+        if (makeObj?.batteryUsableCapacity) {
+            capacityUpdate = { battery2UsableCapacity: makeObj.batteryUsableCapacity.toString() };
+        }
+
+        setFormState(prev => ({
+            ...prev,
+            battery2Manufacturer: value,
+            battery2Model: '-',
+            ...capacityUpdate
+        }));
+    };
+
+    const handleBattery2ModelChange = (value: string) => {
+        if (!value || value === '-') {
+            setFormState(prev => ({ ...prev, battery2Model: '-' }));
+            return;
+        }
+        const modelObj = battery2ModelsData?.batteryModels?.find((m: any) => m.model === value || m.uid === value);
+        setFormState(prev => ({
+            ...prev,
+            battery2Model: modelObj ? modelObj.model : value,
+            ...(modelObj?.capacity ? { battery2UsableCapacity: modelObj.capacity.toString() } : {})
         }));
     };
 
@@ -234,6 +284,7 @@ export function VppCertificateTab({
             const s = data.customer.solarDetails;
 
             const batteryMake = resolveBatteryMakeName(v?.batteryManufacturer || b?.batterybrand || '');
+            const battery2Make = resolveBatteryMakeName(v?.battery2Manufacturer || '');
             const inverterMake = resolveInverterMakeName(v?.inverterManufacturer || '');
 
             setTimeout(() => {
@@ -247,6 +298,11 @@ export function VppCertificateTab({
                     batteryInstalledDate: v?.batteryInstalledDate ? new Date(v.batteryInstalledDate).toISOString().split('T')[0] : (prev.batteryInstalledDate || ''),
                     batteryUsableCapacity: v?.batteryUsableCapacity?.toString() || b?.batterycapacity?.toString() || prev.batteryUsableCapacity || '',
                     batteryPortConnected: v?.batteryPortConnected ?? prev.batteryPortConnected ?? 0,
+                    hasSecondBattery: v?.hasSecondBattery ?? (v?.battery2Manufacturer || v?.battery2UsableCapacity ? 1 : (prev.hasSecondBattery ?? 0)),
+                    battery2Manufacturer: battery2Make || prev.battery2Manufacturer || '',
+                    battery2Model: (v?.battery2Model && v.battery2Model.trim() !== '') ? v.battery2Model : (prev.battery2Model || '-'),
+                    battery2UsableCapacity: v?.battery2UsableCapacity?.toString() || prev.battery2UsableCapacity || '',
+                    totalBatteryUsableCapacity: v?.totalBatteryUsableCapacity?.toString() || prev.totalBatteryUsableCapacity || '',
                     inverterManufacturer: inverterMake || prev.inverterManufacturer,
                     inverterModel: (v?.inverterModel && v.inverterModel.trim() !== '') ? v.inverterModel : (prev.inverterModel || '-'),
                     inverterSnNumbers: v?.inverterSnNumbers || prev.inverterSnNumbers || '',
@@ -294,6 +350,16 @@ export function VppCertificateTab({
         }
     }, [makesData, formState.batteryManufacturer]);
 
+    // Re-resolve battery 2 manufacturer name if makesData finishes loading afterwards
+    useEffect(() => {
+        if (formState.battery2Manufacturer && makesData?.batteryMakes?.length) {
+            const match = makesData.batteryMakes.find((m: any) => m.uid === formState.battery2Manufacturer);
+            if (match) {
+                setFormState(prev => ({ ...prev, battery2Manufacturer: match.make }));
+            }
+        }
+    }, [makesData, formState.battery2Manufacturer]);
+
     // Re-resolve inverter manufacturer name if inverterMakesData finishes loading afterwards
     useEffect(() => {
         if (formState.inverterManufacturer && inverterMakesData?.inverterMakes?.length) {
@@ -313,6 +379,16 @@ export function VppCertificateTab({
             }
         }
     }, [batteryModelsData, formState.batteryModel]);
+
+    // Re-resolve battery 2 model name if battery2ModelsData finishes loading
+    useEffect(() => {
+        if (formState.battery2Model && formState.battery2Model !== '-' && battery2ModelsData?.batteryModels?.length) {
+            const match = battery2ModelsData.batteryModels.find((m: any) => m.uid === formState.battery2Model);
+            if (match) {
+                setFormState(prev => ({ ...prev, battery2Model: match.model }));
+            }
+        }
+    }, [battery2ModelsData, formState.battery2Model]);
 
     // Re-resolve inverter model name if inverterModelsData finishes loading
     useEffect(() => {
@@ -404,6 +480,10 @@ export function VppCertificateTab({
         { key: 'batterySerialNumber', label: 'Battery Serial Number', stepIndex: 1, stepName: 'Battery Details' },
         { key: 'batteryInstalledDate', label: 'Battery Installed Date', stepIndex: 1, stepName: 'Battery Details' },
         { key: 'batteryUsableCapacity', label: 'Battery Usable Capacity', stepIndex: 1, stepName: 'Battery Details' },
+        ...(formState.hasSecondBattery === 1 ? [
+            { key: 'battery2Manufacturer', label: 'Battery 2 Manufacturer', stepIndex: 1, stepName: 'Battery Details' },
+            { key: 'battery2UsableCapacity', label: 'Battery 2 Usable Capacity', stepIndex: 1, stepName: 'Battery Details' },
+        ] : []),
     ];
 
     const getMissingFields = () => {
@@ -424,10 +504,21 @@ export function VppCertificateTab({
 
         const effectiveTestResult = formState.testResult || (allPassed ? 'All Test passed successfully' : 'Failed');
 
+        const cap1 = parseFloat(formState.batteryUsableCapacity) || 0;
+        const cap2 = formState.hasSecondBattery === 1 ? (parseFloat(formState.battery2UsableCapacity) || 0) : 0;
+        const calculatedTotalCapacity = formState.hasSecondBattery === 1
+            ? Math.round((cap1 + cap2) * 100) / 100
+            : (formState.batteryUsableCapacity ? parseFloat(formState.batteryUsableCapacity) : null);
+
         return {
             ...formState,
             issueDate: formState.issueDate ? formState.issueDate : new Date().toISOString().split('T')[0],
             batteryModel: (formState.batteryModel && formState.batteryModel.trim() !== '') ? formState.batteryModel : '-',
+            battery2Model: formState.hasSecondBattery === 1 && formState.battery2Model && formState.battery2Model.trim() !== '' ? formState.battery2Model : '-',
+            battery2Manufacturer: formState.hasSecondBattery === 1 ? formState.battery2Manufacturer : null,
+            battery2UsableCapacity: formState.hasSecondBattery === 1 && formState.battery2UsableCapacity ? parseFloat(formState.battery2UsableCapacity) : null,
+            totalBatteryUsableCapacity: calculatedTotalCapacity,
+            hasSecondBattery: formState.hasSecondBattery === 1 ? 1 : 0,
             inverterModel: (formState.inverterModel && formState.inverterModel.trim() !== '') ? formState.inverterModel : '-',
             testResult: effectiveTestResult,
             solarCapacity: formState.solarCapacity ? parseFloat(formState.solarCapacity) : null,
@@ -516,6 +607,13 @@ export function VppCertificateTab({
     const missingFieldItems = getMissingFields();
     const missingFields = missingFieldItems.map(f => f.label);
     const isFormComplete = missingFieldItems.length === 0;
+
+    const cap1 = parseFloat(formState.batteryUsableCapacity) || 0;
+    const cap2 = formState.hasSecondBattery === 1 ? (parseFloat(formState.battery2UsableCapacity) || 0) : 0;
+    const totalCapacityNumber = Math.round((cap1 + cap2) * 100) / 100;
+    const totalCapacityDisplay = (formState.batteryUsableCapacity || formState.battery2UsableCapacity)
+        ? `${totalCapacityNumber} kWh`
+        : '-';
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
@@ -886,61 +984,156 @@ export function VppCertificateTab({
                     {/* Step 2 — Battery Details */}
                     {STEPS[currentStep].id === 2 && (
                         <div className="space-y-6">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Battery Details</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Manufacturer <span className="text-red-500">*</span></label>
-                                    <Select
-                                        value={formState.batteryManufacturer}
-                                        onChange={(v: any) => handleManufacturerChange('batteryManufacturer', v as string)}
-                                        options={batteryMakeOptions}
-                                        placeholder="Select brand"
-                                        creatable
-                                        isLoading={loadingBatteryMakes}
-                                        error={hasAttemptedSubmit && isFieldEmpty(formState.batteryManufacturer) ? 'Battery Manufacturer is required' : undefined}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Model</label>
-                                    <Select
-                                        value={formState.batteryModel || '-'}
-                                        onChange={(v) => handleBatteryModelChange(v as string)}
-                                        options={batteryModelOptions}
-                                        placeholder="-"
+                            <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Battery Details</h4>
+                                {formState.hasSecondBattery !== 1 && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setFormState(prev => ({ ...prev, hasSecondBattery: 1 }))}
+                                        className="text-xs h-8 text-primary border-primary/30 hover:bg-primary/5 hover:border-primary shadow-sm"
+                                    >
+                                        <PlusIcon size={14} className="mr-1.5" /> Add Another Battery
+                                    </Button>
+                                )}
+                            </div>
 
-                                        creatable={true}
-                                        isLoading={loadingBatteryModels}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Serial Number(SN numbers) <span className="text-red-500">*</span></label>
-                                    <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" error={hasAttemptedSubmit && isFieldEmpty(formState.batterySerialNumber) ? 'Battery Serial Number is required' : undefined} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Installed Date <span className="text-red-500">*</span></label>
-                                    <DatePicker
-                                        value={formState.batteryInstalledDate || null}
-                                        onChange={(date) => setFormState(prev => ({ ...prev, batteryInstalledDate: date ? date.toISOString().split('T')[0] : '' }))}
-                                        placeholder="Select date"
-                                        error={hasAttemptedSubmit && isFieldEmpty(formState.batteryInstalledDate) ? 'Battery Installed Date is required' : undefined}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Usable Capacity (kWh) <span className="text-red-500">*</span></label>
-                                    <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} error={hasAttemptedSubmit && isFieldEmpty(formState.batteryUsableCapacity) ? 'Battery Usable Capacity is required' : undefined} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-foreground">Backup Port Connected</label>
-                                    <Select
-                                        value={formState.batteryPortConnected.toString()}
-                                        onChange={(v) => handleSelectChange('batteryPortConnected', v as string)}
-                                        options={[
-                                            { value: '0', label: 'No' },
-                                            { value: '1', label: 'Yes' }
-                                        ]}
-                                    />
+                            <div className="space-y-4">
+                                {formState.hasSecondBattery === 1 && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold">1</span>
+                                        <span className="text-sm font-semibold text-foreground">Battery 1 Details</span>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-foreground">Manufacturer <span className="text-red-500">*</span></label>
+                                        <Select
+                                            value={formState.batteryManufacturer}
+                                            onChange={(v: any) => handleManufacturerChange('batteryManufacturer', v as string)}
+                                            options={batteryMakeOptions}
+                                            placeholder="Select brand"
+                                            creatable
+                                            isLoading={loadingBatteryMakes}
+                                            error={hasAttemptedSubmit && isFieldEmpty(formState.batteryManufacturer) ? 'Battery Manufacturer is required' : undefined}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-foreground">Model</label>
+                                        <Select
+                                            value={formState.batteryModel || '-'}
+                                            onChange={(v) => handleBatteryModelChange(v as string)}
+                                            options={batteryModelOptions}
+                                            placeholder="-"
+                                            creatable={true}
+                                            isLoading={loadingBatteryModels}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-foreground">Serial Number(SN numbers) <span className="text-red-500">*</span></label>
+                                        <Input name="batterySerialNumber" value={formState.batterySerialNumber} onChange={handleChange} placeholder="Comma separated" error={hasAttemptedSubmit && isFieldEmpty(formState.batterySerialNumber) ? 'Battery Serial Number is required' : undefined} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-foreground">Installed Date <span className="text-red-500">*</span></label>
+                                        <DatePicker
+                                            value={formState.batteryInstalledDate || null}
+                                            onChange={(date) => setFormState(prev => ({ ...prev, batteryInstalledDate: date ? date.toISOString().split('T')[0] : '' }))}
+                                            placeholder="Select date"
+                                            error={hasAttemptedSubmit && isFieldEmpty(formState.batteryInstalledDate) ? 'Battery Installed Date is required' : undefined}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-foreground">Usable Capacity (kWh) <span className="text-red-500">*</span></label>
+                                        <Input type="number" step="0.1" name="batteryUsableCapacity" value={formState.batteryUsableCapacity} onChange={handleChange} error={hasAttemptedSubmit && isFieldEmpty(formState.batteryUsableCapacity) ? 'Battery Usable Capacity is required' : undefined} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-foreground">Backup Port Connected</label>
+                                        <Select
+                                            value={formState.batteryPortConnected.toString()}
+                                            onChange={(v) => handleSelectChange('batteryPortConnected', v as string)}
+                                            options={[
+                                                { value: '0', label: 'No' },
+                                                { value: '1', label: 'Yes' }
+                                            ]}
+                                        />
+                                    </div>
                                 </div>
                             </div>
+
+                            {formState.hasSecondBattery === 1 && (
+                                <div className="space-y-4 pt-6 border-t border-border/60">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold">2</span>
+                                            <span className="text-sm font-semibold text-foreground">Battery 2 Details</span>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setFormState(prev => ({
+                                                ...prev,
+                                                hasSecondBattery: 0,
+                                                battery2Manufacturer: '',
+                                                battery2Model: '-',
+                                                battery2UsableCapacity: ''
+                                            }))}
+                                            className="text-xs h-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                        >
+                                            <TrashIcon size={14} className="mr-1.5" /> Remove Battery
+                                        </Button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-foreground">Manufacturer <span className="text-red-500">*</span></label>
+                                            <Select
+                                                value={formState.battery2Manufacturer}
+                                                onChange={(v: any) => handleBattery2ManufacturerChange(v as string)}
+                                                options={batteryMakeOptions}
+                                                placeholder="Select brand"
+                                                creatable
+                                                isLoading={loadingBatteryMakes}
+                                                error={hasAttemptedSubmit && isFieldEmpty(formState.battery2Manufacturer) ? 'Battery 2 Manufacturer is required' : undefined}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-foreground">Model</label>
+                                            <Select
+                                                value={formState.battery2Model || '-'}
+                                                onChange={(v) => handleBattery2ModelChange(v as string)}
+                                                options={battery2ModelOptions}
+                                                placeholder="-"
+                                                creatable={true}
+                                                isLoading={loadingBattery2Models}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-foreground">Usable Capacity (kWh) <span className="text-red-500">*</span></label>
+                                            <Input
+                                                type="number"
+                                                step="0.1"
+                                                name="battery2UsableCapacity"
+                                                value={formState.battery2UsableCapacity}
+                                                onChange={handleChange}
+                                                error={hasAttemptedSubmit && isFieldEmpty(formState.battery2UsableCapacity) ? 'Battery 2 Usable Capacity is required' : undefined}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-foreground">Total Usable Capacity (kWh)</label>
+                                            <Input
+                                                type="text"
+                                                name="totalBatteryUsableCapacity"
+                                                value={totalCapacityDisplay}
+                                                disabled
+                                                readOnly
+                                                className="bg-muted/40 font-semibold cursor-not-allowed text-foreground"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
