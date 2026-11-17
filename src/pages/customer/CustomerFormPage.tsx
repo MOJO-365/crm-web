@@ -213,16 +213,176 @@ const initialFormData: CustomerFormData = {
 
 const streetTypeOptions = [
     { value: 'St', label: 'Street' },
+    { value: 'Street', label: 'Street' },
     { value: 'Rd', label: 'Road' },
+    { value: 'Road', label: 'Road' },
     { value: 'Ave', label: 'Avenue' },
+    { value: 'Avenue', label: 'Avenue' },
     { value: 'Dr', label: 'Drive' },
+    { value: 'Drive', label: 'Drive' },
     { value: 'Ct', label: 'Court' },
+    { value: 'Court', label: 'Court' },
     { value: 'Pl', label: 'Place' },
+    { value: 'Place', label: 'Place' },
     { value: 'Cres', label: 'Crescent' },
+    { value: 'Crescent', label: 'Crescent' },
     { value: 'Way', label: 'Way' },
     { value: 'Ln', label: 'Lane' },
+    { value: 'Lane', label: 'Lane' },
     { value: 'Blvd', label: 'Boulevard' },
+    { value: 'Boulevard', label: 'Boulevard' },
+    { value: 'Pde', label: 'Parade' },
+    { value: 'Parade', label: 'Parade' },
+    { value: 'Cct', label: 'Circuit' },
+    { value: 'Circuit', label: 'Circuit' },
+    { value: 'Cl', label: 'Close' },
+    { value: 'Close', label: 'Close' },
+    { value: 'Tce', label: 'Terrace' },
+    { value: 'Terrace', label: 'Terrace' },
+    { value: 'Hwy', label: 'Highway' },
+    { value: 'Highway', label: 'Highway' },
+    { value: 'Gr', label: 'Grove' },
+    { value: 'Grove', label: 'Grove' },
+    { value: 'Esp', label: 'Esplanade' },
+    { value: 'Esplanade', label: 'Esplanade' },
+    { value: 'Walk', label: 'Walk' },
 ];
+
+export const parseAustralianStreetAddress = (full: string) => {
+    if (!full || typeof full !== 'string') return {};
+    let text = full.trim().replace(/,\s*(?:AU|Australia)$/i, '').trim();
+
+    let unitNumber = '';
+    let flatOrUnitType = '';
+
+    // Check if starts with 'Unit 3,' or 'Suite 2,'
+    const commaUnitMatch = text.match(/^(unit|apt|apartment|flat|suite|lot)\s*([0-9a-zA-Z]+)\s*,\s*(.*)$/i);
+    if (commaUnitMatch) {
+        flatOrUnitType = commaUnitMatch[1].charAt(0).toUpperCase() + commaUnitMatch[1].slice(1).toLowerCase();
+        unitNumber = commaUnitMatch[2];
+        text = commaUnitMatch[3].trim();
+    }
+
+    const parts = text.split(',').map((p: string) => p.trim()).filter(Boolean);
+    let streetPart = parts[0] || '';
+
+    let suburb = '';
+    let state = '';
+    let postcode = '';
+
+    if (parts.length > 1) {
+        for (let i = 1; i < parts.length; i++) {
+            const p = parts[i];
+            const statePc = p.match(/\b(NSW|VIC|QLD|SA|WA|TAS|ACT|NT)\s+(\d{4})\b/i);
+            if (statePc) {
+                state = statePc[1].toUpperCase();
+                postcode = statePc[2];
+                const sub = p.replace(statePc[0], '').trim();
+                if (sub) suburb = sub;
+            } else {
+                const stOnly = p.match(/^(NSW|VIC|QLD|SA|WA|TAS|ACT|NT)$/i);
+                if (stOnly) state = stOnly[1].toUpperCase();
+                const pcOnly = p.match(/^(\d{4})$/);
+                if (pcOnly) postcode = pcOnly[1];
+                if (!stOnly && !pcOnly && !suburb) suburb = p;
+            }
+        }
+    }
+
+    if (!unitNumber) {
+        const slashMatch = streetPart.match(/^([0-9a-zA-Z]+)\s*\/\s*(.*)$/);
+        if (slashMatch) {
+            unitNumber = slashMatch[1];
+            streetPart = slashMatch[2].trim();
+        } else {
+            const unitPrefixMatch = streetPart.match(/^(unit|apt|apartment|flat|suite|lot)\s*([0-9a-zA-Z]+)[\s,\/]+(.*)$/i);
+            if (unitPrefixMatch) {
+                flatOrUnitType = unitPrefixMatch[1].charAt(0).toUpperCase() + unitPrefixMatch[1].slice(1).toLowerCase();
+                unitNumber = unitPrefixMatch[2];
+                streetPart = unitPrefixMatch[3].trim();
+            }
+        }
+    }
+
+    let streetNumber = '';
+    let houseNumberSuffix = '';
+    let streetRest = streetPart;
+
+    const numMatch = streetPart.match(/^(\d+(?:-\d+)?)\s*([a-zA-Z])?\s+(.*)$/);
+    if (numMatch) {
+        streetNumber = numMatch[1];
+        houseNumberSuffix = numMatch[2] ? numMatch[2].toUpperCase() : '';
+        streetRest = numMatch[3].trim();
+    }
+
+    const typeMapping: Record<string, string> = {
+        'st': 'Street', 'street': 'Street',
+        'rd': 'Road', 'road': 'Road',
+        'ave': 'Avenue', 'avenue': 'Avenue',
+        'dr': 'Drive', 'drive': 'Drive',
+        'ct': 'Court', 'court': 'Court',
+        'pl': 'Place', 'place': 'Place',
+        'cres': 'Crescent', 'crescent': 'Crescent',
+        'way': 'Way',
+        'ln': 'Lane', 'lane': 'Lane',
+        'blvd': 'Boulevard', 'boulevard': 'Boulevard',
+        'pde': 'Parade', 'parade': 'Parade',
+        'cct': 'Circuit', 'circuit': 'Circuit',
+        'cl': 'Close', 'close': 'Close',
+        'tce': 'Terrace', 'terrace': 'Terrace',
+        'hwy': 'Highway', 'highway': 'Highway',
+        'gr': 'Grove', 'grove': 'Grove',
+        'esp': 'Esplanade', 'esplanade': 'Esplanade',
+        'walk': 'Walk'
+    };
+
+    const shortTypeMapping: Record<string, string> = {
+        'street': 'St', 'st': 'St',
+        'road': 'Rd', 'rd': 'Rd',
+        'avenue': 'Ave', 'ave': 'Ave',
+        'drive': 'Dr', 'dr': 'Dr',
+        'court': 'Ct', 'ct': 'Ct',
+        'place': 'Pl', 'pl': 'Pl',
+        'crescent': 'Cres', 'cres': 'Cres',
+        'way': 'Way',
+        'lane': 'Ln', 'ln': 'Ln',
+        'boulevard': 'Blvd', 'blvd': 'Blvd',
+        'parade': 'Pde', 'pde': 'Pde',
+        'circuit': 'Cct', 'cct': 'Cct',
+        'close': 'Cl', 'cl': 'Cl',
+        'terrace': 'Tce', 'tce': 'Tce',
+        'highway': 'Hwy', 'hwy': 'Hwy',
+        'grove': 'Gr', 'gr': 'Gr',
+        'esplanade': 'Esp', 'esp': 'Esp',
+        'walk': 'Walk'
+    };
+
+    const words = streetRest.split(/\s+/);
+    let streetType = '';
+    let streetTypeShort = '';
+    let streetName = streetRest;
+
+    if (words.length > 1) {
+        const lastWord = words[words.length - 1].toLowerCase();
+        if (typeMapping[lastWord]) {
+            streetType = typeMapping[lastWord];
+            streetTypeShort = shortTypeMapping[lastWord] || streetType;
+            streetName = words.slice(0, words.length - 1).join(' ');
+        }
+    }
+
+    return {
+        unitNumber,
+        flatOrUnitType,
+        streetNumber: streetNumber + houseNumberSuffix,
+        streetName,
+        streetType,
+        streetTypeShort,
+        suburb,
+        state,
+        postcode
+    };
+};
 
 // ============================================================================
 // STEP BADGE COMPONENT
@@ -864,6 +1024,37 @@ export const CustomerFormPage = () => {
         if (customerData?.customer && initializedFormForUid.current !== uid) {
             const c = customerData.customer;
 
+            const addr = c.address || {};
+            let unitNumber = addr.unitNumber || '';
+            let houseNumber = addr.houseNumber || '';
+            let houseNumberSuffix = addr.houseNumberSuffix || '';
+            let buildingName = addr.buildingName || '';
+            let floorLevelNumber = addr.floorLevelNumber || '';
+            let streetNumber = addr.streetNumber || '';
+            let streetName = addr.streetName || '';
+            let streetType = addr.streetType || '';
+            let suburb = addr.suburb || '';
+            let state = addr.state || '';
+            let flatOrUnitType = addr.flatOrUnitType || '';
+            let gnafPid = addr.gnafPid || '';
+            let postcode = addr.postcode || '';
+            let country = addr.country || 'Australia';
+            let nmi = addr.nmi || '';
+
+            // Auto-fallback: if streetNumber or streetName is missing, parse from fullAddress
+            const rawFullAddr = addr.fullAddress || (c as any).fullAddress || addr.address;
+            if ((!streetNumber || !streetName) && rawFullAddr) {
+                const parsed = parseAustralianStreetAddress(rawFullAddr);
+                if (!streetNumber && parsed.streetNumber) streetNumber = parsed.streetNumber;
+                if (!streetName && parsed.streetName) streetName = parsed.streetName;
+                if (!streetType && (parsed.streetTypeShort || parsed.streetType)) streetType = parsed.streetTypeShort || parsed.streetType;
+                if (!unitNumber && parsed.unitNumber) unitNumber = parsed.unitNumber;
+                if (!flatOrUnitType && parsed.flatOrUnitType) flatOrUnitType = parsed.flatOrUnitType;
+                if (!suburb && parsed.suburb) suburb = parsed.suburb;
+                if (!state && parsed.state) state = parsed.state;
+                if (!postcode && parsed.postcode) postcode = parsed.postcode;
+            }
+
             setFormData({
                 title: c.title || '',
                 firstName: c.firstName || '',
@@ -885,21 +1076,21 @@ export const CustomerFormPage = () => {
                 abn: c.abn || '',
                 showAsBusinessName: c.showAsBusinessName || false,
                 showName: c.showName ?? true,
-                unitNumber: c.address?.unitNumber || '',
-                houseNumber: c.address?.houseNumber || '',
-                houseNumberSuffix: c.address?.houseNumberSuffix || '',
-                buildingName: c.address?.buildingName || '',
-                floorLevelNumber: c.address?.floorLevelNumber || '',
-                streetNumber: c.address?.streetNumber || '',
-                streetName: c.address?.streetName || '',
-                streetType: c.address?.streetType || '',
-                suburb: c.address?.suburb || '',
-                state: c.address?.state || '',
-                flatOrUnitType: c.address?.flatOrUnitType || '',
-                gnafPid: c.address?.gnafPid || '',
-                postcode: c.address?.postcode || '',
-                country: c.address?.country || 'Australia',
-                nmi: c.address?.nmi || '',
+                unitNumber,
+                houseNumber,
+                houseNumberSuffix,
+                buildingName,
+                floorLevelNumber,
+                streetNumber,
+                streetName,
+                streetType,
+                suburb,
+                state,
+                flatOrUnitType,
+                gnafPid,
+                postcode,
+                country,
+                nmi,
                 hasSolar: c.solarDetails?.hassolar === 1 || c.vppDetails?.vpp === 1,
                 solarCapacity: c.solarDetails?.solarcapacity?.toString() || '',
                 inverterCapacity: c.solarDetails?.invertercapacity?.toString() || '',

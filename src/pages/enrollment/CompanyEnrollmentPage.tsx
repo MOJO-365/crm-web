@@ -18,6 +18,7 @@ import { TITLE_OPTIONS, STATE_OPTIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { BASE_API_URL } from '@/lib/apollo';
 import LocationAutocomplete from '@/pages/LocationAutocomplete';
+import { parseAustralianStreetAddress } from '@/pages/customer/CustomerFormPage';
 
 interface CompanyInfo {
     name: string;
@@ -96,6 +97,12 @@ export const CompanyEnrollmentPage = () => {
         email: '',
         mobile: '',
         streetAddress: '',
+        unitNumber: '',
+        streetNumber: '',
+        streetName: '',
+        streetType: '',
+        gnafPid: '',
+        dpid: '',
         suburb: '',
         state: 'NSW',
         postcode: '',
@@ -266,6 +273,12 @@ export const CompanyEnrollmentPage = () => {
             // User requirement: "No need to take 0 add by default add while saving in db"
             const dbMobile = `0${rawDigits}`; // e.g. "0451254154"
 
+            const parsed = parseAustralianStreetAddress(formData.streetAddress);
+            const streetNumber = formData.streetNumber || parsed.streetNumber || '';
+            const streetName = formData.streetName || parsed.streetName || '';
+            const streetType = formData.streetType || parsed.streetType || '';
+            const unitNumber = formData.unitNumber || parsed.unitNumber || '';
+
             const payload = {
                 title: formData.title || 'Mr',
                 firstname: formData.firstname.trim(),
@@ -276,12 +289,25 @@ export const CompanyEnrollmentPage = () => {
                 number: dbMobile,
                 address: {
                     street: formData.streetAddress.trim(),
+                    unitNumber: unitNumber || undefined,
+                    streetNumber: streetNumber || undefined,
+                    streetName: streetName || undefined,
+                    streetType: streetType || undefined,
+                    gnafPid: formData.gnafPid || undefined,
+                    dpid: formData.dpid || undefined,
                     suburb: formData.suburb.trim(),
                     state: formData.state,
                     postcode: formData.postcode.trim(),
                     address: fullAddress,
                     fullAddress: fullAddress
                 },
+                streetNumber: streetNumber || undefined,
+                streetName: streetName || undefined,
+                streetType: streetType || undefined,
+                unitNumber: unitNumber || undefined,
+                suburb: formData.suburb.trim(),
+                state: formData.state,
+                postcode: formData.postcode.trim(),
                 fullAddress: fullAddress,
                 property_type: parseInt(formData.propertyType, 10),
                 isVpp: 1,
@@ -926,6 +952,12 @@ export const CompanyEnrollmentPage = () => {
                                     setFormData(prev => ({
                                         ...prev,
                                         streetAddress: fullStreet || place.address,
+                                        unitNumber: unitNumber,
+                                        streetNumber: (streetNumber + houseNumberSuffix).trim(),
+                                        streetName: place.streetName || '',
+                                        streetType: place.streetType || '',
+                                        gnafPid: place.gnafPid || '',
+                                        dpid: place.dpid || '',
                                         suburb: place.suburb || prev.suburb,
                                         state: matchedState || prev.state,
                                         postcode: place.postcode || prev.postcode

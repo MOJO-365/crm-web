@@ -12,6 +12,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { DateRangePicker } from '@/components/ui/DateRangePicker';
 // import { Switch } from '@/components/ui/Switch';
 import { StatusField } from '@/components/common';
 import BulkEmailModal from './BulkEmailModal';
@@ -20,7 +21,7 @@ import BulkAssignSalesRepModal from './BulkAssignSalesRepModal';
 import { DNSP_OPTIONS, DISCOUNT_OPTIONS, CUSTOMER_STATUS_OPTIONS, VPP_OPTIONS, VPP_CONNECTED_OPTIONS, ULTIMATE_STATUS_OPTIONS, MSAT_CONNECTED_OPTIONS } from '@/lib/constants';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { formatDateTime } from '@/lib/date';
+import { formatDate, formatTime, formatDateTime } from '@/lib/date';
 
 interface CustomerAddress {
     id: string;
@@ -127,6 +128,8 @@ interface SearchFilters {
     assignedTo: string;
     createdBy: string;
     portal: string;
+    startDate: string;
+    endDate: string;
 }
 const CUSTOMERS_FILTER_KEY = 'customers_search_filters';
 
@@ -147,6 +150,8 @@ const INITIAL_FILTERS: SearchFilters = {
     assignedTo: '',
     createdBy: '',
     portal: '',
+    startDate: '',
+    endDate: '',
 };
 
 export function CustomersPage() {
@@ -309,6 +314,8 @@ export function CustomersPage() {
             searchAssignedTo: debouncedFilters.assignedTo || undefined,
             searchCreatedBy: debouncedFilters.createdBy || undefined,
             searchPortal: debouncedFilters.portal || undefined,
+            startDate: debouncedFilters.startDate || undefined,
+            endDate: debouncedFilters.endDate || undefined,
             includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : ((debouncedFilters.status === '' && hasSearch) ? 'true' : 'false'),
         },
         fetchPolicy: 'network-only',
@@ -445,6 +452,8 @@ export function CustomersPage() {
                     searchRiskStatus: debouncedFilters.riskStatus || undefined,
                     searchAssignedTo: debouncedFilters.assignedTo || undefined,
                     searchPortal: debouncedFilters.portal || undefined,
+                    startDate: debouncedFilters.startDate || undefined,
+                    endDate: debouncedFilters.endDate || undefined,
                     includeDeleted: debouncedFilters.status === 'deleted' ? 'only' : ((debouncedFilters.status === '' && hasSearch) ? 'true' : 'false'),
                 },
             });
@@ -944,6 +953,64 @@ export function CustomersPage() {
                             {displayText}
                         </span>
                     </Tooltip>
+                );
+            },
+        },
+        {
+            key: 'createdAt',
+            header: (
+                <div className="flex flex-col gap-1 min-w-[170px]">
+                    <div className="h-7 flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                            (searchFilters.startDate || searchFilters.endDate) ? "text-primary" : "text-muted-foreground"
+                        )}>
+                            Created At
+                        </span>
+                        {(searchFilters.startDate || searchFilters.endDate) && (
+                            <div className="w-1 h-1 rounded-full bg-primary" />
+                        )}
+                    </div>
+                    <DateRangePicker
+                        value={
+                            searchFilters.startDate && searchFilters.endDate
+                                ? {
+                                    from: new Date(searchFilters.startDate + 'T00:00:00'),
+                                    to: new Date(searchFilters.endDate + 'T23:59:59')
+                                }
+                                : null
+                        }
+                        onChange={(range) => {
+                            if (range?.from && range?.to) {
+                                const pad = (n: number) => String(n).padStart(2, '0');
+                                const fromStr = `${range.from.getFullYear()}-${pad(range.from.getMonth() + 1)}-${pad(range.from.getDate())}`;
+                                const toStr = `${range.to.getFullYear()}-${pad(range.to.getMonth() + 1)}-${pad(range.to.getDate())}`;
+                                setSearchFilters(prev => ({ ...prev, startDate: fromStr, endDate: toStr }));
+                            } else {
+                                setSearchFilters(prev => ({ ...prev, startDate: '', endDate: '' }));
+                            }
+                        }}
+                        placeholder="Select range"
+                        isClearable={true}
+                        className={cn(
+                            "h-7 text-xs px-2 py-0 w-[160px] transition-all duration-200 font-normal",
+                            (searchFilters.startDate || searchFilters.endDate) && "border-primary ring-1 ring-primary/30 bg-primary/5"
+                        )}
+                    />
+                </div>
+            ),
+            width: 'w-[180px] min-w-[170px]',
+            render: (row) => {
+                if (!row.createdAt) return <span className="text-muted-foreground text-xs">-</span>;
+                return (
+                    <div className="flex flex-col whitespace-nowrap" title={formatDateTime(row.createdAt)}>
+                        <span className="font-medium text-foreground text-xs">
+                            {formatDate(row.createdAt)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                            {formatTime(row.createdAt)}
+                        </span>
+                    </div>
                 );
             },
         },

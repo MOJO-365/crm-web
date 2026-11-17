@@ -408,7 +408,9 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
         $searchRiskStatus: String,
         $searchAssignedTo: String,
         $searchPortal: String,
-        $includeDeleted: String
+        $includeDeleted: String,
+        $startDate: String,
+        $endDate: String
     ) {
         customersCursor(
             first: 10000, 
@@ -427,7 +429,9 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
             searchMsatConnected: $searchMsatConnected,
             searchAssignedTo: $searchAssignedTo,
             searchPortal: $searchPortal,
-            includeDeleted: $includeDeleted
+            includeDeleted: $includeDeleted,
+            startDate: $startDate,
+            endDate: $endDate
         ) {
             data {
                 uid
@@ -440,8 +444,8 @@ export const GET_ALL_FILTERED_CUSTOMER_IDS = gql`
 `;
 
 export const GET_CUSTOMERS_CURSOR = gql`
-    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: String, $searchVpp: Int, $searchVppConnected: Int, $searchVppApiPushed: Int, $searchUtilmateStatus: Int, $searchUtilmateApiPushed: Int, $searchMsatConnected: Int, $searchAssignedTo: String, $searchPortal: String, $searchSigned: Int, $includeDeleted: String, $isGlobalSearch: Boolean) {
-        customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchRiskStatus: $searchRiskStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchVppApiPushed: $searchVppApiPushed, searchUtilmateStatus: $searchUtilmateStatus, searchUtilmateApiPushed: $searchUtilmateApiPushed, searchMsatConnected: $searchMsatConnected, searchAssignedTo: $searchAssignedTo, searchPortal: $searchPortal, searchSigned: $searchSigned, includeDeleted: $includeDeleted, isGlobalSearch: $isGlobalSearch) {
+    query CustomersCursor($first: Int, $after: String, $search: String, $discount: Float, $status: Int, $searchId: String, $searchName: String, $searchMobile: String, $searchAddress: String, $searchTariff: String, $searchDnsp: String, $searchDiscount: Int, $searchStatus: Int, $searchRiskStatus: String, $searchVpp: Int, $searchVppConnected: Int, $searchVppApiPushed: Int, $searchUtilmateStatus: Int, $searchUtilmateApiPushed: Int, $searchMsatConnected: Int, $searchAssignedTo: String, $searchPortal: String, $searchSigned: Int, $includeDeleted: String, $isGlobalSearch: Boolean, $startDate: String, $endDate: String) {
+        customersCursor(first: $first, after: $after, search: $search, discount: $discount, status: $status, searchId: $searchId, searchName: $searchName, searchMobile: $searchMobile, searchAddress: $searchAddress, searchTariff: $searchTariff, searchDnsp: $searchDnsp, searchDiscount: $searchDiscount, searchStatus: $searchStatus, searchRiskStatus: $searchRiskStatus, searchVpp: $searchVpp, searchVppConnected: $searchVppConnected, searchVppApiPushed: $searchVppApiPushed, searchUtilmateStatus: $searchUtilmateStatus, searchUtilmateApiPushed: $searchUtilmateApiPushed, searchMsatConnected: $searchMsatConnected, searchAssignedTo: $searchAssignedTo, searchPortal: $searchPortal, searchSigned: $searchSigned, includeDeleted: $includeDeleted, isGlobalSearch: $isGlobalSearch, startDate: $startDate, endDate: $endDate) {
             data {
                 id
                 uid
