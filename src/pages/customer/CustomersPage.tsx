@@ -247,8 +247,8 @@ export function CustomersPage() {
         const companyOptions = (companyRefsData?.companyRefs || [])
             .filter((c: any) => c.isActive)
             .map((c: any) => ({
-                value: c.portalName || c.name,
-                label: c.name
+                value: c.portalName || c.code || c.name,
+                label: c.name || c.portalName || c.code
             }));
 
         const leadOptions = (sourcesData?.leadSources || []).map((s: any) => ({
@@ -826,6 +826,17 @@ export function CustomersPage() {
                         const matchedCred = webApiCredsData.webApiCredentials.find((c: any) => c.portalName === displayPortal && c.isPDRS);
                         if (matchedCred) {
                             displayPortal = matchedCred.name;
+                        }
+                    }
+
+                    if (companyRefsData?.companyRefs) {
+                        const matchedComp = companyRefsData.companyRefs.find((c: any) => 
+                            (c.portalName && c.portalName.toLowerCase() === displayPortal.toLowerCase()) || 
+                            (c.code && c.code.toLowerCase() === displayPortal.toLowerCase()) || 
+                            (c.name && c.name.toLowerCase() === displayPortal.toLowerCase())
+                        );
+                        if (matchedComp && matchedComp.name) {
+                            displayPortal = matchedComp.name;
                         }
                     }
                 }
