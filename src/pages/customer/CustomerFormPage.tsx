@@ -1953,7 +1953,7 @@ export const CustomerFormPage = () => {
             const significantChanges = hasSignificantChanges();
 
             let signatureClears = {};
-            if (isEditMode && significantChanges) {
+            if (isEditMode && !isUpdateOnly && significantChanges) {
                 signatureClears = {
                     signDate: null,
                     signedPdfPath: null,
@@ -2049,7 +2049,7 @@ export const CustomerFormPage = () => {
                 rateVersion: activeVersionForLookup || activeRateVersion,
                 customerId: isEditMode ? undefined : generatedCustomerId,
                 triggerWelcomeEmail: (!isUpdateOnly && !isPdrs) ? ((!isEditMode && finalStatus === 2) || isWithoutSignature) : undefined,
-                triggerUpdateEmail: (isEditMode && !isPdrs) ? (isUpdateOnly ? significantChanges : !isWithoutSignature) : undefined,
+                triggerUpdateEmail: (isEditMode && !isPdrs && !isUpdateOnly) ? (!isWithoutSignature) : undefined,
                 isWithoutSignature: isWithoutSignature || undefined,
                 selectedBonuses: formData.selectedBonuses,
                 leadUid: prefillLeadUid || undefined,
