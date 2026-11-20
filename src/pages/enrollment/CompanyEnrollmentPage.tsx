@@ -79,6 +79,26 @@ const getWebRestApiBase = () => {
     return raw.endsWith('/api') ? raw : `${raw}/api`;
 };
 
+const INITIAL_ENROLLMENT_FORM_DATA = {
+    title: 'Mr',
+    firstname: '',
+    lastname: '',
+    email: '',
+    mobile: '',
+    streetAddress: '',
+    unitNumber: '',
+    streetNumber: '',
+    streetName: '',
+    streetType: '',
+    gnafPid: '',
+    dpid: '',
+    suburb: '',
+    state: 'NSW',
+    postcode: '',
+    propertyType: '0', // 0 = Residential, 1 = Commercial
+    agreed: false
+};
+
 export const CompanyEnrollmentPage = () => {
     const { code } = useParams<{ code: string }>();
 
@@ -90,25 +110,7 @@ export const CompanyEnrollmentPage = () => {
     const [currentView, setCurrentView] = useState<'overview' | 'step1' | 'step2'>('overview');
 
     // Form fields
-    const [formData, setFormData] = useState({
-        title: 'Mr',
-        firstname: '',
-        lastname: '',
-        email: '',
-        mobile: '',
-        streetAddress: '',
-        unitNumber: '',
-        streetNumber: '',
-        streetName: '',
-        streetType: '',
-        gnafPid: '',
-        dpid: '',
-        suburb: '',
-        state: 'NSW',
-        postcode: '',
-        propertyType: '0', // 0 = Residential, 1 = Commercial
-        agreed: false
-    });
+    const [formData, setFormData] = useState(INITIAL_ENROLLMENT_FORM_DATA);
 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
@@ -445,19 +447,7 @@ export const CompanyEnrollmentPage = () => {
                         onClick={() => {
                             setSubmittedUid(null);
                             setCurrentView('overview');
-                            setFormData({
-                                title: 'Mr',
-                                firstname: '',
-                                lastname: '',
-                                email: '',
-                                mobile: '',
-                                streetAddress: '',
-                                suburb: '',
-                                state: 'NSW',
-                                postcode: '',
-                                propertyType: '0',
-                                agreed: false
-                            });
+                            setFormData(INITIAL_ENROLLMENT_FORM_DATA);
                         }}
                         variant="outline"
                         className="w-full rounded-xl h-11 text-xs font-semibold"
@@ -956,8 +946,8 @@ export const CompanyEnrollmentPage = () => {
                                         streetNumber: (streetNumber + houseNumberSuffix).trim(),
                                         streetName: place.streetName || '',
                                         streetType: place.streetType || '',
-                                        gnafPid: place.gnafPid || '',
-                                        dpid: place.dpid || '',
+                                        gnafPid: (place as any).gnafPid || '',
+                                        dpid: (place as any).dpid || '',
                                         suburb: place.suburb || prev.suburb,
                                         state: matchedState || prev.state,
                                         postcode: place.postcode || prev.postcode
